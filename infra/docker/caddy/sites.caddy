@@ -73,6 +73,11 @@
 	# canonical locale URLs end with a slash (trailingSlash export)
 	@locale_noslash path /ru /en /es /zh
 	redir @locale_noslash {path}/ 308
+	# Bot API page moved into /developers/ (landing v6): /<locale>/bots/ → /<locale>/developers/, a bare /bots/ → English.
+	@bots_page path_regexp bots ^/(ru|en|es|zh)/bots/?$
+	redir @bots_page /{re.bots.1}/developers/ 301
+	@bots_bare path /bots /bots/
+	redir @bots_bare /en/developers/ 301
 	handle {
 		root * /srv/landing
 		encode zstd gzip
