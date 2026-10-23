@@ -452,6 +452,14 @@ export class MailStore {
     return rows.map((r) => str(r['id']));
   }
 
+  /** Messages of a folder not yet seen (id, thread). */
+  unseenInFolder(row: number): Array<{ id: string; threadId: string }> {
+    return this.db
+      .prepare('SELECT id, thread_id FROM messages WHERE folder_row = ? AND seen = 0')
+      .all(row)
+      .map((r) => ({ id: str(r['id']), threadId: str(r['thread_id']) }));
+  }
+
   folderCounts(row: number): { unread: number; total: number } {
     const r = this.db.prepare('SELECT COUNT(*) AS total, COALESCE(SUM(seen = 0), 0) AS unread FROM messages WHERE folder_row = ?').get(row);
     return { unread: num(r?.['unread']), total: num(r?.['total']) };

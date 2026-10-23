@@ -1,6 +1,6 @@
 import * as ContextMenu from '../../components/radix/context-menu';
 import * as Dropdown from '../../components/radix/dropdown-menu';
-import { Archive, BrushCleaning, Check, ChevronDown, Flag, FolderInput, Forward, ListFilter, Mail, MailOpen, MessageSquareShare, PanelLeft, Paperclip, Plus, Reply, ReplyAll, RotateCw, Search, Trash2, TriangleAlert, X } from 'lucide-react';
+import { Archive, BrushCleaning, Check, ChevronDown, Flag, FolderInput, Forward, ListFilter, Mail, MailCheck, MailOpen, MessageSquareShare, PanelLeft, Paperclip, Plus, Reply, ReplyAll, RotateCw, Search, Trash2, TriangleAlert, X } from 'lucide-react';
 import { forwardRef, memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useShallow } from 'zustand/react/shallow';
@@ -35,12 +35,13 @@ import {
   trashBox,
   useMail,
   type MailBox,
+  markAllReadCount,
 } from '../../stores/mail';
 import { clearPicked, pickRange, togglePick, useMailUi } from '../../stores/mailUi';
 import { toast } from '../../stores/toasts';
 import { ColumnHeader, ROW_HOVER, ROW_SELECTED } from '../shell/ColumnHeader';
 import { menuBox, menuItem, menuLabel, menuSeparator } from '../shell/menu';
-import { MAIL_KEYS, composeNew, deleteKeysForever, emptyTrash, moveKeys, replyOpen, toggleRowsFlag, toggleRowsRead } from './actions';
+import { MAIL_KEYS, composeNew, markAllRead, deleteKeysForever, emptyTrash, moveKeys, replyOpen, toggleRowsFlag, toggleRowsRead } from './actions';
 import { pickedSummary } from './BatchView';
 import { useMoveTargets } from './MailMessageView';
 import { MailStatusFooter } from './MailStatusFooter';
@@ -60,6 +61,7 @@ export function MailColumn(): ReactNode {
     <aside className="mat-sidebar mat-sidebar-window island-fade flex w-[clamp(300px,30vw,380px)] shrink-0 flex-col border-r border-line" aria-label={t('mbox.list')} data-testid="mail-column">
       <ColumnHeader title={<BoxSwitcher />}>
         <SidebarToggle />
+        <MarkAllReadButton />
         <EmptyTrashButton />
         <SyncControl />
         <CreateButton label={t('mbox.compose')} data-testid="mail-compose" onClick={composeNew} />
@@ -106,6 +108,21 @@ const SyncControl = memo(function SyncControl(): ReactNode {
         </IconButton>
       )}
     </>
+  );
+});
+
+/**
+ * «Прочитать все» (#231): a quiet icon button while the shown folder (or «Все входящие») has unread
+ * mail. A leaf on one primitive selector: only the unread count of the box re-renders it.
+ */
+const MarkAllReadButton = memo(function MarkAllReadButton(): ReactNode {
+  useLocale();
+  const n = useMail((s) => markAllReadCount(s, s.box));
+  if (n === 0) return null;
+  return (
+    <IconButton label={t('mbox.markAll')} shortcut={MAIL_KEYS.markAll} onClick={() => void markAllRead()} data-testid="mail-mark-all-read">
+      <MailCheck className="size-4" strokeWidth={1.75} />
+    </IconButton>
   );
 });
 

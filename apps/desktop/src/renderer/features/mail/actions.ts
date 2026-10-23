@@ -1,7 +1,7 @@
 import { confirmAction } from '../../components/Confirm';
 import { plural, t } from '../../i18n';
 import { toast } from '../../stores/toasts';
-import { emptyFolder, inTrash, moveMessages, moveRows, openRow, setMessageFlags, setRowFlags, useMail, type MoveOp } from '../../stores/mail';
+import { emptyFolder, inTrash, markAllReadCount, markAllReadTargets, markFoldersRead, type MailBox, moveMessages, moveRows, openRow, setMessageFlags, setRowFlags, useMail, type MoveOp } from '../../stores/mail';
 import { actionKeys, clearPicked, useMailUi } from '../../stores/mailUi';
 
 /**
@@ -109,6 +109,18 @@ export async function emptyTrash(folderId: string, total: number): Promise<void>
   if (ok && (await emptyFolder(folderId))) toast.success(t('mbox.trash.emptied'));
 }
 
+/** «Прочитать все»: confirmed above 20 unread («Отметить N писем прочитанными?»); the unified box marks every account's inbox. */
+export async function markAllRead(box: MailBox = useMail.getState().box): Promise<void> {
+  const s = useMail.getState();
+  const targets = markAllReadTargets(s, box);
+  const n = markAllReadCount(s, box);
+  if (!targets.length) return;
+  if (n > MARK_ALL_CONFIRM_ABOVE && !(await confirmAction(t('mbox.markAll'), plural('mbox.markAllConfirm', n), t('mbox.markAllOk')))) return;
+  if (await markFoldersRead(targets.map((f) => f.id))) toast.success(t('mbox.markAllDone'));
+}
+
+const MARK_ALL_CONFIRM_ABOVE = 20;
+
 /** Marks the open message, the next auto-read must not undo it (see `noteManualRead`). */
 export function toggleOpenRead(): void {
   const many = multi();
@@ -176,6 +188,8 @@ export const MAIL_KEYS = {
   trash: MAC ? '⌘⌫' : 'Delete',
   unread: combo('U', true),
   flag: combo('L', true),
+  /** Mark all in the shown folder read (#231): ⌥⇧⌘U / Ctrl+Alt+Shift+U, next to ⇧⌘U. */
+  markAll: MAC ? '⌥⇧⌘U' : 'Ctrl+Alt+Shift+U',
   /** ⌃⌘A is macOS-only (no Ctrl+Meta elsewhere): no hint there. */
   archive: MAC ? '⌃⌘A' : '',
   send: MAC ? '⌘↩' : 'Ctrl+Enter',

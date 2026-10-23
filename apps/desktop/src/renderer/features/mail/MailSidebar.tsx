@@ -1,4 +1,4 @@
-import { Archive, BrushCleaning, ChevronRight, FileText, Folder, FolderPlus, FolderSearch, Inbox, OctagonAlert, PanelLeft, Pencil, Plus, RotateCw, Send, SendHorizontal, Star, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { Archive, BrushCleaning, ChevronRight, FileText, Folder, FolderPlus, FolderSearch, Inbox, MailCheck, OctagonAlert, PanelLeft, Pencil, Plus, RotateCw, Send, SendHorizontal, Star, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { MailFolderRef, MailFolderRole } from '../../../shared/mail';
@@ -9,7 +9,7 @@ import { boxUnread, refKey, selectBox, syncNow, useMail, type MailBox } from '..
 import { useMailUi } from '../../stores/mailUi';
 import { ColumnHeader, ColumnTitle, GROUP_LABEL, GroupChevron, ROW_HOVER, ROW_SELECTED } from '../shell/ColumnHeader';
 import { menuBox, menuItem, menuSeparator } from '../shell/menu';
-import { emptyTrash } from './actions';
+import { emptyTrash, markAllRead } from './actions';
 import { deleteFolder, deleteSmartFolder } from './folderActions';
 import { canHoldFolders, folderTree, isOwnFolder } from './folderTree';
 import { allLabel, folderLabel } from './format';
@@ -326,6 +326,12 @@ function MenuItems({ target }: { target: NonNullable<MenuTarget> }): ReactNode {
         <ContextMenu.Item className={menuItem} onSelect={() => ui.openFolderDialog({ kind: 'create', accountId: folder.accountId, parentId: folder.id, smart: false })} data-testid="mail-menu-new-subfolder">
           <FolderPlus className="size-4" aria-hidden />
           {t('mbox.folders.newSub')}
+        </ContextMenu.Item>
+      ) : null}
+      {folder.unread > 0 && folder.path ? (
+        <ContextMenu.Item className={menuItem} onSelect={() => void markAllRead({ scope: folder.accountId, folder: { id: folder.id } })} data-testid="mail-menu-mark-all-read">
+          <MailCheck className="size-4" aria-hidden />
+          {t('mbox.markAll')}
         </ContextMenu.Item>
       ) : null}
       {folder.role === 'trash' ? (

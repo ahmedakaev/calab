@@ -19,6 +19,26 @@ test('mail-folders', async ({ open, win, shot }) => {
   await expect(sidebar.getByTestId('mail-sidebar-account')).toHaveCount(2);
   await checkpoint(shot, 'mail-sidebar');
 
+  // #231 «Прочитать все»: the header button over «Все входящие» (unread mail), the folder context
+  // menu, then the counters and the unread dots are gone.
+  const markAll = win.getByTestId('mail-mark-all-read');
+  await expect(markAll).toBeVisible();
+  await expect(win.locator('[data-testid="mail-row"][data-unread]').first()).toBeVisible();
+  await checkpoint(shot, 'mail-mark-all-header');
+  await sidebar.getByTestId('mail-sidebar-account').first().getByTestId('mail-sidebar-row').first().click({ button: 'right' });
+  await expect(win.getByTestId('mail-menu-mark-all-read')).toBeVisible();
+  await checkpoint(shot, 'mail-mark-all-menu');
+  await win.keyboard.press('Escape');
+  await markAll.click();
+  const confirm = win.getByRole('alertdialog');
+  if (await confirm.isVisible().catch(() => false)) {
+    await checkpoint(shot, 'mail-mark-all-confirm');
+    await confirm.getByRole('button').last().click();
+  }
+  await expect(markAll).toHaveCount(0);
+  await expect(win.locator('[data-testid="mail-row"][data-unread]')).toHaveCount(0);
+  await checkpoint(shot, 'mail-mark-all-after');
+
   // The switcher: unified boxes, then one submenu per account (no flat list of every folder).
   await win.getByTestId('mail-box-switcher').click();
   await expect(win.getByTestId('mail-box-account')).toHaveCount(2);

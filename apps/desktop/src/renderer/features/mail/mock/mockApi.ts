@@ -465,6 +465,20 @@ export function createMockMailApi(opts: MockMailOptions = {}): MailApi {
         emitRows('messages_changed', touched, list.map((m) => m.id));
         emitFolders(f.accountId);
       },
+      markAllRead: async (fid) => {
+        const f = folder(fid);
+        if (!f.path) fail('INVALID', 'only real folders can be marked read');
+        const touched = new Map<string, Set<string>>();
+        const ids: string[] = [];
+        for (const m of inFolder(f)) {
+          if (m.seen) continue;
+          m.seen = true;
+          touch(touched, m);
+          ids.push(m.id);
+        }
+        if (ids.length) emitRows('messages_changed', touched, ids);
+        emitFolders(f.accountId);
+      },
       // CBF-39 / CBF-56: a folder, top-level or under `parentId` (the engine's name checks, simplified); offline account → NETWORK.
       create: async (accountId, name, parentId) => {
         const a = account(accountId);
