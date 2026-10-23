@@ -693,7 +693,10 @@ class VoiceEngine {
         await this.publishMic();
       }
       this.startStats();
-      this.pushSelfState();
+      // A seat kept with «on the phone» (ADR-0133: a reload during the call, or a lost parked
+      // connection joined anew — the idempotent /join keeps the flag): I am back, clear it.
+      const sv = useWorkspaces.getState().byId[workspaceId]?.voice[this.myId()];
+      this.pushSelfState(sv?.roomId === roomId && sv.onPhone ? { onPhone: false } : {});
       this.refreshStreams();
       this.refreshCameras();
       this.camerasPrimed = true;
@@ -1404,6 +1407,9 @@ class VoiceEngine {
     if (!room && !this.room) return;
     log.info('voice: another tab of this session joined voice, leaving here');
     this.tabClaim = null;
+    // The seat is the other tab's now (same LiveKit identity): a parked room must not come
+    // back here when the phone session below ends (ADR-0133).
+    this.dropParked(false);
     this.takenOverRoom = room; // a one-to-one call goes on in the other tab (services/call.ts)
     toast.info(t('mediaErr.voice.duplicate'));
     void this.leave(false, false);

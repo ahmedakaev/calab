@@ -131,6 +131,8 @@ export function removeRoom(workspaceId: string, roomId: string): void {
   dropSipCalls((r) => r === roomId);
   useInbox.getState().removeRooms((id) => id !== roomId);
   if (inVoice) void voice.leave();
+  // Parked by a phone call (ADR-0133): not to be resumed into a room that is gone.
+  if (useVoice.getState().parked?.roomId === roomId) voice.leaveParked();
 }
 
 // A request about a live room answered 410 ROOM_ARCHIVED (a temporary room closed meanwhile, the
@@ -385,6 +387,7 @@ export function applyDispatch(ev: DispatchEvent): void {
       useWiki.getState().dropWorkspace(id);
       useCanvas.getState().dropWorkspace(id);
       if (useVoice.getState().workspaceId === id) void voice.leave();
+      if (useVoice.getState().parked?.workspaceId === id) voice.leaveParked(); // ADR-0133
       if (useUi.getState().activeWorkspaceId === id) useUi.getState().setWorkspace(null);
       ensureActiveWorkspace();
       dropStaleWorkspaceBackground();

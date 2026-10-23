@@ -1789,7 +1789,7 @@ describe('musician mode (ADR-0052)', () => {
     const { useWorkspaces } = await import('../stores/workspaces');
     const { setMusicianMode } = await import('./musician');
     const plan = (free: boolean) => create(WorkspacePlanSchema, { plan: free ? Plan.FREE : Plan.TEAM, limits: create(PlanLimitsSchema, { musicianDisabled: free }) });
-    useWorkspaces.setState({ byId: { free: { ws: { plan: plan(true) } }, team: { ws: { plan: plan(false) } } } as never });
+    useWorkspaces.setState({ byId: { free: { ws: { plan: plan(true) }, voice: {} }, team: { ws: { plan: plan(false) }, voice: {} } } as never });
     const locked = 'Доступно на тарифе Team и выше';
     await voice.join('A', 'free');
     pushToast.mockClear();
@@ -2430,6 +2430,18 @@ describe('a phone call parks the room (ADR-0133)', () => {
     await settle();
     expect(useVoice.getState()).toMatchObject({ roomId: 'A', phase: 'connected' });
     expect(joinVoice.mock.calls.map((c) => c[0])).toEqual(['A', 'A']);
+  });
+
+  it('a seat kept «on the phone» (reload during the call, idempotent /join): the connect clears the flag', async () => {
+    const { useWorkspaces } = await import('../stores/workspaces');
+    const { useSession } = await import('../stores/session');
+    useSession.setState({ me: { user: { id: 'u1' } } } as never);
+    useWorkspaces.setState({ byId: { ws: { ws: {}, voice: { u1: { userId: 'u1', roomId: 'A', onPhone: true } } } } as never });
+    await voice.join('A', 'ws', { resumed: true });
+    await settle();
+    expect(updateSelf).toHaveBeenLastCalledWith(expect.objectContaining({ onPhone: false }));
+    await voice.leave();
+    useWorkspaces.setState({ byId: {} });
   });
 
   it('nothing to park in a one-to-one call: the caller leaves it as before', async () => {
