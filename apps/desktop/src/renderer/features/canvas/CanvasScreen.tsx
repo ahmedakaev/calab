@@ -1,6 +1,6 @@
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragMoveEvent, type DragStartEvent } from '@dnd-kit/core';
 import { WorkspaceRole, canvasPermissions } from '@calaba/protocol';
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MOD } from '../../components/ui';
 import { t } from '../../i18n';
@@ -81,7 +81,7 @@ export function CanvasScreen({ workspaceId }: { workspaceId: string }): ReactNod
           field's left: the left-anchored controls start 8 px right of it (`--canvas-left`, view/Toolbar.tsx). */}
       <section
         className="mat-content relative flex min-w-0 flex-1"
-        style={collapsed ? ({ ['--canvas-left' as string]: 'var(--sidebar-width)' } as CSSProperties) : undefined}
+        style={collapsed ? { ['--canvas-left' as string]: 'var(--sidebar-width)' } : undefined}
         aria-label={t('canvas.section')}
         data-testid="canvas"
       >
