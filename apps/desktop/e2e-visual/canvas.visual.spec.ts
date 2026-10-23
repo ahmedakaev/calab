@@ -215,6 +215,23 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await win.getByTestId('canvas-share-tabs').getByRole('radio', { name: 'Ссылка' }).click();
   await expect(dialog.getByTestId('canvas-link-private')).toBeVisible();
 
+  // 6b. «Отправить в чат» (owner 23.10): from the «⋯» menu, the share dialog gives way to the chat picker;
+  // the card of the sent link in the feed (dark and light), and the card of a canvas that is not mine to see.
+  await win.getByTestId('canvas-share-send').click();
+  await expect(win.getByTestId('forward-dialog')).toBeVisible();
+  await checkpoint(shot, 'canvas-send');
+  await win.keyboard.press('Escape');
+  const board = [...mock.canvas.items.values()].find((i) => i.name === 'Дорожная карта Q1');
+  expect(board).toBeTruthy();
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: `Посмотрите доску ${mock.url}/canvas/${board?.id ?? ''}` });
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.boris, content: `А эта удалена ${mock.url}/canvas/00000000-0000-4000-8000-00000000dead` });
+  await win.getByTestId('section-chats').click();
+  await win.locator('aside').getByRole('button', { name: /общий/ }).first().click();
+  await expect(win.getByTestId('canvas-link-card').first()).toHaveAttribute('data-state', 'page');
+  await expect(win.getByTestId('canvas-link-card').last()).toHaveAttribute('data-state', 'unavailable');
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'canvas-chat-card');
+
   if (theme === 'dark') {
     // 6a. «Ссылка» of a canvas that can have one: turned on, the address, the term and the views.
     await open();

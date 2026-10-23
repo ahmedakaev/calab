@@ -14,7 +14,7 @@ vi.mock('./wiki', () => ({ openWikiLink }));
 const openDiskLink = vi.hoisted(() => vi.fn());
 vi.mock('./diskLink', () => ({ openDiskLink }));
 
-const { INVITE_EXAMPLE_CODE, diskItemUrl, handleDeepLink, inviteUrl, joinPlaceholder, openOwnLink, ownDiskItemId, ownWikiPageId, parseBoardLink, parseDiskLink, parseDmLink, parseEventLink, parseInviteCode, parseMessageLink, parseRoomInviteCode, parseWikiLink, roomInviteUrl, wikiPageUrl } = await import('./links');
+const { INVITE_EXAMPLE_CODE, diskItemUrl, handleDeepLink, inviteUrl, joinPlaceholder, openOwnLink, ownDiskItemId, ownWikiPageId, parseBoardLink, parseCanvasLink, parseDiskLink, parseDmLink, parseEventLink, parseInviteCode, parseMessageLink, parseRoomInviteCode, parseWikiLink, roomInviteUrl, wikiPageUrl } = await import('./links');
 
 describe('DM links (ADR-0020)', () => {
   const ID = '00000000-0000-7000-8003-000000000021';
@@ -177,6 +177,11 @@ describe('wiki page links (owner 14.10)', () => {
     expect(parseWikiLink(`https://app.calab.io/wiki/${P}`)).toBe(P);
     expect(parseWikiLink(`calab://wiki/${P.toUpperCase()}/`)).toBe(P);
     expect(parseWikiLink(`/wiki/${P}`)).toBeNull();
+    expect(parseCanvasLink(`https://app.calab.io/canvas/${P}`)).toBe(P);
+    expect(parseCanvasLink(`calab://canvas/${P.toUpperCase()}/`)).toBe(P);
+    expect(parseCanvasLink('https://app.calab.io/c/mockCanvasCode')).toBeNull();
+    expect(parseCanvasLink(`/canvas/${P}`)).toBeNull();
+    expect(parseWikiLink(`https://app.calab.io/canvas/${P}`)).toBeNull();
     expect(parseWikiLink(`https://app.calab.io/w/${P}`)).toBeNull();
     expect(parseWikiLink('https://app.calab.io/wiki/abc')).toBeNull();
   });

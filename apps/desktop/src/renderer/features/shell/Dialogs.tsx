@@ -10,6 +10,7 @@ import { StreamPicker } from '../voice/StreamPicker';
 import { QuickSwitcher } from './QuickSwitcher';
 import { NewDmDialog } from '../dm/NewDmDialog';
 import { ForwardDialog } from '../chat/ForwardDialog';
+import { sendCanvasToChats } from '../../services/canvasLink';
 import { sendPageToChats } from '../../services/wiki';
 import { isFolder } from '../../lib/disk';
 import { sendDiskItemToChats } from '../../services/diskLink';
@@ -104,6 +105,19 @@ export function Dialogs(): ReactNode {
             description={t('wiki.send.hint')}
             comment
             onSend={(targets, comment) => sendPageToChats(d.pageId, targets, comment)}
+          />
+        );
+        break;
+      case 'canvas-send':
+        node = (
+          <ForwardDialog
+            roomId=""
+            messageId=""
+            onClose={close}
+            title={t('canvas.send.title')}
+            description={t('canvas.send.hint')}
+            comment
+            onSend={(targets, comment) => sendCanvasToChats(d.itemId, targets, comment)}
           />
         );
         break;

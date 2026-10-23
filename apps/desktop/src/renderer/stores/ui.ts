@@ -47,6 +47,8 @@ export type Dialog =
   | { kind: 'forward'; roomId: string; messageId: string }
   /** «Отправить в чат…» of a wiki page (owner 14.10): the forward picker sends the page's address (+ a comment). */
   | { kind: 'wiki-send'; pageId: string }
+  /** «Отправить в чат…» of a canvas (owner 23.10): the same picker, the canvas' address (+ a comment). */
+  | { kind: 'canvas-send'; itemId: string }
   /** The Disk file card (CBF-20): details and actions of a file; on every surface (also from a chat link). */
   | { kind: 'disk-file'; itemId: string }
   /** The Disk viewer of an audio / text file (CBF-22): `siblings` are the folder's viewable ids (←/→). */

@@ -25,6 +25,7 @@ import { useChatView } from './chatView';
 import { ReactionTip } from './ReactionTip';
 import { userColorIndex, type RowMeta } from './grouping';
 import { LinkPreview } from './LinkPreview';
+import { CanvasLinkCard, firstCanvas } from '../canvas/CanvasLinkCard';
 import { WikiLinkCard, firstWikiPage } from '../wiki/WikiLinkCard';
 import { DiskLinkChip, firstDiskItem } from '../disk/DiskLinkChip';
 import { MessageActions, hasMessageActions } from './MessageActions';
@@ -377,8 +378,10 @@ function Bubble({
   const link = useMemo(() => (m.embedsHidden ? null : firstLink(nodes)), [nodes, m.embedsHidden]);
   // A wiki page link of this server (owner 14.10): the page card in place of the web preview.
   const wikiPage = useMemo(() => (link ? firstWikiPage(nodes) : null), [link, nodes]);
+  // A canvas link of this server (owner 23.10): the same card, a canvas tile.
+  const canvasItem = useMemo(() => (link && !wikiPage ? firstCanvas(nodes) : null), [link, wikiPage, nodes]);
   // A Disk file link of this server (CBF-20): the compact chip in place of the web preview.
-  const diskItem = useMemo(() => (link && !wikiPage ? firstDiskItem(nodes) : null), [link, wikiPage, nodes]);
+  const diskItem = useMemo(() => (link && !wikiPage && !canvasItem ? firstDiskItem(nodes) : null), [link, wikiPage, canvasItem, nodes]);
   const canHideEmbed = c.status === 'sent' && (own || can(perms, 'MANAGE_MESSAGES'));
   const bar = useActionBar(hasMessageActions(c));
   const images = m.attachments.filter(isImage);
@@ -507,7 +510,7 @@ function Bubble({
         ) : null}
         {link && hasText ? (
           <div className="px-3 pb-1">
-            {wikiPage ? <WikiLinkCard pageId={wikiPage} /> : diskItem ? <DiskLinkChip itemId={diskItem} workspaceId={workspaceId} sharedBy={m.authorId} /> : <LinkPreview url={link} onHide={canHideEmbed ? () => void setEmbedsHidden(m, true) : undefined} />}
+            {wikiPage ? <WikiLinkCard pageId={wikiPage} /> : canvasItem ? <CanvasLinkCard itemId={canvasItem} /> : diskItem ? <DiskLinkChip itemId={diskItem} workspaceId={workspaceId} sharedBy={m.authorId} /> : <LinkPreview url={link} onHide={canHideEmbed ? () => void setEmbedsHidden(m, true) : undefined} />}
           </div>
         ) : null}
         {rows.length ? (

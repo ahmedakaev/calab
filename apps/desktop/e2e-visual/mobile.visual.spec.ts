@@ -474,6 +474,28 @@ test('m-chat-folder-card', async ({ page }) => {
   await checkpoint(page, 'm-chat-folder-card', { main: true });
 });
 
+// A canvas link in a chat (owner 23.10): the card like a wiki page's — tile, name, «Холст · изменён …», «Открыть»;
+// a tap opens the board on the phone's «Холст» tab; a canvas not mine to see is the muted «Холст недоступен».
+test('m-chat-canvas-card', async ({ page }) => {
+  await signedInRoom(page);
+  await expect(page.getByTestId('composer')).toBeVisible();
+  const roadmap = [...mock.canvas.items.values()].find((i) => i.name === 'Дорожная карта Q1');
+  expect(roadmap).toBeTruthy();
+  const origin = new URL(page.url()).origin;
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: `Доска по плану ${origin}/canvas/${roadmap?.id ?? ''}` });
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.boris, content: `Старая ${origin}/canvas/00000000-0000-4000-8000-00000000dead` });
+  const cards = page.getByTestId('canvas-link-card');
+  await expect(cards.first()).toHaveAttribute('data-state', 'page');
+  await expect(cards.last()).toHaveAttribute('data-state', 'unavailable');
+  await feedToBottom(page);
+  await page.mouse.move(0, 0);
+  await expectFeedFits(page);
+  // The raw addresses carry the mock's random port: masked.
+  await checkpoint(page, 'm-chat-canvas-card', { main: true, mask: [page.locator('[data-message-id] a:not([data-testid])')] });
+  await cards.first().tap();
+  await expect(page.getByTestId('phone-canvas-screen').getByTestId('phone-header')).toContainText('Дорожная карта Q1');
+});
+
 // A done meeting recording on a phone (docs/09 #47): the card across the feed, the summary folded,
 // the actions wrap; 44 px targets; the REC circle plays (#88), no «Готово» row.
 test('m-chat-recording', async ({ page }) => {

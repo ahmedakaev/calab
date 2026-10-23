@@ -164,6 +164,30 @@ export function ownWikiPageId(href: string): string | null {
 }
 
 /**
+ * Canvas links (owner 23.10): `https://<server>/canvas/<item id>` and `calab://canvas/<item id>` —
+ * the Canvas section opens on the board; no access → «Холст удалён или недоступен». (`/c/<code>` is
+ * the public view-only page, not this.)
+ */
+export function parseCanvasLink(input: string): string | null {
+  const s = input.trim();
+  const ID = '([0-9a-fA-F-]{36})';
+  const m = new RegExp(`^${SCHEME}://canvas/${ID}/?$`).exec(s) ?? new RegExp(`^https?://[^/\\s]+/canvas/${ID}/?(?:[?#].*)?$`).exec(s);
+  return m?.[1]?.toLowerCase() ?? null;
+}
+
+/** The shareable address of a canvas on this server (null: no server known). */
+export function canvasUrl(itemId: string): string | null {
+  const origin = shareOrigin('');
+  return origin ? `${origin}/canvas/${itemId}` : null;
+}
+
+/** A canvas link of this server (the chat's card); null for any other URL. */
+export function ownCanvasId(href: string): string | null {
+  const origin = shareOrigin('');
+  return origin && href.startsWith(`${origin}/`) ? parseCanvasLink(href) : null;
+}
+
+/**
  * Disk item links (CBF-20): `https://<server>/disk/<item id>` and `calab://disk/<item id>` — the
  * Disk opens at the item's folder with its card; no access → «Файл больше недоступен».
  */
@@ -194,7 +218,7 @@ export function openOwnLink(href: string): boolean {
   const origin = shareOrigin('');
   if (!origin || !href.startsWith(`${origin}/`)) return false;
   // Every in-app route (CBF-63), the same set as shared/ownLink.ts in the main process.
-  const known = parseMessageLink(href) ?? parseBoardLink(href) ?? parseWikiLink(href) ?? parseDiskLink(href) ?? parseEventLink(href) ?? parseDmLink(href) ?? parseRoomInviteCode(href);
+  const known = parseMessageLink(href) ?? parseBoardLink(href) ?? parseWikiLink(href) ?? parseCanvasLink(href) ?? parseDiskLink(href) ?? parseEventLink(href) ?? parseDmLink(href) ?? parseRoomInviteCode(href);
   if (!known && !parseInviteCode(href)) return false;
   handleDeepLink(href);
   return true;
@@ -223,6 +247,12 @@ export function handleDeepLink(url: string): void {
   if (wiki) {
     // Loaded lazily, like the boards: links.ts stays free of the API / platform graph.
     void import('./wiki').then((m) => m.openWikiLink(wiki)).catch(() => undefined);
+    return;
+  }
+  const canvas = parseCanvasLink(url);
+  if (canvas) {
+    // Loaded lazily, like the wiki: links.ts stays free of the API / platform graph.
+    void import('./canvasLink').then((m) => m.openCanvasLink(canvas)).catch(() => undefined);
     return;
   }
   const board = parseBoardLink(url);

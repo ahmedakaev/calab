@@ -15,6 +15,7 @@ describe('own app links (CBF-63)', () => {
     expect(ownLinkToDeepLink(`${S}/dm/${ID}`, S)).toBe(`calab://dm/${ID}`);
     expect(ownLinkToDeepLink(`${S}/e/${ID}`, S)).toBe(`calab://e/${ID}`);
     expect(ownLinkToDeepLink(`${S}/wiki/${ID}`, S)).toBe(`calab://wiki/${ID}`);
+    expect(ownLinkToDeepLink(`${S}/canvas/${ID}`, S)).toBe(`calab://canvas/${ID}`);
     expect(ownLinkToDeepLink(`${S}/disk/${ID}`, S)).toBe(`calab://disk/${ID}`);
   });
   it('leaves unknown paths of our host and foreign hosts to the browser', () => {

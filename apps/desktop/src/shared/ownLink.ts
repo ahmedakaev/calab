@@ -21,6 +21,7 @@ const ROUTES: readonly RegExp[] = [
   new RegExp(`^/dm/${ID}/?$`),
   new RegExp(`^/e/${ID}/?$`),
   new RegExp(`^/wiki/${ID}/?$`),
+  new RegExp(`^/canvas/${ID}/?$`),
   new RegExp(`^/disk/${ID}/?$`),
 ];
 
