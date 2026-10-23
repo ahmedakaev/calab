@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { DevelopersPage } from '@/components/developers';
 import { Footer } from '@/components/footer';
 import { Header } from '@/components/header';
-import { getPageCopy } from '@/components/page-copy';
+import { getPageCopy } from '@/i18n/pages';
 import { getDict, hreflangAlternates, isLocale, LOCALE_INFO, localePath } from '@/i18n';
 
 type Params = Promise<{ locale: string }>;

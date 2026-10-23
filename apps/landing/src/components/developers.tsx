@@ -6,7 +6,7 @@ import { rich } from '@/lib/rich';
 import { BOT_EXAMPLES_URL, BOT_SDK_URL } from '@/lib/site';
 import { BotCode } from './bot-code';
 import { McpSnippet } from './ai-section';
-import { getPageCopy } from './page-copy';
+import { getPageCopy } from '@/i18n/pages';
 import { Button, Card, Container, Section, SectionHeading } from './ui';
 
 type CardId = keyof Dict['bots']['cards'];

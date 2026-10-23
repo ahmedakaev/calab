@@ -37,7 +37,7 @@ import type { SceneName } from '@/i18n/home';
 import { BotCode } from './bot-code';
 import { getCatalog } from '@/i18n/catalog';
 import { getHome } from '@/i18n/home';
-import { getPageCopy } from './page-copy';
+import { getPageCopy } from '@/i18n/pages';
 import { Container, nb, Shot, cx } from './ui';
 
 type T = Dict['features'];

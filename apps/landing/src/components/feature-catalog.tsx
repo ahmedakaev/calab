@@ -2,17 +2,11 @@ import { LayoutGrid, MessagesSquare, ShieldCheck, Sparkles, type LucideIcon } fr
 import type { Locale } from '@/i18n';
 import { getHome, type CatalogGroupKey } from '@/i18n/home';
 import { localePath } from '@/i18n/locales';
+import { getPageCopy } from '@/i18n/pages';
 import { CatalogGroups } from './catalog-groups';
 import { DrawnLink, Section, SectionHeading, Tile } from './ui';
 
 const ICONS: Record<CatalogGroupKey, LucideIcon> = { talk: MessagesSquare, work: LayoutGrid, order: ShieldCheck, smart: Sparkles };
-// TODO(i18n C): two button labels outside the home contract.
-const ARROWS: Record<Locale, { prev: string; next: string }> = {
-  ru: { prev: 'Назад', next: 'Дальше' },
-  en: { prev: 'Previous', next: 'Next' },
-  es: { prev: 'Anterior', next: 'Siguiente' },
-  zh: { prev: '上一页', next: '下一页' },
-};
 
 /** «Что есть в Calab» (§4.4): four groups of equal 16:10 tiles; every tile is a real capture, nothing cropped live. */
 export function FeatureCatalog({ locale }: { locale: Locale }) {
@@ -24,7 +18,7 @@ export function FeatureCatalog({ locale }: { locale: Locale }) {
       <SectionHeading id="catalog-title" title={c.title} lead={c.lead} sticker="tasks" />
       <CatalogGroups
         label={c.title}
-        arrows={ARROWS[locale]}
+        arrows={getPageCopy(locale).catalogArrows}
         groups={c.groups.map((g) => {
           const Icon = ICONS[g.key];
           return {
