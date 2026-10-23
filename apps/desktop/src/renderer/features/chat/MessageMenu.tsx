@@ -28,7 +28,7 @@ export const menuItem =
   'flex h-8 cursor-default items-center gap-2 rounded-[6px] px-2.5 text-body text-fg outline-none data-[disabled]:opacity-40 data-[highlighted]:bg-accent-strong data-[highlighted]:text-accent-fg';
 
 /** Text selected inside this message, if any (copy copies the selection first, like Telegram). */
-function selectionWithin(key: string): string {
+export function selectionWithin(key: string): string {
   const sel = window.getSelection();
   const text = sel?.toString() ?? '';
   if (!text || !sel?.anchorNode) return '';

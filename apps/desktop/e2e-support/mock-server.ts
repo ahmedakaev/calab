@@ -94,6 +94,11 @@ import {
   CanvasPermissionsResponseSchema,
   CanvasSettingsSchema,
   CanvasVersionsResponseSchema,
+  CanvasCommentResponseSchema,
+  CanvasMentionAccessResponseSchema,
+  CreateCanvasCommentRequestSchema,
+  ListCanvasCommentsResponseSchema,
+  UpdateCanvasCommentRequestSchema,
   CreateCanvasItemRequestSchema,
   CreateCanvasLinkRequestSchema,
   EmptyCanvasTrashResponseSchema,
@@ -8701,6 +8706,26 @@ class MockImpl {
     };
     this.route('GET', '/api/public/canvas/:code', pub(true));
     this.route('HEAD', '/api/public/canvas/:code', pub(false));
+    // Comments (ADR-0127 wave 4): one page holds every thread; no events (the writer applies its answer).
+    this.canvasRoute('GET', '/api/canvas/items/:id/comments', (c, me) => {
+      const comments = k().listComments(p0(c), me);
+      sendMsg(c.res, 200, ListCanvasCommentsResponseSchema, { comments, openThreads: comments.filter((x) => !x.parentId && !x.resolved).length });
+    });
+    this.canvasRoute('POST', '/api/canvas/items/:id/comments', (c, me) => {
+      const b = parseBody(c, CreateCanvasCommentRequestSchema);
+      sendMsg(c.res, 201, CanvasCommentResponseSchema, { comment: k().addComment(p0(c), me, b) });
+    });
+    this.canvasRoute('GET', '/api/canvas/items/:id/comments/mention-access', (c, me) => {
+      sendMsg(c.res, 200, CanvasMentionAccessResponseSchema, { seeIds: k().mentionAccess(p0(c), me, q(c, 'user_ids').split(',').filter(Boolean)) });
+    });
+    this.canvasRoute('PATCH', '/api/canvas/comments/:id', (c, me) => {
+      const b = parseBody(c, UpdateCanvasCommentRequestSchema);
+      sendMsg(c.res, 200, CanvasCommentResponseSchema, { comment: k().updateComment(p0(c), me, b) });
+    });
+    this.canvasRoute('DELETE', '/api/canvas/comments/:id', (c, me) => {
+      k().removeComment(p0(c), me);
+      noContent(c.res);
+    });
     this.canvasRoute('GET', '/api/canvas/items/:id/versions', (c, me) => sendMsg(c.res, 200, CanvasVersionsResponseSchema, { versions: k().listVersions(p0(c), me) }));
     this.canvasRoute('GET', '/api/canvas/items/:id/versions/:vid', (c, me) => {
       const state = k().versionState(p0(c), c.params[1] ?? '', me);

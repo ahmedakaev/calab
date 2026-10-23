@@ -18,8 +18,10 @@ import { timestampFromMs, timestampMs, type Timestamp } from '@bufbuild/protobuf
 import {
   CANVAS_BITS,
   CanvasItemKind,
+  CanvasCommentSchema,
   CanvasItemSchema,
   CanvasLinkSchema,
+  type CanvasComment,
   PublicCanvasSchema,
   type CanvasLink,
   type PublicCanvas,
@@ -469,6 +471,82 @@ export class CanvasMock {
     a.setLocalState(state);
     const frame = encodeAwareness(encodeAwarenessUpdate(a, [clientId]));
     for (const s of this.room(canvasId).sockets) if (s.uid !== '') s.ws.send(frame);
+  }
+
+  // ---------------------------------------------------------------- comments (ADR-0127 wave 4)
+
+  /** Canvas → its comments in writing order (roots and replies). No CANVAS_COMMENT_* fan-out: the writer's client applies its own answer. */
+  readonly comments = new Map<string, CanvasComment[]>();
+
+  private commentById(id: string): CanvasComment {
+    for (const list of this.comments.values()) {
+      const c = list.find((x) => x.id === id);
+      if (c) return c;
+    }
+    throw new CanvasError(404, ErrorCode.NOT_FOUND, 'comment not found');
+  }
+
+  /** A comment as a fixture (no rights): `atMs` sets its time. */
+  seedComment(canvasId: string, authorId: string, body: string, opts: { parentId?: string; objectId?: string; x?: number; y?: number; resolved?: boolean; atMs?: number } = {}): CanvasComment {
+    const c = create(CanvasCommentSchema, {
+      id: this.d.nextId(),
+      canvasId,
+      authorId,
+      body,
+      parentId: opts.parentId ?? '',
+      objectId: opts.parentId ? '' : (opts.objectId ?? ''),
+      x: opts.x ?? 0,
+      y: opts.y ?? 0,
+      resolved: opts.resolved ?? false,
+      mentions: [...body.matchAll(/@([0-9a-f-]{36})/gi)].map((m) => (m[1] ?? '').toLowerCase()),
+      createdAt: opts.atMs !== undefined ? timestampFromMs(opts.atMs) : this.d.tick(),
+    });
+    const list = this.comments.get(canvasId) ?? [];
+    list.push(c);
+    this.comments.set(canvasId, list);
+    return c;
+  }
+
+  /** Roots in order, each followed by its replies (the server's page shape). */
+  listComments(canvasId: string, uid: string): CanvasComment[] {
+    this.visible(canvasId, uid);
+    const list = this.comments.get(canvasId) ?? [];
+    return list.filter((c) => !c.parentId).flatMap((r) => [r, ...list.filter((c) => c.parentId === r.id)]);
+  }
+
+  addComment(canvasId: string, uid: string, b: { body: string; parentId: string; objectId: string; x: number; y: number }): CanvasComment {
+    this.writable(canvasId, uid);
+    if (b.parentId) this.commentById(b.parentId);
+    return this.seedComment(canvasId, uid, b.body, { parentId: b.parentId, objectId: b.objectId, x: b.x, y: b.y });
+  }
+
+  updateComment(id: string, uid: string, b: { body?: string | undefined; resolved?: boolean | undefined }): CanvasComment {
+    const c = this.commentById(id);
+    this.writable(c.canvasId, uid);
+    if (b.body !== undefined) {
+      if (c.authorId !== uid) throw forbidden('not the author');
+      c.body = b.body;
+      c.editedAt = this.d.tick();
+    }
+    if (b.resolved !== undefined) {
+      c.resolved = b.resolved;
+      c.resolvedBy = b.resolved ? uid : '';
+    }
+    return c;
+  }
+
+  removeComment(id: string, uid: string): void {
+    const c = this.commentById(id);
+    this.writable(c.canvasId, uid);
+    if (c.authorId !== uid) throw forbidden('not the author');
+    const list = this.comments.get(c.canvasId) ?? [];
+    this.comments.set(c.canvasId, list.filter((x) => x.id !== id && x.parentId !== id));
+  }
+
+  /** Who of `ids` sees the canvas (the @ list). */
+  mentionAccess(canvasId: string, uid: string, ids: readonly string[]): string[] {
+    const p = this.visible(canvasId, uid);
+    return ids.filter((id) => (this.bitsOf(p, p.workspaceId, id) & V) !== 0n);
   }
 
   /** The object ids of a canvas's current document, with their text (to aim a co-author's selection). */

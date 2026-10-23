@@ -237,4 +237,42 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
     await expect(win.getByTestId('canvas-trashed')).toBeVisible();
     await checkpoint(shot, 'canvas-trash');
   }
+
+  // 8. Comments like the chat (owner 23.10, dark and light): thread cards with chat rows (Борис's two
+  // grouped, my reply with a mention, Вера's answer), the reply composer of the active thread, a
+  // resolved thread; then (dark) the hover bar of my comment and a new thread's composer at the bottom.
+  await open();
+  const roadmap = [...mock.canvas.items.values()].find((i) => i.name === 'Дорожная карта Q1');
+  if (!roadmap) throw new Error('no roadmap');
+  const target = mock.canvas.objects(roadmap.id).find((o) => o.text === 'Раздел «Холст»');
+  const { anna, boris, vera } = IDS.users;
+  const root = mock.canvas.seedComment(roadmap.id, boris, 'Давайте добавим сюда **макет** панели комментариев', { objectId: target?.id ?? '', x: 150, y: 20 });
+  mock.canvas.seedComment(roadmap.id, boris, 'И ссылку на ADR-0127', { parentId: root.id });
+  mock.canvas.seedComment(roadmap.id, anna, `@${vera} посмотришь сегодня?`, { parentId: root.id });
+  mock.canvas.seedComment(roadmap.id, vera, 'Да, вечером 👍', { parentId: root.id });
+  mock.canvas.seedComment(roadmap.id, vera, 'Цвета стикеров согласованы', { x: 40, y: 300, resolved: true });
+  mock.canvas.seedComment(roadmap.id, anna, 'Проверить контраст в светлой теме', { x: 520, y: 320 });
+  await openRoadmap(win);
+  await win.getByTestId('canvas-comments-toggle').click();
+  const panel = win.getByTestId('canvas-comments-panel');
+  await expect(panel.getByTestId('canvas-comment-thread')).toHaveCount(3);
+  await panel.getByTestId('canvas-comment-thread').first().getByTestId('canvas-comment').first().click();
+  await expect(panel.getByTestId('canvas-comment-input')).toHaveCount(1);
+  await win.mouse.move(10, 10);
+  await win.waitForTimeout(300);
+  await checkpoint(shot, 'canvas-comments');
+
+  if (theme === 'dark') {
+    await panel.getByTestId('canvas-comment-thread').first().getByTestId('canvas-comment').nth(2).getByTestId('comment-bubble').hover();
+    await expect(panel.getByTestId('comment-actions')).toBeVisible();
+    await checkpoint(shot, 'canvas-comments-hover', { keepPointer: true });
+    await win.getByTestId('canvas-tool-comment').click();
+    const at = await atWorld(win, 520, 200);
+    await win.mouse.click(at.x, at.y);
+    await expect(panel.getByTestId('canvas-comment-draft')).toBeVisible();
+    await win.keyboard.type('Новая ветка про @');
+    await expect(win.getByRole('option')).not.toHaveCount(0);
+    await win.waitForTimeout(200);
+    await checkpoint(shot, 'canvas-comments-draft');
+  }
 });
