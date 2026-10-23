@@ -19,7 +19,10 @@ export const nb = (text: string): string =>
     .replace(/ ([—–]) /g, '\u00a0$1 ')
     .replace(/(\d) %/g, '$1\u00a0%')
     .replace(/≈ /g, '≈\u00a0')
-    .replace(/(^|[\s(«])([вкосуиаВКОСУИА]) /g, '$1$2\u00a0');
+    .replace(/(?<=^|[\s(«])([вкосуиаВКОСУИА]) /g, '$1\u00a0');
+
+/** The same helper under the name used in reviews. */
+export const nbsp = nb;
 
 export const cx = (...c: (string | false | null | undefined)[]): string => c.filter(Boolean).join(' ');
 

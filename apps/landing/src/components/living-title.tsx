@@ -11,6 +11,11 @@ function words(text: string): string[] {
     if (/^[—–-]$/.test(w) && out.length) out[out.length - 1] = `${out.at(-1) ?? ''}\u00a0${w}`;
     else out.push(...(CJK.test(w) ? Array.from(w) : [w]));
   }
+  // A one-letter word («в», «и», «с», «a») never ends a line: it travels with the next word.
+  for (let i = out.length - 2; i >= 0; i--) {
+    const w = out[i] ?? '';
+    if (w.length === 1 && !CJK.test(w)) out.splice(i, 2, `${w}\u00a0${out[i + 1] ?? ''}`);
+  }
   return out;
 }
 
