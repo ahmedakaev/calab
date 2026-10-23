@@ -10,6 +10,8 @@ import { useUi } from '../../stores/ui';
 import { AllDayChip, BusyBlock, BusyChip, DragGhost, DropCursor, EventBlock, type BlockDown } from './blocks';
 import { CalendarHeader, FilterRow } from './CalendarHeader';
 import { isBusyKey, useCalendarDays, type DayData } from './calendarData';
+import { gridScrollTarget } from '../../lib/calendar/scrollTarget';
+import { useSession } from '../../stores/session';
 import { settleScroll, useCloseCardOutside, useDayKeys, useDragController } from './dayControls';
 import { useDayDrag } from './dragState';
 import { ExternalBlock, ExternalChip } from './ExternalEventCard';
@@ -63,6 +65,7 @@ export function WeekGrid({ workspaceId }: { workspaceId: string }): ReactNode {
   const today = useToday();
   const day = useUi((s) => s.calDay) ?? today;
   const selected = useUi((s) => s.calEvent);
+  const workStart = useSession((s) => s.me?.settings?.workHours?.startMin);
   const scroller = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const creatable = calendarAvailable(workspaceId);
@@ -74,14 +77,13 @@ export function WeekGrid({ workspaceId }: { workspaceId: string }): ReactNode {
   const from = dayStart(startKey);
   const to = dayEnd(days[6] ?? startKey);
 
-  // Open at «now» (this week) or the selected meeting, else at 08:00 / the week's first meeting.
+  // Open at the selected meeting, else at the working day's start (CBF-57; «now» does not move it).
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const placed = data.flatMap((d) => d.placed);
     const sel = selected ? placed.find((p) => p.key === selected) : undefined;
-    const minute = sel ? sel.top : days.includes(today) ? (Date.now() - dayStart(today)) / 60_000 : Math.min(8 * 60, ...placed.map((p) => p.top));
-    return settleScroll(el, minute);
+    return settleScroll(el, gridScrollTarget(workStart, sel?.top));
     // Only when the week changes (not on every list refresh).
   }, [startKey]); // eslint-disable-line react-hooks/exhaustive-deps
 

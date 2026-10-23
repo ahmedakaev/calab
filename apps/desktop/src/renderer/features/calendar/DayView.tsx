@@ -21,6 +21,8 @@ import { defaultDraft, newEvent, startFind } from './actions';
 import { AllDayChip, BusyBlock, BusyChip, DragGhost, DropCursor, EventBlock, type BlockDown } from './blocks';
 import { CalendarHeader, ConnectControl, FilterRow } from './CalendarHeader';
 import { isBusyKey, useCalendarDays } from './calendarData';
+import { gridScrollTarget } from '../../lib/calendar/scrollTarget';
+import { useSession } from '../../stores/session';
 import { settleScroll, useCloseCardOutside, useDayKeys, useDragController } from './dayControls';
 import { ExternalBlock, ExternalChip } from './ExternalEventCard';
 import { useDayDrag } from './dragState';
@@ -66,6 +68,7 @@ function DayGrid({ workspaceId }: { workspaceId: string }): ReactNode {
   const day = useUi((s) => s.calDay) ?? today;
   const selected = useUi((s) => s.calEvent);
   const mobile = useMobile();
+  const workStart = useSession((s) => s.me?.settings?.workHours?.startMin);
   const scroller = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const creatable = calendarAvailable(workspaceId);
@@ -75,14 +78,12 @@ function DayGrid({ workspaceId }: { workspaceId: string }): ReactNode {
   const d = data[0];
   const placed = useMemo(() => d?.placed ?? [], [d]);
 
-  // Open at «now» (today) or the selected meeting, else at 08:00 / the first meeting.
+  // Open at the selected meeting, else at the working day's start (CBF-57; «now» does not move it).
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const sel = selected ? placed.find((p) => p.key === selected) : undefined;
-    const first = placed[0];
-    const minute = sel ? sel.top : day === today ? (Date.now() - dayStart(day)) / 60_000 : first ? Math.min(first.top, 8 * 60) : 8 * 60;
-    return settleScroll(el, minute);
+    return settleScroll(el, gridScrollTarget(workStart, sel?.top));
     // Only when the day changes (not on every list refresh).
   }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
 
