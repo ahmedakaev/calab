@@ -150,7 +150,7 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, works
       role="group"
       aria-label={t('canvasBoard.toolbar')}
       data-testid="canvas-toolbar"
-      className={cx(PANEL, 'absolute left-3 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-0.5')}
+      className={cx(PANEL, 'absolute left-[var(--canvas-left,0.75rem)] top-1/2 z-10 flex -translate-y-1/2 flex-col gap-0.5')}
     >
       <ToolButton {...common} tool="select" icon={<MousePointer2 className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'select'} pinned={false} />
       <ToolButton {...common} tool="sticky" icon={<StickyNote className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'sticky'} pinned={pinned === 'sticky'} />
@@ -240,7 +240,7 @@ export const HistoryBar = memo(function HistoryBar({ engine, focusCanvas }: { en
   const canUndo = useEngineValue(engine, (s) => s.canUndo);
   const canRedo = useEngineValue(engine, (s) => s.canRedo);
   return (
-    <div className={cx(PANEL, 'absolute bottom-3 left-3 z-10 flex items-center gap-0.5')} data-testid="canvas-history">
+    <div className={cx(PANEL, 'absolute bottom-3 left-[var(--canvas-left,0.75rem)] z-10 flex items-center gap-0.5')} data-testid="canvas-history">
       <IconButton label={t('canvasBoard.undo')} shortcut={`${MOD}Z`} disabled={!canUndo} onMouseDown={keepFocus} onClick={() => { engine.undo(); focusCanvas(); }} data-testid="canvas-undo">
         <Undo2 className={ICON} strokeWidth={1.75} aria-hidden />
       </IconButton>

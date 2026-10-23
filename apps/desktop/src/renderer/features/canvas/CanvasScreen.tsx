@@ -1,6 +1,6 @@
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragMoveEvent, type DragStartEvent } from '@dnd-kit/core';
 import { WorkspaceRole, canvasPermissions } from '@calaba/protocol';
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MOD } from '../../components/ui';
 import { t } from '../../i18n';
@@ -77,7 +77,14 @@ export function CanvasScreen({ workspaceId }: { workspaceId: string }): ReactNod
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-      <section className="mat-content relative flex min-w-0 flex-1" aria-label={t('canvas.section')} data-testid="canvas">
+      {/* A folded tree leaves no column, and the bottom island (the usual column width) floats over the
+          field's left: the left-anchored controls start 8 px right of it (`--canvas-left`, view/Toolbar.tsx). */}
+      <section
+        className="mat-content relative flex min-w-0 flex-1"
+        style={collapsed ? ({ ['--canvas-left' as string]: 'var(--sidebar-width)' } as CSSProperties) : undefined}
+        aria-label={t('canvas.section')}
+        data-testid="canvas"
+      >
         {collapsed ? null : (
           <aside className="island-fade flex shrink-0 flex-col border-r border-line [--island-fade-color:var(--color-bg)]" style={{ width }} data-testid="canvas-column">
             <CanvasTree workspaceId={workspaceId} canCreate={canCreate} />
