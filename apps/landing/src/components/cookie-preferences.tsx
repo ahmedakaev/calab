@@ -21,6 +21,7 @@ export function CookiePreferences({ locale }: { locale: Locale }) {
   const [dismissed, setDismissed] = useState(false);
   const [settings, setSettings] = useState(false);
   const [language, setLanguage] = useState(false);
+  const [analytics, setAnalytics] = useState(false);
   const [error, setError] = useState(false);
   const [, refresh] = useState(0);
   const launcher = useRef<HTMLButtonElement>(null);
@@ -42,7 +43,9 @@ export function CookiePreferences({ locale }: { locale: Locale }) {
   useEffect(() => {
     const open = () => {
       previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setLanguage(parsePreferences(readPreferences())?.language ?? false);
+      const saved = parsePreferences(readPreferences());
+      setLanguage(saved?.language ?? false);
+      setAnalytics(saved?.analytics ?? false);
       setSettings(true);
       setError(false);
       setOpened(true);
@@ -59,8 +62,8 @@ export function CookiePreferences({ locale }: { locale: Locale }) {
     (previousFocus.current?.isConnected ? previousFocus.current : launcher.current)?.focus();
   };
 
-  const save = (allow: boolean) => {
-    if (!savePreferences(allow, locale)) { setError(true); return; }
+  const save = (language: boolean, analytics: boolean) => {
+    if (!savePreferences(language, locale, analytics)) { setError(true); return; }
     setError(false);
     close();
   };
@@ -84,8 +87,11 @@ export function CookiePreferences({ locale }: { locale: Locale }) {
                 <input type="checkbox" checked={language} onChange={(event) => { setLanguage(event.target.checked); }} className="mt-1 size-5 shrink-0 accent-accent" />
                 <span><span className="block font-medium">{t.language}</span><span className="mt-1 block text-fg-2">{t.languageDetail}</span></span>
               </label>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={analytics} onChange={(event) => { setAnalytics(event.target.checked); }} className="mt-1 size-5 shrink-0 accent-accent" />
+                <span><span className="block font-medium">{t.analytics}</span><span className="mt-1 block text-fg-2">{t.analyticsDetail}</span></span>
+              </label>
               <div className="space-y-2 text-fg-2">
-                <p className="flex justify-between gap-3"><span>{t.analytics}</span><span>{t.inactive}</span></p>
                 <p className="flex justify-between gap-3"><span>{t.marketing}</span><span>{t.inactive}</span></p>
                 <p className="text-[12px] leading-5">{t.future}</p>
               </div>
@@ -93,11 +99,11 @@ export function CookiePreferences({ locale }: { locale: Locale }) {
           )}
           {error && <p role="alert" className="mt-3 text-[13px] leading-5 text-fg">{t.error}</p>}
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <button type="button" className={action} onClick={() => { save(false); }}>{t.reject}</button>
-            <button type="button" className={action} onClick={() => { save(true); }}>{t.allow}</button>
+            <button type="button" className={action} onClick={() => { save(false, false); }}>{t.reject}</button>
+            <button type="button" className={action} onClick={() => { save(true, true); }}>{t.allow}</button>
           </div>
-          {settings ? <button type="button" className={`${action} mt-2 w-full`} onClick={() => { save(language); }}>{t.save}</button> :
-            <button type="button" className={`${action} mt-2 w-full`} onClick={() => { setLanguage(preferences?.language ?? false); setSettings(true); }}>{t.settings}</button>}
+          {settings ? <button type="button" className={`${action} mt-2 w-full`} onClick={() => { save(language, analytics); }}>{t.save}</button> :
+            <button type="button" className={`${action} mt-2 w-full`} onClick={() => { setLanguage(preferences?.language ?? false); setAnalytics(preferences?.analytics ?? false); setSettings(true); }}>{t.settings}</button>}
           <a href={localePath(locale, 'legal/cookies/')} className="link mt-3 inline-flex min-h-11 items-center text-[13px]">{t.policy}</a>
         </section>
       )}

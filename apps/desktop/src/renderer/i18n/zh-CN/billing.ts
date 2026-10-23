@@ -85,7 +85,7 @@ export const zhBilling: DictShape<typeof ruBilling> = {
   'billing.market.ru': '俄罗斯，₽',
   'billing.market.global': '全球，$',
   'billing.market.sellerRu': '卖方：OOO Gromtech（俄罗斯），以卢布通过 Mir 卡或 SBP 付款',
-  'billing.market.sellerGlobal': '卖方：Unne L.L.C-FZ（阿联酋），以美元刷卡付款',
+  'billing.market.sellerGlobal': '卖方：OOO Gromtech（俄罗斯），以美元刷卡付款',
   'billing.market.fixedHint': '首次付款后市场将固定',
   'billing.plans.contact': '联系我们',
   'billing.plans.contactUnknown': '请联系客服开通——暂未提供联系方式',

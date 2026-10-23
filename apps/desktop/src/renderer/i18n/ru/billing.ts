@@ -86,7 +86,7 @@ export const ruBilling = {
   'billing.market.ru': 'Россия, ₽',
   'billing.market.global': 'Global, $',
   'billing.market.sellerRu': 'Продавец — ООО «Громтех», оплата в рублях картой МИР или по СБП',
-  'billing.market.sellerGlobal': 'Продавец — Unne L.L.C-FZ (ОАЭ), оплата в долларах США картой',
+  'billing.market.sellerGlobal': 'Продавец — ООО «Громтех», оплата в долларах США картой',
   'billing.market.fixedHint': 'Рынок закрепится после первой оплаты',
   'billing.plans.contact': 'Связаться с нами',
   'billing.plans.contactUnknown': 'Для подключения напишите в поддержку — контакт пока не указан',

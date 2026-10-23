@@ -201,7 +201,8 @@
         "paragraphs": [
           "The marketing website has no advertising or analytics trackers. It uses a necessary localStorage record, calab.site-preferences, to remember your storage choice for up to 180 days. Only with permission, calab.locale remembers your chosen language for the remaining duration of that choice.",
           "Use the corner preferences button or the footer’s Cookie settings link to allow, reject or withdraw optional storage. Closing the panel is not consent. Rejection, withdrawal or expiry stops use of the saved language and removes it on the next site storage access. Language links work without saving a preference. See the Cookie & storage policy for details.",
-          "This marketing-site choice does not control the application’s separate login/security storage or external sites. Browser controls can remove stored data; application and device controls govern notifications. New optional tracking purposes would require new information and any necessary permission before activation."
+          "This marketing-site choice does not control the application’s separate login/security storage or external sites. Browser controls can remove stored data; application and device controls govern notifications. New optional tracking purposes would require new information and any necessary permission before activation.",
+          "Exception to the statements above about analytics: only with your separate consent does the website load Yandex Metrika (operated by Yandex LLC, Russia). It collects visits and pages viewed, clicks and mouse movement, and records the session (Webvisor) to help us improve the website; Yandex may set its own cookies and identifiers in your browser for this. Before consent the service is not loaded and receives no data. You can withdraw consent at any time with the “Cookie settings” link in the footer: the service stops loading and the website removes the service records it can access. Data already collected is handled by Yandex under its own terms."
         ]
       },
       {
@@ -319,7 +320,8 @@
         "title": "4. Change your choice",
         "paragraphs": [
           "Use the corner button or Cookie settings in the footer at any time. Allowing and rejecting optional storage are equally available. Closing the panel, scrolling or following a link does not give permission. Withdrawing is as easy as allowing and does not invalidate earlier lawful use.",
-          "If your browser blocks storage, optional persistence stays off and language links still work. Clearing browser data removes the choice too, so the panel will appear again. The choice applies to this browser and domain; other devices, app domains and external sites manage their own settings and necessary session data."
+          "If your browser blocks storage, optional persistence stays off and language links still work. Clearing browser data removes the choice too, so the panel will appear again. The choice applies to this browser and domain; other devices, app domains and external sites manage their own settings and necessary session data.",
+          "Exception to the statements above about analytics: only with your separate consent does the website load Yandex Metrika (operated by Yandex LLC, Russia). It collects visits and pages viewed, clicks and mouse movement, and records the session (Webvisor) to help us improve the website; Yandex may set its own cookies and identifiers in your browser for this. Before consent the service is not loaded and receives no data. You can withdraw consent at any time with the “Cookie settings” link in the footer: the service stops loading and the website removes the service records it can access. Data already collected is handled by Yandex under its own terms."
         ]
       },
       {

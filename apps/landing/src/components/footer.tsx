@@ -48,8 +48,8 @@ export function Footer({ t, locale }: { t: Dict['footer']; locale: Locale }) {
           <p>ООО «Громтех» · ИНН 5027346848 · КПП 502701001 · ОГРН 1265000035420</p>
           <p>Московская область, г. Лыткарино, ул. Набережная, д. 7, кв. 130</p>
         </div> : <div lang="en">
-          <p>Unne L.L.C-FZ · United Arab Emirates · VAT TRN 105410888900001</p>
-          <p>Meydan Grandstand, 6th Floor, Meydan Road, Nad Al Sheba, Dubai, UAE</p>
+          <p>OOO Gromtech · INN 5027346848 · KPP 502701001 · OGRN 1265000035420</p>
+          <p>Naberezhnaya St. 7, apt. 130, Lytkarino, Moscow Region, Russia</p>
         </div>}
         <p><a href="mailto:support@calab.io" className="link">support@calab.io</a></p>
       </Container>

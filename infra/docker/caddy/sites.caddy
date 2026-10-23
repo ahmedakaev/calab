@@ -78,8 +78,9 @@
 		encode zstd gzip
 		header {
 			# Next.js static export hydrates through inline <script> tags: 'unsafe-inline' for scripts is the
-			# price of a no-server export (no nonces). No connect targets beyond self; no framing.
-			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'{$RELEASES_ORIGIN}{$APP_ORIGIN}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+			# price of a no-server export (no nonces). Yandex Metrika (consent-gated in the page, components/yandex-metrika.tsx) needs mc.yandex.ru/.com for script, pixel,
+			# XHR/beacon, Webvisor websocket and iframe; yastatic.net for the tag's helper scripts. No framing of the landing itself.
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://mc.yandex.ru https://mc.yandex.com; font-src 'self' data:; connect-src 'self'{$RELEASES_ORIGIN}{$APP_ORIGIN} https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com; frame-src https://mc.yandex.ru https://mc.yandex.com; child-src https://mc.yandex.ru https://mc.yandex.com blob:; worker-src blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 			X-Content-Type-Options nosniff
 			Referrer-Policy strict-origin-when-cross-origin
 			X-Frame-Options DENY

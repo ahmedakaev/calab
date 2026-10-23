@@ -85,7 +85,7 @@ export const esBilling: DictShape<typeof ruBilling> = {
   'billing.market.ru': 'Rusia, ₽',
   'billing.market.global': 'Global, $',
   'billing.market.sellerRu': 'Vendedor: OOO Gromtech (Rusia), pago en rublos con tarjeta Mir o SBP',
-  'billing.market.sellerGlobal': 'Vendedor: Unne L.L.C-FZ (EAU), pago en dólares estadounidenses con tarjeta',
+  'billing.market.sellerGlobal': 'Vendedor: OOO Gromtech (Rusia), pago en dólares estadounidenses con tarjeta',
   'billing.market.fixedHint': 'El mercado se fija con el primer pago',
   'billing.plans.contact': 'Contáctanos',
   'billing.plans.contactUnknown': 'Para conectarlo, escribe a soporte: aún no hay contacto',
