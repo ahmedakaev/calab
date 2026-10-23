@@ -1,3 +1,6 @@
+import { en } from './home-en';
+import { es } from './home-es';
+import { zh } from './home-zh';
 import type { Locale } from './locales';
 
 /**
@@ -366,6 +369,5 @@ export const ru: Home = {
   },
 };
 
-// en/es/zh: filled by the next commit (home-en.ts, home-es.ts, home-zh.ts); ru stands in until then.
-export const homes: Record<Locale, Home> = { ru, en: ru, es: ru, zh: ru };
+export const homes: Record<Locale, Home> = { ru, en, es, zh };
 export const getHome = (locale: Locale): Home => homes[locale];
