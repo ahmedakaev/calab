@@ -163,6 +163,44 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await win.waitForTimeout(900);
   await checkpoint(shot, 'canvas-palette');
 
+  // 5b. Connector routes: straight, elbow and curved between pairs of shapes, with arrows and labels (dark and light).
+  await open();
+  const routes = ['straight', 'elbow', 'curve'] as const;
+  const routeText = { straight: 'прямой', elbow: 'ломаный', curve: 'плавный' } as const;
+  mock.canvas.put({ workspaceId: IDS.workspaces.main, name: 'Связи', ownerId: IDS.users.anna }, (d) => {
+    routes.forEach((route, i) => {
+      const a = d.create({ kind: 'shape', shape: 'rounded', x: 0, y: i * 170, w: 140, h: 80, fill: 'blue', text: `A${i + 1}` });
+      const b = d.create({ kind: 'shape', shape: 'rounded', x: 460, y: i * 170 + 70, w: 140, h: 80, fill: 'green', text: `B${i + 1}` });
+      d.create({ kind: 'connector', from: { id: a ?? '', side: 'right' }, to: { id: b ?? '', side: 'left' }, route, arrow: 'end', label: routeText[route] });
+    });
+  });
+  await win.getByTestId('section-canvas').click();
+  await win.getByTestId('canvas-node').filter({ hasText: 'Связи' }).getByTestId('canvas-node-open').click();
+  await expect(win.getByTestId('canvas-title')).toHaveText('Связи');
+  await expect(win.getByTestId('canvas-connecting')).toHaveCount(0);
+  await win.getByTestId('canvas-fit-all').click();
+  await win.waitForTimeout(900);
+  await checkpoint(shot, 'canvas-connectors');
+
+  if (theme === 'dark') {
+    // 5c. The connector tool's route menu: three routes with their icons.
+    await win.getByTestId('canvas-tool-connector').locator('..').getByRole('button', { name: 'Выбрать вариант' }).click();
+    await expect(win.getByTestId('canvas-route-menu')).toBeVisible();
+    await checkpoint(shot, 'canvas-route-menu');
+    await win.keyboard.press('Escape');
+
+    // 5d. A sticker from the workspace's pack placed on the board (the chat's sticker panel, K), selected.
+    await win.getByTestId('canvas-tool-sticker').click();
+    const panel = win.getByTestId('canvas-sticker-panel');
+    await expect(panel.getByRole('button', { name: 'Стикер 💎' })).toBeVisible();
+    await checkpoint(shot, 'canvas-sticker-panel');
+    await panel.getByRole('button', { name: 'Стикер 💎' }).click();
+    await expect(panel).toHaveCount(0);
+    await expect(win.getByTestId('canvas-announce')).toHaveText('Стикер-картинка');
+    await win.waitForTimeout(600);
+    await checkpoint(shot, 'canvas-sticker');
+  }
+
   // 6. «Доступ» (dark and light).
   await open();
   await win.getByTestId('section-canvas').click();
