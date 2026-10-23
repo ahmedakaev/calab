@@ -4068,17 +4068,34 @@ test('boards-task', async ({ open, win, mock, shot }) => {
   await expect(viewer).toBeHidden();
   await expect(panel).toBeVisible();
 
-  // CBF-59: a picture picked in the description editor is attached and shown inline, in place.
+  // Owner 23.10: the description edits in place in the wiki's editor — the `/` blocks (only what the
+  // task view shows), the selection bar; CBF-59: «/Картинка» attaches the picture and shows it inline.
   await panel.getByTestId('task-description').click();
   const editor = panel.getByTestId('task-description-editor');
-  await editor.press('End');
+  const prose = editor.locator('.wiki-prose');
+  await expect(prose).toBeFocused();
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('Проверить экспорт');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('/');
+  const blocks = win.getByRole('listbox', { name: 'Блоки' });
+  await expect(blocks.getByRole('option')).toHaveCount(6);
+  await checkpoint(shot, 'boards-task-desc-slash');
   const shotPng = encodePng(640, 360, (u, v) => (v < 0.15 ? [58, 124, 246] : u < 0.3 ? [235, 238, 245] : [250, 251, 253]));
   const attached = win.waitForResponse((r) => r.request().method() === 'PATCH' && /\/api\/tasks\/[^/]+$/.test(r.url()));
-  await panel.locator('input[accept="image/*"]').setInputFiles({ name: 'screenshot.png', mimeType: 'image/png', buffer: shotPng });
+  const chooser = win.waitForEvent('filechooser');
+  await blocks.getByRole('option', { name: 'Картинка' }).click();
+  await (await chooser).setFiles({ name: 'screenshot.png', mimeType: 'image/png', buffer: shotPng });
   expect((await attached).ok()).toBe(true);
-  await expect(editor).toHaveValue(/calaba-file:/);
+  await expect(prose.locator('.wiki-image img')).toBeVisible();
+  // The selection bar over «Проверить экспорт»: marks and «Превратить в», no highlight colours.
+  await prose.getByText('Проверить экспорт').dblclick();
+  await expect(win.getByRole('toolbar', { name: 'Форматирование' })).toBeVisible();
+  await checkpoint(shot, 'boards-task-desc-bubble');
   await panel.getByTestId('task-description-save').click();
+  await expect(editor).toHaveCount(0);
   await expect(panel.getByTestId('task-description-img')).toBeVisible();
+  await expect(panel.getByTestId('task-description')).toContainText('Проверить экспорт');
   await checkpoint(shot, 'boards-task-inline-image');
 });
 
@@ -4289,6 +4306,23 @@ test('boards-create', async ({ open, win, mock, shot }) => {
   await win.getByRole('button', { name: /Сегодня/ }).first().click();
   await expect(win.getByTestId('create-start')).not.toContainText('Начало');
   await checkpoint(shot, 'boards-create');
+
+  // Owner 23.10: the description is the wiki's editor here too (compact); `/` opens the blocks
+  // inside the sheet, Esc closes the list, not the sheet.
+  const desc = win.getByTestId('create-task').locator('.wiki-prose');
+  await desc.click();
+  await win.keyboard.type('Шаги:');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('- воспроизвести');
+  await win.keyboard.press('Enter');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('/');
+  const blocks = win.getByRole('listbox', { name: 'Блоки' });
+  await expect(blocks).toBeVisible();
+  await checkpoint(shot, 'boards-create-desc');
+  await win.keyboard.press('Escape');
+  await expect(blocks).toHaveCount(0);
+  await expect(win.getByTestId('create-task')).toBeVisible();
 });
 
 /** The timeline (3), month scale: today line, weekends, CAL-3 → CAL-4 late-blocker marker, «Без дат». */

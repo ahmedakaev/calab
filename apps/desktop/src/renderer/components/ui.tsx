@@ -724,6 +724,10 @@ export function Modal({
             const target = e.target instanceof Element ? e.target : null;
             if (target && keepOpen?.(target)) e.preventDefault();
           }}
+          // A field's own floating panel inside (the rich editor's link field) takes Esc first.
+          onEscapeKeyDown={(e) => {
+            if (e.target instanceof Element && e.target.closest('[data-esc-local]')) e.preventDefault();
+          }}
           onOpenAutoFocus={(e) => {
             // Phones: the dialog itself takes the focus — no field focused (and no keyboard) until a tap.
             if (!autoFocusAllowed()) {

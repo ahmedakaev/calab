@@ -12,7 +12,6 @@ import {
   FolderInput,
   GitFork,
   Link2,
-  ImagePlus,
   Paperclip,
   Plus,
   X,
@@ -20,12 +19,12 @@ import {
 import { timestampMs } from '@bufbuild/protobuf/wkt';
 import { fmt } from '../../lib/format';
 import { log } from '../../lib/log';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { ProfileTarget } from '../../components/ProfileTarget';
 import { Bar } from '../../components/Bar';
 import { PhoneBack } from '../../components/PhoneHeader';
 import { useShallow } from 'zustand/react/shallow';
-import { Button, CloseButton, IconButton, Modal, Spinner, Tip, cx } from '../../components/ui';
+import { Button, CloseButton, IconButton, MOD, Modal, Spinner, Tip, cx } from '../../components/ui';
 import { Choice as ChoiceSwitch } from '../../components/Choice';
 import { t } from '../../i18n';
 import { Markdown } from '../../lib/markdown/Markdown';
@@ -76,7 +75,11 @@ import { ApprovalsSection } from './Approvals';
 import { WatchersSection } from './Watchers';
 import { GitSection } from './GitLinks';
 import { AttachmentChip } from './AttachmentChip';
-import { imageToken, insertImage, splitDescription } from './inlineImages';
+import { splitDescription } from './inlineImages';
+import { descriptionToDoc, docToDescription } from './descriptionDoc';
+import { RichDescription } from './RichDescription';
+import { preloadWikiEditor, type UploadedImage, type WikiEditorApi } from '../wiki/editor';
+import type { PmNode } from '@calaba/wiki-doc/markdown';
 import { MediaImg } from '../../components/MediaImg';
 import { THUMB_LARGE, thumbWidthPath } from '../../lib/thumbs';
 import { openAttachment } from '../../services/files';
@@ -92,6 +95,8 @@ import { Dot, PRIORITY_LABEL, PriorityIcon, StatusIcon, formatDue, isOverdue } f
 
 const TITLE_MAX = 200;
 const DESCRIPTION_MAX = 20000;
+/** Attachments of a task (the server's limit). */
+const ATTACH_MAX = 20;
 
 /**
  * The task on the phone (ADR-0042 §5, ADR-0073): a full-screen pushed page with «←». One scroll:
@@ -408,69 +413,127 @@ const DescriptionImage = memo(function DescriptionImage({ id, name, list }: { id
   );
 });
 
+/** Changed since editing started, or null when the editor is not there yet (nothing typed). */
+function draftOf(api: WikiEditorApi | null, base: string): string | null {
+  if (!api || api.editor.isDestroyed) return null;
+  const next = docToDescription(api.getJSON() as PmNode);
+  return next === base ? null : next;
+}
+
+/** A hidden window or the system file picker took the focus: not a blur that ends editing. */
+const windowBlur = (): boolean => !document.hasFocus();
+
+/**
+ * The description (docs/08 «Доски»): the markdown-lite read view; a click turns it into the rich
+ * editor in place (RichDescription, owner 23.10) — saved on blur, ⌘↩ or «Готово», Esc cancels
+ * (asks first when something changed). The editor is uncontrolled: typing never re-renders this.
+ */
 export function DescriptionEditor({ task, canEdit, attachments }: { task: Task; canEdit: boolean; attachments: boolean }): ReactNode {
   const { guard, dialog } = useResetGuard(task);
   const [editing, setEditing] = useState(false);
-  const [v, setV] = useState(task.description);
+  const [discard, setDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
-  const pic = useRef<HTMLInputElement>(null);
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const [prev, setPrev] = useState(task.description);
-  if (prev !== task.description && !editing) {
-    setPrev(task.description);
-    setV(task.description);
-  }
-  useEffect(() => {
-    const el = ref.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = `${Math.max(96, el.scrollHeight)}px`;
-    }
-  }, [v, editing]);
-  const save = (): void => {
-    if (v === task.description) setEditing(false);
-    // Cancelling the reset prompt keeps the editor open with the draft.
-    else guard(() => { setEditing(false); void updateTask(task.id, { description: v }); });
+  const api = useRef<WikiEditorApi | null>(null);
+  /** The description as the editor writes it back untouched (a save without edits is no save). */
+  const base = useRef('');
+  /** Pictures uploading: a blur meanwhile keeps the editor (the picture lands in it). */
+  const uploads = useRef(0);
+  /** A save waits for the reset prompt: no second one from the blur it causes. */
+  const asking = useRef(false);
+  const live = useRef(task);
+  useLayoutEffect(() => {
+    live.current = task;
+  });
+
+  const start = (): void => {
+    if (!canEdit || editing) return;
+    base.current = docToDescription(descriptionToDoc(task.description));
+    setEditing(true);
   };
+  const close = (): void => {
+    asking.current = false;
+    api.current = null;
+    setDiscard(false);
+    setEditing(false);
+  };
+  const save = (): void => {
+    if (asking.current) return;
+    const next = draftOf(api.current, base.current);
+    if (next === null || next === task.description) {
+      close();
+      return;
+    }
+    if (next.length > DESCRIPTION_MAX) {
+      toast.error(t('boards.descriptionTooLong', { n: DESCRIPTION_MAX.toLocaleString() }));
+      return;
+    }
+    asking.current = true;
+    // Cancelling the reset prompt keeps the editor open with the draft.
+    guard(
+      () => {
+        close();
+        void updateTask(task.id, { description: next });
+      },
+      () => {
+        asking.current = false;
+        api.current?.focus();
+      },
+    );
+  };
+  const cancel = (): void => {
+    if (draftOf(api.current, base.current) === null) {
+      close();
+      return;
+    }
+    asking.current = true; // the prompt takes the focus: that blur is no save
+    setDiscard(true);
+  };
+  const keep = (): void => {
+    asking.current = false;
+    setDiscard(false);
+    api.current?.focus();
+  };
+  const onKey = (e: KeyboardEvent): boolean => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save();
+    else if (e.key === 'Escape') cancel();
+    else return false;
+    // The board's own keys (Esc closes the task) never see these.
+    e.stopPropagation();
+    return true;
+  };
+  const keyRef = useRef(onKey);
+  useLayoutEffect(() => {
+    keyRef.current = onKey;
+  });
+  const stableKey = useCallback((e: KeyboardEvent) => keyRef.current(e), []);
+  const onReady = useCallback((a: WikiEditorApi | null) => {
+    api.current = a;
+    a?.editor.commands.focus('end');
+  }, []);
+  // CBF-59: a picture pasted / dropped / picked in the editor becomes an attachment of the task at once; the text refers to it.
+  const upload = useCallback(
+    async (f: File): Promise<UploadedImage> => {
+      const cur = live.current;
+      if (cur.attachments.length >= ATTACH_MAX) throw new Error('too many attachments');
+      uploads.current++;
+      try {
+        const up = await uploadFile(boardsApi.uploadPath(cur.boardId), f, f.name || 'image.png', () => undefined).promise;
+        await setTaskAttachments(cur.id, [...live.current.attachments.map((a) => a.id), up.id]);
+        return { fileId: up.id, width: up.width, height: up.height };
+      } finally {
+        uploads.current--;
+      }
+    },
+    [],
+  );
   const attach = async (files: FileList | null): Promise<void> => {
     if (!files?.length) return;
     setBusy(true);
     try {
       const ids = task.attachments.map((a) => a.id);
-      for (const f of [...files].slice(0, 20 - ids.length)) ids.push((await uploadFile(boardsApi.uploadPath(task.boardId), f, f.name, () => undefined).promise).id);
+      for (const f of [...files].slice(0, ATTACH_MAX - ids.length)) ids.push((await uploadFile(boardsApi.uploadPath(task.boardId), f, f.name, () => undefined).promise).id);
       await setTaskAttachments(task.id, ids);
-    } catch (e) {
-      toast.fail(e, t('boards.err.save'));
-    } finally {
-      setBusy(false);
-    }
-  };
-  // CBF-59: a picture pasted / dropped / picked in the editor is uploaded as an attachment of the
-  // task and referenced from the draft at the caret (the text itself is saved with «Save»).
-  const insertPictures = async (list: File[]): Promise<void> => {
-    const pics = list.filter((f) => f.type.startsWith('image/')).slice(0, Math.max(0, 20 - task.attachments.length));
-    if (!pics.length) return;
-    let caret = ref.current?.selectionStart ?? v.length;
-    setBusy(true);
-    try {
-      const ids = task.attachments.map((a) => a.id);
-      const tokens: string[] = [];
-      for (const f of pics) {
-        const up = await uploadFile(boardsApi.uploadPath(task.boardId), f, f.name || 'image.png', () => undefined).promise;
-        ids.push(up.id);
-        tokens.push(imageToken(up.id, f.name || 'image.png'));
-      }
-      await setTaskAttachments(task.id, ids);
-      setV((cur) => {
-        let text = cur;
-        for (const tk of tokens) {
-          const r = insertImage(text, caret, tk);
-          text = r.text;
-          caret = r.caret;
-        }
-        return text;
-      });
     } catch (e) {
       toast.fail(e, t('boards.err.save'));
     } finally {
@@ -479,72 +542,42 @@ export function DescriptionEditor({ task, canEdit, attachments }: { task: Task; 
   };
   const removeAttachment = (f: FileMeta): void => guard(() => void setTaskAttachments(task.id, task.attachments.filter((x) => x.id !== f.id).map((x) => x.id)));
   const mention = useCallback((val: string, key: string) => <span key={key} className="font-medium text-accent-text">@{memberName(task.workspaceId, val)}</span>, [task.workspaceId]);
+  const view = (
+    <div
+      role={canEdit && !editing ? 'button' : undefined}
+      tabIndex={canEdit && !editing ? 0 : undefined}
+      onClick={start}
+      onPointerEnter={canEdit ? preloadWikiEditor : undefined}
+      onFocus={canEdit ? preloadWikiEditor : undefined}
+      onKeyDown={(e) => e.key === 'Enter' && start()}
+      className={cx('selectable min-h-8 whitespace-pre-wrap break-words rounded-[var(--radius-row)] text-body', canEdit && 'cursor-text hover:bg-[color-mix(in_srgb,var(--color-fill)_40%,transparent)]', !task.description && 'text-faint')}
+      data-testid="task-description"
+    >
+      {task.description ? splitDescription(task.description).map((seg, i) => seg.k === 'text' ? <Markdown key={i} text={seg.v} mention={mention} /> : <DescriptionImage key={i} id={seg.id} name={seg.name} list={task.attachments} />) : canEdit ? t('boards.descriptionPlaceholder') : t('boards.noDescription')}
+    </div>
+  );
   return (
     <section className="flex flex-col gap-2" aria-label={t('boards.description')}>
       {editing ? (
-        <>
-          <textarea
-            ref={ref}
-            autoFocus
-            value={v}
-            maxLength={DESCRIPTION_MAX}
-            onChange={(e) => setV(e.target.value)}
-            onPaste={(e) => {
-              const pics = attachments ? [...e.clipboardData.files].filter((f) => f.type.startsWith('image/')) : [];
-              if (!pics.length) return;
-              e.preventDefault();
-              void insertPictures(pics);
-            }}
-            onDrop={(e) => {
-              const pics = attachments ? [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')) : [];
-              if (!pics.length) return;
-              e.preventDefault();
-              void insertPictures(pics);
-            }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                save();
-              }
-              if (e.key === 'Escape') {
-                setV(task.description);
-                setEditing(false);
-              }
-            }}
-            placeholder={t('boards.descriptionPlaceholder')}
-            className="selectable w-full resize-none rounded-[var(--radius-card)] border border-accent bg-elev p-3 text-body text-fg outline-none"
-            data-testid="task-description-editor"
-          />
-          <div className="flex items-center justify-end gap-2">
-            <span className="mr-auto text-caption text-faint">{t('boards.markdownHint')}</span>
-            {attachments ? (
-              <>
-                <Button variant="ghost" size="sm" busy={busy} onClick={() => pic.current?.click()} data-testid="task-description-image">
-                  <ImagePlus className="size-3.5" aria-hidden /> {t('boards.insertImage')}
-                </Button>
-                <input ref={pic} type="file" accept="image/*" multiple hidden onChange={(e) => { void insertPictures([...(e.target.files ?? [])]); e.target.value = ''; }} />
-              </>
-            ) : null}
-            <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button size="sm" onClick={save} data-testid="task-description-save">
-              {t('common.save')}
+        <div
+          className="flex flex-col gap-1"
+          onBlur={(e) => {
+            const to = e.relatedTarget instanceof Element ? e.relatedTarget : null;
+            // Focus inside the editor, into its own popovers (the link field), out of the window, or a blur before the editor is there: still editing.
+            if ((to && (e.currentTarget.contains(to) || to.closest('.mat-popover'))) || windowBlur() || uploads.current || !api.current) return;
+            save();
+          }}
+          data-testid="task-description-editor"
+        >
+          <RichDescription workspaceId={task.workspaceId} initial={task.description} onUploadImage={attachments ? upload : undefined} onReady={onReady} onKey={stableKey} fallback={view} className="min-h-8 rounded-[var(--radius-row)]" />
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={save} title={`${MOD}↩`} data-testid="task-description-save">
+              {t('boards.descriptionDone')}
             </Button>
           </div>
-        </>
-      ) : (
-        <div
-          role={canEdit ? 'button' : undefined}
-          tabIndex={canEdit ? 0 : undefined}
-          onClick={() => canEdit && setEditing(true)}
-          onKeyDown={(e) => canEdit && e.key === 'Enter' && setEditing(true)}
-          className={cx('selectable min-h-8 whitespace-pre-wrap break-words rounded-[var(--radius-row)] text-body', canEdit && 'cursor-text hover:bg-[color-mix(in_srgb,var(--color-fill)_40%,transparent)]', !task.description && 'text-faint')}
-          data-testid="task-description"
-        >
-          {task.description ? splitDescription(task.description).map((seg, i) => seg.k === 'text' ? <Markdown key={i} text={seg.v} mention={mention} /> : <DescriptionImage key={i} id={seg.id} name={seg.name} list={task.attachments} />) : canEdit ? t('boards.descriptionPlaceholder') : t('boards.noDescription')}
         </div>
+      ) : (
+        view
       )}
       {attachments && (task.attachments.length || canEdit) ? (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -560,6 +593,25 @@ export function DescriptionEditor({ task, canEdit, attachments }: { task: Task; 
             </>
           ) : null}
         </div>
+      ) : null}
+      {discard ? (
+        <Modal
+          open
+          onClose={keep}
+          title={t('boards.descriptionDiscard')}
+          footer={
+            <>
+              <Button variant="secondary" onClick={keep}>
+                {t('boards.descriptionKeep')}
+              </Button>
+              <Button variant="destructive" onClick={close} data-testid="task-description-discard">
+                {t('boards.descriptionDiscardConfirm')}
+              </Button>
+            </>
+          }
+        >
+          {null}
+        </Modal>
       ) : null}
       {dialog}
     </section>

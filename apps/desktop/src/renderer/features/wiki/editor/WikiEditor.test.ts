@@ -307,4 +307,36 @@ describe('WikiEditor', () => {
     expect(json).not.toContain('blob:');
     expect(docPlainText(doc)).toBe('text');
   });
+
+  it('standalone (no Yjs): edits its content with local undo, offers only its blocks, lets the page take keys', () => {
+    const keys: string[] = [];
+    const onKey = (e: KeyboardEvent): boolean => {
+      keys.push(e.key);
+      return e.key === 'Escape';
+    };
+    const { api, editor } = mount(null as unknown as Y.Doc, true, { doc: null, content: fromMarkdown('- a'), blocks: ['text', 'bullet'], highlight: false, onKey });
+    expect(toMarkdown(editor().getJSON() as PmNode, { lite: true })).toBe('- a');
+    act(() => {
+      editor().commands.focus('end');
+      editor().commands.insertContent('b');
+    });
+    expect(toMarkdown(editor().getJSON() as PmNode, { lite: true })).toBe('- ab');
+    act(() => {
+      editor().commands.undo();
+    });
+    expect(toMarkdown(editor().getJSON() as PmNode, { lite: true })).toBe('- a');
+    const key = (k: string): boolean => !!editor().view.someProp('handleKeyDown', (f) => f(editor().view, new KeyboardEvent('keydown', { key: k })));
+    expect(key('Escape')).toBe(true);
+    expect(key('x')).toBe(false);
+    expect(keys).toEqual(['Escape', 'x']);
+    act(() => api().openBlocks());
+    expect([...document.querySelectorAll('[role=option]')].map((o) => o.textContent)).toHaveLength(2);
+    // While a popover is open Esc is its own: the page is not asked; the window-level catch closes it.
+    key('Escape');
+    expect(keys).toEqual(['Escape', 'x']);
+    act(() => {
+      editor().view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(document.querySelectorAll('[role=option]')).toHaveLength(0);
+  });
 });

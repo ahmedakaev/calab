@@ -1074,10 +1074,18 @@ test('m-boards-task', async ({ page }) => {
   await tab(page, 'boards');
   const nav = page.getByTestId('phone-boards');
   await nav.getByTestId('board-row').filter({ hasText: 'Разработка' }).getByRole('button').first().tap();
-  await page.getByTestId('list-row').filter({ hasText: 'CAL-3' }).tap();
+  // The title, not the row's centre (that is the due date cell, which opens its menu).
+  await page.getByTestId('list-row').filter({ hasText: 'CAL-3' }).getByText('Эхо в звонке').tap();
   const panel = page.getByTestId('task-panel');
   await expect(panel.getByTestId('assignee-row')).toHaveCount(2);
   await checkpoint(page, 'm-boards-task');
+  // Owner 23.10: a tap on the description edits it in place in the wiki's editor («Готово» under it).
+  await panel.getByTestId('task-description').tap();
+  const prose = panel.getByTestId('task-description-editor').locator('.wiki-prose');
+  await expect(prose).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('[] проверить на телефоне');
+  await checkpoint(page, 'm-boards-task-desc', { keyboard: true });
 });
 
 // «История» on the phone's task screen (ADR-0091): two tabs as segments, a detail opened.

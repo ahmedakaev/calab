@@ -505,3 +505,36 @@
 .wiki-editor[data-phone] .wiki-prose {
   padding-bottom: var(--space-8);
 }
+
+/* Compact (task description, docs/08 «Доски»): body text 14/20 like the read view, tighter blocks,
+   pictures left-aligned and capped like the description's own (420 px); no keyboard-bar room. */
+.wiki-editor[data-compact] .wiki-prose {
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  padding-bottom: 0;
+}
+.wiki-editor[data-compact] .wiki-prose p {
+  min-height: var(--text-body--line-height);
+}
+.wiki-editor[data-compact] .wiki-prose > * + * {
+  margin-top: var(--space-1);
+}
+.wiki-editor[data-compact] .wiki-prose h1,
+.wiki-editor[data-compact] .wiki-prose h2,
+.wiki-editor[data-compact] .wiki-prose h3 {
+  margin-top: var(--space-3);
+}
+.wiki-editor[data-compact] .wiki-prose > :first-child {
+  margin-top: 0;
+}
+.wiki-editor[data-compact] .wiki-prose ul[data-type='taskList'] > li > label {
+  height: var(--text-body--line-height);
+}
+.wiki-editor[data-compact] .wiki-image {
+  justify-content: flex-start;
+}
+.wiki-editor[data-compact] .wiki-image-img {
+  max-height: 420px;
+  width: auto;
+  object-fit: contain;
+}

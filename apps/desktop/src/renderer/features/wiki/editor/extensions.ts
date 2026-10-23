@@ -5,7 +5,7 @@ import { Collaboration } from '@tiptap/extension-collaboration';
 import { CollaborationCaret } from '@tiptap/extension-collaboration-caret';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
-import { Placeholder } from '@tiptap/extensions';
+import { Placeholder, UndoRedo } from '@tiptap/extensions';
 import { isAllowedHref, wikiStarterKit } from '@calaba/wiki-doc/schema';
 import type { Awareness } from 'y-protocols/awareness';
 import type * as Y from 'yjs';
@@ -84,7 +84,11 @@ const shortcuts = (env: EditorEnv) =>
     },
   });
 
-export function buildExtensions(o: { doc: Y.Doc; awareness: Awareness | null; me: WikiEditorUser; env: EditorEnv }): AnyExtension[] {
+/**
+ * `doc`: the page's Y.Doc (collaboration, Yjs undo); null — a standalone editor over `content`
+ * (task descriptions): ProseMirror's own undo history, no carets.
+ */
+export function buildExtensions(o: { doc: Y.Doc | null; awareness: Awareness | null; me: WikiEditorUser; env: EditorEnv; placeholder?: string | undefined }): AnyExtension[] {
   const exts: AnyExtension[] = [
     wikiStarterKit(),
     WikiCodeBlock.configure({ defaultLanguage: null, enableTabIndentation: true }),
@@ -104,10 +108,10 @@ export function buildExtensions(o: { doc: Y.Doc; awareness: Awareness | null; me
     pageLinks(o.env),
     wikiPaste(o.env),
     shortcuts(o.env),
-    Placeholder.configure({ placeholder: t('wiki.editor.placeholder'), showOnlyWhenEditable: true }),
-    Collaboration.configure({ document: o.doc, field: WIKI_FIELD }),
+    Placeholder.configure({ placeholder: o.placeholder ?? t('wiki.editor.placeholder'), showOnlyWhenEditable: true }),
+    o.doc ? Collaboration.configure({ document: o.doc, field: WIKI_FIELD }) : UndoRedo,
   ];
-  if (o.awareness) {
+  if (o.doc && o.awareness) {
     exts.push(
       CollaborationCaret.configure({
         provider: { awareness: o.awareness },
