@@ -302,4 +302,8 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await joinVoice(win);
   await openRoadmap(win);
   await checkpoint(shot, 'canvas-voice');
+  // A folded tree leaves no column: the island keeps its usual width.
+  await win.getByTestId('canvas-tree-collapse').click();
+  await expect(win.getByTestId('canvas-column')).toHaveCount(0);
+  await checkpoint(shot, 'canvas-voice-collapsed');
 });
