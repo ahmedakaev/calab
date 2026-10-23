@@ -32,7 +32,7 @@ export function ParkedRoomLine({ className }: { className?: string }): ReactNode
       </button>
       <button
         type="button"
-        className="shrink-0 rounded-[var(--radius-control)] font-medium text-danger hover:underline mobile:tap-h"
+        className="shrink-0 rounded-[var(--radius-control)] font-medium text-danger-text hover:underline mobile:tap-h"
         onClick={() => voice.leaveParked()}
         aria-label={t('call.sipParkedLeave')}
         title={t('call.sipParkedLeave')}

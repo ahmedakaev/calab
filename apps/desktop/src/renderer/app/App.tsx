@@ -25,6 +25,7 @@ import { WaitingScreen } from '../features/guests/WaitingScreen';
 import { useWaiting } from '../features/guests/stores/admissions';
 import { useLocale, t, type Locale } from '../i18n';
 import { useTimeFormat } from '../lib/format';
+import { setVoice } from '../stores/voice';
 import { usePrefs } from '../stores/prefs';
 import { queryClient } from '../lib/queryClient';
 import { platform } from '../platform';
@@ -42,6 +43,8 @@ declare global {
     __calabaLogout?: () => Promise<void>;
     /** Visual / marketing tests only: switch the UI language live (landing shots per locale). */
     __calabaLocale?: (locale: Locale) => void;
+    /** Visual tests only: the room a phone call parked (ADR-0133) — the phone harness has no LiveKit link to park. */
+    __calabaParked?: (p: { roomId: string; workspaceId: string } | null) => void;
   }
 }
 
@@ -58,9 +61,11 @@ function useTheme(): void {
     if (!visualTest) return;
     window.__calabaLogout = () => logout();
     window.__calabaLocale = (locale) => usePrefs.getState().setPrefs({ locale });
+    window.__calabaParked = (parked) => setVoice({ parked });
     return () => {
       delete window.__calabaLogout;
       delete window.__calabaLocale;
+      delete window.__calabaParked;
     };
   }, [os, visualTest]);
   useEffect(() => {

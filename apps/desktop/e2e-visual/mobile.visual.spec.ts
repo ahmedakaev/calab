@@ -1682,6 +1682,13 @@ test('m-telephony', async ({ page }) => {
   const strip = page.getByTestId('mobile-voice-strip');
   // The transfer does not wait for the media: WebKit's LiveKit link may still be connecting — masked.
   const status = [strip.getByTestId('mobile-voice-status')];
+  // ADR-0133: a room parked by the call (WebKit's link cannot connect here to park one for real):
+  // «Комната: Созвон — на паузе» · «Выйти» above the strip.
+  await expect(strip).toBeVisible();
+  await page.evaluate((ids) => (window as unknown as { __calabaParked?: (p: { roomId: string; workspaceId: string } | null) => void }).__calabaParked?.({ roomId: ids[0], workspaceId: ids[1] }), [IDS.rooms.call, IDS.workspaces.main]);
+  await expect(strip.getByTestId('voice-parked')).toContainText('Комната: Созвон — на паузе');
+  await checkpoint(page, 'm-sip-parked', { mask: status });
+  await page.evaluate(() => (window as unknown as { __calabaParked?: (p: null) => void }).__calabaParked?.(null));
   await strip.getByTestId('sip-transfer').tap();
   const picker = page.getByTestId('sip-transfer-picker');
   await expect(picker.getByRole('option', { name: /Борис/ })).toBeVisible();
