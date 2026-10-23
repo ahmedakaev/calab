@@ -1,19 +1,20 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { BotsPage } from '@/components/bots';
+import { DevelopersPage } from '@/components/developers';
 import { Footer } from '@/components/footer';
 import { Header } from '@/components/header';
+import { getPageCopy } from '@/components/page-copy';
 import { getDict, hreflangAlternates, isLocale, LOCALE_INFO, localePath } from '@/i18n';
 
 type Params = Promise<{ locale: string }>;
 
-const PAGE = 'bots/';
+const PAGE = 'developers/';
 
 // Title, description and URLs of this page; icons, OG image and the rest come from [locale]/layout.tsx.
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const { title, description } = getDict(locale).bots.meta;
+  const { metaTitle: title, metaDescription: description } = getPageCopy(locale).developers;
   const path = localePath(locale, PAGE);
   return {
     title,
@@ -32,16 +33,15 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
-export default async function Bots({ params }: { params: Params }) {
+export default async function Developers({ params }: { params: Params }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const t = getDict(locale);
   return (
     <>
       <Header t={t.header} locale={locale} page={PAGE} />
-      <main id="main">
-        {/* Russian docs for ru; the English ones for every other locale (es/zh: English only). */}
-        <BotsPage t={t.bots} docsUrl={localePath(locale, 'docs/bots/')} />
+      <main id="main" className="site">
+        <DevelopersPage locale={locale} bots={t.bots} />
       </main>
       <Footer t={t.footer} locale={locale} />
     </>

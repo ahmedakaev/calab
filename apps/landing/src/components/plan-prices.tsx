@@ -37,12 +37,12 @@ export function PlanMonth({ plan, locale, t, className }: { plan: PaidPlan; loca
 export function PlanCta({ locale, t, label }: { locale: Locale; t: Live; label: string }) {
   const { view } = useOffersView(useLang(locale));
   if (view.mode === 'snapshot') {
-    return <Button href={CONTACT_FORM_URL} variant="secondary" className="w-full">{label}</Button>;
+    return <Button href={CONTACT_FORM_URL} variant="secondary" size="md" className="w-full">{label}</Button>;
   }
   if (view.contactOnly) {
-    return <Button href={view.contact || CONTACT_FORM_URL} variant="secondary" className="w-full">{t.request}</Button>;
+    return <Button href={view.contact || CONTACT_FORM_URL} variant="secondary" size="md" className="w-full">{t.request}</Button>;
   }
-  return <Button href={APP_URL} variant="secondary" className="w-full">{t.connect}</Button>;
+  return <Button href={APP_URL} variant="secondary" size="md" className="w-full">{t.connect}</Button>;
 }
 
 const MARKETS: Market[] = ['ru', 'global'];

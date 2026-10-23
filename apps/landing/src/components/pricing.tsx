@@ -2,9 +2,12 @@ import { ChevronDown, Lock } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { localePath, type Dict, type Locale } from '@/i18n';
+import { getHome } from '@/i18n/home';
 import { APP_URL, repoFile } from '@/lib/site';
 import { PlanCta, PlanMonth, PlanPrice, PricesBar } from './plan-prices';
 import { Button, Section, SectionHeading } from './ui';
+
+const KEY_ROWS = ['members', 'room', 'boards', 'canvases'] as const;
 
 const PLAN_IDS = ['free', 'team', 'business', 'enterprise'] as const;
 type PlanId = (typeof PLAN_IDS)[number];
@@ -47,10 +50,10 @@ const ROW_IDS = Object.keys({
 const CTA: Record<PlanId, (t: Dict['pricing'], locale: Locale) => ReactNode> = {
   free: (t) => (
     <div className="flex gap-2">
-      <Button href="#download" size="card" className="min-w-0 flex-1">
+      <Button href="#download" size="md" className="min-w-0 flex-1 px-3">
         {t.cta.download}
       </Button>
-      <Button href={APP_URL} variant="secondary" size="card" className="min-w-0 flex-1">
+      <Button href={APP_URL} variant="secondary" size="md" className="min-w-0 flex-1 px-3">
         {t.cta.web}
       </Button>
     </div>
@@ -58,7 +61,7 @@ const CTA: Record<PlanId, (t: Dict['pricing'], locale: Locale) => ReactNode> = {
   team: (t, locale) => <PlanCta locale={locale} t={t.live} label={t.cta.contact} />,
   business: (t, locale) => <PlanCta locale={locale} t={t.live} label={t.cta.contact} />,
   enterprise: (t) => (
-    <Button href={repoFile('COMMERCIAL-LICENSE.md')} variant="secondary" className="w-full">
+    <Button href={repoFile('COMMERCIAL-LICENSE.md')} variant="secondary" size="md" className="w-full">
       {t.cta.license}
     </Button>
   ),
@@ -87,29 +90,25 @@ function Cell({ value, t }: { value: string; t: Dict['pricing']['table'] }) {
 }
 
 /**
- * Plans (README «Тарифы», ADR-0024; Free · Team · Business · Enterprise = own server): four plan cards (Free is where to start) and one comparison
- * table from md up, expanded by default; on phones the table would need a sideways scroll, so each card carries its own
- * values in a native <details> instead (no JS).
+ * Plans (README «Тарифы», ADR-0024; Free · Team · Business · Enterprise = own server): four plan cards with their four
+ * key limits (Free is where to start); the full comparison table from md up sits in a closed native <details> (§4.10);
+ * on phones the table would need a sideways scroll, so each card carries its own values in a <details> instead (no JS).
  */
 export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
   const tb = t.table;
+  const h = getHome(locale).pricing;
   return (
     <Section id="pricing" labelledBy="pricing-title">
-      <div className="sticker-section-heading">
-      <SectionHeading id="pricing-title" eyebrow={t.eyebrow} title={t.title} lead={t.lead} />
-        <img className="section-sticker" src="/editorial/sticker-pricing.webp" width={180} height={180} alt="" loading="lazy" />
-      </div>
+      <SectionHeading id="pricing-title" eyebrow={t.eyebrow} title={t.title} lead={t.lead} sticker="pricing" />
       <PricesBar locale={locale} t={t.live} />
-      <ul className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <ul className="swipe-sm mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {PLAN_IDS.map((id, col) => {
           const plan = t.plans[id];
           const start = id === 'free';
           return (
             <li
               key={id}
-              className={
-                'relative flex flex-col rounded-[24px] border bg-card p-6 ' + (start ? 'border-2 border-accent' : 'border-line')
-              }
+              className={'card plan-card' + (start ? ' plan-card-start' : '')}
             >
               {start && (
                 <p className="absolute -top-3 left-6 rounded-full bg-accent-strong px-3 py-0.5 text-[13px] leading-5 font-semibold text-white">
@@ -129,6 +128,16 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
                 </>
               )}
               <p className="mt-1 text-[14px] leading-5 text-pretty text-fg-2">{plan.note}</p>
+              <dl className="plan-keys">
+                {KEY_ROWS.map((row) => (
+                  <div key={row}>
+                    <dt>{h.rows[row]}</dt>
+                    <dd>
+                      <Cell value={tb.cells[row][col] ?? ''} t={tb} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
               <details className="group mt-4 md:hidden">
                 <summary className="flex min-h-11 cursor-pointer items-center justify-between rounded-md text-[15px] font-medium text-accent-text">
                   {tb.details}
@@ -153,11 +162,24 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
           );
         })}
       </ul>
-      <p className="mt-6 max-w-[860px] text-[14px] leading-6 text-fg-2">
-        {t.billingNote}{' '}
-        <Link href={localePath(locale, 'legal/offer/')} className="link">{t.offerLink}</Link>
-      </p>
-      <div className="mt-10 hidden overflow-hidden rounded-[24px] md:block">
+      <div className="pricing-notes">
+        <p className="caption">
+          {t.billingNote}{' '}
+          <Link href={localePath(locale, 'legal/offer/')} className="link">{t.offerLink}</Link>
+        </p>
+        <p className="caption pricing-license">
+          {t.license}{' '}
+          <a href={repoFile('LICENSE')} className="link">
+            {t.licenseLink}
+          </a>
+        </p>
+      </div>
+      <details className="compare mt-6 hidden md:block">
+        <summary className="compare-summary">
+          {h.compare}
+          <ChevronDown aria-hidden="true" className="chevron size-5 motion-safe:transition-transform" strokeWidth={1.75} />
+        </summary>
+        <div className="compare-table">
         <table className="w-full table-fixed border-collapse text-[15px] leading-6">
           <caption className="sr-only">{tb.caption}</caption>
           <colgroup>
@@ -198,13 +220,8 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
             ))}
           </tbody>
         </table>
-      </div>
-      <p className="mt-10 max-w-[860px] border-l-4 border-accent pl-6 text-[14px] leading-5 text-pretty text-fg-2">
-        {t.license}{' '}
-        <a href={repoFile('LICENSE')} className="link">
-          {t.licenseLink}
-        </a>
-      </p>
+        </div>
+      </details>
     </Section>
   );
 }

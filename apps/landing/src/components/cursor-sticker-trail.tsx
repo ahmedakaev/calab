@@ -65,6 +65,6 @@ export function CursorStickerTrail({ quiet = false }: { quiet?: boolean }) {
     };
   }, [quiet]);
   return <span ref={layer} className={`cursor-sticker-layer ${quiet ? 'cursor-sticker-layer-quiet' : ''}`} aria-hidden="true">
-    {Array.from({ length: count }, (_, index) => <img key={index} className="trail-sticker" src={stickerSrc(STICKERS[index] ?? 'chat')} width={180} height={180} alt="" draggable={false} />)}
+    {Array.from({ length: count }, (_, index) => <img key={index} className="trail-sticker" width={180} height={180} alt="" draggable={false} />)}
   </span>;
 }

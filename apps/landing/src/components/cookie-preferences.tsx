@@ -73,7 +73,7 @@ export function CookiePreferences({ locale }: { locale: Locale }) {
     <div className="fixed right-4 bottom-4 z-50 max-w-[calc(100vw-2rem)] print:hidden">
       {visible && (
         <section id="site-cookie-panel" role="region" aria-labelledby="cookie-title"
-          className="mb-3 max-h-[calc(100dvh-6rem)] w-[400px] max-w-full overflow-y-auto rounded-2xl border border-white/20 bg-card p-5 shadow-xl"
+          className="fixed right-4 bottom-[4.5rem] max-h-[calc(100dvh-6rem)] w-[400px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-white/20 bg-card p-5 shadow-xl"
           onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
           <div className="flex items-start justify-between gap-3">
             <h2 id="cookie-title" ref={heading} tabIndex={-1} className="pt-2 text-[17px] font-semibold">{t.title}</h2>

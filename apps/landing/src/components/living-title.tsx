@@ -1,52 +1,96 @@
 'use client';
 import { useEffect, useRef } from 'react';
 
-/** Reference proximity contract, with a finite animation loop instead of an idle ticker. */
-export function LivingTitle({ lines, className }: { lines: string[]; className?: string }) {
- const root = useRef<HTMLHeadingElement>(null);
- useEffect(() => {
-   const node = root.current; if (!node) return;
-   const media = window.matchMedia('(pointer: fine) and (prefers-reduced-motion: no-preference)');
-   const glyphs = [...node.querySelectorAll<HTMLElement>('[data-glyph]')].map((el) => {
-     const accent = !!el.closest('.title-line-accent'); const rest = accent ? 400 : 900;
-     return { el, accent, rest, near: accent ? 900 : 100, x: 0, y: 0, value: rest };
-   });
-   let frame = 0;
-   let disposed = false;
-   const measure = () => { glyphs.forEach((g) => { const b = g.el.parentElement?.getBoundingClientRect(); if (b) { g.x = b.left + b.width / 2; g.y = b.top + b.height / 2; } }); };
-   let pointerX = 0;
-   let pointerY = 0;
-   const tick = () => {
-     frame = 0;
-     // Positions are read on demand (no scroll listener); a title far off screen is ignored.
-     const box = node.getBoundingClientRect();
-     if (box.bottom < -400 || box.top > window.innerHeight + 400) return;
-     measure();
-     glyphs.forEach((g) => {
-       const strength = Math.max(0, 1 - Math.hypot(pointerX - g.x, pointerY - g.y) / 400);
-       const weight = g.rest + (g.near - g.rest) * strength;
-       if (Math.abs(weight - g.value) < .5) return;
-       g.value = weight;
-       g.el.style.fontVariationSettings = `"wght" ${weight.toFixed(2)}`;
-     });
-   };
-   const pointer = (e: PointerEvent) => {
-     if (!media.matches || e.pointerType !== 'mouse') return;
-     pointerX = e.clientX;
-     pointerY = e.clientY;
-     if (!frame) frame = requestAnimationFrame(tick);
-   };
-   const reset = () => { cancelAnimationFrame(frame); frame = 0; glyphs.forEach((g) => { g.value = g.rest; g.el.style.removeProperty('font-variation-settings'); }); };
-   measure();
-   const observer = new ResizeObserver(measure); observer.observe(node);
-   document.fonts.ready.then(() => { if (!disposed) measure(); }).catch(() => {});
-   window.addEventListener('pointermove', pointer, { passive: true });
-   window.addEventListener('resize', measure);
-   node.addEventListener('animationend', measure);
-   media.addEventListener('change', reset);
-   return () => { disposed = true; reset(); observer.disconnect(); window.removeEventListener('pointermove', pointer); window.removeEventListener('resize', measure); node.removeEventListener('animationend', measure); media.removeEventListener('change', reset); };
- }, []);
- return <h1 ref={root} id="hero-title" className={`story-hero-title living-title ${className ?? ''}`} aria-label={lines.join(' ')}>
- {lines.map((line,index) => <span key={line} className={`living-line ${index === lines.length - 1 ? 'title-line-accent' : ''}`} aria-hidden="true">{Array.from(line.replace(/\.$/, '').toUpperCase()).map((char,i) => <span className="glyph-slot" data-char={char === ' ' ? '\u00a0' : char} key={i} style={{animationDelay:`${.15 + index * .14 + i * .025}s`}}><span data-glyph>{char === ' ' ? '\u00a0' : char}</span></span>)}</span>)}
- </h1>;
+const CJK = /[\u3000-\u9fff\uff00-\uffef]/;
+
+/** Words that wrap as wholes; CJK text breaks between characters, as it normally would. */
+function words(text: string): string[] {
+  const out: string[] = [];
+  for (const w of text.split(/\s+/).filter(Boolean)) {
+    // A dash stays with the word before it (never starts a line).
+    if (/^[—–-]$/.test(w) && out.length) out[out.length - 1] = `${out.at(-1) ?? ''}\u00a0${w}`;
+    else out.push(...(CJK.test(w) ? Array.from(w) : [w]));
+  }
+  return out;
+}
+
+/**
+ * The live headline (CalabCondensed 900): each glyph lightens as the mouse comes near. Work happens only on
+ * pointer moves over a visible title (one rAF per move, no idle loop); touch, reduced motion — a static title.
+ * Every glyph reserves its 900-weight width, so the line never reflows while the weight changes.
+ */
+export function LivingTitle({ text, id, className }: { text: string; id: string; className?: string }) {
+  const root = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const node = root.current;
+    if (!node) return;
+    const media = window.matchMedia('(pointer: fine) and (prefers-reduced-motion: no-preference)');
+    const glyphs = [...node.querySelectorAll<HTMLElement>('[data-glyph]')].map((el) => ({ el, x: 0, y: 0, value: 900 }));
+    let frame = 0;
+    let disposed = false;
+    let px = 0;
+    let py = 0;
+    const measure = () => {
+      glyphs.forEach((g) => {
+        const b = g.el.parentElement?.getBoundingClientRect();
+        if (b) {
+          g.x = b.left + b.width / 2;
+          g.y = b.top + b.height / 2;
+        }
+      });
+    };
+    const tick = () => {
+      frame = 0;
+      const box = node.getBoundingClientRect();
+      if (box.bottom < 0 || box.top > window.innerHeight) return;
+      measure();
+      glyphs.forEach((g) => {
+        const strength = Math.max(0, 1 - Math.hypot(px - g.x, py - g.y) / 400);
+        const weight = 900 - 800 * strength;
+        if (Math.abs(weight - g.value) < 0.5) return;
+        g.value = weight;
+        g.el.style.fontVariationSettings = `"wght" ${weight.toFixed(1)}`;
+      });
+    };
+    const pointer = (e: PointerEvent) => {
+      if (!media.matches || e.pointerType !== 'mouse') return;
+      px = e.clientX;
+      py = e.clientY;
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
+    const reset = () => {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      glyphs.forEach((g) => {
+        g.value = 900;
+        g.el.style.removeProperty('font-variation-settings');
+      });
+    };
+    document.fonts.ready.then(() => { if (!disposed) measure(); }).catch(() => undefined);
+    window.addEventListener('pointermove', pointer, { passive: true });
+    media.addEventListener('change', reset);
+    return () => {
+      disposed = true;
+      reset();
+      window.removeEventListener('pointermove', pointer);
+      media.removeEventListener('change', reset);
+    };
+  }, []);
+  let n = 0;
+  return (
+    <h1 ref={root} id={id} className={`h1 living-title ${className ?? ''}`} aria-label={text}>
+      {words(text).map((word, w) => (
+        <span key={w} aria-hidden="true">
+          <span className="living-word">
+            {Array.from(word).map((char, i) => (
+              <span className="glyph-slot" data-char={char} key={i} style={{ animationDelay: `${0.1 + n++ * 0.018}s` }}>
+                <span data-glyph>{char}</span>
+              </span>
+            ))}
+          </span>
+          {CJK.test(word) ? null : ' '}
+        </span>
+      ))}
+    </h1>
+  );
 }
