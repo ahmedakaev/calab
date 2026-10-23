@@ -76,12 +76,12 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await win.mouse.move(700, 300);
 
   // 2b. The folded list: «show» at the left of the header, the canvas takes the width (dark and light).
-  await win.getByTestId('canvas-tree-collapse').click();
+  await win.getByTestId('canvas-tree-toggle').click();
   await expect(win.getByTestId('canvas-column')).toHaveCount(0);
-  await expect(win.getByTestId('canvas-tree-expand')).toBeVisible();
+  await expect(win.getByTestId('canvas-tree-toggle')).toBeVisible();
   await win.waitForTimeout(150);
   await checkpoint(shot, 'canvas-tree-collapsed');
-  await win.getByTestId('canvas-tree-expand').click();
+  await win.getByTestId('canvas-tree-toggle').click();
   await expect(win.getByTestId('canvas-column')).toBeVisible();
 
   // 3. A selected sticky and its properties panel (dark and light).
@@ -158,7 +158,7 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await win.getByTestId('canvas-node').filter({ hasText: 'Палитра' }).getByTestId('canvas-node-open').click();
   await expect(win.getByTestId('canvas-title')).toHaveText('Палитра');
   await expect(win.getByTestId('canvas-connecting')).toHaveCount(0);
-  await win.getByTestId('canvas-tree-collapse').click();
+  await win.getByTestId('canvas-tree-toggle').click();
   await win.getByTestId('canvas-fit-all').click();
   await win.waitForTimeout(900);
   await checkpoint(shot, 'canvas-palette');
@@ -303,7 +303,7 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await openRoadmap(win);
   await checkpoint(shot, 'canvas-voice');
   // A folded tree leaves no column: the island keeps its usual width.
-  await win.getByTestId('canvas-tree-collapse').click();
+  await win.getByTestId('canvas-tree-toggle').click();
   await expect(win.getByTestId('canvas-column')).toHaveCount(0);
   await checkpoint(shot, 'canvas-voice-collapsed');
 });

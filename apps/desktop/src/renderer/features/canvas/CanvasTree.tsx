@@ -2,12 +2,12 @@ import * as Dropdown from '@radix-ui/react-dropdown-menu';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
 import { CanvasItemKind } from '@calaba/protocol';
-import { ArrowLeft, ChevronRight, FilePlus2, Folder, FolderOpen, FolderPlus, PanelLeftClose, Plus, RotateCcw, Search, Shapes, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, FilePlus2, Folder, FolderOpen, FolderPlus, Plus, RotateCcw, Search, Shapes, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { CreateButton } from '../../components/CreateButton';
-import { Button, IconButton, Input, MOD, Spinner, cx } from '../../components/ui';
+import { Button, IconButton, Input, Spinner, cx } from '../../components/ui';
 import { t, useLocale } from '../../i18n';
 import { fmt } from '../../lib/format';
 import { canStructure, canWrite, childKey, filterItems, TOP, trashKey, type DropZone } from '../../lib/canvas/tree';
@@ -72,9 +72,6 @@ function TreeColumn({ workspaceId, canCreate }: { workspaceId: string; canCreate
           />
         </span>
         {canCreate ? <CreateMenu workspaceId={workspaceId} /> : null}
-        <IconButton label={t('canvas.hideTree')} shortcut={`${MOD}\\`} onClick={() => useCanvasUi.getState().setTreeCollapsed(true)} data-testid="canvas-tree-collapse">
-          <PanelLeftClose className="size-4" strokeWidth={1.75} aria-hidden />
-        </IconButton>
       </div>
       <nav className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-1.5" aria-label={t('canvas.tree')} data-testid="canvas-tree">
         {query.trim() ? <SearchResults workspaceId={workspaceId} query={query} /> : <ChildList workspaceId={workspaceId} parentId={TOP} depth={0} />}
