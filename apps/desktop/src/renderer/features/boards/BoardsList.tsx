@@ -162,7 +162,8 @@ export function BoardsList({ workspaceId }: { workspaceId: string }): ReactNode 
   return (
     <div
       ref={list}
-      className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto px-2 pb-5 pt-1 mobile:px-0 mobile:pt-1"
+      className="scrollbar-none relative min-h-0 flex-1 overflow-y-auto px-2 pt-1 mobile:px-0 mobile:pt-1"
+      style={{ paddingBottom: 'calc(var(--island-height, 0px) + 20px)' }}
       onClickCapture={(e) => {
         if (suppress.current) {
           e.stopPropagation();

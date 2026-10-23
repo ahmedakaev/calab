@@ -1,5 +1,5 @@
 import { expect, test } from './app';
-import { checkpoint } from './harness';
+import { checkpoint, joinVoice } from './harness';
 
 /**
  * «Диск» on the desktop (ADR-0094 §8, docs/08 «Диск»): the root as tiles and as a list, the
@@ -24,6 +24,12 @@ test('disk-tiles', async ({ open, win, shot, theme }) => {
   await expect(tiles.first()).toContainText('Дизайн');
   await expect(win.getByTestId('disk-meter')).toBeVisible();
   await checkpoint(shot, 'disk-tiles');
+
+  // Owner 23.10: the same bottom island in a call; the usage meter sits at the footer's right end, the left stays free under the island.
+  await joinVoice(win);
+  await win.getByTestId('section-disk').click();
+  await expect(tiles).toHaveCount(9);
+  await checkpoint(shot, 'disk-voice');
 });
 
 test('disk-list', async ({ open, win, shot, theme }) => {
@@ -59,6 +65,7 @@ test('disk-list', async ({ open, win, shot, theme }) => {
   await win.keyboard.press('Space');
   await expect(win.getByTestId('audio-player')).toBeVisible();
   await checkpoint(shot, 'disk-preview-audio');
+  await win.keyboard.press('Escape');
   await win.getByTestId('disk-crumb').filter({ hasText: 'Диск' }).first().click();
   await expect(win.getByTestId('disk-row')).toHaveCount(9);
   // CBF-21: «Колонки» — the root column, a folder opens the next one, a file adds the card column.

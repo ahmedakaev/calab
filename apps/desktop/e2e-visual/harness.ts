@@ -306,6 +306,19 @@ export async function expectAccessible(page: Page, name: string): Promise<void> 
   expect.soft(bad, `axe: ${name}`).toEqual([]);
 }
 
+// ---------------------------------------------------------------- voice
+
+/**
+ * Joins the voice room «Переговорка» from the chats section (needs the dev LiveKit,
+ * `livekit-server --dev` or `pnpm infra:dev`), so a following screen is captured in a call.
+ */
+export async function joinVoice(page: Page): Promise<void> {
+  await page.getByTestId('section-chats').click();
+  await page.locator('aside').getByRole('button', { name: /Переговорка/ }).first().click();
+  await page.getByRole('region', { name: 'Переговорка' }).getByRole('button', { name: 'Войти в голос', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^Качество связи: Хорошее/ })).toBeVisible({ timeout: 30_000 });
+}
+
 // ---------------------------------------------------------------- one checkpoint
 
 export interface Shot {

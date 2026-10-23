@@ -27,7 +27,7 @@ export function MailSidebar(): ReactNode {
   const accountIds = useMail((s) => s.accountIds);
   if (!shown) return null;
   return (
-    <nav className="mat-sidebar mat-sidebar-window relative flex w-[clamp(224px,19vw,260px)] shrink-0 flex-col border-r border-line" aria-label={t('mbox.sidebar')} data-testid="mail-sidebar">
+    <nav className="mat-sidebar mat-sidebar-window island-fade flex w-[clamp(224px,19vw,260px)] shrink-0 flex-col border-r border-line" aria-label={t('mbox.sidebar')} data-testid="mail-sidebar">
       <ColumnHeader title={<ColumnTitle>{t('mbox.sidebar')}</ColumnTitle>}>
         <IconButton label={t('mbox.sidebar.hide')} onClick={() => useMailUi.getState().toggleSidebar()} data-testid="mail-sidebar-hide">
           <PanelLeft className="size-4" strokeWidth={1.75} />
@@ -42,7 +42,7 @@ export function MailSidebar(): ReactNode {
           <SmartSection />
         </div>
       </SidebarMenu>
-      <div className="shrink-0 px-2 pb-3 pt-1">
+      <div className="shrink-0 px-2 pt-1" style={{ paddingBottom: 'calc(var(--island-height, 0px) + 20px)' }}>
         <Button size="sm" variant="ghost" className="w-full justify-start" onClick={() => useMailUi.getState().openAdd()} data-testid="mail-sidebar-add-account">
           <Plus className="size-3.5" aria-hidden />
           {t('mbox.addAccount')}

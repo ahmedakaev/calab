@@ -3,7 +3,7 @@ import { CANVAS_BITS, CanvasPermissionEntrySchema, PermissionTargetType } from '
 import type { Page } from '@playwright/test';
 import { IDS } from '../e2e-support/fixtures';
 import { expect, test } from './app';
-import { checkpoint } from './harness';
+import { checkpoint, joinVoice } from './harness';
 
 /**
  * «Холст» on the desktop (ADR-0126 §5, docs/08 «Холст»): one test, one `checkpoint` per state —
@@ -296,4 +296,10 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
     await win.waitForTimeout(200);
     await checkpoint(shot, 'canvas-comments-draft');
   }
+
+  // Owner 23.10: the same bottom island in a call, across the rail and the tree column.
+  await open();
+  await joinVoice(win);
+  await openRoadmap(win);
+  await checkpoint(shot, 'canvas-voice');
 });

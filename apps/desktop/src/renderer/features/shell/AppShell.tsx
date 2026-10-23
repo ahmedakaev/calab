@@ -23,7 +23,6 @@ import { usePrefs } from '../../stores/prefs';
 import { useSession } from '../../stores/session';
 import { useMediaQuery } from '../../lib/useMediaQuery';
 import { useMobile } from '../../lib/mobile';
-import { showBottomIsland } from '../../lib/webApps';
 import { MobileShell } from './MobileShell';
 import { MEMBERS_COLUMN_MIN, useUi } from '../../stores/ui';
 import { useMemberRoles, useWorkspaces } from '../../stores/workspaces';
@@ -259,19 +258,13 @@ function ShellLayout(): ReactNode {
             <Welcome />
           </div>
         )}
-        {ready && !mailOn && (home || (hasWs && wsId)) ? <IslandSlot appOpen={!!appId} workTab={boards || disk || wiki || canvas || (calDay !== null && !guestWs)} /> : null}
+        {/* One island on every screen with the rail (owner 23.10); not over a web app's native view. */}
+        {ready && (mailOn || home || (hasWs && wsId && !appId)) ? <BottomIsland column={mailOn ? 'mail' : wiki ? 'wiki' : canvas ? 'canvas' : 'sidebar'} /> : null}
         {ready ? <CreateTaskDialog /> : null}
         {ready ? <SmartTaskDialog /> : null}
       </div>
     </div>
   );
-}
-
-/**
- * Web apps use the entire content area, including while a voice call continues.
- */
-function IslandSlot({ appOpen, workTab }: { appOpen: boolean; workTab: boolean }): ReactNode {
-  return showBottomIsland(appOpen, workTab) ? <BottomIsland /> : null;
 }
 
 /**

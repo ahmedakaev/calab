@@ -79,7 +79,7 @@ export function CanvasScreen({ workspaceId }: { workspaceId: string }): ReactNod
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       <section className="mat-content relative flex min-w-0 flex-1" aria-label={t('canvas.section')} data-testid="canvas">
         {collapsed ? null : (
-          <aside className="flex shrink-0 flex-col border-r border-line" style={{ width }} data-testid="canvas-column">
+          <aside className="island-fade flex shrink-0 flex-col border-r border-line [--island-fade-color:var(--color-bg)]" style={{ width }} data-testid="canvas-column">
             <CanvasTree workspaceId={workspaceId} canCreate={canCreate} />
           </aside>
         )}

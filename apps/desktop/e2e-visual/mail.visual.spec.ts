@@ -1,5 +1,5 @@
 import { expect, test } from './app';
-import { checkpoint } from './harness';
+import { checkpoint, joinVoice } from './harness';
 
 /**
  * «Почта» folders (CBF-56, docs/08 «Почтовый клиент»): the mailbox sidebar (two accounts of the mail
@@ -68,4 +68,11 @@ test('mail-folders', async ({ open, win, shot }) => {
   await rule.scrollIntoViewIfNeeded();
   await expect(rule).toBeVisible();
   await checkpoint(shot, 'mail-settings-rules');
+  await win.keyboard.press('Escape');
+
+  // Owner 23.10: the island in a call over the mailbox sidebar (leftmost column).
+  await joinVoice(win);
+  await win.getByTestId('section-mail').click();
+  await expect(win.getByTestId('mail-sidebar')).toBeVisible();
+  await checkpoint(shot, 'mail-voice');
 });

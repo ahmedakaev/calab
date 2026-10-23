@@ -19,8 +19,6 @@ import { DiskColumns } from './DiskColumns';
 import { DiskListing, DragChip, DropTarget } from './DiskItems';
 import { DiskDialogs } from './Dialogs';
 import { UsageMeter } from './UsageMeter';
-import { VoiceControls } from '../shell/SelfPanel';
-import { useVoice } from '../../stores/voice';
 
 /**
  * «Диск» on the desktop (ADR-0094 §8, docs/08 «Диск»): one panel in place of the column and the
@@ -32,7 +30,6 @@ import { useVoice } from '../../stores/voice';
  */
 export function DiskScreen({ workspaceId }: { workspaceId: string }): ReactNode {
   const folderId = useDiskUi((s) => folderOf(s, workspaceId));
-  const inVoice = useVoice((s) => s.roomId !== null);
   const trash = useDiskUi((s) => !!s.trashOf[workspaceId]);
   const columns = usePrefs((s) => s.diskView === 'columns');
   const roles = useMemberRoles(workspaceId, myUserId());
@@ -91,10 +88,11 @@ export function DiskScreen({ workspaceId }: { workspaceId: string }): ReactNode 
   return (
     <DropTarget.Provider value={dropTarget}>
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragged(null)}>
-        <section className="mat-content relative flex min-w-0 flex-1 flex-col" aria-label={t('disk.section')} data-testid="disk">
+        <section className="mat-content island-fade flex min-w-0 flex-1 flex-col [--island-fade-color:var(--color-bg)] [&::after]:right-auto [&::after]:w-[calc(var(--sidebar-width)+8px)]" aria-label={t('disk.section')} data-testid="disk">
           <DiskBar workspaceId={workspaceId} folderId={folderId} trash={trash} write={write} manage={manage} />
           <div
             className="relative flex min-h-0 flex-1 flex-col overflow-y-auto"
+            style={{ paddingBottom: 'max(0px, calc(var(--island-height, 0px) - 28px))' }}
             onClick={() => useDiskUi.getState().select(null)}
             onKeyDown={onKeyDown}
             {...dropHandlers}
@@ -110,22 +108,17 @@ export function DiskScreen({ workspaceId }: { workspaceId: string }): ReactNode 
               </div>
             ) : null}
           </div>
+          {/* The bottom island floats over the panel's left part (no column here): the meter sits at the right end, the left stays free. */}
           <footer className="flex h-11 shrink-0 items-center gap-3 border-t border-line px-4">
             <button
               type="button"
               onClick={() => useDiskUi.getState().openDialog({ kind: 'usage', wsId: workspaceId })}
-              className="-mx-2 w-72 max-w-full rounded-[var(--radius-control)] px-2 py-1 text-left hover:bg-hover"
+              className="-mr-2 ml-auto w-72 max-w-full rounded-[var(--radius-control)] px-2 py-1 text-left hover:bg-hover"
               aria-label={t('disk.usage.title')}
               data-testid="disk-footer-meter"
             >
               <UsageMeter workspaceId={workspaceId} compact />
             </button>
-            {/* No bottom island or column on the Disk: the self panel's mic and sound (CBF-4). */}
-            {inVoice ? (
-              <span className="ml-auto flex items-center gap-1.5">
-                <VoiceControls />
-              </span>
-            ) : null}
           </footer>
           <Uploads workspaceId={workspaceId} />
           <DiskDialogs workspaceId={workspaceId} />

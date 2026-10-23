@@ -57,7 +57,7 @@ import { addressLabel, allLabel, folderLabel, mailErrorText, mailListTime } from
 export function MailColumn(): ReactNode {
   const role = useMail((s) => (s.query ? null : boxRole(s, s.box)));
   return (
-    <aside className="mat-sidebar mat-sidebar-window relative flex w-[clamp(300px,30vw,380px)] shrink-0 flex-col border-r border-line" aria-label={t('mbox.list')} data-testid="mail-column">
+    <aside className="mat-sidebar mat-sidebar-window island-fade flex w-[clamp(300px,30vw,380px)] shrink-0 flex-col border-r border-line" aria-label={t('mbox.list')} data-testid="mail-column">
       <ColumnHeader title={<BoxSwitcher />}>
         <SidebarToggle />
         <EmptyTrashButton />

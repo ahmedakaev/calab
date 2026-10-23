@@ -1,19 +1,43 @@
-import { forwardRef, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import { useMobile } from '../../lib/mobile';
-import { useVoice } from '../../stores/voice';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useCanvasUi } from '../../stores/canvasUi';
+import { useMailUi } from '../../stores/mailUi';
+import { useWikiUi } from '../../stores/wikiUi';
 import { SelfPanel } from './SelfPanel';
 import { VoiceBar } from './VoiceBar';
 import { MeetingRecordPrompt } from '../calendar/RoomEvent';
 
+/** Which left column the island's right edge follows (docs/08 «Нижний островок»). */
+export type IslandColumn = 'sidebar' | 'wiki' | 'canvas' | 'mail';
+
 /**
  * Bottom island (docs/08 «Нижний островок», Discord reference): «Голос подключён» and
  * the self panel as one floating block across the whole left part — from the rail's
- * left edge to the room column's right edge, 8 px in (4 px up from the bottom, so my avatar lands
- * on the rail's axis at the inset the old rail avatar had), radius 12, on the window layer. The rail
- * and the room list end above it: its height is published as `--island-height` on the parent
- * (their bottom padding).
+ * left edge to the current screen's left column right edge, 8 px in (4 px up from the bottom, so my
+ * avatar lands on the rail's axis at the inset the old rail avatar had), radius 12, on the window
+ * layer. The rail and the column end above it: its height is published as `--island-height` on the
+ * parent (their bottom padding).
+ *
+ * One island on every desktop screen (owner 23.10), with and without a call (VoiceBar only in
+ * voice). `column` picks the width: room / DM / boards / calendar / Disk columns are
+ * `--sidebar-width`, the wiki and canvas trees their own resizable width, mail its leftmost column's clamp.
  */
-export function BottomIsland(): ReactNode {
+export function BottomIsland({ column }: { column: IslandColumn }): ReactNode {
+  // Primitive selectors; only the active screen's store can change while it is shown.
+  const wikiW = useWikiUi((s) => (column === 'wiki' ? s.treeWidth : 0));
+  // A collapsed canvas tree has no column: the island keeps the usual size.
+  const canvasW = useCanvasUi((s) => (column === 'canvas' && !s.treeCollapsed ? s.treeWidth : 0));
+  // Mail: the leftmost column - the mailbox sidebar when shown, else the thread list.
+  const mailSidebar = useMailUi((s) => column === 'mail' && s.sidebar);
+  const colW =
+    column === 'wiki'
+      ? `${wikiW}px`
+      : column === 'canvas' && canvasW > 0
+        ? `${canvasW}px`
+        : column === 'mail'
+          ? mailSidebar
+            ? 'clamp(224px, 19vw, 260px)'
+            : 'clamp(300px, 30vw, 380px)'
+          : 'var(--sidebar-width)';
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -27,48 +51,16 @@ export function BottomIsland(): ReactNode {
     };
   }, []);
   return (
-    <VoiceBlock
-      ref={ref}
-      testId="bottom-island"
-      island
-      className="absolute bottom-2 left-2 z-[var(--z-sticky)]"
-      style={{ width: 'calc(var(--rail-width) + var(--sidebar-width) - 16px)' }}
-    />
-  );
-}
-
-/**
- * The one shell of the voice block (docs/08 «Нижний островок»): mat-toolbar plate, panel radius,
- * island shadow, hairline-separated record prompt, VoiceBar and SelfPanel. The island and the
- * work-section column both render it; they differ only in positioning and width (className/style).
- */
-const VoiceBlock = forwardRef<
-  HTMLDivElement,
-  { testId: string; island?: boolean; className: string; style?: CSSProperties }
->(function VoiceBlock({ testId, island, className, style }, ref) {
-  return (
     <div
       ref={ref}
-      data-testid={testId}
-      data-island={island ? true : undefined}
-      className={`mat-toolbar flex flex-col divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] shadow-[var(--shadow-island)] ${className}`}
-      style={style}
+      data-testid="bottom-island"
+      data-island
+      className="mat-toolbar absolute bottom-2 left-2 z-[var(--z-sticky)] flex flex-col divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] shadow-[var(--shadow-island)]"
+      style={{ width: `calc(var(--rail-width) + ${colW} - 16px)` }}
     >
       <MeetingRecordPrompt />
       <VoiceBar />
       <SelfPanel />
     </div>
   );
-});
-
-/**
- * The same block as the island (`VoiceBlock`), in the flow at the foot of a work-section
- * column (Boards, Calendar, Wiki have no island - owner 02.10 - but a call must stay reachable:
- * bug board CBF-4). Only while in voice, desktop layout only (the phone has its call strip).
- */
-export function ColumnVoice(): ReactNode {
-  const inVoice = useVoice((s) => s.roomId !== null);
-  const mobile = useMobile();
-  if (!inVoice || mobile) return null;
-  return <VoiceBlock testId="voice-dock" className="mx-2 mb-2 mt-auto shrink-0" />;
 }

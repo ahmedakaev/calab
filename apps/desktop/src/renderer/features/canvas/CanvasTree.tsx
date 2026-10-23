@@ -79,7 +79,7 @@ function TreeColumn({ workspaceId, canCreate }: { workspaceId: string; canCreate
       <nav className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-1.5" aria-label={t('canvas.tree')} data-testid="canvas-tree">
         {query.trim() ? <SearchResults workspaceId={workspaceId} query={query} /> : <ChildList workspaceId={workspaceId} parentId={TOP} depth={0} />}
       </nav>
-      <div className="shrink-0 border-t border-line p-1.5">
+      <div className="shrink-0 border-t border-line px-1.5 pt-1.5" style={{ paddingBottom: 'calc(var(--island-height, 0px) + 20px)' }}>
         <button
           type="button"
           onClick={() => useCanvasUi.getState().openTrash(workspaceId, true)}
@@ -392,7 +392,7 @@ function TrashColumn({ workspaceId }: { workspaceId: string }): ReactNode {
           </Button>
         ) : null}
       </div>
-      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto p-1.5" data-testid="canvas-trash">
+      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 pt-1.5" style={{ paddingBottom: 'calc(var(--island-height, 0px) + 20px)' }} data-testid="canvas-trash">
         {!loaded ? (
           <div className="grid h-12 place-items-center">
             <Spinner />

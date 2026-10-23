@@ -7,7 +7,7 @@ import { FREE_PLAN_LIMITS, defaultSettings, mockPdf, ts } from '../e2e-support/f
 import { CODE_FIXTURE, IDS, MOCK_GPTUNNEL_CODE, MOCK_GPTUNNEL_WEB, PASSWORD, RECORDING_FIXTURE, slowWebpAnimation, type MockServer } from '../e2e-support/mock-server';
 import { encodePng } from '../e2e-support/png';
 import { expect, test } from './app';
-import { NOW, checkpoint, login, settle } from './harness';
+import { NOW, checkpoint, joinVoice, login, settle } from './harness';
 import { DAY, seedDay } from './calendarWeb';
 import { startPublisher } from './publisher';
 
@@ -3974,19 +3974,16 @@ test('boards-kanban', async ({ open, win, mock, shot }) => {
   await win.keyboard.press('Escape');
   await expect(createMenu).toHaveCount(0);
 
-  // Bug board #4 (needs the dev LiveKit): in voice, the boards column ends with the same voice
-  // block as the rooms island; its mic mutes the call while the board stays on screen.
-  await win.getByTestId('section-chats').click();
-  await win.locator('aside').getByRole('button', { name: /Переговорка/ }).first().click();
-  await win.getByRole('region', { name: 'Переговорка' }).getByRole('button', { name: 'Войти в голос', exact: true }).click();
-  await expect(win.getByRole('button', { name: /^Качество связи: Хорошее/ })).toBeVisible({ timeout: 30_000 });
+  // Needs the dev LiveKit: in voice, the boards screen carries the same bottom island as every
+  // screen (owner 23.10); its mic mutes the call while the board stays on screen.
+  await joinVoice(win);
   await boardsMode(win, mock);
-  const dock = win.getByTestId('voice-dock');
+  const dock = win.getByTestId('bottom-island');
   await expect(dock).toContainText('Голос подключён');
   await dock.getByRole('button', { name: /^Выключить микрофон/ }).click();
   await expect(dock.getByRole('button', { name: /^Включить микрофон/ })).toBeVisible();
   await expect(win.getByTestId('kanban')).toBeVisible();
-  await checkpoint(shot, 'boards-voice-dock');
+  await checkpoint(shot, 'boards-voice-island');
 });
 
 /**
