@@ -154,7 +154,7 @@ export interface GroupItem {
  * of one author within GROUP_MS on one day; no «new» pill. Metas keep their objects per key while
  * unchanged (`cache`), so memo rows re-render only where grouping changed.
  */
-export function groupMetas(items: readonly GroupItem[], cache: Map<string, RowMeta>): RowMeta[] {
+export function groupMetas(items: readonly GroupItem[], cache: Map<string, RowMeta>, firstDay = true): RowMeta[] {
   const day = items.map((c) => new Date(c.ms).toDateString());
   const joins = (i: number): boolean => {
     const c = items[i];
@@ -164,7 +164,7 @@ export function groupMetas(items: readonly GroupItem[], cache: Map<string, RowMe
     return dt >= 0 && dt < GROUP_MS;
   };
   const out = items.map((c, i): RowMeta => {
-    const m: RowMeta = { day: i === 0 || day[i] !== day[i - 1], isNew: false, first: !joins(i), last: !joins(i + 1) };
+    const m: RowMeta = { day: i === 0 ? firstDay : day[i] !== day[i - 1], isNew: false, first: !joins(i), last: !joins(i + 1) };
     const old = cache.get(c.key);
     const v = old && same(old, m) ? old : m;
     cache.set(c.key, v);

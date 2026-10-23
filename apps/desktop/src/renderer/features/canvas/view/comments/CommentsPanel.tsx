@@ -17,6 +17,7 @@ import { t, useLocale } from '../../../../i18n';
 import { mayChange, pinWorld, type CommentRights } from '../../../../lib/canvas/comments';
 import { createThread, deleteComment, editComment, loadComments, replyTo, resolveThread } from '../../../../services/canvasComments';
 import { useCanvasComments } from '../../../../stores/canvasComments';
+import { fmt } from '../../../../lib/format';
 import { myUserId } from '../../../../stores/session';
 import { ContextBar } from '../../../chat/ComposerField';
 import { CommentRow, commentShape, useCommentGroups } from '../../../chat/CommentRow';
@@ -73,7 +74,9 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
       .filter(Boolean)
       .join('\n'),
   );
-  const { items, metas } = useCommentGroups(shape);
+  // The thread's day is in its header: no date pill over the first row of every card.
+  const { items, metas } = useCommentGroups(shape, false);
+  const startMs = items[0]?.ms ?? 0;
   const [editId, setEditId] = useState<string | null>(null);
   const editBody = useCanvasComments((s) => (editId ? s.byId[editId]?.body : undefined));
   // The edited comment went away (deleted elsewhere): the field goes back to a reply.
@@ -111,12 +114,12 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
   const composer = (active && ctx.rights.write) || !!editing;
   return (
     <li
-      className={cx('rounded-[var(--radius-card)] border bg-main', active ? 'border-accent' : 'border-line', resolved && !active && 'opacity-70')}
+      className={cx('overflow-hidden rounded-[var(--radius-card)] border bg-feed', active ? 'border-accent' : 'border-line')}
       data-testid="canvas-comment-thread"
       data-thread-id={id}
       data-resolved={resolved || undefined}
     >
-      <div className="flex h-8 items-center gap-1 pl-1 pr-1">
+      <div className="flex h-8 items-center gap-1 border-b border-line bg-main px-1">
         <Button variant="ghost" size="sm" className="min-w-0 text-muted hover:text-fg" onClick={show} data-testid="canvas-comment-show"
           aria-label={resolved ? `${t('canvasComments.resolved')} · ${t('canvasComments.showPin')}` : undefined}
         >
@@ -124,6 +127,7 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
           <span className="truncate">{resolved ? t('canvasComments.resolved') : t('canvasComments.showPin')}</span>
         </Button>
         <span className="flex-1" />
+        {startMs ? <span className="shrink-0 px-1 text-caption text-muted">{fmt.dayLabel(new Date(startMs))}</span> : null}
         {ctx.rights.write || ctx.rights.moderate ? (
           <IconButton
             size="sm"
@@ -135,7 +139,7 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
           </IconButton>
         ) : null}
       </div>
-      <div className="pb-2" onClick={() => useCanvasComments.getState().setActive(id)} role="presentation">
+      <div className="pb-2 pt-1" onClick={() => useCanvasComments.getState().setActive(id)} role="presentation">
         {items.map((it, i) => (
           <Item key={it.key} id={it.key} meta={metas[i] as RowMeta} ctx={ctx} editing={editing?.id === it.key} onEdit={onEdit} onDelete={onDelete} />
         ))}
@@ -148,7 +152,7 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
           editing={editing}
           onCancelEdit={cancelEdit}
           onSubmit={submit}
-          className="border-t border-line pt-2"
+          className="border-t border-line bg-main px-2 pb-2 pt-2"
         />
       ) : null}
     </li>
@@ -169,7 +173,7 @@ function Draft({ ctx }: { ctx: Ctx }): ReactNode {
         autoFocus
         onEscape={cancel}
         bar={<ContextBar icon={<MessageCirclePlus className="size-4" aria-hidden />} title={t('canvasComments.newThread')} onClose={cancel} />}
-        className="pt-2"
+        className="px-2 pb-2 pt-2"
         onSubmit={async (wire) => {
           const c = await createThread(ctx.canvasId, wire, draft);
           if (!c) return false;

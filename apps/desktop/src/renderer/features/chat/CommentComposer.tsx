@@ -7,7 +7,6 @@
  */
 import { Pencil } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { cx } from '../../components/ui';
 import { t } from '../../i18n';
 import { applyMention, exactNames, filterCandidates, fromWire, toWire, type MentionCandidate } from '../../lib/mentions';
 import { autoFocusAllowed } from '../../lib/mobile';
@@ -189,7 +188,7 @@ export function CommentComposer({
 
   const editParts = editing ? previewPartsOf(workspaceId, editing.wire, 160) : [];
   return (
-    <div className={cx('px-2 pb-2 pt-1.5', className)} data-testid={testId ? `${testId}-box` : undefined}>
+    <div className={className ?? 'px-2 pb-2 pt-1.5'} data-testid={testId ? `${testId}-box` : undefined}>
       {editing ? <ContextBar icon={<Pencil className="size-4" aria-hidden />} title={t('chat.editing')} text={editParts.length ? <PreviewRuns parts={editParts} /> : ''} onClose={cancelEdit} /> : bar}
       <ComposerField
         fieldRef={ref}
@@ -213,7 +212,6 @@ export function CommentComposer({
           onBlur: mention.dismiss,
           'aria-autocomplete': 'list',
           'aria-controls': mention.open ? mention.listId : undefined,
-          'aria-expanded': mention.open,
           'aria-activedescendant': mention.activeId,
           onKeyDown: onKey,
         }}

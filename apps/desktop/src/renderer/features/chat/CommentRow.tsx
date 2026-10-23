@@ -44,7 +44,7 @@ export const commentShape = (id: string, authorId: string, ms: number): string =
  * The rows and their chat grouping from `shape` — commentShape rows joined by '\n' (the selector's
  * primitive). Metas keep their objects while unchanged, so memo rows re-render only where grouping changed.
  */
-export function useCommentGroups(shape: string): { items: GroupItem[]; metas: RowMeta[] } {
+export function useCommentGroups(shape: string, firstDay = true): { items: GroupItem[]; metas: RowMeta[] } {
   const [cache] = useState(() => new Map<string, RowMeta>());
   return useMemo(() => {
     const items: GroupItem[] = shape
@@ -53,8 +53,8 @@ export function useCommentGroups(shape: string): { items: GroupItem[]; metas: Ro
           return { key, authorId, ms: Number(ms) };
         })
       : [];
-    return { items, metas: groupMetas(items, cache) };
-  }, [shape, cache]);
+    return { items, metas: groupMetas(items, cache, firstDay) };
+  }, [shape, cache, firstDay]);
 }
 
 export interface CommentRowProps {

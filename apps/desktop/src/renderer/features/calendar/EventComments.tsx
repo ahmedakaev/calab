@@ -89,7 +89,7 @@ export const EventComments = memo(function EventComments({ ev, moderate }: { ev:
           <Spinner className="size-4" />
         </div>
       ) : items.length > 0 ? (
-        <div className="-mx-2 mt-1 flex flex-col pb-1">
+        <div className="mt-2 flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-feed pb-2">
           {items.map((it, i) => (
             <Comment
               key={it.key}
@@ -111,7 +111,7 @@ export const EventComments = memo(function EventComments({ ev, moderate }: { ev:
         </p>
       ) : null}
       {cancelled ? null : (
-        <div ref={field} className="-mx-2">
+        <div ref={field}>
           <CommentComposer
             workspaceId={ev.workspaceId}
             placeholder={t('cal.comments.placeholder')}
@@ -119,6 +119,7 @@ export const EventComments = memo(function EventComments({ ev, moderate }: { ev:
             editing={editing}
             onCancelEdit={cancelEdit}
             onSubmit={submit}
+            className="pb-1 pt-2"
             testId="event-comment-input"
             sendTestId="event-comment-send"
           />

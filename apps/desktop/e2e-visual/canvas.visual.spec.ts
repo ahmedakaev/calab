@@ -258,16 +258,20 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await expect(panel.getByTestId('canvas-comment-thread')).toHaveCount(3);
   await panel.getByTestId('canvas-comment-thread').first().getByTestId('canvas-comment').first().click();
   await expect(panel.getByTestId('canvas-comment-input')).toHaveCount(1);
-  await win.mouse.move(10, 10);
-  await win.waitForTimeout(300);
-  await checkpoint(shot, 'canvas-comments');
-
   if (theme === 'dark') {
     await panel.getByTestId('canvas-comment-thread').first().getByTestId('canvas-comment').nth(2).getByTestId('comment-bubble').hover();
     await expect(panel.getByTestId('comment-actions')).toBeVisible();
     await checkpoint(shot, 'canvas-comments-hover', { keepPointer: true });
+  }
+  // The reply composer at the bottom of the active thread, the resolved and my threads below it.
+  await win.mouse.move(10, 10);
+  await panel.getByTestId('canvas-comment-input').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await win.waitForTimeout(300);
+  await checkpoint(shot, 'canvas-comments');
+
+  if (theme === 'dark') {
     await win.getByTestId('canvas-tool-comment').click();
-    const at = await atWorld(win, 520, 200);
+    const at = await atWorld(win, 60, 260);
     await win.mouse.click(at.x, at.y);
     await expect(panel.getByTestId('canvas-comment-draft')).toBeVisible();
     await win.keyboard.type('Новая ветка про @');
