@@ -131,6 +131,8 @@ class FakeRoom {
   };
   constructor() {
     FakeRoom.all.push(this);
+    // Local publications (a parked room unpublishes them, ADR-0133).
+    Object.defineProperty(this.localParticipant, 'trackPublications', { get: () => new Map(this.published.map((t, i) => [`L${i}`, { track: t }])) });
   }
   on(ev: string, fn: Handler): this {
     this.handlers.set(ev, [...(this.handlers.get(ev) ?? []), fn]);
@@ -2312,5 +2314,127 @@ describe('auto-mute after silence («Выключать микрофон, есл
     expect(prefsChanges).toBe(0);
     expect([...changed].every((k) => ['transmitting', 'speaking', 'gateOpen'].includes(k))).toBe(true);
     await voice.leave();
+  });
+});
+
+describe('a phone call parks the room (ADR-0133)', () => {
+  type Pub = { source: string; trackSid: string; kind: string; isMuted: boolean; subscriptionStatus: string; setSubscribed: ReturnType<typeof vi.fn>; setEnabled: () => void };
+  const pub = (source: string, trackSid: string): Pub => ({ source, trackSid, kind: 'audio', isMuted: false, subscriptionStatus: 'desired', setSubscribed: vi.fn(), setEnabled: () => undefined });
+  const participant = (identity: string, pubs: Pub[]) => ({
+    identity,
+    trackPublications: new Map(pubs.map((p) => [p.trackSid, p])),
+    getTrackPublication: (source: string) => pubs.find((p) => p.source === source),
+    getTrackPublicationBySid: (sid: string) => pubs.find((p) => p.trackSid === sid),
+  });
+  const last = (p: Pub): unknown => p.setSubscribed.mock.calls.at(-1)?.[0];
+  /** In room A with Борис's mic; local tracks are visible to the parking as publications. */
+  async function inRoom(): Promise<{ room: FakeRoom; mic: Pub }> {
+    await voice.join('A', 'ws');
+    const room = FakeRoom.all.at(-1) as FakeRoom;
+    const mic = pub('microphone', 'TR_mic_b');
+    room.remoteParticipants.set('u2:b', participant('u2:b', [mic]));
+    room.emit('TrackPublished', mic, room.remoteParticipants.get('u2:b'));
+    return { room, mic };
+  }
+  async function answer(callId = 'c1'): Promise<boolean> {
+    const { setPhoneJoin } = await import('../lib/sipInbound');
+    const parked = await voice.park();
+    setPhoneJoin(`sipin:${callId}`, { url: 'wss://lk', token: `t-${callId}`, identity: 'answer', canSpeak: true } as never);
+    voice.unmuteForAnswer(); // as services/sipInbound.ts acceptInbound
+    await voice.join(`sipin:${callId}`, '', { call: true });
+    return parked;
+  }
+
+  it('«Принять»: the room stays connected with nothing sent or received; hang-up brings it back without a reconnect', async () => {
+    const { room, mic } = await inRoom();
+    voice.toggleMute(); // muted before the call
+    await settle();
+    updateSelf.mockClear();
+    expect(await answer()).toBe(true);
+    expect(room.disconnects).toHaveLength(0);
+    expect(room.published).toHaveLength(0);
+    expect(last(mic)).toBe(false);
+    expect(updateSelf).toHaveBeenCalledWith({ onPhone: true });
+    expect(useVoice.getState()).toMatchObject({ roomId: 'sipin:c1', parked: { roomId: 'A', workspaceId: 'ws' } });
+    const phoneRoom = FakeRoom.all.at(-1) as FakeRoom;
+    expect(phoneRoom).not.toBe(room);
+    // A mic published in the parked room meanwhile is not subscribed (its handlers are silent).
+    const late = pub('microphone', 'TR_mic_c');
+    room.remoteParticipants.set('u3:c', participant('u3:c', [late]));
+    room.emit('TrackPublished', late, room.remoteParticipants.get('u3:c'));
+    expect(late.setSubscribed).not.toHaveBeenCalled();
+    await voice.leave(); // hang up
+    await settle();
+    await settle();
+    expect(useVoice.getState()).toMatchObject({ roomId: 'A', workspaceId: 'ws', phase: 'connected', parked: null, muted: true });
+    expect(voice.currentRoomId).toBe('A');
+    expect(joinVoice.mock.calls.map((c) => c[0])).toEqual(['A']); // no new /join
+    expect(room.disconnects).toHaveLength(0);
+    expect(room.published).toHaveLength(1);
+    expect([last(mic), last(late)]).toEqual([true, true]);
+    expect(updateSelf).toHaveBeenLastCalledWith(expect.objectContaining({ muted: true, onPhone: false }));
+  });
+
+  it('«Выйти» from the parked room leaves it and keeps the phone call', async () => {
+    const { room } = await inRoom();
+    await answer();
+    voice.leaveParked();
+    await settle();
+    expect(room.disconnects).toHaveLength(1);
+    expect(leaveVoice).toHaveBeenCalledWith('A');
+    expect(useVoice.getState()).toMatchObject({ roomId: 'sipin:c1', phase: 'connected', parked: null });
+    await voice.leave();
+    await settle();
+    expect(useVoice.getState().roomId).toBeNull(); // nothing to come back to
+  });
+
+  it('another room picked during the call is entered after it; a one-to-one call drops the parked room', async () => {
+    const { room } = await inRoom();
+    await answer();
+    await voice.join('B', 'ws');
+    await settle();
+    expect(room.disconnects).toHaveLength(1);
+    expect(leaveVoice).toHaveBeenCalledWith('A');
+    expect(useVoice.getState()).toMatchObject({ roomId: 'sipin:c1', parked: { roomId: 'B', workspaceId: 'ws' } });
+    await voice.leave();
+    await settle();
+    expect(useVoice.getState()).toMatchObject({ roomId: 'B', phase: 'connected', parked: null });
+    expect(joinVoice.mock.calls.map((c) => c[0])).toEqual(['A', 'B']);
+
+    await answer('c2');
+    expect(useVoice.getState().parked).toMatchObject({ roomId: 'B' });
+    await voice.join('dm', '', { call: true });
+    await settle();
+    expect(useVoice.getState()).toMatchObject({ roomId: 'dm', parked: null });
+    expect(leaveVoice).toHaveBeenCalledWith('B');
+  });
+
+  it('a moderator removal of the parked room: no resume after the call', async () => {
+    const { room } = await inRoom();
+    await answer();
+    room.emit('Disconnected', 'PARTICIPANT_REMOVED');
+    expect(useVoice.getState().parked).toBeNull();
+    await voice.leave();
+    await settle();
+    expect(useVoice.getState().roomId).toBeNull();
+    expect(joinVoice).toHaveBeenCalledTimes(1);
+  });
+
+  it('a parked connection lost meanwhile: the room is joined again after the call', async () => {
+    const { room } = await inRoom();
+    await answer();
+    room.state = 'Disconnected';
+    room.emit('Disconnected', 'SIGNAL_CLOSE');
+    expect(useVoice.getState().parked).toMatchObject({ roomId: 'A' });
+    await voice.leave();
+    await settle();
+    expect(useVoice.getState()).toMatchObject({ roomId: 'A', phase: 'connected' });
+    expect(joinVoice.mock.calls.map((c) => c[0])).toEqual(['A', 'A']);
+  });
+
+  it('nothing to park in a one-to-one call: the caller leaves it as before', async () => {
+    await voice.join('dm', '', { call: true });
+    expect(await voice.park()).toBe(false);
+    expect(useVoice.getState().parked).toBeNull();
   });
 });

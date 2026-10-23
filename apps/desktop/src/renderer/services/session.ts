@@ -208,6 +208,7 @@ export async function retryConnect(): Promise<void> {
 }
 
 export async function logout(allSessions = false): Promise<void> {
+  voice.leaveParked(); // first: leaving a phone call would resume a parked room (ADR-0133)
   await voice.leave(false);
   await platform.auth.logout(allSessions);
   await endSession('logout');
@@ -220,6 +221,7 @@ async function endSession(reason: LogoutReason): Promise<void> {
   resetIdentityGate();
   stopGateway();
   resetGatewaySubscriptions();
+  voice.leaveParked();
   await voice.leave(false);
   useWorkspaces.getState().reset();
   useRooms.getState().reset();

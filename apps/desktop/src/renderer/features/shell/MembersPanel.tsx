@@ -412,7 +412,7 @@ const MemberRow = memo(function MemberRow({
         <span className="min-w-0 truncate">{activityLabel}</span>
         {v.camera ? <Video className="size-3.5 shrink-0" aria-label={t('video.stateOn')} role="img" /> : null}
         {v.musician ? <MusicianIcon className="size-3.5" /> : null}
-        <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} />
+        <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} onPhone={v.onPhone} />
       </>
     );
   } else if (line.activity === 'call') {

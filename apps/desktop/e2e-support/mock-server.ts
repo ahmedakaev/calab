@@ -689,7 +689,7 @@ export interface MockServer {
    * `joinedAtMs`: VoiceState.joined_at (client clock — a visual test's page clock is fixed); kept
    * within the same room, none by default.
    */
-  setVoiceState(args: { userId: string; roomId: string; muted?: boolean; deafened?: boolean; streaming?: boolean; camera?: boolean; pending?: boolean; joinedAtMs?: number; musician?: boolean; ptt?: boolean }): void;
+  setVoiceState(args: { userId: string; roomId: string; muted?: boolean; deafened?: boolean; streaming?: boolean; camera?: boolean; pending?: boolean; joinedAtMs?: number; musician?: boolean; ptt?: boolean; onPhone?: boolean }): void;
   /** Sets a user's presence and fans out PRESENCE_UPDATE. */
   setPresence(userId: string, status: PresenceStatus): void;
   /**
@@ -2460,7 +2460,7 @@ class MockImpl {
     this.fanout((u) => (u === userId || this.shareWorkspace(u, userId) ? { event: { case: 'presenceUpdate', value: { presence } } } : null));
   }
 
-  setVoice(userId: string, roomId: string, patch: { muted?: boolean; deafened?: boolean; streaming?: boolean; serverMuted?: boolean; camera?: boolean; pending?: boolean; joinedAtMs?: number; musician?: boolean; ptt?: boolean }): void {
+  setVoice(userId: string, roomId: string, patch: { muted?: boolean; deafened?: boolean; streaming?: boolean; serverMuted?: boolean; camera?: boolean; pending?: boolean; joinedAtMs?: number; musician?: boolean; ptt?: boolean; onPhone?: boolean }): void {
     const prev = this.state.voiceStates.get(userId);
     const room = roomId ? this.state.rooms.get(roomId) : undefined;
     // ADR-0034: a DM call's voice session — no workspace; its events go to the two participants.
@@ -2485,6 +2485,7 @@ class MockImpl {
       pending: patch.pending ?? (sameRoom ? prev.pending : false),
       musician: patch.musician ?? (sameRoom ? prev.musician : false),
       ptt: patch.ptt ?? (sameRoom ? prev.ptt : false),
+      onPhone: patch.onPhone ?? (sameRoom ? prev.onPhone : false),
       joinedAt: patch.joinedAtMs !== undefined ? timestampFromMs(patch.joinedAtMs) : sameRoom ? prev.joinedAt : undefined,
     });
     // Moving to another workspace's room: tell the old workspace the user left.
@@ -2718,6 +2719,7 @@ class MockImpl {
       pending: patch.pending ?? (sameRoom ? prev.pending : false),
       musician: patch.musician ?? (sameRoom ? prev.musician : false),
       ptt: patch.ptt ?? (sameRoom ? prev.ptt : false),
+      onPhone: patch.onPhone ?? (sameRoom ? prev.onPhone : false),
     });
     const dmId = room?.id ?? (prevDm ? (prev?.roomId ?? '') : '');
     if (room) this.state.voiceStates.set(userId, v);
@@ -5475,7 +5477,7 @@ class MockImpl {
       const v = s().voiceStates.get(me);
       if (!v?.roomId) throw conflict('device is not in voice');
       const b = parseBody(c, UpdateVoiceSelfRequestSchema);
-      this.setVoice(me, v.roomId, { ...(b.muted !== undefined ? { muted: b.muted } : {}), ...(b.deafened !== undefined ? { deafened: b.deafened } : {}), ...(b.musician !== undefined ? { musician: b.musician } : {}), ...(b.ptt !== undefined ? { ptt: b.ptt } : {}) });
+      this.setVoice(me, v.roomId, { ...(b.muted !== undefined ? { muted: b.muted } : {}), ...(b.deafened !== undefined ? { deafened: b.deafened } : {}), ...(b.musician !== undefined ? { musician: b.musician } : {}), ...(b.ptt !== undefined ? { ptt: b.ptt } : {}), ...(b.onPhone !== undefined ? { onPhone: b.onPhone } : {}) });
       noContent(c.res);
     });
 

@@ -12,7 +12,8 @@ import { checkpoint, settle } from './harness';
  * seedSipActiveCalls. And the incoming phone call (ADR-0117 step 2): the sheet with the caller's
  * number and the menu it came through; a group's fallback off / on (ADR-0124); an exchange from
  * scratch (a new menu with its greeting chosen in the form: refused files at once, the upload
- * right after «Сохранить» — the conversion, a server refusal that keeps the saved menu open).
+ * right after «Сохранить» — the conversion, a server refusal that keeps the saved menu open). A call
+ * taken while in a voice room parks the room (ADR-0133): me and Борис dimmed with a handset.
  * Projects `telephony-dark-960` (all) and `telephony-light-960` (telephony-menu and the incoming
  * call); run with -g:
  *
@@ -316,4 +317,29 @@ test('telephony-incoming', async ({ open, win, mock, shot }) => {
   await expect(transfer).toBeVisible();
   await panel.getByRole('button', { name: 'Отключиться' }).click();
   await expect(panel).toHaveCount(0);
+
+  // ADR-0133: a call taken while in a voice room parks the room - I stay in «Переговорка» for the
+  // others, dimmed with a handset (Борис too, parked by his own call), and the island says «Комната:
+  // Переговорка — на паузе» with «Выйти». The hang-up brings the room back without a reconnect.
+  const sidebar = win.locator('aside').first();
+  await sidebar.getByRole('button', { name: /Переговорка/ }).first().click();
+  await win.getByRole('region', { name: 'Переговорка' }).getByRole('button', { name: 'Войти в голос', exact: true }).click();
+  await expect(panel).toContainText('Голос подключён', { timeout: 30_000 });
+  mock.setVoiceState({ userId: IDS.users.boris, roomId: IDS.rooms.meeting, onPhone: true });
+  mock.ringSipInbound(IDS.users.anna, '+79161234567', 'Отдел продаж');
+  await modal.getByRole('button', { name: 'Принять' }).click();
+  await expect(panel).toContainText('Звонок · +7 916 123-45-67');
+  await expect(panel).toContainText('Голос подключён', { timeout: 30_000 });
+  const parked = panel.getByTestId('voice-parked');
+  await expect(parked).toContainText('Комната: Переговорка — на паузе');
+  await expect(sidebar.locator('li[data-on-phone]')).toHaveCount(2);
+  await expect(sidebar.locator('li[data-on-phone] [data-voice-icon="on-phone"]')).toHaveCount(2);
+  await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await settle(win);
+  await checkpoint(shot, 'telephony-parked-room');
+  await panel.getByRole('button', { name: 'Отключиться' }).click();
+  await expect(panel).not.toContainText('Звонок ·');
+  await expect(panel).toContainText('Голос подключён');
+  await expect(parked).toHaveCount(0);
+  await expect(sidebar.locator('li[data-on-phone]')).toHaveCount(1); // Борис is still on his call
 });

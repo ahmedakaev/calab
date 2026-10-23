@@ -165,6 +165,11 @@ export interface VoiceStore {
   link: VoiceLink;
   /** Recording of my room, if any (REC on the room card, the voice panel, the phone strip). */
   recording: VoiceRecording | null;
+  /**
+   * The workspace room parked by a phone call (ADR-0133): still my seat there for the others
+   * (connected, nothing sent or received), resumed when the call ends. Null otherwise.
+   */
+  parked: { roomId: string; workspaceId: string } | null;
   set: (p: Partial<VoiceStore>) => void;
 }
 
@@ -215,6 +220,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   trackEpoch: 0,
   link: { rtcHost: null, attempts: 0, lastError: null, blockedHost: null },
   recording: null,
+  parked: null,
   set: (p) => set(p),
 }));
 

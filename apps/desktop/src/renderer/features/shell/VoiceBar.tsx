@@ -33,6 +33,7 @@ import { dmPeer } from '../../stores/dms';
 import { usePhoneCallNumber } from '../../stores/sipInbound';
 import { phoneCallId } from '../../lib/sipInbound';
 import { PhoneTransferRow } from '../call/PhoneTransfer';
+import { ParkedRoomLine } from '../call/ParkedRoom';
 import { formatPhone } from '../../lib/sip';
 import { openDm } from '../../services/dms';
 import { NoiseButton } from './NoisePopover';
@@ -677,6 +678,8 @@ export function VoiceBar(): ReactNode {
       {call ? null : <SoundChip className="mt-1 pl-11" />}
       {/* An inbound phone call (ADR-0132): «Перевести» → whom; while it rings, «Переводим: Имя». */}
       {phone !== null ? <PhoneTransferRow callId={phoneCallId(roomId)} className="mt-2" /> : null}
+      {/* The room the phone call parked (ADR-0133): «Комната: Lobby — на паузе» · «Выйти». */}
+      {phone !== null ? <ParkedRoomLine className="mt-2" /> : null}
 
       {phase === 'reconnecting' || phase === 'blocked' ? (
         // Connection lost (docs/09 #15): yellow notice inside the panel; LiveKit / rejoin brings it

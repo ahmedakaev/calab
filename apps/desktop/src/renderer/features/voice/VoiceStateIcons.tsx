@@ -1,4 +1,4 @@
-import { Guitar, HeadphoneOff, MicOff } from 'lucide-react';
+import { Guitar, HeadphoneOff, MicOff, Phone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cx } from '../../components/ui';
 import { t } from '../../i18n';
@@ -7,14 +7,16 @@ import { usePrefs } from '../../stores/prefs';
 import { useVoice } from '../../stores/voice';
 
 /** One icon of the per-participant voice state, in display order. */
-export type VoiceStateIcon = 'server-muted' | 'muted' | 'deafened' | 'ptt-idle';
+export type VoiceStateIcon = 'server-muted' | 'muted' | 'deafened' | 'ptt-idle' | 'on-phone';
 
 /**
  * Which icons a participant shows (docs/09 #15, Discord): the crossed mic first — red for a
  * moderator (server) mute, grey for a self-mute; deafen implies mute, so a deafened member shows
- * the crossed mic too, then the crossed headphones.
+ * the crossed mic too, then the crossed headphones. On a phone call (ADR-0133) only the handset:
+ * the mic state of a parked room says nothing then.
  */
-export function voiceStateIcons(muted: boolean, deafened: boolean, serverMuted = false, pttIdle = false): VoiceStateIcon[] {
+export function voiceStateIcons(muted: boolean, deafened: boolean, serverMuted = false, pttIdle = false, onPhone = false): VoiceStateIcon[] {
+  if (onPhone) return ['on-phone'];
   const out: VoiceStateIcon[] = [];
   if (serverMuted) out.push('server-muted');
   else if (muted || deafened) out.push('muted');
@@ -29,6 +31,7 @@ export function VoiceStateIcons({
   deafened,
   serverMuted = false,
   pttIdle = false,
+  onPhone = false,
   className,
 }: {
   muted: boolean;
@@ -36,12 +39,16 @@ export function VoiceStateIcons({
   serverMuted?: boolean;
   /** My mic is on but waits for the push-to-talk key (CBF-71): a pale crossed mic. */
   pttIdle?: boolean;
+  /** Parked here for a phone call (ADR-0133, VoiceState.on_phone): a handset instead. */
+  onPhone?: boolean;
   className?: string;
 }): ReactNode {
   return (
     <>
-      {voiceStateIcons(muted, deafened, serverMuted, pttIdle).map((k) =>
-        k === 'deafened' ? (
+      {voiceStateIcons(muted, deafened, serverMuted, pttIdle, onPhone).map((k) =>
+        k === 'on-phone' ? (
+          <OnPhoneIcon key={k} className={className} />
+        ) : k === 'deafened' ? (
           <HeadphoneOff key={k} className={cx('size-4 shrink-0 text-muted', className)} aria-label={t('shell.deafenedState')} role="img" data-voice-icon={k} />
         ) : (
           <MicOff
@@ -54,6 +61,15 @@ export function VoiceStateIcons({
         ),
       )}
     </>
+  );
+}
+
+/** «Разговаривает по телефону» (ADR-0133): the handset; the tooltip is native (no popover per row). */
+export function OnPhoneIcon({ className }: { className?: string }): ReactNode {
+  return (
+    <span className="inline-flex shrink-0" title={t('call.onPhone')}>
+      <Phone className={cx('size-4 shrink-0 text-muted', className)} aria-label={t('call.onPhone')} role="img" data-voice-icon="on-phone" />
+    </span>
   );
 }
 
@@ -73,11 +89,11 @@ export function MusicianIcon({ className }: { className?: string }): ReactNode {
  * My own voice-state icons (CBF-71): the leaf that knows the push-to-talk wait. It subscribes to
  * two booleans, so a key press redraws only this icon, never the row.
  */
-export function SelfVoiceStateIcons({ muted, deafened, serverMuted = false }: { muted: boolean; deafened: boolean; serverMuted?: boolean }): ReactNode {
+export function SelfVoiceStateIcons({ muted, deafened, serverMuted = false, onPhone = false }: { muted: boolean; deafened: boolean; serverMuted?: boolean; onPhone?: boolean }): ReactNode {
   // A one-to-one call is voice activation only (ADR-0034): no PTT wait there.
   const pttPref = usePrefs((s) => s.micMode === 'ptt');
   const oneToOne = useVoice((s) => s.call);
   const talking = useVoice((s) => s.pttDown);
   const pttIdle = micGlyph({ muted, deafened, ptt: pttPref && !oneToOne, talking }) === 'ptt-idle';
-  return <VoiceStateIcons muted={muted} deafened={deafened} serverMuted={serverMuted} pttIdle={pttIdle} />;
+  return <VoiceStateIcons muted={muted} deafened={deafened} serverMuted={serverMuted} pttIdle={pttIdle} onPhone={onPhone} />;
 }

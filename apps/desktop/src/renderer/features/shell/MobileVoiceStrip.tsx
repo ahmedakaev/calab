@@ -13,6 +13,7 @@ import { useUi } from '../../stores/ui';
 import { useConnectingRing, useVoiceStateOf } from '../../stores/voicePending';
 import { useVoice } from '../../stores/voice';
 import { dmPeer } from '../../stores/dms';
+import { ParkedRoomLine } from '../call/ParkedRoom';
 import { usePhoneCallNumber } from '../../stores/sipInbound';
 import { phoneCallId } from '../../lib/sipInbound';
 import { PhoneTransferButton, PhoneTransferStatus } from '../call/PhoneTransfer';
@@ -79,6 +80,8 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
       {ptt ? <PttHoldButton disabled={!connected || muted || deafened} /> : null}
       {/* A transfer of the phone call rings (ADR-0132): «Переводим: Имя · Отменить перевод». */}
       {phone !== null ? <PhoneTransferStatus callId={phoneCallId(roomId)} className="mb-2 shadow-[var(--shadow-island)]" /> : null}
+      {/* The room the phone call parked (ADR-0133). */}
+      {phone !== null ? <ParkedRoomLine className="mb-2 shadow-[var(--shadow-island)]" /> : null}
       <div role="region" aria-label={t('mobile.voiceStrip')} className="mat-toolbar flex h-14 items-center gap-1 rounded-[var(--radius-panel)] pl-2 pr-1.5 shadow-[var(--shadow-island)]">
         {me ? (
           <span

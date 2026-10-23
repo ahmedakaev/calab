@@ -342,6 +342,9 @@ class VoiceEngine {
     useVoice.subscribe((s, p) => {
       if (s.roomId === p.roomId && s.workspaceId === p.workspaceId && s.joining === p.joining) return;
       this.guardMusician(s.roomId === null && s.joining === null);
+      // A phone call's session ended with nothing joined after it (hang-up, the caller hung up,
+      // the transfer went through, a failed connect): back into the parked room (ADR-0133).
+      if (this.parked && s.roomId === null && s.joining === null && isPhoneRoom(p.roomId)) void this.resumeParked();
     });
     useWorkspaces.subscribe((s, p) => {
       if (s.byId !== p.byId) this.guardMusician(false);
@@ -423,6 +426,15 @@ class VoiceEngine {
     if (useWorkspaces.getState().byId[workspaceId]?.ws.suspension) {
       toast.info(t('suspended.voice'));
       return;
+    }
+    // A room parked by a phone call (ADR-0133): another room while the call goes on is entered
+    // after it (the parked one is left now); a one-to-one call takes over like from a room.
+    if (this.parked && !isPhoneRoom(roomId)) {
+      if (!opts.call && this.onPhoneCall()) {
+        this.parkInstead(roomId, workspaceId);
+        return;
+      }
+      this.dropParked(true);
     }
     this.rejoinGen++;
     this.rejoinRoomId = null;
@@ -1144,6 +1156,227 @@ class VoiceEngine {
     if (seat && tellServer) this.sendLeave(seat);
   }
 
+  // ------------------------------------------------------------ phone call parks the room (ADR-0133)
+
+  /**
+   * The room parked by a phone call: its Room still connected (my seat for the others) with
+   * nothing published or subscribed, or only the room to enter after the call (`room` null: its
+   * connection was lost, or another room was picked during the call). My mic state before the
+   * call comes back with it.
+   */
+  private parked: {
+    room: Room | null;
+    roomId: string;
+    workspaceId: string;
+    joinedAt: number | null;
+    muted: boolean;
+    deafened: boolean;
+    mutedBeforeDeafen: boolean;
+    serverMuted: boolean;
+  } | null = null;
+  /** Rooms whose parked-time listeners are installed (a room may be parked more than once). */
+  private readonly parkWatched = new WeakSet<Room>();
+
+  /** The voice session is an inbound phone call's (ADR-0117), also while it is being joined. */
+  private onPhoneCall(): boolean {
+    const v = useVoice.getState();
+    return isPhoneRoom(this.roomId) || isPhoneRoom(v.roomId) || isPhoneRoom(v.joining?.roomId);
+  }
+
+  /** The parked Room (read through a call: it changes across awaits). */
+  private parkedRoom(): Room | null {
+    return this.parked?.room ?? null;
+  }
+
+  /** A room is parked (or waits for the end of the phone call). */
+  get hasParked(): boolean {
+    return this.parked !== null;
+  }
+
+  /**
+   * «Принять» on a phone call (ADR-0133): the workspace room I am connected to is parked instead
+   * of left. Only a web Room of a workspace room that is connected; anything else (a one-to-one
+   * call, the native call audio, a connect or reconnect under way, a phone call) returns false
+   * and the caller leaves it as before.
+   */
+  async park(): Promise<boolean> {
+    const room = this.room;
+    const roomId = this.roomId;
+    const v = useVoice.getState();
+    if (!room || !roomId || this.nativeAudio || this.callMode || isPhoneRoom(roomId) || !v.workspaceId || v.joining) return false;
+    if (v.phase !== 'connected' || room.state !== ConnectionState.Connected || this.teardownRun || this.parked) return false;
+    this.clearRemoved();
+    this.rejoinGen++;
+    this.rejoinRoomId = null;
+    this.moveIntent = null;
+    this.intentSeq++;
+    const workspaceId = v.workspaceId;
+    this.parked = {
+      room,
+      roomId,
+      workspaceId,
+      joinedAt: v.joinedAt,
+      muted: v.muted,
+      deafened: v.deafened,
+      mutedBeforeDeafen: v.mutedBeforeDeafen,
+      serverMuted: v.serverMuted,
+    };
+    this.watchParked(room);
+    await this.teardown(false, false, true);
+    if (this.parkedRoom() !== room) return true; // dropped meanwhile (removed, room closed)
+    setVoice({ parked: { roomId, workspaceId } });
+    // The others see me «on the phone» (VoiceState.on_phone): the session is still connected there.
+    void api.voice.updateSelf({ onPhone: true }).catch((e: unknown) => log.warn('voice/self failed', e));
+    return true;
+  }
+
+  /**
+   * Nothing sent, nothing received in the parked room (docs/02 «Воспроизведение»: Chromium mixes
+   * every subscribed receiver, an element's mute is not enough): every local track unpublished,
+   * every remote subscription dropped. Bounded like the rest of the teardown.
+   */
+  private async silenceParked(room: Room): Promise<void> {
+    const lp = room.localParticipant;
+    const mine = [...lp.trackPublications.values()].flatMap((pub) => (pub.track ? [pub.track] : []));
+    const unpublished = Promise.all(mine.map((tr) => lp.unpublishTrack(tr, false))).then(() => undefined);
+    if (!(await settleWithin(unpublished, DISCONNECT_WAIT_MS))) log.warn('voice: unpublishing in the parked room did not settle, going on');
+    for (const p of room.remoteParticipants.values()) {
+      for (const pub of p.trackPublications.values()) if ((pub.subscriptionStatus as string) !== 'unsubscribed') pub.setSubscribed(false);
+    }
+  }
+
+  /**
+   * The parked Room's own events (its wire() handlers are silent while it is not the current
+   * room): a moderator removal, a closed room, another tab — out of it, no resume; a network loss
+   * LiveKit could not resume — the room is entered again after the call.
+   */
+  private watchParked(room: Room): void {
+    if (this.parkWatched.has(room)) return;
+    this.parkWatched.add(room);
+    room.on(RoomEvent.Disconnected, (reason) => {
+      const p = this.parked;
+      if (!p || p.room !== room || reason === DisconnectReason.CLIENT_INITIATED) return;
+      log.info('voice: the parked room disconnected, reason', reason ?? 'none');
+      const gone =
+        reason === DisconnectReason.PARTICIPANT_REMOVED ||
+        reason === DisconnectReason.ROOM_DELETED ||
+        reason === DisconnectReason.ROOM_CLOSED ||
+        reason === DisconnectReason.DUPLICATE_IDENTITY;
+      if (gone) this.dropParked(false);
+      else p.room = null;
+    });
+  }
+
+  /** The parked room was moved by a moderator: parked in the target from now on. */
+  private parkedMoved(toRoomId: string, workspaceId: string, newConnection: boolean): void {
+    const p = this.parked;
+    if (!p) return;
+    log.info('voice: the parked room was moved', toRoomId);
+    if (newConnection && p.room) {
+      const old = p.room;
+      p.room = null;
+      void settleWithin(old.disconnect(), DISCONNECT_WAIT_MS);
+    }
+    p.roomId = toRoomId;
+    p.workspaceId = workspaceId;
+    setVoice({ parked: { roomId: toRoomId, workspaceId } });
+  }
+
+  /** Another room picked during the phone call: the parked one is left, the new one entered after the call. */
+  private parkInstead(roomId: string, workspaceId: string): void {
+    const p = this.parked;
+    if (!p) return;
+    if (p.roomId !== roomId) {
+      this.dropParked(true);
+      this.parked = { ...p, room: null, roomId, workspaceId, joinedAt: null };
+      setVoice({ parked: { roomId, workspaceId } });
+    }
+    toast.info(t('call.sipParkedAfter'));
+  }
+
+  /** Out of the parked room (its connection and its seat); the phone call goes on. */
+  leaveParked(): void {
+    this.dropParked(true);
+  }
+
+  private dropParked(tellServer: boolean): void {
+    const p = this.parked;
+    if (!p) return;
+    this.parked = null;
+    setVoice({ parked: null });
+    if (!p.room) return;
+    void settleWithin(p.room.disconnect(), DISCONNECT_WAIT_MS);
+    if (tellServer) this.sendLeave(p.roomId);
+  }
+
+  /**
+   * The phone call ended (ADR-0133): the parked Room becomes the current one again — the
+   * subscriptions follow the usual rules, the mic is published with my state from before the
+   * call; no reconnect. A lost connection (or a room picked during the call) is joined anew.
+   */
+  async resumeParked(): Promise<void> {
+    const p = this.parked;
+    if (!p) return;
+    this.parked = null;
+    setVoice({ parked: null });
+    // The phone session's teardown resets the store: it goes first.
+    while (this.teardownRun) {
+      const run = this.teardownRun;
+      if (!(await settleWithin(run, TEARDOWN_WAIT_MS)) && this.teardownRun === run) this.teardownRun = null;
+    }
+    const v = useVoice.getState();
+    const room = p.room;
+    // Something else started meanwhile (a join, a call): the parked room goes.
+    if (this.room || this.nativeAudio || v.joining || v.roomId) {
+      if (room) {
+        void settleWithin(room.disconnect(), DISCONNECT_WAIT_MS);
+        this.sendLeave(p.roomId);
+      }
+      return;
+    }
+    setVoice({ muted: p.muted, deafened: p.deafened, mutedBeforeDeafen: p.mutedBeforeDeafen });
+    const live = room !== null && (room.state === ConnectionState.Connected || room.state === ConnectionState.Reconnecting || room.state === ConnectionState.SignalReconnecting);
+    if (!room || !live) {
+      if (room) await settleWithin(room.disconnect(), DISCONNECT_WAIT_MS);
+      await this.join(p.roomId, p.workspaceId, { resumed: true });
+      return;
+    }
+    this.intentSeq++;
+    const seq = ++this.joinSeq;
+    this.room = room;
+    this.roomId = p.roomId;
+    this.setCallMode(false);
+    this.echoToasted = false;
+    const sv = useWorkspaces.getState().byId[p.workspaceId]?.voice[this.myId()];
+    const perm = room.localParticipant.permissions;
+    const canSpeak = perm ? canSpeakFrom(perm) : true;
+    setVoice({
+      roomId: p.roomId,
+      workspaceId: p.workspaceId,
+      joinedAt: p.joinedAt ?? Date.now(),
+      joining: null,
+      phase: room.state === ConnectionState.Connected ? 'connected' : 'reconnecting',
+      error: null,
+      canSpeak,
+      serverMuted: sv?.serverMuted ?? p.serverMuted,
+    });
+    this.refreshRights();
+    for (const rp of room.remoteParticipants.values()) for (const pub of rp.trackPublications.values()) this.onPublished(pub);
+    if (canSpeak) {
+      await this.ensureMic();
+      if (seq !== this.joinSeq || this.room !== room) return;
+      await this.publishMic();
+      if (seq !== this.joinSeq || this.room !== room) return;
+    }
+    this.startStats();
+    this.pushSelfState({ onPhone: false });
+    this.refreshStreams();
+    this.refreshCameras();
+    this.camerasPrimed = true;
+    playSound('reconnect');
+    this.syncTray();
+  }
+
   // ------------------------------------------------------------ tabs of one browser (#40)
 
   private tabChannel: BroadcastChannel | null = null;
@@ -1252,9 +1485,13 @@ class VoiceEngine {
   /** The teardown in progress (connect() waits for it). */
   private teardownRun: Promise<void> | null = null;
 
-  /** `keepSeat`: a reconnect — the store keeps room, workspace, phase and the moderator mute. */
-  private teardown(sound: boolean, keepSeat = false): Promise<void> {
-    const run = this.doTeardown(sound, keepSeat);
+  /**
+   * `keepSeat`: a reconnect — the store keeps room, workspace, phase and the moderator mute.
+   * `park`: a phone call parks the room (ADR-0133) — the Room stays connected with nothing
+   * published or subscribed instead of being disconnected.
+   */
+  private teardown(sound: boolean, keepSeat = false, park = false): Promise<void> {
+    const run = this.doTeardown(sound, keepSeat, park);
     this.teardownRun = run;
     const done = (): void => {
       if (this.teardownRun === run) this.teardownRun = null;
@@ -1263,7 +1500,7 @@ class VoiceEngine {
     return run;
   }
 
-  private async doTeardown(sound: boolean, keepSeat: boolean): Promise<void> {
+  private async doTeardown(sound: boolean, keepSeat: boolean, park = false): Promise<void> {
     this.joinSeq++;
     this.nativeAudio?.stop(); this.nativeAudio = null;
     this.endPttTail();
@@ -1286,7 +1523,8 @@ class VoiceEngine {
     // mic there (review M1). The pipeline is stopped below when nobody needs it.
     // Bounded (docs/09 #131): a half-open signalling socket may never let disconnect() settle;
     // the room's events are already ignored (this.room !== room, see wire()).
-    if (room && !(await settleWithin(room.disconnect(false), DISCONNECT_WAIT_MS))) log.warn(`voice: room.disconnect() did not settle in ${DISCONNECT_WAIT_MS} ms, dropped`);
+    if (room && park) await this.silenceParked(room);
+    else if (room && !(await settleWithin(room.disconnect(false), DISCONNECT_WAIT_MS))) log.warn(`voice: room.disconnect() did not settle in ${DISCONNECT_WAIT_MS} ms, dropped`);
     this.camera.onLeave();
     if (!this.micTesting) {
       micTrack?.stop();
@@ -2450,6 +2688,13 @@ class VoiceEngine {
   onServerDisconnect(ev: Pick<VoiceDisconnected, 'roomId' | 'sessionId' | 'reason'>): boolean {
     const mySession = useSession.getState().sessionId;
     if (!mySession || ev.sessionId !== mySession) return false;
+    // The parked room (ADR-0133): out of it, the phone call goes on.
+    if (this.parked?.roomId === ev.roomId) {
+      log.info('voice: the server took the parked room away');
+      if (ev.reason === VoiceDisconnectReason.OTHER_DEVICE) toast.info(t('mediaErr.voice.otherDevice'));
+      this.dropParked(false);
+      return true;
+    }
     const v = useVoice.getState();
     const removedHere = this.removed !== null && this.removed.roomId === ev.roomId;
     // Connected, connecting, reconnecting (the rejoin loop) or just removed by LiveKit there.
@@ -2477,6 +2722,11 @@ class VoiceEngine {
     // session (the LiveKit identity is `<user_id>:<session_id>`); the identity double-checks it.
     const mySession = useSession.getState().sessionId;
     if (ev.sessionId && mySession && ev.sessionId !== mySession) return false;
+    // The parked room was moved (ADR-0133): its connection goes, the target is entered after the call.
+    if (this.parked && this.parked.roomId === ev.fromRoomId && ev.fromRoomId !== ev.toRoomId) {
+      this.parkedMoved(ev.toRoomId, ev.workspaceId, true);
+      return false;
+    }
     const myIdentity = this.room?.localParticipant.identity;
     if (ev.identity && myIdentity && ev.identity !== myIdentity) return false;
     if (ev.fromRoomId === ev.toRoomId || ev.token === this.lastMoveToken) return false; // duplicate
@@ -2539,6 +2789,11 @@ class VoiceEngine {
    * rejoin the target room cleanly after a grace period.
    */
   private onSfuMoved(fromRoomId: string, toRoomId: string, workspaceId: string): void {
+    // The SFU moved the parked connection itself (ADR-0133): it stays parked, in the target.
+    if (this.parked && this.parked.roomId === fromRoomId && fromRoomId !== toRoomId) {
+      this.parkedMoved(toRoomId, workspaceId, false);
+      return;
+    }
     if (!this.room || this.roomId !== fromRoomId || fromRoomId === toRoomId) return;
     this.roomId = toRoomId;
     setVoice({ roomId: toRoomId, workspaceId });
@@ -2613,14 +2868,14 @@ class VoiceEngine {
   }
 
   /** Optimistic voice state for everyone (docs/05: PATCH /api/voice/self). */
-  private pushSelfState(): void {
+  private pushSelfState(extra: { onPhone?: boolean } = {}): void {
     if (!this.room && !this.nativeAudio) return;
     if (isPhoneRoom(this.roomId)) return; // a phone call's session is in no voice list (ADR-0117)
     const v = useVoice.getState();
     const musician = prefs().musicianMode;
     // Push-to-talk is a mode, not a key press (ADR-0130): sent when the mode changes, never per press.
     const ptt = this.micMode() === 'ptt';
-    void api.voice.updateSelf({ muted: v.muted, deafened: v.deafened, musician, ptt }).catch((e: unknown) => {
+    void api.voice.updateSelf({ muted: v.muted, deafened: v.deafened, musician, ptt, ...extra }).catch((e: unknown) => {
       // The plan does not include musician mode (ADR-0052, 409 PLAN_LIMIT): back to the processed mic.
       if (musician && e instanceof ApiError && e.reason === 'PLAN_LIMIT' && prefs().musicianMode) {
         usePrefs.getState().setPrefs({ musicianMode: false });
@@ -2632,8 +2887,19 @@ class VoiceEngine {
   }
 
   /** Server view of our voice state differs from local (e.g. PATCH raced the join) → push again. */
-  reconcileSelfState(s: { roomId: string; muted: boolean; deafened: boolean; serverMuted?: boolean; musician?: boolean }): void {
+  reconcileSelfState(s: { roomId: string; muted: boolean; deafened: boolean; serverMuted?: boolean; musician?: boolean; onPhone?: boolean }): void {
     const v = useVoice.getState();
+    // The parked room (ADR-0133): the server lost the flag (a seat repaired by the LiveKit sync).
+    const parked = this.parked;
+    if (parked?.room && s.roomId === parked.roomId) {
+      if (s.onPhone === false) void api.voice.updateSelf({ onPhone: true }).catch((e: unknown) => log.warn('voice/self failed', e));
+      return;
+    }
+    // Back from a phone call: the flag must go (the PATCH of the resume may have been lost).
+    if (s.onPhone && this.room && s.roomId === this.roomId) {
+      this.pushSelfState({ onPhone: false });
+      return;
+    }
     if ((!this.room && !this.nativeAudio) || s.roomId !== this.roomId) {
       // Not where I am connected (docs/09 #71): the server may have lost this device.
       if (this.room && this.roomId) this.scheduleSelfCheck();
