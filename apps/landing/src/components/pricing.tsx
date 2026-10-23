@@ -23,6 +23,7 @@ const ROW_IDS = Object.keys({
   boards: 0,
   tempRooms: 0,
   wiki: 0,
+  canvases: 0,
   calendar: 0,
   caldav: 0,
   musician: 0,

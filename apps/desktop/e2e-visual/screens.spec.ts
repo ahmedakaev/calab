@@ -1737,6 +1737,11 @@ test('settings-plan', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('plan-limits')).toBeVisible();
   await expect(win.getByRole('dialog').getByText('Free', { exact: true })).toBeVisible();
   await checkpoint(shot, 'settings-plan');
+  // The limits table further down: «Холстов 3» under «Досок» (ADR-0126 addendum, owner 23.10).
+  const canvases = win.getByTestId('plan-limits').getByRole('row').filter({ hasText: 'Холстов' });
+  await expect(canvases).toContainText('3');
+  await canvases.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await checkpoint(shot, 'settings-plan-limits');
 });
 
 /**
@@ -1812,6 +1817,9 @@ test('admin-plan', async ({ open, win, mock, shot }) => {
   await expect(admin.getByTestId('admin-log')).toBeAttached();
   await admin.getByRole('heading', { name: 'Тариф', exact: true }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await checkpoint(shot, 'admin-plan');
+  // The counted limits of the custom plan: «Статей в Wiki», «Холстов» (ADR-0126 addendum, owner 23.10).
+  await admin.getByRole('textbox', { name: 'Холстов' }).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await checkpoint(shot, 'admin-plan-limits');
 });
 
 /** Suspends a workspace in the mock and tells the clients (docs/09 #32). */

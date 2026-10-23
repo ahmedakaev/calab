@@ -1,5 +1,5 @@
 import { create } from '@bufbuild/protobuf';
-import { CANVAS_BITS, CanvasPermissionEntrySchema, PermissionTargetType } from '@calaba/protocol';
+import { CANVAS_BITS, CanvasPermissionEntrySchema, PermissionTargetType, Plan } from '@calaba/protocol';
 import type { Page } from '@playwright/test';
 import { IDS } from '../e2e-support/fixtures';
 import { expect, test } from './app';
@@ -253,6 +253,17 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
     await win.getByTestId('canvas-trash-row').first().getByRole('button').first().click();
     await expect(win.getByTestId('canvas-trashed')).toBeVisible();
     await checkpoint(shot, 'canvas-trash');
+
+    // 7a. The plan's canvas cap (ADR-0126 addendum, owner 23.10): on Free (3) the fixture's four live
+    // canvases are already over it — «+ Новый холст» answers with the plan toast, as the Wiki.
+    await open();
+    mock.setPlanKind(IDS.workspaces.main, Plan.FREE);
+    await win.getByTestId('section-canvas').click();
+    await expect(win.getByTestId('canvas-node').first()).toBeVisible();
+    await win.getByTestId('canvas-create').click();
+    await win.getByTestId('canvas-new-canvas').click();
+    await expect(win.getByTestId('toast')).toContainText('Лимит тарифа Free: 3 холстов');
+    await checkpoint(shot, 'canvas-plan-limit');
   }
 
   // 8. Comments like the chat (owner 23.10, dark and light): thread cards with chat rows (Борис's two

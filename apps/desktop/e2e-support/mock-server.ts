@@ -8632,7 +8632,7 @@ class MockImpl {
       try {
         await h(c, me);
       } catch (e) {
-        if (e instanceof CanvasError) throw new HttpError(e.status, e.code, e.message, e.field);
+        if (e instanceof CanvasError) throw new HttpError(e.status, e.code, e.message, e.field, e.extra);
         throw e;
       }
     });
@@ -8700,7 +8700,7 @@ class MockImpl {
         if (count) sendMsg(c.res, 200, PublicCanvasSchema, meta);
         else noContent(c.res);
       } catch (e) {
-        if (e instanceof CanvasError) throw new HttpError(e.status, e.code, e.message, e.field);
+        if (e instanceof CanvasError) throw new HttpError(e.status, e.code, e.message, e.field, e.extra);
         throw e;
       }
     };

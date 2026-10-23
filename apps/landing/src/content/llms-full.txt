@@ -182,6 +182,7 @@ Global paid terms: https://calab.io/en/legal/offer/; EULA: https://calab.io/en/l
 | Task boards | 3 | 30 | 50 | unlimited |
 | Temporary rooms per person (up to 30 days) | 3 | 10 | 50 | unlimited |
 | Wiki pages | 10 | 50 | 500 | unlimited |
+| Canvases (folders and the trash do not count) | 3 | 30 | 100 | unlimited |
 | Simultaneous screen shares per room | 1 | 2 | 5 | unlimited |
 | Simultaneous cameras per room | 3 | 10 | 25 | unlimited |
 | Musician mode | no (locked) | yes | yes | yes |

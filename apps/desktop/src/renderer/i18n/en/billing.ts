@@ -545,6 +545,7 @@ export const enBilling: DictShape<typeof ruBilling> = {
   'billing.plans.f.audio': 'Call quality up to «{tier}»',
   'billing.plans.f.mediaFree': 'Audio and video not limited by the plan',
   'billing.plans.f.bots': 'Bots: {n}',
+  'billing.plans.f.canvases': 'Canvases: {n}',
   'billing.plans.f.sso': 'Corporate SSO sign-in (OIDC)',
   'billing.plans.f.directory': 'Employee directory: Active Directory / LDAP',
   'billing.plans.f.oauth': 'Sign in to your services with Calab (OAuth)',

@@ -119,6 +119,8 @@ function limitRows(limits: PlanLimits | undefined, usage: ReturnType<typeof plan
     { label: t('plan.limit.camera'), used: '—', max: videoLimitText(l?.cameraMaxPreset ?? 0, l?.cameraMaxFps ?? 0) },
     counted(t('plan.limit.bots'), usage.bots, l?.bots ?? 0),
     { label: t('plan.limit.boards'), used: '—', max: countText(l?.boards ?? 0) },
+    // ADR-0126 addendum (owner, 23.10): live canvases, folders and the trash not counted.
+    { label: t('plan.limit.canvases'), used: '—', max: countText(l?.canvases ?? 0) },
     { label: t('plan.limit.caldav'), used: '—', max: t(l?.caldavDisabled ? 'plan.caldav.no' : 'plan.caldav.yes') },
     { label: t('music.mode'), used: '—', max: t(l?.musicianDisabled ? 'plan.caldav.no' : 'plan.caldav.yes') },
     // ADR-0058 §5: checklists (Team and above), the board webhook (Business).

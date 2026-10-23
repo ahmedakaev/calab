@@ -545,6 +545,7 @@ export const zhBilling: DictShape<typeof ruBilling> = {
   'billing.plans.f.audio': '通话质量最高“{tier}”',
   'billing.plans.f.mediaFree': '音视频不受套餐限制',
   'billing.plans.f.bots': '机器人：{n}',
+  'billing.plans.f.canvases': '画布：{n}',
   'billing.plans.f.sso': '企业 SSO 登录（OIDC）',
   'billing.plans.f.directory': '员工目录：Active Directory / LDAP',
   'billing.plans.f.oauth': '用 Calab 登录你的服务（OAuth）',

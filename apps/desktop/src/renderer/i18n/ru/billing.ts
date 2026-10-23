@@ -548,6 +548,7 @@ export const ruBilling = {
   'billing.plans.f.audio': 'Качество связи до «{tier}»',
   'billing.plans.f.mediaFree': 'Звук и видео без ограничений тарифа',
   'billing.plans.f.bots': 'Ботов: {n}',
+  'billing.plans.f.canvases': 'Холстов: {n}',
   'billing.plans.f.sso': 'Корпоративный вход через SSO (OIDC)',
   'billing.plans.f.directory': 'Каталог сотрудников: Active Directory / LDAP',
   'billing.plans.f.oauth': 'Вход в ваши сервисы через Calab (OAuth)',

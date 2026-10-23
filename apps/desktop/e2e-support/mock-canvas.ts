@@ -51,6 +51,8 @@ export class CanvasError extends Error {
     readonly code: ErrorCode,
     message: string,
     readonly field = '',
+    /** ApiError reason / used / limit (the plan's canvas cap, ADR-0126 addendum 23.10). */
+    readonly extra: { reason?: string; used?: bigint; limit?: bigint } = {},
   ) {
     super(message);
   }
@@ -238,10 +240,24 @@ export class CanvasMock {
     return this.chainOf(this.visible(id, uid)).map((x) => this.out(x, uid));
   }
 
+  /**
+   * The plan's cap on live canvases (folders and the trash not counted; ADR-0126 addendum 23.10):
+   * 409 PLAN_LIMIT when `adding` more would pass it, as the server's plans.CheckAdd.
+   */
+  private checkPlan(wsId: string, adding: number): void {
+    const limit = this.d.state.workspaces.get(wsId)?.plan?.limits?.canvases ?? 0;
+    if (!limit || adding <= 0) return;
+    const used = [...this.items.values()].filter((x) => x.workspaceId === wsId && x.kind === CanvasItemKind.CANVAS && !x.trashedAt).length;
+    if (used + adding > limit) {
+      throw new CanvasError(409, ErrorCode.CONFLICT, `the workspace plan allows ${limit} canvases`, '', { reason: 'PLAN_LIMIT', used: BigInt(used), limit: BigInt(limit) });
+    }
+  }
+
   create(wsId: string, uid: string, b: { parentId: string; kind: CanvasItemKind; name: string }): CanvasItem {
     if (b.kind !== CanvasItemKind.FOLDER && b.kind !== CanvasItemKind.CANVAS) throw new CanvasError(422, ErrorCode.VALIDATION, 'kind is required', 'kind');
     if (b.parentId) this.folder(b.parentId, wsId, uid);
     else if (!(this.bitsOf(null, wsId, uid) & W)) throw forbidden('CANVAS_WRITE required');
+    if (b.kind === CanvasItemKind.CANVAS) this.checkPlan(wsId, 1);
     const p = this.put({ workspaceId: wsId, parentId: b.parentId, kind: b.kind, name: b.name.trim().slice(0, 200), ownerId: uid }, b.kind === CanvasItemKind.CANVAS ? () => undefined : undefined);
     this.emit(p);
     return this.out(p, uid);
@@ -284,6 +300,8 @@ export class CanvasMock {
     const p = this.structural(id, uid);
     if (!p.trashedRoot) throw notFound();
     const parentGone = p.parentId && (!this.items.get(p.parentId) || this.items.get(p.parentId)?.trashedAt);
+    const back = (x: CanvasItem): boolean => !!x.trashedAt && timestampMs(x.trashedAt) === timestampMs(p.trashedAt as Timestamp);
+    this.checkPlan(p.workspaceId, this.subtree(id).filter((x) => back(x) && x.kind === CanvasItemKind.CANVAS).length);
     for (const x of this.subtree(id)) if (x.trashedAt && timestampMs(x.trashedAt) === timestampMs(p.trashedAt as Timestamp)) this.items.set(x.id, { ...x, trashedAt: undefined, trashedBy: '', trashedRoot: false });
     const cur = this.items.get(id) as CanvasItem;
     const next = { ...cur, parentId: parentGone ? '' : cur.parentId, position: this.siblings(cur.workspaceId, parentGone ? '' : cur.parentId, id).length };

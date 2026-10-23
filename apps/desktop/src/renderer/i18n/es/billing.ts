@@ -545,6 +545,7 @@ export const esBilling: DictShape<typeof ruBilling> = {
   'billing.plans.f.audio': 'Calidad de llamada hasta «{tier}»',
   'billing.plans.f.mediaFree': 'Audio y vídeo sin límites del plan',
   'billing.plans.f.bots': 'Bots: {n}',
+  'billing.plans.f.canvases': 'Lienzos: {n}',
   'billing.plans.f.sso': 'Inicio de sesión corporativo SSO (OIDC)',
   'billing.plans.f.directory': 'Directorio de empleados: Active Directory / LDAP',
   'billing.plans.f.oauth': 'Acceso a tus servicios con Calab (OAuth)',

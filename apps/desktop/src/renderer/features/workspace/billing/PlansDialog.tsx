@@ -329,6 +329,7 @@ function highlights(tier: PlanTier, l: PlanLimits | undefined): string[] {
     out.push(t('billing.plans.f.room', { n: countText(l.roomMembers) }));
     out.push(l.audioTierMaxKbps ? t('billing.plans.f.audio', { tier: audioTierLabel(l.audioTierMaxKbps) }) : t('billing.plans.f.mediaFree'));
     out.push(t('billing.plans.f.bots', { n: countText(l.bots) }));
+    out.push(t('billing.plans.f.canvases', { n: countText(l.canvases) }));
   }
   for (const f of IDENTITY_FEATURES[tier]) out.push(t(IDENTITY_KEY[f]));
   if (l) {
