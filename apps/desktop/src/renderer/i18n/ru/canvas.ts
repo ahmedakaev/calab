@@ -9,6 +9,8 @@ export const ruCanvas = {
   'canvas.tree': 'Папки и холсты',
   'canvas.search': 'Поиск холстов',
   'canvas.searchEmpty': 'Ничего не найдено',
+  'canvas.hideTree': 'Свернуть список холстов',
+  'canvas.showTree': 'Показать список холстов',
   'canvas.create': 'Создать',
   'canvas.newCanvas': 'Новый холст',
   'canvas.newFolder': 'Новая папка',

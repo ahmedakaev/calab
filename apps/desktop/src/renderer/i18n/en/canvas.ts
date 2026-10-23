@@ -8,6 +8,8 @@ export const enCanvas: DictShape<typeof ruCanvas> = {
   'canvas.tree': 'Folders and canvases',
   'canvas.search': 'Search canvases',
   'canvas.searchEmpty': 'Nothing found',
+  'canvas.hideTree': 'Hide the canvas list',
+  'canvas.showTree': 'Show the canvas list',
   'canvas.create': 'Create',
   'canvas.newCanvas': 'New canvas',
   'canvas.newFolder': 'New folder',

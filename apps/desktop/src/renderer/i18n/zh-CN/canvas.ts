@@ -8,6 +8,8 @@ export const zhCanvas: DictShape<typeof ruCanvas> = {
   'canvas.tree': '文件夹和画布',
   'canvas.search': '搜索画布',
   'canvas.searchEmpty': '未找到任何内容',
+  'canvas.hideTree': '收起画布列表',
+  'canvas.showTree': '显示画布列表',
   'canvas.create': '新建',
   'canvas.newCanvas': '新建画布',
   'canvas.newFolder': '新建文件夹',

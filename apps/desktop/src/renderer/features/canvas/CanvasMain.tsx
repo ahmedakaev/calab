@@ -1,10 +1,10 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
 import { CanvasItemKind } from '@calaba/protocol';
-import { ChevronRight, Ellipsis, Shapes, Share2, Trash2 } from 'lucide-react';
+import { ChevronRight, Ellipsis, PanelLeftOpen, Shapes, Share2, Trash2 } from 'lucide-react';
 import { memo, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Bar, BAR_GROUP } from '../../components/Bar';
-import { Button, IconButton, Spinner, cx } from '../../components/ui';
+import { Button, IconButton, MOD, Spinner, cx } from '../../components/ui';
 import { t, useLocale } from '../../i18n';
 import { ancestorsOf, canStructure } from '../../lib/canvas/tree';
 import { createItem, deleteForever, loadItem, restoreItem } from '../../services/canvas';
@@ -140,10 +140,16 @@ function CanvasBar({ workspaceId, itemId }: { workspaceId: string; itemId: strin
     return !!i && canStructure(i, myUserId());
   });
   const trashed = useCanvas((s) => !!s.items[itemId]?.trashedAt);
+  const collapsed = useCanvasUi((s) => s.treeCollapsed);
   // The global «Нет соединения» pill floats over the middle of this bar: keep the crumbs left of it.
   const reconnecting = useSession((s) => s.ready && s.reconnectBanner);
   return (
     <Bar plain className="gap-2 pl-3 pr-3" data-testid="canvas-bar">
+      {collapsed ? (
+        <IconButton label={t('canvas.showTree')} shortcut={`${MOD}\\`} onClick={() => useCanvasUi.getState().setTreeCollapsed(false)} data-testid="canvas-tree-expand">
+          <PanelLeftOpen className="size-4" strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      ) : null}
       {itemId ? <Crumbs workspaceId={workspaceId} itemId={itemId} clear={reconnecting} /> : <h1 className="px-1.5 text-headline font-semibold">{t('canvas.section')}</h1>}
       <span className="flex-1" />
       {itemId ? (

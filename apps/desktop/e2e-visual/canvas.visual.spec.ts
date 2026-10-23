@@ -69,6 +69,21 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await expect(win.getByTestId('canvas-toolbar')).toBeVisible();
   await checkpoint(shot, 'canvas-tree');
 
+  // 2a. The open canvas's row is filled; the pointer on its neighbour fills the same box (dark and light).
+  await win.getByTestId('canvas-node').filter({ hasText: 'Ретро-доска' }).hover();
+  await win.waitForTimeout(150);
+  await checkpoint(shot, 'canvas-tree-hover');
+  await win.mouse.move(700, 300);
+
+  // 2b. The folded list: «show» at the left of the header, the canvas takes the width (dark and light).
+  await win.getByTestId('canvas-tree-collapse').click();
+  await expect(win.getByTestId('canvas-column')).toHaveCount(0);
+  await expect(win.getByTestId('canvas-tree-expand')).toBeVisible();
+  await win.waitForTimeout(150);
+  await checkpoint(shot, 'canvas-tree-collapsed');
+  await win.getByTestId('canvas-tree-expand').click();
+  await expect(win.getByTestId('canvas-column')).toBeVisible();
+
   // 3. A selected sticky and its properties panel (dark and light).
   const p = await atWorld(win, 300, 80);
   await win.mouse.click(p.x, p.y);
@@ -127,6 +142,26 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
     await expect(win.getByTestId('canvas-version-restore')).toBeEnabled();
     await checkpoint(shot, 'canvas-versions');
   }
+
+  // 5a. The palette: a sticky in every colour and a shape in every hue (dark and light).
+  await open();
+  const swatches = [
+    'yellow', 'amber', 'orange', 'coral', 'red', 'crimson', 'pink', 'magenta', 'violet', 'purple', 'lavender', 'indigo', 'cobalt',
+    'blue', 'sky', 'cyan', 'teal', 'mint', 'green', 'emerald', 'lime', 'brown', 'gray', 'slate', 'black',
+  ];
+  const hues = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'cyan', 'blue', 'indigo', 'purple', 'magenta', 'pink', 'brown', 'gray'];
+  mock.canvas.put({ workspaceId: IDS.workspaces.main, name: 'Палитра', ownerId: IDS.users.anna }, (d) => {
+    swatches.forEach((color, i) => d.create({ kind: 'sticky', x: (i % 9) * 150, y: Math.floor(i / 9) * 150, color, text: color }));
+    hues.forEach((hue, i) => d.create({ kind: 'shape', shape: 'rounded', x: (i % 7) * 190, y: 470 + Math.floor(i / 7) * 120, w: 160, h: 90, fill: 'none', stroke: hue, text: hue }));
+  });
+  await win.getByTestId('section-canvas').click();
+  await win.getByTestId('canvas-node').filter({ hasText: 'Палитра' }).getByTestId('canvas-node-open').click();
+  await expect(win.getByTestId('canvas-title')).toHaveText('Палитра');
+  await expect(win.getByTestId('canvas-connecting')).toHaveCount(0);
+  await win.getByTestId('canvas-tree-collapse').click();
+  await win.getByTestId('canvas-fit-all').click();
+  await win.waitForTimeout(900);
+  await checkpoint(shot, 'canvas-palette');
 
   // 6. «Доступ» (dark and light).
   await open();

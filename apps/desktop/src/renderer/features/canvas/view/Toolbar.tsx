@@ -175,7 +175,7 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas }: { e
                       aria-label={t(d.label)}
                       data-testid={`canvas-shape-${d.kind}`}
                       className={cx(
-                        'grid size-9 cursor-default place-items-center rounded-[6px] text-fg outline-none data-[highlighted]:bg-accent-strong data-[highlighted]:text-accent-fg',
+                        'grid size-9 cursor-default place-items-center rounded-[var(--radius-icon)] text-fg outline-none data-[highlighted]:bg-accent-strong data-[highlighted]:text-accent-fg',
                         shapeKind === d.kind && 'bg-active',
                       )}
                       onSelect={() => {

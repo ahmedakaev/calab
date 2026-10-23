@@ -2,12 +2,12 @@ import * as Dropdown from '@radix-ui/react-dropdown-menu';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
 import { CanvasItemKind } from '@calaba/protocol';
-import { ArrowLeft, ChevronRight, FilePlus2, Folder, FolderOpen, FolderPlus, Plus, RotateCcw, Search, Shapes, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, FilePlus2, Folder, FolderOpen, FolderPlus, PanelLeftClose, Plus, RotateCcw, Search, Shapes, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { CreateButton } from '../../components/CreateButton';
-import { Button, IconButton, Input, Spinner, cx } from '../../components/ui';
+import { Button, IconButton, Input, MOD, Spinner, cx } from '../../components/ui';
 import { t, useLocale } from '../../i18n';
 import { fmt } from '../../lib/format';
 import { canStructure, canWrite, childKey, filterItems, TOP, trashKey, type DropZone } from '../../lib/canvas/tree';
@@ -72,6 +72,9 @@ function TreeColumn({ workspaceId, canCreate }: { workspaceId: string; canCreate
           />
         </span>
         {canCreate ? <CreateMenu workspaceId={workspaceId} /> : null}
+        <IconButton label={t('canvas.hideTree')} shortcut={`${MOD}\\`} onClick={() => useCanvasUi.getState().setTreeCollapsed(true)} data-testid="canvas-tree-collapse">
+          <PanelLeftClose className="size-4" strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </div>
       <nav className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-1.5" aria-label={t('canvas.tree')} data-testid="canvas-tree">
         {query.trim() ? <SearchResults workspaceId={workspaceId} query={query} /> : <ChildList workspaceId={workspaceId} parentId={TOP} depth={0} />}
@@ -140,7 +143,7 @@ const ChildList = memo(function ChildList({ workspaceId, parentId, depth }: { wo
     );
   }
   return (
-    <ul className="flex flex-col">
+    <ul className="flex flex-col gap-0.5">
       {ids.map((id) => (
         <TreeNode key={id} workspaceId={workspaceId} id={id} depth={depth} />
       ))}
@@ -187,7 +190,7 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
           ref={ref}
           {...drag.listeners}
           className={cx(
-            'group relative flex h-8 items-center gap-1 rounded-[var(--radius-row)] pr-1 text-body',
+            'group relative flex h-8 items-center gap-1 rounded-[var(--radius-row)] pr-1 text-body has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-inset has-[button:focus-visible]:ring-accent',
             active ? 'bg-active text-fg' : 'text-fg hover:bg-hover',
             drag.isDragging && 'opacity-40',
             zone === 'inside' && 'bg-hover ring-2 ring-inset ring-accent',
@@ -228,7 +231,7 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
                 else if (e.key === 'ArrowLeft' && folder && expanded) toggle();
               }}
               aria-current={active ? 'page' : undefined}
-              className="flex h-full min-w-0 flex-1 items-center gap-1 rounded-[var(--radius-row)] text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex h-full min-w-0 flex-1 items-center gap-1 rounded-[var(--radius-row)] text-left outline-none"
               data-testid="canvas-node-open"
             >
               <span className="grid size-5 shrink-0 place-items-center" aria-hidden>

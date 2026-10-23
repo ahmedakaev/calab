@@ -8,6 +8,8 @@ export const esCanvas: DictShape<typeof ruCanvas> = {
   'canvas.tree': 'Carpetas y lienzos',
   'canvas.search': 'Buscar lienzos',
   'canvas.searchEmpty': 'No se ha encontrado nada',
+  'canvas.hideTree': 'Ocultar la lista de lienzos',
+  'canvas.showTree': 'Mostrar la lista de lienzos',
   'canvas.create': 'Crear',
   'canvas.newCanvas': 'Nuevo lienzo',
   'canvas.newFolder': 'Nueva carpeta',
