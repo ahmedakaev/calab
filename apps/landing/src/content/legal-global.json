@@ -199,10 +199,10 @@
       {
         "title": "6. Website cookies and browser storage",
         "paragraphs": [
-          "The marketing website has no advertising or analytics trackers. It uses a necessary localStorage record, calab.site-preferences, to remember your storage choice for up to 180 days. Only with permission, calab.locale remembers your chosen language for the remaining duration of that choice.",
+          "By default the website uses only necessary storage; analytics (Yandex Metrika) runs only with the visitor’s consent and can be withdrawn in the cookie settings. It uses a necessary localStorage record, calab.site-preferences, to remember your storage choice for up to 180 days. Only with permission, calab.locale remembers your chosen language for the remaining duration of that choice.",
           "Use the corner preferences button or the footer’s Cookie settings link to allow, reject or withdraw optional storage. Closing the panel is not consent. Rejection, withdrawal or expiry stops use of the saved language and removes it on the next site storage access. Language links work without saving a preference. See the Cookie & storage policy for details.",
           "This marketing-site choice does not control the application’s separate login/security storage or external sites. Browser controls can remove stored data; application and device controls govern notifications. New optional tracking purposes would require new information and any necessary permission before activation.",
-          "Exception to the statements above about analytics: only with your separate consent does the website load Yandex Metrika (operated by Yandex LLC, Russia). It collects visits and pages viewed, clicks and mouse movement, and records the session (Webvisor) to help us improve the website; Yandex may set its own cookies and identifiers in your browser for this. Before consent the service is not loaded and receives no data. You can withdraw consent at any time with the “Cookie settings” link in the footer: the service stops loading and the website removes the service records it can access. Data already collected is handled by Yandex under its own terms."
+          "With your separate consent the website loads Yandex Metrika (operated by Yandex LLC, Russia). It collects visits and pages viewed, clicks and mouse movement, and records the session (Webvisor) to help us improve the website; Yandex may set its own cookies and identifiers in your browser for this. Before consent the service is not loaded and receives no data. You can withdraw consent at any time with the “Cookie settings” link in the footer: the service stops loading and the website removes the service records it can access. Data already collected is handled by Yandex under its own terms."
         ]
       },
       {
@@ -300,7 +300,7 @@
         "title": "1. Scope",
         "paragraphs": [
           "Unne L.L.C-FZ, a Limited Liability Company (Free Zone) registered in Dubai, United Arab Emirates. Registered office: Meydan Grandstand, 6th Floor, Meydan Road, Nad Al Sheba, Dubai, UAE. Contact: support@calab.io. VAT TRN: 105410888900001.",
-          "The marketing website at calab.io has no advertising or analytics trackers. The records below use localStorage rather than HTTP cookies, but both types of technology store information on your device. Fonts and images are hosted by the website itself; links to the app or third-party services do not embed their trackers here. The Privacy Policy explains broader personal-data handling."
+          "By default the marketing website at calab.io uses only necessary storage; analytics (Yandex Metrika) runs only with the visitor’s consent and can be withdrawn in the cookie settings. The records below use localStorage rather than HTTP cookies, but both types of technology store information on your device. Fonts and images are hosted by the website itself; links to the app or third-party services do not embed their trackers here. The Privacy Policy explains broader personal-data handling."
         ]
       },
       {
@@ -321,14 +321,14 @@
         "paragraphs": [
           "Use the corner button or Cookie settings in the footer at any time. Allowing and rejecting optional storage are equally available. Closing the panel, scrolling or following a link does not give permission. Withdrawing is as easy as allowing and does not invalidate earlier lawful use.",
           "If your browser blocks storage, optional persistence stays off and language links still work. Clearing browser data removes the choice too, so the panel will appear again. The choice applies to this browser and domain; other devices, app domains and external sites manage their own settings and necessary session data.",
-          "Exception to the statements above about analytics: only with your separate consent does the website load Yandex Metrika (operated by Yandex LLC, Russia). It collects visits and pages viewed, clicks and mouse movement, and records the session (Webvisor) to help us improve the website; Yandex may set its own cookies and identifiers in your browser for this. Before consent the service is not loaded and receives no data. You can withdraw consent at any time with the “Cookie settings” link in the footer: the service stops loading and the website removes the service records it can access. Data already collected is handled by Yandex under its own terms."
+          "With your separate consent the website loads Yandex Metrika (operated by Yandex LLC, Russia). It collects visits and pages viewed, clicks and mouse movement, and records the session (Webvisor) to help us improve the website; Yandex may set its own cookies and identifiers in your browser for this. Before consent the service is not loaded and receives no data. You can withdraw consent at any time with the “Cookie settings” link in the footer: the service stops loading and the website removes the service records it can access. Data already collected is handled by Yandex under its own terms."
         ]
       },
       {
         "title": "5. Future changes",
         "paragraphs": [
           "A new optional purpose requires updated information and any necessary permission before activation. This policy does not authorise future trackers. For questions or requests, contact support@calab.io.",
-          "Settings include Analytics and Marketing categories marked “Not connected”. We do not currently collect permission for them; their stored values remain off. Before connecting a service, we will identify its provider, purpose and retention, update the choice version and request fresh permission."
+          "Settings include an Analytics category (Yandex Metrika; off by default) and a Marketing category marked “Not connected”. We do not currently collect permission for marketing; its stored value remains off. Before connecting a new service, we will identify its provider, purpose and retention, update the choice version and request fresh permission."
         ]
       }
     ]
