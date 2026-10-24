@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { detectMacArch, detectOs, type MacArch } from '@/lib/detect-os';
 import type { Dict } from '@/i18n';
 import { rich } from '@/lib/rich';
-import { APP_URL, DOWNLOADS, REPO_URL, repoFile } from '@/lib/site';
+import { APP_URL, DOWNLOADS } from '@/lib/site';
 import { Button, Section } from './ui';
 
 // Direct links to the stable latest/ names (no directory listing, no redirect hop).
@@ -103,15 +103,6 @@ export function Downloads({ t }: { t: Dict['downloads'] }) {
           ),
         })}
       </p>
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-        <span className="text-[14px] leading-5 text-fg-2">{t.whatsNew}</span>
-        <Button href={repoFile('CHANGELOG.md')} variant="secondary" size="sm">
-          {t.changelog}
-        </Button>
-        <Button href={`${REPO_URL}/releases`} variant="secondary" size="sm">
-          {t.releases}
-        </Button>
-      </div>
     </Section>
   );
 }

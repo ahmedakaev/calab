@@ -306,9 +306,6 @@ const zh: Dict = {
     },
     web: '或者在 Chrome、Edge、Safari 或 Firefox 中打开{link}，手机上也可以。iPhone 和 Android 应用即将推出。',
     webLink: '网页版',
-    whatsNew: '更新内容：',
-    changelog: '更新日志',
-    releases: 'GitHub 发布页',
   },
   pricing: {
     live: {

@@ -306,9 +306,6 @@ const ru = {
     },
     web: 'Или откройте {link} — в Chrome, Edge, Safari или Firefox, в том числе на телефоне. Приложения для iPhone и Android — скоро.',
     webLink: 'веб-версию',
-    whatsNew: 'Что нового:',
-    changelog: 'Список изменений',
-    releases: 'Релизы на GitHub',
   },
   pricing: {
     live: {

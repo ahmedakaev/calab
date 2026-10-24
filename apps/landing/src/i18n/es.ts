@@ -305,9 +305,6 @@ const es: Dict = {
     },
     web: 'O abre la {link} en Chrome, Edge, Safari o Firefox, también en el móvil. Las apps para iPhone y Android llegan pronto.',
     webLink: 'versión web',
-    whatsNew: 'Novedades:',
-    changelog: 'Registro de cambios',
-    releases: 'Versiones en GitHub',
   },
   pricing: {
     live: {
