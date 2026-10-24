@@ -28,12 +28,11 @@ export function AiSection({ locale }: { locale: Locale }) {
           <Tile
             key={tile.title}
             scene={tile.shot ?? undefined}
-            media={tile.shot ? undefined : <McpSnippet />}
+            media={tile.shot ? undefined : <McpSnippet inline />}
             locale={locale}
             title={tile.title}
             text={tile.text}
             alt={tile.shot ? t.alts[tile.shot] : ''}
-            ratio={[16, 10]}
             sizes="(min-width: 1360px) 400px, (min-width: 1024px) 30vw, 86vw"
           />
         ))}

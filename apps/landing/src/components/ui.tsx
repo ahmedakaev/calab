@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { preload } from 'react-dom';
 import { LOCALE_INFO, type Locale } from '@/i18n/locales';
-import { SCREENS, type ScreenName } from '@/lib/screens';
+import { focusOf, type ScreenName } from '@/lib/screens';
 import { stickerSrc } from '@/lib/stickers';
-import { sceneRatio, sceneScreen, type SceneName } from './scenes';
+import { sceneFile, type SceneName } from './scenes';
 
 export { DrawnLink } from './drawn-link';
 
@@ -147,14 +147,11 @@ export function Sticker({ name, size = 120, className, eager }: { name: string; 
   );
 }
 
-type Dims = { width: number; height: number };
-const dims = (name: ScreenName): Dims & { focus?: Dims } => SCREENS[name];
-
 /**
  * A screenshot of the app (dark theme, the UI and the team in the page's language, `public/screens/<lang>/<name>`):
- * a r12 frame with a hairline. The tile sets the proportion (`ratio`, default: the crop's own) and the crop
- * matches it — no `object-fit: cover`, nothing is cut. Files: `<name>.webp` 1x, `<name>@2x.webp`, `<name>-720.webp`
- * for phones; a scene with a `focus` crop serves `<name>-focus(.webp|@2x.webp)` below 640 px through `<picture>`.
+ * a r12 frame with a hairline, always in the crop's own proportion — no `object-fit`, nothing is cut or letterboxed.
+ * Files: `<name>.webp` 1x, `<name>@2x.webp`, `<name>-720.webp` for phones; a scene with a `focus` crop serves
+ * `<name>-focus(.webp|@2x.webp)` below 640 px through `<picture>` (a focus scene of scenes.ts shows that crop everywhere).
  * width/height are CSS px: no layout shift.
  */
 export function Shot({
@@ -162,7 +159,6 @@ export function Shot({
   locale,
   alt,
   sizes,
-  ratio,
   priority,
   eager,
   phone,
@@ -172,8 +168,6 @@ export function Shot({
   locale: Locale;
   alt: string;
   sizes: string;
-  /** The tile's proportion, e.g. [16, 10]. */
-  ratio?: readonly [number, number] | undefined;
   /** The LCP image: preloaded with its srcset and high fetch priority. */
   priority?: boolean | undefined;
   /** Near the top of the page: eager (a lazy image there stays empty during a fast scroll). */
@@ -182,28 +176,17 @@ export function Shot({
   phone?: boolean | undefined;
   className?: string | undefined;
 }) {
-  const name = sceneScreen(scene);
-  if (!name) {
-    // TODO(shots A): no capture of this scene yet — a quiet stand-in of the right proportion.
-    const [w, h] = ratio ?? sceneRatio(scene);
-    return (
-      <div className={cx('shot shot-pending', phone && 'shot-phone', className)} style={{ '--ar': `${w} / ${h}` } as CSSProperties} role="img" aria-label={alt}>
-        <img src="/calab-mark.svg" width={44} height={50} alt="" loading="lazy" />
-      </div>
-    );
-  }
-  const { width, height, focus } = dims(name);
-  const [rw, rh] = ratio ?? sceneRatio(scene);
-  // Temporary: an existing capture of another proportion is shown whole (contain) until A's crop lands.
-  const fit = Math.abs(rw / rh - width / height) > 0.01;
-  const base = `/screens/${LOCALE_INFO[locale].lang}/${name}`;
+  const { screen, focus: isFocus, width, height } = sceneFile(scene);
+  const dir = `/screens/${LOCALE_INFO[locale].lang}/${screen}`;
+  const base = isFocus ? `${dir}-focus` : dir;
+  const focus = isFocus ? undefined : focusOf(screen);
   const srcSet = `${width > 720 ? `${base}-720.webp 720w, ` : ''}${base}.webp ${width}w, ${base}@2x.webp ${width * 2}w`;
   if (priority) preload(`${base}.webp`, { as: 'image', imageSrcSet: srcSet, imageSizes: sizes, fetchPriority: 'high' });
-  const style = { '--ar': `${rw} / ${rh}`, ...(focus && !fit ? { '--ar-sm': `${focus.width} / ${focus.height}` } : {}) } as CSSProperties;
+  const style = { '--ar': `${width} / ${height}`, ...(focus ? { '--ar-sm': `${focus.width} / ${focus.height}` } : {}) } as CSSProperties;
   return (
-    <div className={cx('shot', fit && 'shot-fit', phone && 'shot-phone', focus && !fit && 'shot-has-focus', className)} style={style}>
+    <div className={cx('shot', phone && 'shot-phone', focus && 'shot-has-focus', className)} style={style}>
       <picture>
-        {focus && !fit && (
+        {focus && (
           <source
             media="(max-width: 639px)"
             srcSet={`${base}-focus.webp ${focus.width}w, ${base}-focus@2x.webp ${focus.width * 2}w`}
@@ -239,7 +222,6 @@ export function Tile({
   more,
   badge,
   sizes,
-  ratio = [16, 10],
   className,
   media,
 }: {
@@ -253,14 +235,13 @@ export function Tile({
   more?: string | undefined;
   badge?: string | undefined;
   sizes: string;
-  ratio?: readonly [number, number] | undefined;
   className?: string | undefined;
   /** Replaces the screenshot (e.g. a code snippet). */
   media?: ReactNode | undefined;
 }) {
   return (
     <Card as="li" id={id} className={cx('tile', className)}>
-      {media ?? (scene && <Shot scene={scene} locale={locale} alt={alt} sizes={sizes} ratio={ratio} />)}
+      {media ?? (scene && <Shot scene={scene} locale={locale} alt={alt} sizes={sizes} />)}
       <div className="tile-copy">
         <h3 className="h3">
           {nb(title)}

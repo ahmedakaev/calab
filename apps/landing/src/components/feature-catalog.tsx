@@ -37,7 +37,6 @@ export function FeatureCatalog({ locale }: { locale: Locale }) {
                 badge={tile.badge ? c.badges[tile.badge] : undefined}
                 href={tile.anchor ? `${features}#${tile.anchor}` : undefined}
                 more={c.more}
-                ratio={[16, 10]}
                 sizes="(min-width: 1360px) 588px, (min-width: 1024px) 46vw, (min-width: 640px) 60vw, 86vw"
                 className="catalog-tile"
               />

@@ -55,7 +55,6 @@ export function Hero({ locale }: { locale: Locale }) {
               locale={locale}
               alt={t.alts[HERO_SHOT[s.key]]}
               sizes={sizes}
-              ratio={[16, 10]}
               priority={i === 0}
               className="hero-shot"
             />

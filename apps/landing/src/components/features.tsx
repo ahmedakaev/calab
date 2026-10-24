@@ -221,7 +221,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
             <Points items={x.canvas.points} className="mt-7" />
           </>
         }
-        shot={shot('canvas-focus', locale, home.alts['canvas-focus'])}
+        shot={shot('canvas-panel', locale, home.alts['canvas-panel'])}
       />
 
       <Split
@@ -337,7 +337,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
           // The waiting card on a stage of the app's background (the guest's whole window is mostly empty).
           <div className="guest-stage flex items-center justify-center rounded-[20px] px-4 py-10 sm:py-14">
             <div className="w-full max-w-[420px]">
-              <Shot scene="temp-room" locale={locale} alt={t.guests.alt} sizes="420px" />
+              <Shot scene="guest" locale={locale} alt={t.guests.alt} sizes="420px" />
             </div>
           </div>
         }

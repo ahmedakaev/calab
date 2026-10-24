@@ -173,8 +173,10 @@ details[open] .chevron { transform: rotate(180deg); }
 .card-grid { display: grid; gap: 16px; list-style: none; }
 @media (min-width: 640px) { .card-grid-2, .card-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .card-grid { gap: 24px; } .card-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.tile { display: flex; flex-direction: column; padding: 10px; }
-.tile-copy { display: flex; flex-direction: column; flex: 1; padding: 18px 14px 12px; }
+/* The shot runs edge to edge at the top of the tile (a 568 px catalogue tile shows an 860 px crop at 0.66, §5 rule 3). */
+.tile { display: flex; flex-direction: column; padding: 0; }
+.tile > .shot, .tile > .code-snippet { border-radius: 20px 20px 0 0; }
+.tile-copy { display: flex; flex-direction: column; flex: 1; padding: 22px 24px 24px; }
 .more-link { margin-top: auto; padding-top: 14px; align-self: flex-start; font-size: 16px; font-weight: 600; color: var(--color-accent-text); }
 .more-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-family: var(--font-display); font-size: 13px; line-height: 20px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; vertical-align: 4px; }
@@ -190,10 +192,6 @@ details[open] .chevron { transform: rotate(180deg); }
 .shot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px solid var(--hairline); pointer-events: none; }
 .shot picture, .shot img { display: block; width: 100%; height: 100%; }
 @media (max-width: 639px) { .shot-has-focus { aspect-ratio: var(--ar-sm); } }
-/* TODO(shots A): stand-ins — an existing capture of another proportion is shown whole on the app background. */
-.shot-fit img { object-fit: contain; }
-.shot-pending { display: grid; place-items: center; }
-.shot-pending img { width: 44px; height: auto; opacity: .18; }
 .shot-phone { border-radius: 28px; border: 5px solid #26262a; background: #000; }
 .shot-phone::after { display: none; }
 @media (max-width: 639px) { .shot-phone { border-radius: 18px; border-width: 3px; } }
@@ -395,8 +393,13 @@ details[open] .chevron { transform: rotate(180deg); }
 
 /* ---------- Telephony / AI rows ---------- */
 .shot-row, .tile-row { display: grid; gap: 24px; list-style: none; }
-@media (min-width: 1024px) { .shot-row, .tile-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 640px) and (max-width: 1023px) { .tile-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .shot-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* AI: the smart-task window on the left, the transcript and the MCP snippet stacked on the right — each shot in its own
+   proportion at ≥ 0.66 (a three-column row would show the 860 px transcript at 0.48). */
+@media (min-width: 1024px) {
+  .tile-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .tile-row > :first-child { grid-row: span 2; }
+}
 .shot-row figcaption { margin-top: 12px; }
 .telephony-facts { display: grid; gap: 24px; margin-top: 32px; align-items: start; }
 @media (min-width: 1024px) { .telephony-facts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; } }

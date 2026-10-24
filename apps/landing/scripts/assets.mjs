@@ -30,7 +30,9 @@ const MAX = 300_000;
 // Crops in CSS px of the 1440×900 window. The sizes here are the width/height the pages use
 // (src/lib/screens.ts) — change both together (`--check` compares them). `focus` (≤ 720 px wide, for phones) is
 // `{ left, top, width, height, own? }`: with `own` the rectangle is cut from a capture of its own in a window as wide as the
-// panel (<scene>-focus-<locale>@2x.png), without it from the scene's crop (CSS px of the crop).
+// panel (<scene>-focus-<locale>@2x.png), without it from the scene's crop (CSS px of the crop). `from: '<scene>'` cuts the
+// crop out of that scene's capture (its overlay included) instead of a capture of its own; without the raw capture it is
+// cut out of the scene's committed @2x file, so a tile can be re-cut without a new capture.
 export const CROPS = {
   // hero: the whole window in a call — the shared slide on the stage, cameras, the room list
   voice: { left: 0, top: 0, width: 1440, height: 900, focus: { left: 329, top: 39, width: 720, height: 560, own: true } },
@@ -42,20 +44,23 @@ export const CROPS = {
   canvas: { left: 0, top: 0, width: 1440, height: 900, focus: { left: 333, top: 39, width: 720, height: 560, own: true } },
   'canvas-panel': { left: 333, top: 39, width: 860, height: 538 },
   // landing v6, continued
-  'phone-call': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 329, top: 39, width: 720, height: 560, own: true } },
-  'phone-call-panel': { left: 73, top: 39, width: 860, height: 538 },
+  // the phones' crop and the catalogue tile keep the call island of the sidebar (a narrow window shows the chat only)
+  'phone-call': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 0, top: 336, width: 720, height: 560 } },
+  'phone-call-panel': { from: 'phone-call', left: 0, top: 336, width: 860, height: 560 },
   // settings windows: the pane to the right of the section list (the dialog is 920 px wide; a tile shows ≤ 860)
   'telephony-ivr': { left: 481, top: 131, width: 698, height: 330 },
   'telephony-groups': { left: 481, top: 131, width: 698, height: 330 },
-  'telephony-call': { left: 481, top: 131, width: 698, height: 638 },
-  roles: { left: 481, top: 131, width: 698, height: 638 },
+  // the three live calls, as tall as the IVR and groups frames (below the title bar, above the call journal)
+  'telephony-call': { left: 481, top: 180, width: 698, height: 330 },
+  // down to «Управлять стикерами», above the «Участники» block
+  roles: { left: 481, top: 131, width: 698, height: 572 },
   'temp-room': { left: 480, top: 320, width: 480, height: 260 },
   'recording-focus': { left: 329, top: 39, width: 860, height: 538 },
   'recording-transcript': { left: 284, top: 108, width: 860, height: 230 },
   aitask: { left: 434, top: 232, width: 576, height: 440 },
   rail: { left: 0, top: 39, width: 72, height: 560 },
   'story-message': { left: 329, top: 131, width: 860, height: 420 },
-  'story-task': { left: 329, top: 39, width: 860, height: 860 },
+  'story-task': { left: 329, top: 39, width: 860, height: 724 },
   'story-meeting': { left: 1120, top: 39, width: 320, height: 560 },
   'story-wiki': { left: 527, top: 318, width: 720, height: 520 },
   'story-canvas': { left: 329, top: 636, width: 860, height: 208 },
@@ -113,7 +118,7 @@ export const CROPS = {
   notify: { left: 260, top: 130, width: 920, height: 640 },
   notifyrelay: { left: 260, top: 130, width: 920, height: 640 },
   // a video meeting in «Галерея»: the 2 × 2 camera grid only (tiles at 341,214–1189,694 + 12 px)
-  gallery: { left: 329, top: 202, width: 872, height: 504 },
+  gallery: { left: 335, top: 202, width: 860, height: 504 },
   // «Диск» as tiles: folders (one restricted), files with thumbnails, the storage meter (window 1060×600)
   disk: { left: 70, top: 30, width: 990, height: 570 },
   // «Вики»: the page tree with branches open and a page with a cover, a checklist, a table and two carets (window 1060×780)
@@ -125,6 +130,16 @@ export const CROPS = {
   'phone-chat': { left: 0, top: 0, width: 390, height: 844 },
   'phone-voice': { left: 0, top: 0, width: 390, height: 844 },
   'phone-board': { left: 0, top: 0, width: 390, height: 844 },
+  // Landing v6 catalogue tiles (≤ 860 px wide, so a 568 px tile shows them at ≥ 0.66): `from` = cut out of another
+  // scene's capture (window coordinates), no capture of their own
+  'taskhistory-panel': { from: 'taskhistory', left: 960, top: 30, width: 480, height: 516 },
+  'findtime-panel': { from: 'findtime', left: 330, top: 30, width: 860, height: 538 },
+  'disk-panel': { from: 'disk', left: 70, top: 87, width: 860, height: 513 },
+  'mail-panel': { from: 'mail', left: 495, top: 46, width: 903, height: 564 },
+  'notifyrelay-panel': { from: 'notifyrelay', left: 482, top: 130, width: 698, height: 640 },
+  'webapps-panel': { from: 'webapps', left: 0, top: 30, width: 757, height: 540 },
+  // the bot's summary card laid over the dashboard (OVERLAYS.webapps) + 24 px
+  'bot-card': { from: 'webapps', left: 948, top: 678, width: 480, height: 210 },
 };
 
 // A second capture laid over a crop as a floating card (CSS px from the crop's right / bottom edge,
@@ -153,6 +168,19 @@ async function floating(file, cw, ch, bw, bh, { right, bottom, radius }) {
     { input: card, left, top },
     { input: border, left, top },
   ];
+}
+
+/** A scene's crop of its raw capture as a PNG buffer, with its floating overlay card (OVERLAYS) laid over. */
+async function sceneCrop(name, crop, short) {
+  const base = sharp(join(src, `${name}-${short}@2x.png`)).extract(scaled(crop));
+  const layer = OVERLAYS[name];
+  if (!layer) return base.png().toBuffer();
+  const card = join(src, `${layer.from}-${short}@2x.png`);
+  if (!existsSync(card)) throw new Error(`missing ${card}: run the landing captures first`);
+  const { width: cw = 0, height: ch = 0 } = await sharp(card).metadata();
+  const { width: bw, height: bh } = scaled(crop);
+  // Flattened first: sharp composites after a resize, and the 1x copies are resized.
+  return sharp(await base.png().toBuffer()).composite(await floating(card, cw, ch, bw, bh, layer)).png().toBuffer();
 }
 
 // `--only=sipdial,siproom` regenerates just those images (raw captures of the other scenes are not needed,
@@ -247,27 +275,25 @@ for (const [short, lang] of Object.entries(LOCALES)) {
   await mkdir(dir, { recursive: true });
   for (const [name, crop] of Object.entries(CROPS)) {
     if (only && !only.includes(name)) continue;
-    const path = join(src, `${name}-${short}@2x.png`);
     const committed = join(dir, `${name}@2x.webp`);
-    // The scene itself: the raw capture, cropped. Without the raw one the committed @2x file stands in as the source of the focus only.
+    // The scene itself: the raw capture, cropped (a `from` crop: cut out of that scene's crop, overlay included). Without
+    // the raw one the committed @2x file stands in as the source of the focus only — and of a `from` crop, its scene's @2x.
     let base;
-    let fromRaw = existsSync(path);
-    if (fromRaw) {
-      base = sharp(path).extract(scaled(crop));
-      const layer = OVERLAYS[name];
-      if (layer) {
-        const card = join(src, `${layer.from}-${short}@2x.png`);
-        if (!existsSync(card)) throw new Error(`missing ${card}: run the landing captures first`);
-        const { width: cw = 0, height: ch = 0 } = await sharp(card).metadata();
-        const { width: bw, height: bh } = scaled(crop);
-        // Flattened first: sharp composites after a resize, and the 1x copies are resized.
-        base = sharp(await sharp(await base.png().toBuffer()).composite(await floating(card, cw, ch, bw, bh, layer)).png().toBuffer());
-      }
+    const parent = crop.from ? CROPS[crop.from] : undefined;
+    const inner = parent && scaled({ left: crop.left - parent.left, top: crop.top - parent.top, width: crop.width, height: crop.height });
+    const raw = join(src, `${crop.from ?? name}-${short}@2x.png`);
+    let fresh = existsSync(raw);
+    if (fresh) {
+      base = sharp(await sceneCrop(crop.from ?? name, parent ?? crop, short));
+      if (inner) base = sharp(await base.extract(inner).png().toBuffer());
+    } else if (inner && existsSync(join(dir, `${crop.from}@2x.webp`))) {
+      base = sharp(await sharp(join(dir, `${crop.from}@2x.webp`)).extract(inner).png().toBuffer());
+      fresh = true;
     } else if (existsSync(committed)) base = sharp(committed);
-    else if (strict) throw new Error(`missing ${path}: run the landing captures first`);
+    else if (strict) throw new Error(`missing ${raw}: run the landing captures first`);
     else continue;
     const parts = [];
-    if (fromRaw) {
+    if (fresh) {
       const big = await webp(base.clone(), join(dir, `${name}@2x.webp`));
       const small = await webp(base.clone().resize({ width: crop.width, kernel: 'lanczos3' }), join(dir, `${name}.webp`));
       // Phones: a 720 px wide file (the 1x one would be 2× too large for a 390 pt screen at 2x).
