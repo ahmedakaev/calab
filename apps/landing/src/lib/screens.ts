@@ -13,6 +13,7 @@ export const SCREENS = {
   'phone-call-panel': { width: 860, height: 548 },
   'phone-incoming': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   'story-incoming': { width: 760, height: 440 },
+  'mail-window': { width: 1440, height: 758, focus: { width: 720, height: 560 } },
   'disk-full': { width: 1056, height: 660, focus: { width: 720, height: 560 } },
   'telephony-ivr': { width: 698, height: 330 },
   'telephony-groups': { width: 698, height: 330 },

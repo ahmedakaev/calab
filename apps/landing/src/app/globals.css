@@ -313,7 +313,8 @@ details[open] .chevron { transform: rotate(180deg); }
   .hero-dim { transition: opacity .35s, visibility 0s linear .35s; }
   .hero-layout[data-zoomed] .hero-dim { transition: opacity .35s, visibility 0s; }
 }
-.scene { grid-area: 1 / 1; opacity: 0; visibility: hidden; }
+/* Scenes share one cell; a wider window (mail, 1440×758) sits in the middle of the 16:10 ones. */
+.scene { grid-area: 1 / 1; align-self: center; opacity: 0; visibility: hidden; }
 .scene[data-active='true'] { opacity: 1; visibility: visible; }
 @media (prefers-reduced-motion: no-preference) {
   .scene { transition: opacity .25s ease-out, visibility 0s linear .25s; }

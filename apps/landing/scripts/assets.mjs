@@ -54,6 +54,8 @@ export const CROPS = {
   'phone-incoming': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 360, top: 170, width: 720, height: 560 } },
   'story-incoming': { from: 'phone-incoming', left: 340, top: 230, width: 760, height: 440 },
   // the disk in a 1056×660 window (16:10, the nine tiles fill it; hero «Облачный диск»)
+  // hero «Почта»: the whole mail window as is; the phones' crop is the open message (the reading pane)
+  'mail-window': { from: 'mail', left: 0, top: 0, width: 1440, height: 758, focus: { left: 713, top: 39, width: 720, height: 560 } },
   'disk-full': { left: 0, top: 0, width: 1056, height: 660, focus: { left: 76, top: 44, width: 720, height: 560 } },
   // settings windows: the pane to the right of the section list (the dialog is 920 px wide; a tile shows ≤ 860)
   'telephony-ivr': { left: 481, top: 131, width: 698, height: 330 },

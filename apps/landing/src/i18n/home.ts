@@ -15,7 +15,7 @@ export type Tuple<T, N extends number, A extends T[] = []> = A['length'] extends
 
 export type SceneName =
   // hero: whole windows (a phone crop each, lib/screens.ts `focus`)
-  | 'voice' | 'chat-full' | 'kanban-full' | 'calendar-week' | 'wiki-full' | 'canvas' | 'disk-full' | 'phone-incoming'
+  | 'voice' | 'chat-full' | 'kanban-full' | 'calendar-week' | 'wiki-full' | 'canvas' | 'mail-window' | 'disk-full' | 'phone-incoming'
   // the day story
   | 'story-message' | 'story-task' | 'story-meeting' | 'recording-focus' | 'story-wiki' | 'story-incoming'
   // catalogue tiles (≤ 860 px wide, about 16:10: cut out of the scenes, scripts/assets.mjs `from`)
@@ -29,10 +29,10 @@ export type SceneName =
 export const SCENES_ARE_SCREENS: Exclude<SceneName, ScreenName> extends never ? true : never = true;
 
 /** Scene order of the hero chips and the screenshot each chip shows (§4.1). */
-export const HERO_SCENES = ['voice', 'chat', 'tasks', 'calendar', 'wiki', 'canvas', 'disk', 'phone'] as const;
+export const HERO_SCENES = ['voice', 'chat', 'tasks', 'calendar', 'mail', 'wiki', 'canvas', 'disk', 'phone'] as const;
 export type HeroSceneKey = (typeof HERO_SCENES)[number];
 export const HERO_SHOT: Record<HeroSceneKey, SceneName> = {
-  voice: 'voice', chat: 'chat-full', tasks: 'kanban-full', calendar: 'calendar-week', wiki: 'wiki-full', canvas: 'canvas', disk: 'disk-full', phone: 'phone-incoming',
+  voice: 'voice', chat: 'chat-full', tasks: 'kanban-full', calendar: 'calendar-week', mail: 'mail-window', wiki: 'wiki-full', canvas: 'canvas', disk: 'disk-full', phone: 'phone-incoming',
 };
 
 export type Badge = 'desktop' | 'team' | 'business';
@@ -64,7 +64,7 @@ export type Home = {
     platforms: string;
     /** aria-label of the chip tablist. */
     scenesLabel: string;
-    scenes: Tuple<{ key: HeroSceneKey; label: string }, 8>;
+    scenes: Tuple<{ key: HeroSceneKey; label: string }, 9>;
   };
   replace: {
     title: string;
@@ -148,6 +148,7 @@ export const ru: Home = {
       { key: 'chat', label: 'Привычные чаты' },
       { key: 'tasks', label: 'Задачи и доски' },
       { key: 'calendar', label: 'Календарь' },
+      { key: 'mail', label: 'Почта' },
       { key: 'wiki', label: 'Вики' },
       { key: 'canvas', label: 'Холст' },
       { key: 'disk', label: 'Облачный диск' },
@@ -342,6 +343,7 @@ export const ru: Home = {
     'canvas': 'Холст «Ретро спринта 12»: стикеры трёх цветов, фигуры, стрелки, голоса, таймер и курсор коллеги',
     'phone-incoming': 'Входящий звонок на номер команды поверх чата: номер +7 916 123-45-67, группа «Продажи», кнопки «Отклонить» и «Принять»',
     'story-incoming': 'Окно входящего звонка: +7 916 123-45-67, входящий на номер группы «Продажи», «Отклонить» и «Принять»',
+    'mail-window': 'Окно почты в приложении для компьютера (почта есть только в нём): ящики двух аккаунтов, список входящих и открытое письмо «Договор на внедрение Calab — финальная версия» с двумя вложениями',
     'disk-full': 'Диск команды плитками: папки «Дизайн», «Договоры» и «Проекты», таблица, видео, превью картинок и шкала занятого места',
     'story-message': 'Сообщение Веры Ким «Клиент просит экспорт доски в CSV до пятницы» и меню сообщения с пунктом «Создать задачу»',
     'story-task': 'Панель задачи APP-7 «Экспорт доски в CSV»: описание, чек-лист 2 из 4, исполнители, срок 16 января и согласующий',
