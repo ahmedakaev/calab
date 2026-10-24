@@ -327,6 +327,8 @@ const zh: Dict = {
     title: 'Free、Team、Business 与 Enterprise',
     lead: '免费开始。需要更多？选择云端的 Team 或 Business，或选择 Enterprise：把 Calab 部署在你自己的服务器上。',
     popular: '最受欢迎',
+    /** Footnote for the «*» on Business limits (owner, 24.10). */
+    quotaNote: '配额可应要求提高。',
     plans: {
       free: { name: 'Free', price: '免费', note: '最多 50 名成员' },
       team: { name: 'Team', price: '$0.10', note: '最多 100 名成员' },

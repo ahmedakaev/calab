@@ -327,6 +327,8 @@ const ru = {
     title: 'Free, Team, Business и Enterprise',
     lead: 'Начните бесплатно. Нужно больше — Team или Business в облаке, либо Enterprise: Calab на вашем собственном сервере.',
     popular: 'Популярный',
+    /** Footnote for the «*» on Business limits (owner, 24.10). */
+    quotaNote: 'Квоты могут быть увеличены по запросу.',
     plans: {
       free: { name: 'Free', price: 'Бесплатно', note: 'До 50 участников' },
       team: { name: 'Team', price: '6 ₽', note: 'До 100 участников' },

@@ -326,6 +326,8 @@ const es: Dict = {
     title: 'Free, Team, Business y Enterprise',
     lead: 'Empieza gratis. ¿Necesitas más? Team o Business en la nube, o Enterprise: Calab en tu propio servidor.',
     popular: 'Popular',
+    /** Footnote for the «*» on Business limits (owner, 24.10). */
+    quotaNote: 'Las cuotas pueden ampliarse a petición.',
     plans: {
       free: { name: 'Free', price: 'Gratis', note: 'Hasta 50 miembros' },
       team: { name: 'Team', price: '$0.10', note: 'Hasta 100 miembros' },

@@ -10,6 +10,12 @@ import { Button, Section, SectionHeading } from './ui';
 const KEY_ROWS = ['members', 'room', 'boards', 'canvases'] as const;
 
 const PLAN_IDS = ['free', 'team', 'business', 'enterprise'] as const;
+/** Business quotas carry a «*»: raised on request (owner, 24.10), footnote `quotaNote` under the cards. */
+const BUSINESS_COL = 2;
+const QUOTA_ROWS: ReadonlySet<string> = new Set([
+  'room', 'members', 'streams', 'cameras', 'files', 'bots', 'boards', 'tempRooms', 'wiki', 'canvases', 'forms',
+]);
+const quota = (row: string, col: number): boolean => col === BUSINESS_COL && QUOTA_ROWS.has(row);
 type PlanId = (typeof PLAN_IDS)[number];
 const paid = (id: PlanId): id is 'team' | 'business' => id === 'team' || id === 'business';
 type RowId = keyof Dict['pricing']['table']['rows'];
@@ -68,7 +74,15 @@ const CTA: Record<PlanId, (t: Dict['pricing'], locale: Locale) => ReactNode> = {
 };
 
 /** A table value: '∞', '—' and '✓' are symbols for the eye and words for a screen reader. */
-function Cell({ value, t }: { value: string; t: Dict['pricing']['table'] }) {
+function Cell({ value, t, star = false }: { value: string; t: Dict['pricing']['table']; star?: boolean }) {
+  if (star) {
+    return (
+      <>
+        <Cell value={value} t={t} />
+        <sup aria-hidden="true" className="ml-0.5 text-fg-2">*</sup>
+      </>
+    );
+  }
   if (value === '✗') {
     return (
       <>
@@ -134,7 +148,7 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
                   <div key={row}>
                     <dt>{h.rows[row]}</dt>
                     <dd>
-                      <Cell value={tb.cells[row][col] ?? ''} t={tb} />
+                      <Cell value={tb.cells[row][col] ?? ''} t={tb} star={quota(row, col)} />
                     </dd>
                   </div>
                 ))}
@@ -149,7 +163,7 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
                     <div key={row} className="flex justify-between gap-4 py-2">
                       <dt className="text-fg-2">{tb.rows[row]}</dt>
                       <dd className="text-right font-medium">
-                        {row === 'price' && paid(id) ? <PlanPrice plan={id} locale={locale} /> : <Cell value={tb.cells[row][col] ?? ''} t={tb} />}
+                        {row === 'price' && paid(id) ? <PlanPrice plan={id} locale={locale} /> : <Cell value={tb.cells[row][col] ?? ''} t={tb} star={quota(row, col)} />}
                         {row === 'price' && paid(id) && (
                           <span className="block text-[12px] font-normal text-fg-2">{t.perSeatDay}</span>
                         )}
@@ -164,10 +178,13 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
         })}
       </ul>
       <div className="pricing-notes">
-        <p className="caption">
-          {t.billingNote}{' '}
-          <Link href={localePath(locale, 'legal/offer/')} className="link">{t.offerLink}</Link>
-        </p>
+        <div className="grid gap-2">
+          <p className="caption">
+            {t.billingNote}{' '}
+            <Link href={localePath(locale, 'legal/offer/')} className="link">{t.offerLink}</Link>
+          </p>
+          <p className="caption">* {t.quotaNote}</p>
+        </div>
         <p className="caption pricing-license">
           {t.license}{' '}
           <a href={repoFile('LICENSE')} className="link">
@@ -210,7 +227,7 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
                     {row === 'price' && (col === 1 || col === 2) ? (
                       <PlanPrice plan={col === 1 ? 'team' : 'business'} locale={locale} />
                     ) : (
-                      <Cell value={v} t={tb} />
+                      <Cell value={v} t={tb} star={quota(row, col)} />
                     )}
                     {row === 'price' && (col === 1 || col === 2) && (
                       <span className="block text-[12px] text-fg-2">{t.perSeatDay}</span>
