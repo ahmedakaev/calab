@@ -386,6 +386,8 @@ details[open] .chevron { transform: rotate(180deg); }
 @media (min-width: 640px) { .catalog-arrows { display: flex; } }
 .catalog-track { display: flex; gap: 20px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; list-style: none; margin-inline: calc(-1 * var(--gutter)); padding-inline: var(--gutter); scroll-padding-inline: var(--gutter); }
 .catalog-tile { flex: 0 0 86%; scroll-snap-align: start; }
+/* Each tile as tall as its own frame and copy: crops keep their proportion, so a stretched row would leave voids. */
+.catalog-track { align-items: flex-start; }
 @media (min-width: 640px) { .catalog-tile { flex-basis: 62%; } }
 @media (min-width: 1024px) {
   .catalog-track { gap: 24px; margin-inline: 0; padding-inline: 0; scroll-padding-inline: 0; }
