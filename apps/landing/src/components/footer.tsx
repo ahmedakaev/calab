@@ -8,7 +8,7 @@ import { Container } from './ui';
 const href = (id: FooterLinkId, locale: Locale): string => {
   const home = localePath(locale);
   const at: Record<FooterLinkId, string> = {
-    features: `${home}#features`,
+    features: localePath(locale, 'features/'),
     telephony: `${home}#telephony`,
     pricing: `${home}#pricing`,
     download: `${home}#download`,

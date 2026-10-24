@@ -16,7 +16,7 @@ export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Lo
   const home = page === '' ? '' : localePath(locale);
   const developers = localePath(locale, 'developers/');
   const nav = [
-    { href: `${home}#features`, label: n.features },
+    { href: localePath(locale, 'features/'), label: n.features, current: page === 'features/' },
     { href: `${home}#telephony`, label: n.telephony },
     { href: developers, label: n.developers, current: page === 'developers/' },
     { href: `${home}#pricing`, label: n.pricing },

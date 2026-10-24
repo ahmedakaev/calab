@@ -6,11 +6,9 @@ export const SCREENS = {
   voice: { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   // landing v6
   'chat-full': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
-  'chat-focus': { width: 860, height: 538 },
   'kanban-full': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   'calendar-week': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   'phone-call': { width: 1440, height: 900, focus: { width: 720, height: 548 } },
-  'phone-call-panel': { width: 860, height: 548 },
   'phone-incoming': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   'story-incoming': { width: 760, height: 440 },
   'mail-window': { width: 1440, height: 758, focus: { width: 720, height: 560 } },
@@ -19,7 +17,6 @@ export const SCREENS = {
   'telephony-groups': { width: 698, height: 330 },
   'telephony-call': { width: 698, height: 330 },
   roles: { width: 698, height: 338 },
-  'temp-room': { width: 480, height: 260 },
   'recording-focus': { width: 860, height: 538 },
   'recording-transcript': { width: 860, height: 230 },
   aitask: { width: 576, height: 440 },
@@ -32,7 +29,6 @@ export const SCREENS = {
   canvas: { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   'canvas-panel': { width: 860, height: 538 },
   'wiki-full': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
-  'wiki-focus': { width: 860, height: 538 },
   chat: { width: 1040, height: 762 },
   call: { width: 1440, height: 870 },
   calendar: { width: 1110, height: 870 },
@@ -69,16 +65,7 @@ export const SCREENS = {
   'phone-voice': { width: 390, height: 844 },
   'phone-board': { width: 390, height: 844 },
   // landing v6 catalogue tiles cut out of the scenes above (≤ 860 px wide: ≥ 0.66 in a 568 px tile)
-  'voice-panel': { width: 853, height: 533 },
-  'kanban-panel': { width: 860, height: 538 },
-  'timeline-panel': { width: 860, height: 538 },
-  'taskhistory-panel': { width: 810, height: 870 },
-  'findtime-panel': { width: 860, height: 538 },
   'disk-panel': { width: 860, height: 513 },
-  'mail-panel': { width: 903, height: 564 },
-  'notifyrelay-panel': { width: 698, height: 431 },
-  'webapps-panel': { width: 757, height: 540 },
-  'bot-card': { width: 480, height: 210 },
 } as const;
 
 /** The screens that have a phone crop (<name>-focus.webp). */

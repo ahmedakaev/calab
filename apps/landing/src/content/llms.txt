@@ -6,7 +6,7 @@ Calab is built for teams of up to 20–30 people online at once (plan limits on 
 
 ## Product
 
-- [Calab website, English](https://calab.io/en/): one window instead of seven services, features with screenshots, telephony, AI, mobile (apps coming soon), pricing, downloads, FAQ
+- [Calab website, English](https://calab.io/en/): one window instead of ten services, a team's day in screenshots, telephony, AI, mobile (apps coming soon), pricing, downloads, FAQ
 - [All features](https://calab.io/en/features/): voice, sound, telephony (SIP), chat, calendar, boards, canvas, wiki, AI, recording and transcripts, email, search, notes, guests, web apps, bots, self-hosting, performance numbers
 - [Calab website, Russian](https://calab.io/ru/): the same in Russian (also Spanish at /es/ and Chinese at /zh/)
 - [For developers](https://calab.io/en/developers/): bots and Bot API (chat, tasks, calendar, voice, members, webhooks), MCP for LLM clients, the TypeScript SDK, Sign in with Calab (OAuth)

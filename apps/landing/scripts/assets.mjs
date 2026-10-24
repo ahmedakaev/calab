@@ -41,7 +41,6 @@ export const CROPS = {
   voice: { left: 0, top: 0, width: 1440, height: 900, focus: { left: 329, top: 39, width: 720, height: 560, own: true } },
   // landing v6 (docs/plans/landing-v6.md §5): one day of a team — the chat, the board, the week, the wiki
   'chat-full': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 329, top: 39, width: 720, height: 560, own: true } },
-  'chat-focus': { left: 329, top: 39, width: 860, height: 538 },
   'kanban-full': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 329, top: 89, width: 720, height: 560, own: true } },
   'calendar-week': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 329, top: 39, width: 720, height: 560, own: true } },
   canvas: { left: 0, top: 0, width: 1440, height: 900, focus: { left: 333, top: 39, width: 720, height: 560, own: true } },
@@ -49,7 +48,6 @@ export const CROPS = {
   // landing v6, continued
   // the phones' crop and the catalogue tile keep the call island of the sidebar (a narrow window shows the chat only)
   'phone-call': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 0, top: 346, width: 720, height: 548 } },
-  'phone-call-panel': { from: 'phone-call', left: 0, top: 346, width: 860, height: 548 },
   // an incoming call ringing over the chat (hero «Телефония и IVR»); the story's frame is the call sheet with the chat around it
   'phone-incoming': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 360, top: 170, width: 720, height: 560 } },
   'story-incoming': { from: 'phone-incoming', left: 340, top: 230, width: 760, height: 440 },
@@ -64,7 +62,6 @@ export const CROPS = {
   'telephony-call': { left: 481, top: 180, width: 698, height: 330 },
   // the role block (name, colour, mentions), above the permission sections (their rows wrap differently per language)
   roles: { left: 481, top: 131, width: 698, height: 338 },
-  'temp-room': { left: 480, top: 320, width: 480, height: 260 },
   'recording-focus': { left: 329, top: 39, width: 860, height: 538 },
   'recording-transcript': { left: 284, top: 108, width: 860, height: 230 },
   aitask: { left: 434, top: 232, width: 576, height: 440 },
@@ -75,7 +72,6 @@ export const CROPS = {
   'story-wiki': { left: 527, top: 318, width: 720, height: 520 },
   'phone-canvas': { left: 0, top: 0, width: 390, height: 844 },
   'wiki-full': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 333, top: 89, width: 720, height: 560, own: true } },
-  'wiki-focus': { left: 333, top: 39, width: 860, height: 538 },
   // chat: the room header (with «… печатает») and the room list column, the feed down to the composer: the mockup's end, a reply
   // quote, short lines of four people with reactions, my last one read (the capture's window is 1280×800)
   chat: { left: 0, top: 38, width: 1040, height: 762 },
@@ -141,18 +137,9 @@ export const CROPS = {
   'phone-board': { left: 0, top: 0, width: 390, height: 844 },
   // Landing v6 catalogue tiles (≤ 860 px wide, so a 568 px tile shows them at ≥ 0.66): `from` = cut out of another
   // scene's capture (window coordinates), no capture of their own
-  'voice-panel': { from: 'voice', left: 338, top: 104, width: 853, height: 533 },
-  'kanban-panel': { from: 'kanban-full', left: 288, top: 100, width: 860, height: 538 },
-  'timeline-panel': { from: 'timeline', left: 330, top: 90, width: 860, height: 538 },
   // the whole history down to the composer (a shorter cut would end mid-list: rows wrap differently per language)
-  'taskhistory-panel': { from: 'taskhistory', left: 630, top: 30, width: 810, height: 870 },
-  'findtime-panel': { from: 'findtime', left: 330, top: 30, width: 860, height: 538 },
   'disk-panel': { from: 'disk', left: 70, top: 87, width: 860, height: 513 },
-  'mail-panel': { from: 'mail', left: 495, top: 46, width: 903, height: 564 },
-  'notifyrelay-panel': { from: 'notifyrelay', left: 482, top: 339, width: 698, height: 431 },
-  'webapps-panel': { from: 'webapps', left: 0, top: 30, width: 757, height: 540 },
   // the bot's summary card laid over the dashboard (OVERLAYS.webapps) + 24 px
-  'bot-card': { from: 'webapps', left: 948, top: 678, width: 480, height: 210 },
 };
 
 // A second capture laid over a crop as a floating card (CSS px from the crop's right / bottom edge,

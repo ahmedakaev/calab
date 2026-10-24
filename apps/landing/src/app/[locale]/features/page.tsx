@@ -7,7 +7,7 @@ import { Container } from '@/components/ui';
 import { getDict, isLocale } from '@/i18n';
 import { getStory } from '@/i18n/story';
 
-/** /<locale>/features/: every section in detail; the home catalog's «Подробнее» links land on its anchors. */
+/** /<locale>/features/: every section in detail (the header's «Возможности» leads here). */
 export default async function FeaturesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();

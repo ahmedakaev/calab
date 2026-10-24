@@ -5,7 +5,6 @@ import { ControlInfographic } from '@/components/control-infographic';
 import { DayStory } from '@/components/day-story';
 import { Downloads } from '@/components/downloads';
 import { Faq } from '@/components/faq';
-import { FeatureCatalog } from '@/components/feature-catalog';
 import { Footer } from '@/components/footer';
 import { Header } from '@/components/header';
 import { Hero } from '@/components/hero';
@@ -43,7 +42,7 @@ function jsonLd(locale: Parameters<typeof getDict>[0]): string {
   }).replace(/</g, '\\u003c');
 }
 
-/** Home page v6 (docs/plans/landing-v6.md §4): product → connections → catalog → special blocks → trust → price → download → FAQ. */
+/** Home page v6 (docs/plans/landing-v6.md §4): product → connections → special blocks → trust → price → download → FAQ. */
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -58,7 +57,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <Hero locale={locale} />
         <ReplaceStrip locale={locale} />
         <DayStory locale={locale} />
-        <FeatureCatalog locale={locale} />
         <TelephonySection locale={locale} />
         <AiSection locale={locale} />
         <PhoneSection locale={locale} />

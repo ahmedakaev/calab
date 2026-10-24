@@ -1,6 +1,6 @@
 /**
  * The browser scrolls to `#download` / `#pricing` while the page still has its no-JS layout; the story (sticky frame)
- * and the catalogue (one group at a time) then get shorter after hydration and the target slides away. Components that
+ * then gets shorter after hydration and the target slides away. Components that
  * change the layout on mount call this afterwards: it scrolls back to the hash target, unless the visitor has already
  * scrolled on their own.
  */

@@ -224,7 +224,7 @@ export function Shot({
   );
 }
 
-/** Card + Shot + H3 + text + link: one tile of the catalog (and of the AI / telephony rows). */
+/** Card + Shot + H3 + text + link: one tile (the AI row). */
 export function Tile({
   id,
   scene,

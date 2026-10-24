@@ -1,4 +1,4 @@
-// Copy of /developers/, of the /features/ sections and of the catalog arrows that the home contract (home.ts)
+// Copy of /developers/, of the /features/ sections that the home contract (home.ts)
 // does not cover. ru is the source; all four locales are required by the type.
 import type { Locale } from './locales';
 
@@ -20,7 +20,6 @@ export type PageCopy = {
     oauthPoints: string[];
     docs: string;
   };
-  catalogArrows: { prev: string; next: string };
   features: {
     canvas: { eyebrow: string; title: string; text: string; points: string[] };
     ai: { eyebrow: string; title: string; text: string; points: string[] };
@@ -46,7 +45,6 @@ const ru: PageCopy = {
     oauthPoints: ['Authorization Code + PKCE (S256)', 'Экран согласия с правами', 'userinfo, refresh и отзыв токенов', 'Клиенты создаются в настройках пространства'],
     docs: 'Документация',
   },
-  catalogArrows: { prev: 'Назад', next: 'Дальше' },
   features: {
     canvas: { eyebrow: 'Холст', title: 'Онлайн-доска прямо в голосе', text: 'Бесконечный холст для ретро, схем и мозговых штурмов. Открывается в голосовой комнате и правится всеми сразу.', points: ['Стикеры, фигуры, стрелки и текст', 'Голосование точками и таймер', 'Курсоры коллег в реальном времени', 'Карточка холста в чате и на странице вики'] },
     ai: { eyebrow: 'AI', title: 'AI там, где он экономит время', text: 'Умная задача из текста и файлов, сводки и расшифровки встреч, любые модели через MCP.', points: ['Умная задача: доска, приоритет и проверка дублей', 'Сводка и расшифровка каждой записи', 'Claude и агенты в IDE — как боты через MCP', 'С тарифа Business; обработка — GPTunneL'] },
@@ -72,7 +70,6 @@ const en: PageCopy = {
     oauthPoints: ['Authorization Code + PKCE (S256)', 'A consent screen with scopes', 'userinfo, refresh and token revocation', 'Clients are created in workspace settings'],
     docs: 'Documentation',
   },
-  catalogArrows: { prev: 'Previous', next: 'Next' },
   features: {
     canvas: { eyebrow: 'Canvas', title: 'A whiteboard right in voice', text: 'An infinite canvas for retros, diagrams and brainstorms. Opens in a voice room and everyone edits at once.', points: ['Sticky notes, shapes, arrows and text', 'Dot voting and a timer', 'Colleagues’ cursors in real time', 'Canvas card in the chat and on a wiki page'] },
     ai: { eyebrow: 'AI', title: 'AI where it saves time', text: 'Smart tasks from text and files, meeting summaries and transcripts, any model via MCP.', points: ['Smart task: board, priority and duplicate check', 'Summary and transcript of every recording', 'Claude and IDE agents as bots via MCP', 'From the Business plan; processing by GPTunneL'] },
@@ -98,7 +95,6 @@ const es: PageCopy = {
     oauthPoints: ['Authorization Code + PKCE (S256)', 'Pantalla de consentimiento con permisos', 'userinfo, refresh y revocación de tokens', 'Los clientes se crean en los ajustes del espacio'],
     docs: 'Documentación',
   },
-  catalogArrows: { prev: 'Anterior', next: 'Siguiente' },
   features: {
     canvas: { eyebrow: 'Lienzo', title: 'Una pizarra online dentro de la llamada', text: 'Un lienzo infinito para retrospectivas, esquemas y lluvias de ideas. Se abre en la sala de voz y todos lo editan a la vez.', points: ['Notas adhesivas, formas, flechas y texto', 'Votación con puntos y temporizador', 'Cursores de tus compañeros en tiempo real', 'Tarjeta del lienzo en el chat y en la página de la wiki'] },
     ai: { eyebrow: 'IA', title: 'IA donde ahorra tiempo', text: 'Tareas inteligentes a partir de texto y archivos, resúmenes y transcripciones de reuniones, y cualquier modelo mediante MCP.', points: ['Tarea inteligente: tablero, prioridad y búsqueda de duplicados', 'Resumen y transcripción de cada grabación', 'Claude y agentes del IDE como bots mediante MCP', 'Desde el plan Business; procesamiento a cargo de GPTunneL'] },
@@ -124,7 +120,6 @@ const zh: PageCopy = {
     oauthPoints: ['Authorization Code + PKCE (S256)', '显示权限范围的授权确认页', 'userinfo、refresh 与令牌撤销', '在工作区设置中创建客户端'],
     docs: '文档',
   },
-  catalogArrows: { prev: '上一页', next: '下一页' },
   features: {
     canvas: { eyebrow: '白板', title: '语音通话中的在线白板', text: '无限画布，适合复盘、画图和头脑风暴。在语音房间中打开，所有人同时编辑。', points: ['便签、图形、箭头和文字', '圆点投票和计时器', '实时显示同事的光标', '白板卡片可发到聊天和维基页面'] },
     ai: { eyebrow: 'AI', title: '只在能省时间的地方用 AI', text: '根据文字和文件生成智能任务，生成会议摘要和文字记录，并可通过 MCP 接入任意模型。', points: ['智能任务：自动选择看板、优先级并检查重复', '每段录音都有摘要和文字记录', 'Claude 和 IDE 智能体通过 MCP 作为机器人接入', 'Business 方案起提供；由 GPTunneL 处理'] },
