@@ -1,7 +1,7 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
-import { detectOs } from '@/lib/detect-os';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { detectMacArch, detectOs, type MacArch } from '@/lib/detect-os';
 import type { Dict } from '@/i18n';
 import { rich } from '@/lib/rich';
 import { APP_URL, DOWNLOADS, REPO_URL, repoFile } from '@/lib/site';
@@ -12,15 +12,15 @@ const platforms: {
   id: keyof Dict['downloads']['platforms'];
   name: string;
   variants: string;
-  files: { label: string | ((t: Dict['downloads']) => string); href: string }[];
+  files: { label: string | ((t: Dict['downloads']) => string); href: string; arch?: MacArch }[];
 }[] = [
   {
     id: 'mac',
     name: 'macOS',
-    variants: 'Apple Silicon · Intel',
+    variants: 'Apple (M1+) · Intel',
     files: [
-      { label: 'Apple Silicon', href: DOWNLOADS.macArm64 },
-      { label: 'Intel', href: DOWNLOADS.macX64 },
+      { label: 'Apple (M1+)', href: DOWNLOADS.macArm64, arch: 'arm' },
+      { label: 'Intel', href: DOWNLOADS.macX64, arch: 'intel' },
     ],
   },
   {
@@ -60,6 +60,18 @@ function Note({ text }: { text: string }) {
 
 export function Downloads({ t }: { t: Dict['downloads'] }) {
   const os = useSyncExternalStore(noSubscribe, detectOs, () => null);
+  // On a Mac only the visitor's build is blue; unknown CPU (Safari) defaults to Apple Silicon (owner, 24.10).
+  const [arch, setArch] = useState<MacArch>('arm');
+  useEffect(() => {
+    if (os !== 'mac') return;
+    let live = true;
+    void detectMacArch().then((a) => {
+      if (live && a) setArch(a);
+    });
+    return () => {
+      live = false;
+    };
+  }, [os]);
   return (
     <Section id="download" labelledBy="download-title">
       <h2 id="download-title" className="sr-only">{t.title}</h2>
@@ -73,7 +85,7 @@ export function Downloads({ t }: { t: Dict['downloads'] }) {
             <Note text={t.platforms[p.id].note} />
             <div className="mt-auto flex w-full gap-2 pt-6">
               {p.files.map((f) => (
-                <Button key={f.href} href={f.href} variant={p.id === os ? 'primary' : 'secondary'} size="md" className="min-w-0 flex-1 px-3">
+                <Button key={f.href} href={f.href} variant={p.id === os && (!f.arch || f.arch === arch) ? 'primary' : 'secondary'} size="md" className="min-w-0 flex-1 px-3">
                   {typeof f.label === 'string' ? f.label : f.label(t)}
                   <span className="sr-only"> — {p.name}</span>
                 </Button>

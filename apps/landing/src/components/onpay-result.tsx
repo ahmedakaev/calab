@@ -38,7 +38,7 @@ export function OnpayResult({ kind }: { kind: 'success' | 'fail' }) {
   return (
     <main id="main" lang={LOCALE_INFO[locale].lang} className="flex min-h-dvh flex-col items-center justify-center px-5 py-16 text-center">
       <a href={`/${locale}/`} aria-label={t.home} className="mb-12 rounded-md">
-        <img src="/calab-wordmark.svg" width={311} height={96} alt="Calab" className="h-8 w-auto" />
+        <img src="/calab-wordmark.svg" width={311} height={87} alt="Calab" className="h-8 w-auto" />
       </a>
       <Icon
         aria-hidden="true"

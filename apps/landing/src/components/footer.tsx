@@ -39,7 +39,7 @@ export function Footer({ t, locale }: { t: Dict['footer']; locale: Locale }) {
       <Container>
         <div className="footer-grid">
           <a href={localePath(locale)} className="footer-brand" aria-label="Calab">
-            <img className="footer-wordmark" src="/calab-wordmark.svg" width={311} height={96} alt="Calab" loading="lazy" />
+            <img className="footer-wordmark" src="/calab-wordmark.svg" width={311} height={87} alt="Calab" loading="lazy" />
           </a>
           {columns.map((col, i) => (
             <nav key={col.title} aria-label={col.title} className="footer-col">
@@ -63,12 +63,10 @@ export function Footer({ t, locale }: { t: Dict['footer']; locale: Locale }) {
           {locale === 'ru' ? (
             <div lang="ru">
               <p>ООО «Громтех» · ИНН 5027346848 · КПП 502701001 · ОГРН 1265000035420</p>
-              <p>Московская область, г. Лыткарино, ул. Набережная, д. 7, кв. 130</p>
             </div>
           ) : (
             <div lang="en">
               <p>OOO Gromtech · INN 5027346848 · KPP 502701001 · OGRN 1265000035420</p>
-              <p>Naberezhnaya St. 7, apt. 130, Lytkarino, Moscow Region, Russia</p>
             </div>
           )}
           {/* Required attribution (BSL 1.1 / NOTICE): never translated. */}

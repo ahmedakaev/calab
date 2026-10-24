@@ -8,7 +8,7 @@ import { SiteMenu } from './site-menu';
 import { Container } from './ui';
 
 /**
- * A 72 px row without a backing that scrolls away (owner, 24.10); the logo and the right-hand buttons stay fixed.
+ * A 72 px row without a backing that scrolls away whole, logo and buttons too (owner, 24.10).
  * `page`: '' on the home page, 'developers/' etc. elsewhere — section links then lead back to the home page.
  */
 export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Locale; page?: string }) {
@@ -29,7 +29,7 @@ export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Lo
       </a>
       <Container className="site-header-row">
         <a href={home === '' ? '#top' : home} className="site-brand" aria-label={t.home}>
-          <img className="site-wordmark" src="/calab-wordmark.svg" width={311} height={96} alt="Calab" />
+          <img className="site-wordmark" src="/calab-wordmark.svg" width={311} height={87} alt="Calab" />
         </a>
         <nav aria-label={t.navLabel} className="site-nav">
           <ul>
