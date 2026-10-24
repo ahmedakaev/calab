@@ -59,7 +59,8 @@ export type Home = {
     accent: string;
     lead: string;
     download: string;
-    openWeb: string;
+    /** The second hero button: the web app, free plan. */
+    startFree: string;
     platforms: string;
     /** aria-label of the chip tablist. */
     scenesLabel: string;
@@ -140,7 +141,7 @@ export const ru: Home = {
     accent: 'в одном окне',
     lead: 'Голосовые комнаты, чат, встречи, задачи, вики, холст, диск, почта и телефония. Всё связано между собой и работает в облаке или на вашем сервере.',
     download: 'Скачать',
-    openWeb: 'Открыть в браузере',
+    startFree: 'Начать бесплатно',
     platforms: 'macOS · Windows · Linux · Web · iOS · Android',
     scenesLabel: 'Что внутри Calab',
     scenes: [

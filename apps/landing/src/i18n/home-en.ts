@@ -7,7 +7,7 @@ export const en: Home = {
     accent: 'in one window',
     lead: 'Voice rooms, chat, meetings, tasks, wiki, canvas, files, mail and phone calls — connected to each other, in the cloud or on your own server.',
     download: 'Download',
-    openWeb: 'Open in browser',
+    startFree: 'Start for free',
     platforms: 'macOS · Windows · Linux · Web · iOS · Android',
     scenesLabel: 'What’s inside Calab',
     scenes: [

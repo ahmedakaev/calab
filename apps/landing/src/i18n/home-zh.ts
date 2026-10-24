@@ -7,7 +7,7 @@ export const zh: Home = {
     accent: '一个窗口搞定',
     lead: '语音房间、聊天、会议、任务、维基、画布、网盘、邮件和电话，彼此打通，可用云端，也可部署在自己的服务器上。',
     download: '下载',
-    openWeb: '在浏览器中打开',
+    startFree: '免费开始',
     platforms: 'macOS · Windows · Linux · 网页 · iOS · Android',
     scenesLabel: 'Calab 里有什么',
     scenes: [

@@ -44,7 +44,7 @@ export function Hero({ locale }: { locale: Locale }) {
                 <div className="hero-buttons">
                   <Button href="#download">{h.download}</Button>
                   <Button href={APP_URL} variant="secondary">
-                    {h.openWeb}
+                    {h.startFree}
                   </Button>
                 </div>
                 <p className="hero-platforms">{h.platforms}</p>

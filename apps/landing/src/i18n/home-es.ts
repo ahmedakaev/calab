@@ -7,7 +7,7 @@ export const es: Home = {
     accent: 'en una sola ventana',
     lead: 'Salas de voz, chat, reuniones, tareas, wiki, lienzo, archivos, correo y llamadas telefónicas, todo conectado, en la nube o en tu propio servidor.',
     download: 'Descargar',
-    openWeb: 'Abrir en el navegador',
+    startFree: 'Empezar gratis',
     platforms: 'macOS · Windows · Linux · Web · iOS · Android',
     scenesLabel: 'Qué hay dentro de Calab',
     scenes: [
