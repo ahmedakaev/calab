@@ -155,7 +155,10 @@ Every scene is captured per language with that language's team (docs/09 #139).
    and `public/og/<lang>.png` (1200×630). `focus.own` means the rectangle is cut from the `<scene>-focus-<locale>@2x.png`
    capture, otherwise from the scene's own crop (a scene without a raw capture keeps its committed files and only gets its
    focus from the committed @2x). `--only=sipdial,webapps` regenerates just those, `--lang=ru` one language,
-   `--strict` fails on a missing capture. The READMEs (`README*.md`) use the same files.
+   `--strict` fails on a missing capture. A crop with `from: '<scene>'` (the catalogue tiles `voice-panel`, `kanban-panel`,
+   `timeline-panel`, `taskhistory-panel`, `findtime-panel`, `disk-panel`, `mail-panel`, `notifyrelay-panel`, `webapps-panel`,
+   `bot-card`, `phone-call-panel`) is cut out of that scene's capture — or, without one, out of its committed @2x file — so a tile
+   can be re-cut without a new capture; every crop ends at a panel's edge in all four languages. The READMEs (`README*.md`) use the same files.
 5. `node scripts/assets.mjs --check` (no captures needed) — every scene of `src/lib/screens.ts` has its files in all four
    languages with the sizes the table says, none over 300 KB, `CROPS` equals `SCREENS`.
 6. Rebuild and commit `public/screens` and `public/og`.
