@@ -24,8 +24,8 @@ export type IslandColumn = 'sidebar' | 'wiki' | 'canvas' | 'mail';
 export function BottomIsland({ column }: { column: IslandColumn }): ReactNode {
   // Primitive selectors; only the active screen's store can change while it is shown.
   const wikiW = useWikiUi((s) => (column === 'wiki' ? s.treeWidth : 0));
-  // A collapsed canvas tree has no column: the island keeps the usual size.
-  const canvasW = useCanvasUi((s) => (column === 'canvas' && !s.treeCollapsed ? s.treeWidth : 0));
+  // A collapsed canvas tree hides the island (AppShell), so the width is the tree's.
+  const canvasW = useCanvasUi((s) => (column === 'canvas' ? s.treeWidth : 0));
   // Mail: the leftmost column - the mailbox sidebar when shown, else the thread list.
   const mailSidebar = useMailUi((s) => column === 'mail' && s.sidebar);
   const colW =

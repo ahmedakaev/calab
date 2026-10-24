@@ -77,11 +77,8 @@ export function CanvasScreen({ workspaceId }: { workspaceId: string }): ReactNod
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
-      {/* A folded tree leaves no column, and the bottom island (the usual column width) floats over the
-          field's left: the left-anchored controls start 8 px right of it (`--canvas-left`, view/Toolbar.tsx). */}
       <section
         className="mat-content relative flex min-w-0 flex-1"
-        style={collapsed ? { ['--canvas-left' as string]: 'var(--sidebar-width)' } : undefined}
         aria-label={t('canvas.section')}
         data-testid="canvas"
       >

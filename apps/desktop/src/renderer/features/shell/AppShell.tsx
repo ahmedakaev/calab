@@ -106,6 +106,8 @@ function ShellLayout(): ReactNode {
   const wiki = useWikiUi((s) => s.active) && !home && !!wsId && !guestWs;
   // «Холст» (ADR-0126 §5): the same, exclusive with the Disk and the wiki; guests have none.
   const canvas = useCanvasUi((s) => s.active) && !home && !!wsId && !guestWs;
+  // The folded canvas tree takes the island with it (docs/08 «Нижний островок»).
+  const canvasFolded = useCanvasUi((s) => s.treeCollapsed);
   // «Открыть историю» of an archived temporary room (ADR-0044) in place of the room.
   const archived = useArchiveView((s) => (s.room && s.room.workspaceId === wsId ? s.room : null));
   // A web app of this workspace (ADR-0050 §3) replaces the room column and the chat.
@@ -259,7 +261,7 @@ function ShellLayout(): ReactNode {
           </div>
         )}
         {/* One island on every screen with the rail (owner 23.10); not over a web app's native view. */}
-        {ready && (mailOn || home || (hasWs && wsId && !appId)) ? <BottomIsland column={mailOn ? 'mail' : wiki ? 'wiki' : canvas ? 'canvas' : 'sidebar'} /> : null}
+        {ready && !(canvas && canvasFolded && !mailOn && !wiki) && (mailOn || home || (hasWs && wsId && !appId)) ? <BottomIsland column={mailOn ? 'mail' : wiki ? 'wiki' : canvas ? 'canvas' : 'sidebar'} /> : null}
         {ready ? <CreateTaskDialog /> : null}
         {ready ? <SmartTaskDialog /> : null}
       </div>

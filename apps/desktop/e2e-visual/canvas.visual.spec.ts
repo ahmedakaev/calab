@@ -79,6 +79,7 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await win.getByTestId('canvas-tree-toggle').click();
   await expect(win.getByTestId('canvas-column')).toHaveCount(0);
   await expect(win.getByTestId('canvas-tree-toggle')).toBeVisible();
+  await expect(win.getByTestId('bottom-island')).toHaveCount(0);
   await win.waitForTimeout(150);
   await checkpoint(shot, 'canvas-tree-collapsed');
   await win.getByTestId('canvas-tree-toggle').click();
@@ -313,8 +314,9 @@ test('canvas-screen', async ({ open, win, mock, shot, theme }) => {
   await joinVoice(win);
   await openRoadmap(win);
   await checkpoint(shot, 'canvas-voice');
-  // A folded tree leaves no column: the island keeps its usual width.
+  // A folded tree takes the island with it; the left controls sit at the canvas edge.
   await win.getByTestId('canvas-tree-toggle').click();
   await expect(win.getByTestId('canvas-column')).toHaveCount(0);
+  await expect(win.getByTestId('bottom-island')).toHaveCount(0);
   await checkpoint(shot, 'canvas-voice-collapsed');
 });
