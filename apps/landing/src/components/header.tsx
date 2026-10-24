@@ -7,7 +7,7 @@ import { LocaleSwitcher } from './locale-switcher';
 import { Container } from './ui';
 
 /**
- * Solid 72 px bar over the whole width (no transparent bar: content never runs under the menu).
+ * Sticky 72 px row without a backing (owner, 24.10): logo, nav, language and the web button are pills of their own.
  * `page`: '' on the home page, 'developers/' etc. elsewhere — section links then lead back to the home page.
  */
 export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Locale; page?: string }) {

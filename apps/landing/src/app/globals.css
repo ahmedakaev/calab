@@ -206,10 +206,14 @@ details[open] .chevron { transform: rotate(180deg); }
 @media (max-width: 639px) { .shot-phone { border-radius: 18px; border-width: 3px; } }
 
 /* ---------- Header ---------- */
-.site-header { position: sticky; top: 0; z-index: 40; background: var(--color-bg); }
+/* Sticky but transparent (owner, 24.10): the pills float over the content with their own fills; the empty strip
+   between them lets clicks through. The logo sits on its own dark pill so it reads over light content. */
+.site-header { position: sticky; top: 0; z-index: 40; pointer-events: none; }
+.site-header-row > *, .site-header .skip-link { pointer-events: auto; }
+.site-nav ul, .locale-globe, .topbar-action, .site-menu summary { box-shadow: 0 4px 16px rgb(0 0 0 / .35); }
 .site-header-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; height: var(--header-h); }
-.site-brand { display: flex; flex-shrink: 0; border-radius: 6px; }
-.site-wordmark { display: block; width: 116px; height: auto; }
+.site-brand { display: flex; align-items: center; flex-shrink: 0; height: 42px; padding-inline: 14px; margin-left: -14px; border-radius: 999px; background: var(--color-bg); box-shadow: 0 4px 16px rgb(0 0 0 / .35); }
+.site-wordmark { display: block; width: 104px; height: auto; }
 .site-nav ul { display: flex; align-items: center; gap: 22px; height: 42px; padding-inline: 20px; border-radius: 999px; background: #fff; color: #111; list-style: none; }
 .site-header-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .skip-link { position: absolute; left: 16px; top: 12px; z-index: 50; padding: 8px 16px; border-radius: 8px; background: var(--color-card-raised); font-size: 14px; }
@@ -222,7 +226,7 @@ details[open] .chevron { transform: rotate(180deg); }
 .site-menu nav a[aria-current='page'] { color: var(--color-accent-text); }
 @media (min-width: 1024px) { .site-menu { display: none; } }
 @media (max-width: 1023px) { .site-nav { display: none; } }
-@media (max-width: 639px) { .site-wordmark { width: 96px; } .site-header-actions { gap: 6px; } }
+@media (max-width: 639px) { .site-brand { padding-inline: 10px; margin-left: -10px; } .site-wordmark { width: 88px; } .site-header-actions { gap: 6px; } }
 
 .locale-globe { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fff; color: #111; cursor: pointer; list-style: none; }
 .locale-menu { z-index: 45; border-radius: 18px; background: #fff; color: #111; box-shadow: 0 12px 32px #0005; }
