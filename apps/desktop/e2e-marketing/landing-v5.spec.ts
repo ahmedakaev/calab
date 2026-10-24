@@ -347,6 +347,59 @@ async function phoneRoom(page: Page, name: string): Promise<void> {
   await expect(page.getByTestId('composer')).toBeVisible();
 }
 
+/** «Диск» (ADR-0094) as tiles: the mock's Disk fixture renamed to the page language, its pictures replaced by real ones. */
+async function diskScene(ctx: Ctx, scene: string, size: { width: number; height: number }): Promise<void> {
+  const { page, mock, c, short } = ctx;
+  const names = DISK[short];
+  const team = readFileSync(resolve(import.meta.dirname, '../../landing/public/editorial/team-conversation.webp'));
+  const pics: Record<string, { bytes: Buffer; mime: string; w: number; h: number }> = {
+    cover: { bytes: await render(ctx.browser, mockupHtml(c), 1600, 900), mime: 'image/png', w: 1600, h: 900 },
+    board: { bytes: heroStream(), mime: 'image/jpeg', w: 1280, h: 720 },
+    team: { bytes: await render(ctx.browser, `<img src="data:image/webp;base64,${team.toString('base64')}" style="display:block;width:1200px;height:800px;object-fit:cover">`, 1200, 800), mime: 'image/png', w: 1200, h: 800 },
+  };
+  // Fixture name → [the page language's name, the picture that replaces the file's bytes].
+  const map: Record<string, [string, string?]> = {
+    Проекты: [names.folders[0]],
+    Дизайн: [names.folders[1]],
+    Договоры: [names.folders[2]],
+    'Обложка релиза.png': [names.files[0], 'cover'],
+    'Офис.png': [names.files[1], 'board'],
+    'Исходники.zip': [names.files[2], 'team'],
+    'Отчёт за квартал.pdf': [names.files[3]],
+    'Бюджет 2026.xlsx': [names.files[4]],
+    'Демо продукта.mp4': [names.files[5]],
+  };
+  for (const it of mock.disk.items.values()) {
+    const m = map[it.name];
+    if (!m) continue;
+    it.name = m[0];
+    if (!it.file) continue;
+    it.file.name = m[0];
+    const pic = m[1] ? pics[m[1]] : undefined;
+    const rec = mock.state.files.get(it.file.id);
+    if (!pic || !rec) continue;
+    it.file.mime = pic.mime;
+    if (m[1] === 'team') it.file.size = 5_412_000n;
+    it.file.thumbnailUrl = `/api/files/${it.file.id}/thumbnail`;
+    it.file.width = pic.w;
+    it.file.height = pic.h;
+    rec.meta = it.file;
+    rec.bytes = pic.bytes;
+    rec.thumbnail = { bytes: pic.bytes, mime: pic.mime };
+  }
+  await setLocale(page, short);
+  // `disk`: a smaller window, two full rows of tiles above the storage meter, no empty floor.
+  await page.setViewportSize(size);
+  await page.getByTestId('section-disk').click();
+  const tiles = page.getByTestId('disk-tile');
+  await expect(tiles).toHaveCount(9, { timeout: 15_000 });
+  await expect(page.getByTestId('disk-meter')).toBeVisible();
+  await expect.poll(() => page.locator('[data-testid="disk-tile"] img').evaluateAll((l) => l.filter((i) => (i as HTMLImageElement).complete && (i as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
+  await page.mouse.move(0, size.height - 1);
+  await page.waitForTimeout(600);
+  await shoot(ctx, scene);
+}
+
 const scenes: Record<string, Scene> = {
   // The board with the opened task on «История» (ADR-0091): the timeline of changes under the properties.
   taskhistory: {
@@ -499,55 +552,15 @@ const scenes: Record<string, Scene> = {
   // the page language, its pictures replaced by real ones.
   disk: {
     async run(ctx) {
-      const { page, mock, c, short } = ctx;
-      const names = DISK[short];
-      const team = readFileSync(resolve(import.meta.dirname, '../../landing/public/editorial/team-conversation.webp'));
-      const pics: Record<string, { bytes: Buffer; mime: string; w: number; h: number }> = {
-        cover: { bytes: await render(ctx.browser, mockupHtml(c), 1600, 900), mime: 'image/png', w: 1600, h: 900 },
-        board: { bytes: heroStream(), mime: 'image/jpeg', w: 1280, h: 720 },
-        team: { bytes: await render(ctx.browser, `<img src="data:image/webp;base64,${team.toString('base64')}" style="display:block;width:1200px;height:800px;object-fit:cover">`, 1200, 800), mime: 'image/png', w: 1200, h: 800 },
-      };
-      // Fixture name → [the page language's name, the picture that replaces the file's bytes].
-      const map: Record<string, [string, string?]> = {
-        Проекты: [names.folders[0]],
-        Дизайн: [names.folders[1]],
-        Договоры: [names.folders[2]],
-        'Обложка релиза.png': [names.files[0], 'cover'],
-        'Офис.png': [names.files[1], 'board'],
-        'Исходники.zip': [names.files[2], 'team'],
-        'Отчёт за квартал.pdf': [names.files[3]],
-        'Бюджет 2026.xlsx': [names.files[4]],
-        'Демо продукта.mp4': [names.files[5]],
-      };
-      for (const it of mock.disk.items.values()) {
-        const m = map[it.name];
-        if (!m) continue;
-        it.name = m[0];
-        if (!it.file) continue;
-        it.file.name = m[0];
-        const pic = m[1] ? pics[m[1]] : undefined;
-        const rec = mock.state.files.get(it.file.id);
-        if (!pic || !rec) continue;
-        it.file.mime = pic.mime;
-        if (m[1] === 'team') it.file.size = 5_412_000n;
-        it.file.thumbnailUrl = `/api/files/${it.file.id}/thumbnail`;
-        it.file.width = pic.w;
-        it.file.height = pic.h;
-        rec.meta = it.file;
-        rec.bytes = pic.bytes;
-        rec.thumbnail = { bytes: pic.bytes, mime: pic.mime };
-      }
-      await setLocale(page, short);
-      // A smaller window: two full rows of tiles above the storage meter, no empty floor.
-      await page.setViewportSize({ width: 1060, height: 600 });
-      await page.getByTestId('section-disk').click();
-      const tiles = page.getByTestId('disk-tile');
-      await expect(tiles).toHaveCount(9, { timeout: 15_000 });
-      await expect(page.getByTestId('disk-meter')).toBeVisible();
-      await expect.poll(() => page.locator('[data-testid="disk-tile"] img').evaluateAll((l) => l.filter((i) => (i as HTMLImageElement).complete && (i as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
-      await page.mouse.move(0, 599);
-      await page.waitForTimeout(600);
-      await shoot(ctx, 'disk');
+      await diskScene(ctx, 'disk', { width: 1060, height: 600 });
+    },
+  },
+
+  // The same disk, the whole window at 16:10 (hero «Облачный диск», landing v6): a smaller window, so the nine
+  // tiles fill it instead of one row over an empty floor.
+  'disk-full': {
+    async run(ctx) {
+      await diskScene(ctx, 'disk-full', { width: 1056, height: 660 });
     },
   },
 

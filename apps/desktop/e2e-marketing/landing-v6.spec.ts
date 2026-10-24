@@ -478,6 +478,25 @@ const scenes: Record<string, Scene> = {
     },
   },
 
+  // An incoming call to the team's number, ringing in the app (hero «Телефония и IVR», story 8): the call sheet
+  // over the chat of the day, before it is answered.
+  'phone-incoming': {
+    seed: (mock, c, c4) => {
+      storySeed(mock, c, c4);
+      seedTelephony(mock, c, c4, false);
+    },
+    async run(ctx) {
+      const { page, mock, c4 } = ctx;
+      await chatRu(ctx);
+      mock.ringSipInbound(U.anna, c4.tel.calls[0], c4.tel.groups[0]);
+      await expect(page.getByTestId('sip-accept')).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(900);
+      await page.mouse.move(0, 0);
+      console.log('phone-incoming boxes', 'accept', await box(page, '[data-testid="sip-accept"]'), 'dialog', await box(page, '[role="dialog"]'));
+      await shoot(ctx, 'phone-incoming');
+    },
+  },
+
   // The sidebar with the call island and the top of the chat (940 px, from the rail's edge).
   'phone-call-panel': {
     seed: (mock, c, c4) => {

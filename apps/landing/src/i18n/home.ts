@@ -15,9 +15,9 @@ export type Tuple<T, N extends number, A extends T[] = []> = A['length'] extends
 
 export type SceneName =
   // hero: whole windows (a phone crop each, lib/screens.ts `focus`)
-  | 'voice' | 'chat-full' | 'kanban-full' | 'calendar-week' | 'wiki-full' | 'canvas' | 'phone-call'
+  | 'voice' | 'chat-full' | 'kanban-full' | 'calendar-week' | 'wiki-full' | 'canvas' | 'disk-full' | 'phone-incoming'
   // the day story
-  | 'story-message' | 'story-task' | 'story-meeting' | 'recording-focus' | 'story-wiki'
+  | 'story-message' | 'story-task' | 'story-meeting' | 'recording-focus' | 'story-wiki' | 'story-incoming'
   // catalogue tiles (≤ 860 px wide, about 16:10: cut out of the scenes, scripts/assets.mjs `from`)
   | 'voice-panel' | 'gallery' | 'chat-focus' | 'phone-call-panel' | 'temp-room'
   | 'kanban-panel' | 'taskhistory-panel' | 'timeline-panel' | 'findtime-panel' | 'wiki-focus' | 'canvas-panel' | 'disk-panel' | 'mail-panel'
@@ -29,10 +29,10 @@ export type SceneName =
 export const SCENES_ARE_SCREENS: Exclude<SceneName, ScreenName> extends never ? true : never = true;
 
 /** Scene order of the hero chips and the screenshot each chip shows (§4.1). */
-export const HERO_SCENES = ['voice', 'chat', 'tasks', 'calendar', 'wiki', 'canvas', 'phone'] as const;
+export const HERO_SCENES = ['voice', 'chat', 'tasks', 'calendar', 'wiki', 'canvas', 'disk', 'phone'] as const;
 export type HeroSceneKey = (typeof HERO_SCENES)[number];
 export const HERO_SHOT: Record<HeroSceneKey, SceneName> = {
-  voice: 'voice', chat: 'chat-full', tasks: 'kanban-full', calendar: 'calendar-week', wiki: 'wiki-full', canvas: 'canvas', phone: 'phone-call',
+  voice: 'voice', chat: 'chat-full', tasks: 'kanban-full', calendar: 'calendar-week', wiki: 'wiki-full', canvas: 'canvas', disk: 'disk-full', phone: 'phone-incoming',
 };
 
 export type Badge = 'desktop' | 'team' | 'business';
@@ -64,7 +64,7 @@ export type Home = {
     platforms: string;
     /** aria-label of the chip tablist. */
     scenesLabel: string;
-    scenes: Tuple<{ key: HeroSceneKey; label: string }, 7>;
+    scenes: Tuple<{ key: HeroSceneKey; label: string }, 8>;
   };
   replace: {
     title: string;
@@ -75,7 +75,7 @@ export type Home = {
   story: {
     /** Visually hidden: the section opens straight with the steps (owner, 24.10). */
     title: string;
-    steps: Tuple<{ title: string; text: string; shot: SceneName }, 7>;
+    steps: Tuple<{ title: string; text: string; shot: SceneName }, 8>;
     cta: string;
   };
   catalog: {
@@ -151,7 +151,8 @@ export const ru: Home = {
       { key: 'calendar', label: 'Календарь' },
       { key: 'wiki', label: 'Вики' },
       { key: 'canvas', label: 'Холст' },
-      { key: 'phone', label: 'Телефон' },
+      { key: 'disk', label: 'Облачный диск' },
+      { key: 'phone', label: 'Телефония и IVR' },
     ],
   },
   replace: {
@@ -169,6 +170,7 @@ export const ru: Home = {
       { title: 'Итог — на странице вики', text: 'На странице — план работ и ссылки на задачу и холст. Один клик — и вы на месте.', shot: 'story-wiki' },
       { title: 'Файлы — на облачном диске', text: 'Макеты, договоры и записи встреч лежат на диске команды: папки с доступом, превью и публичные ссылки.', shot: 'disk-panel' },
       { title: 'Ретро — на холсте', text: 'Стикеры по колонкам, голосование и таймер: команда разбирает спринт вместе и видит курсоры друг друга.', shot: 'canvas-panel' },
+      { title: 'Звонок клиента — прямо в Calab', text: 'Вечером клиент звонит на номер команды: вызов приходит в приложение, ответить можно с компьютера или телефона.', shot: 'story-incoming' },
     ],
     cta: 'Все возможности',
   },
@@ -340,7 +342,9 @@ export const ru: Home = {
     'calendar-week': 'Календарь на неделю: события по дням, линия текущего времени и событие с комнатой',
     'wiki-full': 'Вики: дерево страниц и страница «Экспорт в CSV» с обложкой, чек-листом и курсорами двух коллег',
     'canvas': 'Холст «Ретро спринта 12»: стикеры трёх цветов, фигуры, стрелки, голоса, таймер и курсор коллеги',
-    'phone-call': 'Звонок на номер +7 916 123-45-67 из голосовой комнаты: плашка звонка с кнопкой «Перевести» и лента чата',
+    'phone-incoming': 'Входящий звонок на номер команды поверх чата: номер +7 916 123-45-67, группа «Продажи», кнопки «Отклонить» и «Принять»',
+    'story-incoming': 'Окно входящего звонка: +7 916 123-45-67, входящий на номер группы «Продажи», «Отклонить» и «Принять»',
+    'disk-full': 'Диск команды плитками: папки «Дизайн», «Договоры» и «Проекты», таблица, видео, превью картинок и шкала занятого места',
     'story-message': 'Сообщение Веры Ким «Клиент просит экспорт доски в CSV до пятницы» и меню сообщения с пунктом «Создать задачу»',
     'story-task': 'Панель задачи APP-7 «Экспорт доски в CSV»: описание, чек-лист 2 из 4, исполнители, срок 16 января и согласующий',
     'story-meeting': 'Событие «Ревью экспорта CSV» в 15:00 в комнате «Переговорка» с кнопкой «Перейти» и ответами четырёх участников',

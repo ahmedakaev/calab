@@ -47,6 +47,11 @@ export const CROPS = {
   // the phones' crop and the catalogue tile keep the call island of the sidebar (a narrow window shows the chat only)
   'phone-call': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 0, top: 346, width: 720, height: 548 } },
   'phone-call-panel': { from: 'phone-call', left: 0, top: 346, width: 860, height: 548 },
+  // an incoming call ringing over the chat (hero «Телефония и IVR»); the story's frame is the call sheet with the chat around it
+  'phone-incoming': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 360, top: 170, width: 720, height: 560 } },
+  'story-incoming': { from: 'phone-incoming', left: 340, top: 230, width: 760, height: 440 },
+  // the disk in a 1056×660 window (16:10, the nine tiles fill it; hero «Облачный диск»)
+  'disk-full': { left: 0, top: 0, width: 1056, height: 660, focus: { left: 76, top: 36, width: 720, height: 560 } },
   // settings windows: the pane to the right of the section list (the dialog is 920 px wide; a tile shows ≤ 860)
   'telephony-ivr': { left: 481, top: 131, width: 698, height: 330 },
   'telephony-groups': { left: 481, top: 131, width: 698, height: 330 },

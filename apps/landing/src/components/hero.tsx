@@ -1,4 +1,4 @@
-import { AudioLines, BookOpenText, CalendarDays, MessagesSquare, Phone, Shapes, SquareKanban, type LucideIcon } from 'lucide-react';
+import { AudioLines, BookOpenText, CalendarDays, HardDrive, MessagesSquare, Phone, Shapes, SquareKanban, type LucideIcon } from 'lucide-react';
 import { preload } from 'react-dom';
 import type { Locale } from '@/i18n';
 import { getHome, HERO_SHOT, type HeroSceneKey } from '@/i18n/home';
@@ -14,6 +14,7 @@ const ICONS: Record<HeroSceneKey, LucideIcon> = {
   calendar: CalendarDays,
   wiki: BookOpenText,
   canvas: Shapes,
+  disk: HardDrive,
   phone: Phone,
 };
 
