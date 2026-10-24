@@ -209,29 +209,33 @@ details[open] .chevron { transform: rotate(180deg); }
 @media (max-width: 639px) { .shot-phone { border-radius: 18px; border-width: 3px; } }
 
 /* ---------- Header ---------- */
-/* Sticky but transparent (owner, 24.10): the pills float over the content with their own fills; the empty strip
-   between them lets clicks through. The logo sits on its own dark pill so it reads over light content. */
-.site-header { position: sticky; top: 0; z-index: 40; pointer-events: none; }
-.site-header-row > *, .site-header .skip-link { pointer-events: auto; }
-.site-nav ul, .locale-globe, .topbar-action, .site-menu summary { box-shadow: 0 4px 16px rgb(0 0 0 / .35); }
-.site-header-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; height: var(--header-h); }
-.site-brand { display: flex; align-items: center; flex-shrink: 0; height: 42px; padding-inline: 14px; margin-left: -14px; border-radius: 999px; background: var(--color-bg); box-shadow: 0 4px 16px rgb(0 0 0 / .35); }
-.site-wordmark { display: block; width: 104px; height: auto; }
-.site-nav ul { display: flex; align-items: center; gap: 22px; height: 42px; padding-inline: 20px; border-radius: 999px; background: #fff; color: #111; list-style: none; }
-.site-header-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* No bar and no backing (owner, 24.10): the header scrolls away with the page; only the logo (left) and the
+   language / menu / web buttons (right) stay, fixed at the content column's edges, floating over the content.
+   The nav is plain text in the middle of the first screen. No backdrop-filter. */
+.site-header { position: relative; z-index: 40; }
+.site-header-row { display: flex; align-items: center; justify-content: center; height: var(--header-h); }
+.site-brand, .site-header-actions { position: fixed; top: calc((var(--header-h) - 42px) / 2); z-index: 40; }
+.site-brand { z-index: 41; }
+.site-brand { left: calc(max(0px, (100vw - 1360px) / 2) + var(--gutter)); display: flex; align-items: center; height: 42px; border-radius: 6px; }
+.site-wordmark { display: block; width: 104px; height: auto; filter: drop-shadow(0 1px 6px rgb(0 0 0 / .55)); }
+.site-nav ul { display: flex; align-items: center; gap: 26px; height: 42px; list-style: none; }
+.site-header-actions { right: calc(max(0px, (100vw - 1360px) / 2) + var(--gutter)); display: flex; align-items: center; gap: 8px; }
+.topbar-action { box-shadow: 0 4px 16px rgb(0 0 0 / .35); }
 .skip-link { position: absolute; left: 16px; top: 12px; z-index: 50; padding: 8px 16px; border-radius: 8px; background: var(--color-card-raised); font-size: 14px; }
 .skip-link:not(:focus) { width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .site-menu { position: static; }
-.site-menu summary { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 42px; height: 42px; border-radius: 50%; background: #fff; cursor: pointer; }
-.site-menu summary span { display: block; width: 20px; height: 2px; background: #111; }
-.site-menu nav { position: absolute; top: var(--header-h); left: 0; right: 0; display: grid; gap: 4px; padding: 16px var(--gutter) 24px; border-radius: 0 0 24px 24px; background: var(--color-card); box-shadow: 0 16px 32px rgb(0 0 0 / .4); }
+.site-menu summary { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 42px; height: 42px; border-radius: 50%; background: rgb(28 28 31 / .88); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16); cursor: pointer; }
+.site-menu summary span { display: block; width: 18px; height: 2px; background: #fff; }
+/* The open menu: a sheet from the top edge under the logo and the buttons (z-index -1 inside the fixed actions). */
+.site-menu nav { position: fixed; z-index: -1; top: 0; left: 0; right: 0; display: grid; gap: 4px; padding: calc(var(--header-h) + 8px) var(--gutter) 24px; border-radius: 0 0 24px 24px; background: var(--color-card); box-shadow: 0 16px 32px rgb(0 0 0 / .4); }
 .site-menu nav a { display: flex; align-items: center; min-height: 48px; font-size: 20px; font-weight: 500; }
 .site-menu nav a[aria-current='page'] { color: var(--color-accent-text); }
 @media (min-width: 1024px) { .site-menu { display: none; } }
 @media (max-width: 1023px) { .site-nav { display: none; } }
-@media (max-width: 639px) { .site-brand { padding-inline: 10px; margin-left: -10px; } .site-wordmark { width: 88px; } .site-header-actions { gap: 6px; } }
+@media (max-width: 639px) { .site-wordmark { width: 88px; } .site-header-actions { gap: 6px; } }
 
-.locale-globe { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #fff; color: #111; cursor: pointer; list-style: none; }
+/* Not an accent: a quiet dark disc with a hairline (the white pill is the web button only). */
+.locale-globe { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: rgb(28 28 31 / .88); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16); color: #fff; cursor: pointer; list-style: none; }
 .locale-menu { z-index: 45; border-radius: 18px; background: #fff; color: #111; box-shadow: 0 12px 32px #0005; }
 .locale-menu a { border-radius: 12px; color: #111; }
 .locale-menu a[aria-current='page'] { color: var(--action); }
@@ -245,7 +249,7 @@ details[open] .chevron { transform: rotate(180deg); }
 .topbar-action-dots i { position: absolute; inset: 0; display: block; width: 7px; height: 7px; border-radius: 50%; background: var(--action); }
 .topbar-action-dots i:nth-child(2), .topbar-action-dots i:nth-child(3) { transform: rotate(120deg) scale(0); }
 /* 360 px phones: the longest short label («VERSIÓN WEB») still keeps the 20 px gutter. */
-@media (max-width: 389px) { .site-header-row { gap: 10px; } .topbar-action { gap: 0; padding: 0 14px; font-size: 14px; } .topbar-action-dots { display: none; } }
+@media (max-width: 389px) { .topbar-action { gap: 0; padding: 0 14px; font-size: 14px; } .topbar-action-dots { display: none; } }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .locale-globe svg { transition: transform .6s cubic-bezier(.32, .72, 0, 1), color .3s; }
   .locale-globe:hover svg, .locale-globe:focus-visible svg, .locale-control[open] .locale-globe svg { transform: rotateY(180deg) rotate(-15deg); color: var(--action); }
@@ -265,7 +269,8 @@ details[open] .chevron { transform: rotate(180deg); }
 .drawn-line { position: absolute; left: -2%; top: calc(100% + 1px); width: 104%; height: 8px; overflow: visible; }
 .drawn-line path { fill: none; stroke: var(--action); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
 .drawn[aria-current='page'] .drawn-line path { stroke-dashoffset: 0; }
-.drawn-nav { padding-block: 11px; font-size: 15px; font-weight: 500; line-height: 20px; color: #111; }
+.drawn-nav { padding-block: 11px; font-size: 15px; font-weight: 500; line-height: 20px; color: var(--color-text-secondary); }
+.drawn-nav:hover, .drawn-nav[aria-current='page'] { color: #fff; }
 .drawn-cta { padding-bottom: 12px; font-family: var(--font-display); font-size: 24px; font-weight: 500; line-height: 1.15; color: #fff; }
 .drawn-cta .drawn-line { top: calc(100% + 4px); }
 .drawn-cta .drawn-line path { stroke-dashoffset: 0; }

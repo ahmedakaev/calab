@@ -7,7 +7,7 @@ import { LocaleSwitcher } from './locale-switcher';
 import { Container } from './ui';
 
 /**
- * Sticky 72 px row without a backing (owner, 24.10): logo, nav, language and the web button are pills of their own.
+ * A 72 px row without a backing that scrolls away (owner, 24.10); the logo and the right-hand buttons stay fixed.
  * `page`: '' on the home page, 'developers/' etc. elsewhere — section links then lead back to the home page.
  */
 export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Locale; page?: string }) {
