@@ -63,7 +63,7 @@ export type Home = {
     platforms: string;
     /** aria-label of the chip tablist. */
     scenesLabel: string;
-    scenes: Tuple<{ key: HeroSceneKey; label: string; caption: string }, 7>;
+    scenes: Tuple<{ key: HeroSceneKey; label: string }, 7>;
   };
   replace: {
     title: string;
@@ -142,13 +142,13 @@ export const ru: Home = {
     platforms: 'macOS · Windows · Linux · Web · телефон',
     scenesLabel: 'Что внутри Calab',
     scenes: [
-      { key: 'voice', label: 'Общение и стримы', caption: 'Зашли в комнату — и уже слышите коллег. Экран, камеры, указка поверх стрима.' },
-      { key: 'chat', label: 'Привычные чаты', caption: 'Ответы, реакции, голосовые, стикеры. Любое сообщение — в задачу одним действием.' },
-      { key: 'tasks', label: 'Задачи и доски', caption: 'Доски с приоритетами, сроками, исполнителями и историей изменений.' },
-      { key: 'calendar', label: 'Календарь', caption: 'Встречи со ссылкой на комнату и подбор времени по занятости коллег.' },
-      { key: 'wiki', label: 'Вики', caption: 'Страницы, которые команда правит вместе, в реальном времени.' },
-      { key: 'canvas', label: 'Холст', caption: 'Онлайн-доска для ретро и схем: стикеры, фигуры, стрелки и голосование — прямо в разговоре.' },
-      { key: 'phone', label: 'Телефон', caption: 'Звонок на городской или мобильный номер из голосовой комнаты, перевод коллеге.' },
+      { key: 'voice', label: 'Общение и стримы' },
+      { key: 'chat', label: 'Привычные чаты' },
+      { key: 'tasks', label: 'Задачи и доски' },
+      { key: 'calendar', label: 'Календарь' },
+      { key: 'wiki', label: 'Вики' },
+      { key: 'canvas', label: 'Холст' },
+      { key: 'phone', label: 'Телефон' },
     ],
   },
   replace: {

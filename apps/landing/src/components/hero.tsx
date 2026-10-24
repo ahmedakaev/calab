@@ -56,7 +56,6 @@ export function Hero({ locale }: { locale: Locale }) {
             const Icon = ICONS[s.key];
             return { key: s.key, label: s.label, icon: <Icon aria-hidden="true" size={15} strokeWidth={1.9} /> };
           })}
-          captions={h.scenes.map((s) => nb(s.caption))}
           panels={h.scenes.map((s, i) => (
             <Shot
               key={s.key}

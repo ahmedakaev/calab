@@ -10,22 +10,18 @@ const AUTO_LAST = 2;
  * Without JS only the first scene is in the HTML. The other scenes mount after the page has loaded and gone
  * idle (the LCP shot loads alone). Autoplay: once, while the hero is on screen and the tab is visible; any
  * pointer or key action, leaving the screen for good or reduced motion stops it.
- * Desktop tilt: the window leans a few degrees towards the pointer — one rAF per pointer move, transform only,
- * listening only while the hero is on screen, and only for a fine pointer without reduced motion at ≥ 1024 px.
- * The CSS transition eases it (and back to rest on leave); nothing runs while the mouse is still.
+ * Desktop: the window stands tilted in perspective (CSS); a click zooms it to fit the viewport, a second one returns it.
  */
 export function SceneSwitcher({
   copy,
   label,
   chips,
-  captions,
   panels,
 }: {
   /** The title, lead and buttons: the left column on desktop, above the window on phones. */
   copy: ReactNode;
   label: string;
   chips: { key: string; label: string; icon: ReactNode }[];
-  captions: string[];
   panels: ReactNode[];
 }) {
   const [active, setActive] = useState(0);
@@ -33,6 +29,10 @@ export function SceneSwitcher({
   const root = useRef<HTMLDivElement>(null);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const tilt = useRef<HTMLDivElement>(null);
+  const stopAuto = () => {
+    auto.current.done = true;
+    window.clearTimeout(auto.current.timer);
+  };
   const auto = useRef({ done: false, timer: 0, visible: false, step: 0 });
 
   useEffect(() => {
@@ -87,65 +87,45 @@ export function SceneSwitcher({
     };
   }, [ready]);
 
+  // Zoom: a click centres the window and fits it to the viewport over a dimmed page; a second click, Escape,
+  // a scroll or a resize send it back. Transform only (the CSS transition animates both ways).
+  const [zoomed, setZoomed] = useState(false);
+  const toggleZoom = () => {
+    const win = tilt.current;
+    const stage = win?.parentElement;
+    if (!win || !stage) return;
+    stopAuto();
+    if (zoomed) { setZoomed(false); return; }
+    const box = stage.getBoundingClientRect();
+    const w = win.offsetWidth;
+    const h = win.offsetHeight;
+    const vw = document.documentElement.clientWidth;
+    const vh = window.innerHeight;
+    const scale = Math.min((vw - 48) / w, (vh - 48) / h);
+    // transform-origin is (0, 50%): solve for the translate that puts the scaled box in the middle of the viewport.
+    const x = (vw - w * scale) / 2 - box.left;
+    const y = (vh - h * scale) / 2 - box.top - h / 2 + (h * scale) / 2;
+    win.style.setProperty('--zoom-x', `${x.toFixed(1)}px`);
+    win.style.setProperty('--zoom-y', `${y.toFixed(1)}px`);
+    win.style.setProperty('--zoom-s', scale.toFixed(4));
+    setZoomed(true);
+  };
   useEffect(() => {
-    const node = root.current;
-    const stage = tilt.current;
-    if (!node || !stage) return;
-    const media = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)');
-    let frame = 0;
-    let px = 0;
-    let py = 0;
-    let listening = false;
-    const apply = () => {
-      frame = 0;
-      const box = node.getBoundingClientRect();
-      const x = Math.max(-1, Math.min(1, ((px - box.left) / box.width) * 2 - 1));
-      const y = Math.max(-1, Math.min(1, ((py - box.top) / box.height) * 2 - 1));
-      stage.style.setProperty('--tilt-x', `${(-y * 3).toFixed(2)}deg`);
-      stage.style.setProperty('--tilt-y', `${(x * 4).toFixed(2)}deg`);
-    };
-    const move = (e: PointerEvent) => {
-      if (e.pointerType !== 'mouse') return;
-      px = e.clientX;
-      py = e.clientY;
-      if (!frame) frame = requestAnimationFrame(apply);
-    };
-    const rest = () => {
-      cancelAnimationFrame(frame);
-      frame = 0;
-      stage.style.removeProperty('--tilt-x');
-      stage.style.removeProperty('--tilt-y');
-    };
-    const listen = (on: boolean) => {
-      if (on === listening) return;
-      listening = on;
-      if (on) {
-        node.addEventListener('pointermove', move, { passive: true });
-        node.addEventListener('pointerleave', rest);
-      } else {
-        node.removeEventListener('pointermove', move);
-        node.removeEventListener('pointerleave', rest);
-        rest();
-      }
-    };
-    let inView = false;
-    const sync = () => { listen(inView && media.matches); };
-    const observer = new IntersectionObserver(([entry]) => {
-      inView = !!entry?.isIntersecting;
-      sync();
-    });
-    observer.observe(node);
-    media.addEventListener('change', sync);
+    if (!zoomed) return;
+    const close = () => { setZoomed(false); };
+    const key = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('scroll', close, { passive: true });
+    window.addEventListener('resize', close);
+    document.addEventListener('keydown', key);
     return () => {
-      observer.disconnect();
-      media.removeEventListener('change', sync);
-      listen(false);
+      window.removeEventListener('scroll', close);
+      window.removeEventListener('resize', close);
+      document.removeEventListener('keydown', key);
     };
-  }, []);
+  }, [zoomed]);
 
   const choose = (i: number, focus = false) => {
-    auto.current.done = true;
-    window.clearTimeout(auto.current.timer);
+    stopAuto();
     setActive(i);
     if (focus) tabs.current[i]?.focus();
   };
@@ -158,10 +138,10 @@ export function SceneSwitcher({
   };
 
   return (
-    <div ref={root} className="hero-layout" onPointerDown={() => { auto.current.done = true; window.clearTimeout(auto.current.timer); }}>
+    <div ref={root} className="hero-layout" data-zoomed={zoomed || undefined} onPointerDown={stopAuto}>
       <div className="hero-copy">{copy}</div>
       <div className="hero-stage">
-        <div ref={tilt} className="scenes-window">
+        <div ref={tilt} className="scenes-window" onClick={toggleZoom}>
           {panels.map((panel, i) =>
             i === 0 || ready ? (
               <div
@@ -180,6 +160,7 @@ export function SceneSwitcher({
           )}
         </div>
       </div>
+      <div className="hero-dim" aria-hidden="true" onClick={() => { setZoomed(false); }} />
       <div className="scene-nav">
         <div role="tablist" aria-label={label} className="scene-chips" onKeyDown={onKey}>
           {chips.map((c, i) => (
@@ -200,9 +181,6 @@ export function SceneSwitcher({
             </button>
           ))}
         </div>
-        <p className="scene-caption" key={active}>
-          {captions[active]}
-        </p>
       </div>
     </div>
   );

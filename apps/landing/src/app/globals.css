@@ -296,7 +296,17 @@ details[open] .chevron { transform: rotate(180deg); }
 .hero-platforms { font-size: 14px; color: #9a9aa2; }
 @media (max-width: 639px) { .hero { padding-top: 20px; } .hero-actions { align-self: stretch; } .hero-buttons .btn { flex: 1 1 auto; } }
 .hero-stage { min-width: 0; }
-.scenes-window { display: grid; }
+.scenes-window { display: grid; transform-origin: 0 50%; cursor: zoom-in; }
+/* Click to zoom (scene-switcher.tsx): the window over a dimmed page, flat and centred; a click anywhere returns it. */
+.hero-dim { position: fixed; inset: 0; z-index: 55; background: rgb(0 0 0 / .72); opacity: 0; visibility: hidden; cursor: zoom-out; }
+.hero-layout[data-zoomed] .hero-dim { opacity: 1; visibility: visible; }
+.hero-layout[data-zoomed] .hero-stage { position: relative; z-index: 60; }
+.hero-layout[data-zoomed] .scenes-window { transform: translate(var(--zoom-x), var(--zoom-y)) scale(var(--zoom-s)); cursor: zoom-out; }
+@media (prefers-reduced-motion: no-preference) {
+  .scenes-window { transition: transform .5s cubic-bezier(.2, .8, .2, 1); }
+  .hero-dim { transition: opacity .35s, visibility 0s linear .35s; }
+  .hero-layout[data-zoomed] .hero-dim { transition: opacity .35s, visibility 0s; }
+}
 .scene { grid-area: 1 / 1; opacity: 0; visibility: hidden; }
 .scene[data-active='true'] { opacity: 1; visibility: visible; }
 @media (prefers-reduced-motion: no-preference) {
@@ -306,17 +316,13 @@ details[open] .chevron { transform: rotate(180deg); }
 .hero-shot { border-radius: 16px; }
 @media (min-width: 1024px) {
   .hero { padding: 32px 0 40px; }
-  .hero-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 48px; row-gap: 28px; align-items: center;
+  .hero-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 48px; row-gap: 64px; align-items: center;
     min-height: min(calc(100svh - var(--header-h) - 64px), 720px); }
   .hero-stage { perspective: 2000px; }
-  /* Bleeds 32 px past the viewport edge; leans away to the right, tilts a few degrees more towards the pointer. */
-  .scenes-window { width: calc(100% + (100vw - min(100vw, 1360px)) / 2 + var(--gutter) + 32px); transform-origin: 0 50%;
-    transform: rotateY(calc(-14deg + var(--tilt-y, 0deg))) rotateX(calc(4deg + var(--tilt-x, 0deg))); }
+  /* Bleeds 32 px past the viewport edge and leans away to the right. */
+  .scenes-window { width: calc(100% + (100vw - min(100vw, 1360px)) / 2 + var(--gutter) + 32px); transform: rotateY(-14deg) rotateX(4deg); }
   .scenes-window .hero-shot { box-shadow: 0 50px 100px -30px rgb(0 0 0 / .75), 0 20px 40px -20px rgb(0 0 0 / .5); }
   .scene-nav { grid-column: 1 / -1; }
-}
-@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
-  .scenes-window { transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
 }
 /* Scene pills: quiet (outline, muted, small) so the download buttons stay the loudest thing on the first screen. */
 .scene-nav { min-width: 0; }
@@ -324,11 +330,9 @@ details[open] .chevron { transform: rotate(180deg); }
 .chip-quiet { height: 34px; gap: 6px; padding-inline: 12px; background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1); color: #8d8d95; font-size: 13px; }
 .chip-quiet:hover { color: #fff; }
 .chip-quiet[aria-selected='true'] { background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); color: #fff; }
-.scene-caption { max-width: 720px; min-height: 1.5em; margin: 10px auto 0; text-align: center; font-size: 14px; line-height: 1.5; color: var(--color-text-secondary); }
 @media (max-width: 639px) {
   .scene-chips { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-inline: calc(-1 * var(--gutter)); padding-inline: var(--gutter); scroll-padding-inline: var(--gutter); }
-  .scene-caption { min-height: 4.5em; text-align: left; }
-}
+  }
 
 /* Live headline: one finite entrance; the weight follows the mouse (living-title.tsx). */
 @media (prefers-reduced-motion: no-preference) {
