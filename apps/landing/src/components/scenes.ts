@@ -17,8 +17,7 @@ const FOCUS_SCENES = {
 type FocusScene = keyof typeof FOCUS_SCENES;
 
 // Every scene name resolves: a screen of lib/screens.ts or a focus scene above (fails typecheck otherwise).
-const resolves: Exclude<SceneName, ScreenName | FocusScene> extends never ? true : never = true;
-void resolves;
+export const SCENES_RESOLVE: Exclude<SceneName, ScreenName | FocusScene> extends never ? true : never = true;
 
 /** What a scene shows: the screen's files, `focus` = its phone crop files, and the size in CSS px. */
 export type SceneFile = { screen: ScreenName; focus: boolean; width: number; height: number };
