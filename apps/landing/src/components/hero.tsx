@@ -3,7 +3,6 @@ import { preload } from 'react-dom';
 import type { Locale } from '@/i18n';
 import { getHome, HERO_SHOT, type HeroSceneKey } from '@/i18n/home';
 import { APP_URL } from '@/lib/site';
-import { CursorStickerTrail } from './cursor-sticker-trail';
 import { LivingTitle } from './living-title';
 import { SceneSwitcher } from './scene-switcher';
 import { Button, Container, nb, Shot } from './ui';
@@ -66,7 +65,6 @@ export function Hero({ locale }: { locale: Locale }) {
           ))}
         />
       </Container>
-      <CursorStickerTrail quiet />
     </section>
   );
 }

@@ -313,7 +313,6 @@ details[open] .chevron { transform: rotate(180deg); }
 /* Cursor stickers: a finite pool; hidden on touch and reduced motion. */
 .cursor-sticker-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .trail-sticker { position: absolute; width: 180px; height: 180px; object-fit: contain; pointer-events: none; opacity: 0; z-index: 1; }
-.cursor-sticker-layer-quiet .trail-sticker { width: 125px; height: 125px; }
 @media (prefers-reduced-motion: reduce), (pointer: coarse) { .cursor-sticker-layer { display: none; } }
 
 /* One-shot section reveals (story-motion.tsx): 350 ms, 8 px. */
