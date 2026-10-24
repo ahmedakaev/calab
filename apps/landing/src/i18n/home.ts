@@ -68,11 +68,6 @@ export type Home = {
   replace: {
     title: string;
     lead: string;
-    /** Eight «browser tabs» named by category, never by a brand. */
-    tabs: Tuple<string, 8>;
-    /** The Calab rail on the right: nine sections. */
-    rail: Tuple<string, 9>;
-    railLabel: string;
   };
   story: {
     title: string;
@@ -159,9 +154,6 @@ export const ru: Home = {
   replace: {
     title: 'Вместо семи сервисов — одно окно',
     lead: 'Мессенджер, видеозвонки, трекер задач, вики, онлайн-доска, диск, почта и телефония — у команды обычно это семь вкладок и семь счетов. В Calab это один рейл слева.',
-    tabs: ['Мессенджер', 'Видеозвонки', 'Трекер задач', 'Вики', 'Онлайн-доска', 'Диск', 'Почта', 'Телефония'],
-    rail: ['Команда', 'Личные', 'Календарь', 'Доски', 'Почта', 'Вики', 'Холст', 'Диск', 'Телефония'],
-    railLabel: 'Левый рейл Calab',
   },
   story: {
     title: 'Один день команды — не выходя из окна',

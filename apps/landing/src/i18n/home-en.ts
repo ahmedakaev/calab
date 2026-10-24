@@ -23,9 +23,6 @@ export const en: Home = {
   replace: {
     title: 'One window instead of seven services',
     lead: 'Messenger, video calls, task tracker, wiki, online whiteboard, file storage, mail and phone — a team usually pays for seven tools in seven tabs. In Calab it is one rail on the left.',
-    tabs: ['Messenger', 'Video calls', 'Task tracker', 'Wiki', 'Whiteboard', 'File storage', 'Mail', 'Phone system'],
-    rail: ['Team', 'Direct', 'Calendar', 'Boards', 'Mail', 'Wiki', 'Canvas', 'Files', 'Telephony'],
-    railLabel: 'Calab’s left rail',
   },
   story: {
     title: 'A team’s day, without leaving the window',

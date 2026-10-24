@@ -23,9 +23,6 @@ export const es: Home = {
   replace: {
     title: 'Una ventana en lugar de siete servicios',
     lead: 'Mensajería, videollamadas, gestor de tareas, wiki, pizarra en línea, archivos, correo y telefonía: un equipo suele tener siete pestañas y siete facturas. En Calab es una sola barra a la izquierda.',
-    tabs: ['Mensajería', 'Videollamadas', 'Gestor de tareas', 'Wiki', 'Pizarra en línea', 'Archivos', 'Correo', 'Telefonía'],
-    rail: ['Equipo', 'Directos', 'Calendario', 'Tableros', 'Correo', 'Wiki', 'Lienzo', 'Disco', 'Telefonía'],
-    railLabel: 'Barra izquierda de Calab',
   },
   story: {
     title: 'Un día del equipo sin salir de la ventana',
