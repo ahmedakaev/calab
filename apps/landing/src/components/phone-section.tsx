@@ -11,14 +11,13 @@ export function PhoneSection({ locale }: { locale: Locale }) {
     <section id="mobile" aria-labelledby="mobile-title" className="section">
       <Container>
         <div className="phone-panel">
+          <Badge tone="solid" className="phone-corner">{p.soon}</Badge>
           <div className="phone-copy">
             <h2 id="mobile-title" className="h2">
               {p.title}
             </h2>
             <p className="lead">{nb(p.text)}</p>
-            <p className="phone-soon">
-              <Badge tone="solid">{p.soon}</Badge> {nb(p.soonText)}
-            </p>
+            <p className="phone-soon">{nb(p.soonText)}</p>
             <Button href={APP_URL} variant="secondary" size="md" className="phone-open">
               {t.nav.openWeb}
             </Button>

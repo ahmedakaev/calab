@@ -205,9 +205,13 @@ details[open] .chevron { transform: rotate(180deg); }
 .shot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px solid var(--hairline); pointer-events: none; }
 .shot picture, .shot img { display: block; width: 100%; height: 100%; }
 @media (max-width: 639px) { .shot-has-focus { aspect-ratio: var(--ar-sm); } }
-.shot-phone { border-radius: 28px; border: 5px solid #26262a; background: #000; }
-.shot-phone::after { display: none; }
-@media (max-width: 639px) { .shot-phone { border-radius: 18px; border-width: 3px; } }
+/* A phone capture has no status bar: it sits inside a drawn device (bezel, island, home bar), so the rounded corners
+   never cut the app's header or the message field. The image keeps its own ratio. */
+.shot-phone { aspect-ratio: auto; padding: 10% 4% 8%; border-radius: 30px; background: #070708; box-shadow: inset 0 0 0 1px #34343a, 0 18px 40px -16px rgb(0 0 0 / .6); }
+.shot-phone img { height: auto; border-radius: 6px; }
+.shot-phone::before { content: ''; position: absolute; top: 3.4%; left: 50%; width: 30%; aspect-ratio: 4.4; border-radius: 999px; background: #1c1c1f; transform: translateX(-50%); }
+.shot-phone::after { inset: auto 33% 2.8%; height: 4px; border: 0; border-radius: 999px; background: #3a3a40; }
+@media (max-width: 639px) { .shot-phone { border-radius: 20px; } .shot-phone::after { height: 3px; } }
 
 /* ---------- Header ---------- */
 /* No bar and no backing (owner, 24.10): the header scrolls away with the page; only the logo (left) and the
@@ -469,10 +473,13 @@ details[open] .chevron { transform: rotate(180deg); }
 .page-nav { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---------- Phone panel ---------- */
-.phone-panel { display: grid; gap: 40px; align-items: center; padding: 28px 24px; border-radius: 28px; background: var(--panel-blue); }
+/* A neutral card like the rest of the page (the dark blue read as a foreign block on the grey); «Скоро» is a corner badge. */
+.phone-panel { position: relative; display: grid; gap: 40px; align-items: center; padding: 28px 24px; border-radius: 28px; background: var(--color-card); }
+.phone-corner { position: absolute; top: 20px; left: 24px; z-index: 1; }
+@media (max-width: 1023px) { .phone-panel { padding-top: 60px; } }
+@media (min-width: 1024px) { .phone-corner { top: 28px; left: 56px; } }
 @media (min-width: 1024px) { .phone-panel { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 56px; padding: 40px 56px; } }
 .phone-soon { margin-top: 20px; font-size: 16px; line-height: 1.5; }
-.phone-soon .badge { margin-right: 6px; vertical-align: 1px; }
 .phone-open { margin-top: 28px; }
 .phone-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(8px, 2vw, 20px); align-items: start; list-style: none; max-width: 520px; margin-inline: auto; width: 100%; }
 .phone-shots > :nth-child(2) { margin-top: clamp(16px, 3vw, 32px); }
