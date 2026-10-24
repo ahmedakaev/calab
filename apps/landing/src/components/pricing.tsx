@@ -58,8 +58,8 @@ const CTA: Record<PlanId, (t: Dict['pricing'], locale: Locale) => ReactNode> = {
       </Button>
     </div>
   ),
-  team: (t, locale) => <PlanCta locale={locale} t={t.live} label={t.cta.contact} />,
-  business: (t, locale) => <PlanCta locale={locale} t={t.live} label={t.cta.contact} />,
+  team: (t, locale) => <PlanCta locale={locale} t={t.live} plan="team" />,
+  business: (t, locale) => <PlanCta locale={locale} t={t.live} plan="business" />,
   enterprise: (t) => (
     <Button href={repoFile('COMMERCIAL-LICENSE.md')} variant="secondary" size="md" className="w-full">
       {t.cta.license}
@@ -104,15 +104,16 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
       <ul className="swipe-sm mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {PLAN_IDS.map((id, col) => {
           const plan = t.plans[id];
-          const start = id === 'free';
+          // Team is the highlighted plan (owner, 24.10).
+          const popular = id === 'team';
           return (
             <li
               key={id}
-              className={'card plan-card' + (start ? ' plan-card-start' : '')}
+              className={'card plan-card' + (popular ? ' plan-card-popular' : '')}
             >
-              {start && (
-                <p className="absolute -top-3 left-6 rounded-full bg-accent-strong px-3 py-0.5 text-[13px] leading-5 font-semibold text-white">
-                  {t.startHere}
+              {popular && (
+                <p className="plan-popular">
+                  {t.popular}
                 </p>
               )}
               <h3 id={`plan-${id}`} className="text-[17px] leading-6 font-semibold">

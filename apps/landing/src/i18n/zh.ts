@@ -313,13 +313,11 @@ const zh: Dict = {
   pricing: {
     live: {
       perMonth: '每人 30 天约 {amount}',
-      connect: '在应用中开通',
+      buy: '购买',
       request: '联系我们',
       switchLabel: '价格币种',
       currencyRub: '₽',
       currencyUsd: '$',
-      pricesInRub: '价格以俄罗斯卢布计。',
-      pricesInUsd: '价格以美元计。',
       contactNote: '价格以美元计。付费套餐需联系我们开通。',
     },
     perSeatDay: '每人每天',
@@ -328,7 +326,7 @@ const zh: Dict = {
     eyebrow: '价格',
     title: 'Free、Team、Business 与 Enterprise',
     lead: '免费开始。需要更多？选择云端的 Team 或 Business，或选择 Enterprise：把 Calab 部署在你自己的服务器上。',
-    startHere: '从这里开始',
+    popular: '最受欢迎',
     plans: {
       free: { name: 'Free', price: '免费', note: '最多 50 名成员' },
       team: { name: 'Team', price: '$0.10', note: '最多 100 名成员' },
@@ -338,7 +336,6 @@ const zh: Dict = {
     cta: {
       web: '网页',
       download: '下载',
-      contact: '联系我们',
       license: '许可条款',
     },
     table: {

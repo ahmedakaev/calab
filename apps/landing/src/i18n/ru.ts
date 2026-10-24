@@ -313,13 +313,11 @@ const ru = {
   pricing: {
     live: {
       perMonth: '≈ {amount} за человека за 30 дней',
-      connect: 'Подключить в приложении',
+      buy: 'Купить',
       request: 'По запросу',
       switchLabel: 'Валюта цен',
       currencyRub: '₽',
       currencyUsd: '$',
-      pricesInRub: 'Цены в рублях.',
-      pricesInUsd: 'Цены в долларах США.',
       contactNote: 'Цены в долларах США. Платные тарифы подключаем по запросу.',
     },
     perSeatDay: 'за человека в сутки',
@@ -328,7 +326,7 @@ const ru = {
     eyebrow: 'Тарифы',
     title: 'Free, Team, Business и Enterprise',
     lead: 'Начните бесплатно. Нужно больше — Team или Business в облаке, либо Enterprise: Calab на вашем собственном сервере.',
-    startHere: 'Начните здесь',
+    popular: 'Популярный',
     plans: {
       free: { name: 'Free', price: 'Бесплатно', note: 'До 50 участников' },
       team: { name: 'Team', price: '6 ₽', note: 'До 100 участников' },
@@ -338,7 +336,6 @@ const ru = {
     cta: {
       web: 'Веб',
       download: 'Скачать',
-      contact: 'Связаться',
       license: 'Условия лицензии',
     },
     table: {

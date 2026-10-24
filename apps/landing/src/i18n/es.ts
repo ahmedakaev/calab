@@ -312,13 +312,11 @@ const es: Dict = {
   pricing: {
     live: {
       perMonth: '≈ {amount} por persona en 30 días',
-      connect: 'Activar en la app',
+      buy: 'Comprar',
       request: 'Bajo consulta',
       switchLabel: 'Moneda de los precios',
       currencyRub: '₽',
       currencyUsd: '$',
-      pricesInRub: 'Precios en rublos rusos.',
-      pricesInUsd: 'Precios en dólares estadounidenses.',
       contactNote: 'Precios en dólares estadounidenses. Los planes de pago se activan bajo consulta.',
     },
     perSeatDay: 'por persona y día',
@@ -327,7 +325,7 @@ const es: Dict = {
     eyebrow: 'Precios',
     title: 'Free, Team, Business y Enterprise',
     lead: 'Empieza gratis. ¿Necesitas más? Team o Business en la nube, o Enterprise: Calab en tu propio servidor.',
-    startHere: 'Empieza aquí',
+    popular: 'Popular',
     plans: {
       free: { name: 'Free', price: 'Gratis', note: 'Hasta 50 miembros' },
       team: { name: 'Team', price: '$0.10', note: 'Hasta 100 miembros' },
@@ -337,7 +335,6 @@ const es: Dict = {
     cta: {
       web: 'Web',
       download: 'Descargar',
-      contact: 'Contactar',
       license: 'Condiciones de la licencia',
     },
     table: {
