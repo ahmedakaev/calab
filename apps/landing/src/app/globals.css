@@ -434,7 +434,13 @@ details[open] .chevron { transform: rotate(180deg); }
 .telephony-grid { display: grid; gap: 32px 24px; align-items: start; }
 .telephony-grid figcaption { margin-top: 12px; }
 @media (min-width: 1024px) { .telephony-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-.telephony-points { margin-top: 32px; }
+.telephony-points { margin-top: 24px; }
+/* Compact fact cards (telephony): icon + one line, 3 / 2 / 1 columns. */
+.fact-cards { display: grid; gap: 12px; list-style: none; }
+@media (min-width: 640px) { .fact-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .fact-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+.fact-card { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 14px 18px; border-radius: 16px; background: var(--color-card); font-size: 16px; line-height: 1.35; }
+.fact-card svg { flex-shrink: 0; color: var(--color-accent-text); }
 .check-list { display: grid; gap: 12px; list-style: none; font-size: 17px; line-height: 1.45; }
 .check-list li { display: flex; gap: 12px; }
 .check-list svg { flex-shrink: 0; margin-top: 4px; color: var(--color-accent-text); }

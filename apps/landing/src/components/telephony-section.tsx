@@ -1,7 +1,10 @@
-import { Bot, Check } from 'lucide-react';
+import { Bot, Hash, HardDrive, ListTree, Phone, PhoneForwarded, Users, type LucideIcon } from 'lucide-react';
 import { localePath, type Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
 import { Button, Card, nb, Section, SectionHeading, Shot } from './ui';
+
+/** One icon per fact, in the order of `telephony.points` (all languages): number, extensions, IVR, groups, transfer, recording. */
+const POINT_ICONS: LucideIcon[] = [Phone, Hash, ListTree, Users, PhoneForwarded, HardDrive];
 
 /** «Телефония» (§4.5): the live calls, the IVR and the groups, the bot block, six one-line facts, the bot block. Business and Enterprise. */
 export function TelephonySection({ locale }: { locale: Locale }) {
@@ -40,13 +43,16 @@ export function TelephonySection({ locale }: { locale: Locale }) {
           </div>
         </Card>
       </div>
-      <ul className="check-list check-list-2 telephony-points">
-        {p.points.map((point) => (
-          <li key={point}>
-            <Check aria-hidden="true" size={18} strokeWidth={2.25} />
-            {nb(point)}
-          </li>
-        ))}
+      <ul className="fact-cards telephony-points">
+        {p.points.map((point, i) => {
+          const Icon = POINT_ICONS[i] ?? Phone;
+          return (
+            <li key={point} className="fact-card">
+              <Icon aria-hidden="true" size={20} strokeWidth={1.9} />
+              <span>{nb(point)}</span>
+            </li>
+          );
+        })}
       </ul>
     </Section>
   );
