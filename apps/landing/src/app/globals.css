@@ -272,22 +272,24 @@ details[open] .chevron { transform: rotate(180deg); }
 }
 
 /* ---------- Hero ---------- */
-.hero { position: relative; isolation: isolate; padding: 28px 0 48px; }
-.hero .wrap { position: relative; z-index: 2; }
+/* Desktop: copy on the left (vertically centred, all of it on a 1280×720 first screen), the app window on the right
+   in perspective, bleeding past the page edge (the section clips it: no horizontal scroll); quiet scene pills below.
+   Below 1024: copy, the flat window (the phone crop), the pills. */
+.hero { position: relative; overflow-x: clip; padding: 28px 0 48px; }
 .living-title .glyph-slot { position: relative; display: inline-block; }
 .living-title .glyph-slot::before { content: attr(data-char); visibility: hidden; }
 .living-title [data-glyph] { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .living-word { display: inline-block; white-space: nowrap; }
-.hero-row { display: grid; gap: 24px; margin-top: 20px; }
-.hero-lead { margin-top: 0; max-width: 720px; }
-.hero-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.hero-layout { display: grid; gap: 36px; }
+.hero-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; min-width: 0; }
+.hero-copy .h1 { font-size: clamp(40px, 4.6vw, 68px); }
+.hero-lead { margin-top: 0; max-width: 620px; }
+.hero-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 4px; }
 .hero-buttons { display: flex; flex-wrap: wrap; gap: 12px; }
 .hero-platforms { font-size: 14px; color: #9a9aa2; }
-@media (max-width: 639px) { .hero { padding-top: 20px; } .hero-buttons .btn { flex: 1 1 auto; } }
-.scenes { margin-top: 36px; }
-/* Short laptop screens (1280×720, 1440×800): the window shrinks with the viewport height, so the first screen
-   shows the title, the lead, the buttons and the window's top. 112 px ≈ the header plus the hero's top padding. */
-.scenes-window { display: grid; max-width: min(1200px, calc((100svh - 112px) * 1.6)); margin-inline: auto; }
+@media (max-width: 639px) { .hero { padding-top: 20px; } .hero-actions { align-self: stretch; } .hero-buttons .btn { flex: 1 1 auto; } }
+.hero-stage { min-width: 0; }
+.scenes-window { display: grid; }
 .scene { grid-area: 1 / 1; opacity: 0; visibility: hidden; }
 .scene[data-active='true'] { opacity: 1; visibility: visible; }
 @media (prefers-reduced-motion: no-preference) {
@@ -295,13 +297,30 @@ details[open] .chevron { transform: rotate(180deg); }
   .scene[data-active='true'] { transition: opacity .25s ease-out, visibility 0s; }
 }
 .hero-shot { border-radius: 16px; }
-.scene-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
-.scene-caption { max-width: 720px; min-height: 1.5em; margin: 14px auto 0; text-align: center; font-size: 16px; line-height: 1.5; color: var(--color-text-secondary); }
+@media (min-width: 1024px) {
+  .hero { padding: 32px 0 40px; }
+  .hero-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 48px; row-gap: 28px; align-items: center;
+    min-height: min(calc(100svh - var(--header-h) - 64px), 720px); }
+  .hero-stage { perspective: 2000px; }
+  /* Bleeds 32 px past the viewport edge; leans away to the right, tilts a few degrees more towards the pointer. */
+  .scenes-window { width: calc(100% + (100vw - min(100vw, 1360px)) / 2 + var(--gutter) + 32px); transform-origin: 0 50%;
+    transform: rotateY(calc(-14deg + var(--tilt-y, 0deg))) rotateX(calc(4deg + var(--tilt-x, 0deg))); }
+  .scenes-window .hero-shot { box-shadow: 0 50px 100px -30px rgb(0 0 0 / .75), 0 20px 40px -20px rgb(0 0 0 / .5); }
+  .scene-nav { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .scenes-window { transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+}
+/* Scene pills: quiet (outline, muted, small) so the download buttons stay the loudest thing on the first screen. */
+.scene-nav { min-width: 0; }
+.scene-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.chip-quiet { height: 34px; gap: 6px; padding-inline: 12px; background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1); color: #8d8d95; font-size: 13px; }
+.chip-quiet:hover { color: #fff; }
+.chip-quiet[aria-selected='true'] { background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); color: #fff; }
+.scene-caption { max-width: 720px; min-height: 1.5em; margin: 10px auto 0; text-align: center; font-size: 14px; line-height: 1.5; color: var(--color-text-secondary); }
 @media (max-width: 639px) {
-  .scenes { margin-top: 32px; }
   .scene-chips { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-inline: calc(-1 * var(--gutter)); padding-inline: var(--gutter); scroll-padding-inline: var(--gutter); }
-  .scene-chips .chip { padding-inline: 14px; font-size: 14px; }
-  .scene-caption { font-size: 16px; min-height: 4.5em; text-align: left; }
+  .scene-caption { min-height: 4.5em; text-align: left; }
 }
 
 /* Live headline: one finite entrance; the weight follows the mouse (living-title.tsx). */

@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 
 const CJK = /[\u3000-\u9fff\uff00-\uffef]/;
+const CJK_CLOSING = /[\uff0c\u3002\u3001\uff01\uff1f\uff1a\uff1b\uff09\u300d\u300f\u300b\u3009]/;
 
 /** Words that wrap as wholes; CJK text breaks between characters, as it normally would. */
 function words(text: string): string[] {
@@ -9,7 +10,13 @@ function words(text: string): string[] {
   for (const w of text.split(/\s+/).filter(Boolean)) {
     // A dash stays with the word before it (never starts a line).
     if (/^[—–-]$/.test(w) && out.length) out[out.length - 1] = `${out.at(-1) ?? ''}\u00a0${w}`;
-    else out.push(...(CJK.test(w) ? Array.from(w) : [w]));
+    else if (CJK.test(w)) {
+      // CJK breaks between characters, but closing punctuation («，», «。»…) never starts a line.
+      for (const ch of Array.from(w)) {
+        if (CJK_CLOSING.test(ch) && out.length) out[out.length - 1] = `${out.at(-1) ?? ''}${ch}`;
+        else out.push(ch);
+      }
+    } else out.push(w);
   }
   // A one-letter word («в», «и», «с», «a») never ends a line: it travels with the next word.
   for (let i = out.length - 2; i >= 0; i--) {

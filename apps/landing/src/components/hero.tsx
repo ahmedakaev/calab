@@ -17,7 +17,10 @@ const ICONS: Record<HeroSceneKey, LucideIcon> = {
   phone: Phone,
 };
 
-/** Hero «одно окно — семь сцен» (§4.1): the live H1, the lead, two buttons and the real app window. */
+/**
+ * Hero «одно окно — семь сцен» (§4.1): the live H1, the lead, two buttons on the left; the real app window on the
+ * right, tilted in perspective and bleeding past the page edge (desktop); quiet scene pills underneath.
+ */
 export function Hero({ locale }: { locale: Locale }) {
   const t = getHome(locale);
   const h = t.hero;
@@ -27,29 +30,31 @@ export function Hero({ locale }: { locale: Locale }) {
     preload(`/fonts/source-serif-4-${serif}.woff2`, { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
     preload(`/fonts/source-serif-4-italic-${serif}.woff2`, { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
   }
-  // The window is capped by the viewport height too (.scenes-window), so short laptop screens see the CTAs and its top.
-  const sizes = '(min-width: 640px) min(1200px, calc(100vw - 64px), calc((100vh - 112px) * 1.6)), calc(100vw - 40px)';
+  // Desktop: the right column plus the bleed past the page edge (.hero-stage); below 1024 the full column.
+  const sizes = '(min-width: 1024px) 64vw, (min-width: 640px) calc(100vw - 64px), calc(100vw - 40px)';
   return (
     <section id="top" aria-labelledby="hero-title" className="hero">
       <Container>
-        <LivingTitle id="hero-title" text={h.title} accent={h.accent} />
-        <div className="hero-row">
-          <p className="lead hero-lead">{nb(h.lead)}</p>
-          <div className="hero-actions">
-            <div className="hero-buttons">
-              <Button href="#download">{h.download}</Button>
-              <Button href={APP_URL} variant="secondary">
-                {h.openWeb}
-              </Button>
-            </div>
-            <p className="hero-platforms">{h.platforms}</p>
-          </div>
-        </div>
         <SceneSwitcher
+          copy={
+            <>
+              <LivingTitle id="hero-title" text={h.title} accent={h.accent} />
+              <p className="lead hero-lead">{nb(h.lead)}</p>
+              <div className="hero-actions">
+                <div className="hero-buttons">
+                  <Button href="#download">{h.download}</Button>
+                  <Button href={APP_URL} variant="secondary">
+                    {h.openWeb}
+                  </Button>
+                </div>
+                <p className="hero-platforms">{h.platforms}</p>
+              </div>
+            </>
+          }
           label={h.scenesLabel}
           chips={h.scenes.map((s) => {
             const Icon = ICONS[s.key];
-            return { key: s.key, label: s.label, icon: <Icon aria-hidden="true" size={18} strokeWidth={1.9} /> };
+            return { key: s.key, label: s.label, icon: <Icon aria-hidden="true" size={15} strokeWidth={1.9} /> };
           })}
           captions={h.scenes.map((s) => nb(s.caption))}
           panels={h.scenes.map((s, i) => (
