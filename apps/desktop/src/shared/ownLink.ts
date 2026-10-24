@@ -23,6 +23,7 @@ const ROUTES: readonly RegExp[] = [
   new RegExp(`^/wiki/${ID}/?$`),
   new RegExp(`^/canvas/${ID}/?$`),
   new RegExp(`^/disk/${ID}/?$`),
+  /^\/plans\/?$/,
 ];
 
 function ownAppPath(href: string, serverUrl: string): string | null {
@@ -47,5 +48,15 @@ export function isOwnAppLink(href: string, serverUrl: string): boolean {
 /** `https://<server>/t/KEY?x` → `calab://t/KEY` (the deep-link channel into the renderer); null = not ours. */
 export function ownLinkToDeepLink(href: string, serverUrl: string): string | null {
   const p = ownAppPath(href, serverUrl);
-  return p ? `calab:/${p}` : null;
+  return p ? `calab:/${p}${p.startsWith('/plans') ? planQuery(href) : ''}` : null;
+}
+
+/** The `?plan=` of a plans link survives the hop into `calab://plans`; any other query is dropped. */
+function planQuery(href: string): string {
+  try {
+    const v = new URL(href.trim()).searchParams.get('plan');
+    return v && /^[A-Za-z]{1,16}$/.test(v) ? `?plan=${v}` : '';
+  } catch {
+    return '';
+  }
 }

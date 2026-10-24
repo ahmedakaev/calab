@@ -475,6 +475,8 @@ function takeDeepLink(): Promise<string | null> {
   // A Disk item (CBF-20): /disk/<item id>.
   const disk = /^\/disk\/([0-9a-fA-F-]{36})\/?$/.exec(location.pathname);
   if (disk?.[1]) return Promise.resolve(`${location.origin}/disk/${disk[1]}`);
+  // The landing's «Купить» (docs/08): /plans?plan=team|business — the query is part of the link.
+  if (/^\/plans\/?$/.test(location.pathname)) return Promise.resolve(`${location.origin}/plans${location.search}`);
   const m = /^\/(join|r|dm|e|b|t)\/([A-Za-z0-9_-]{4,64})\/?$/.exec(location.pathname);
   if (!m?.[1] || !m[2]) return Promise.resolve(null);
   return Promise.resolve(`${location.origin}/${m[1]}/${m[2]}`);

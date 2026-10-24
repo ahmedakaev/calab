@@ -3,6 +3,7 @@ import type { CheckoutWindowOutcome } from '../../shared/ipc';
 import { restAdminApi, restOwnerApi, type AdminBillingApi, type BillingAdapters, type OwnerBillingApi } from '../lib/billing/api';
 import type { CheckoutPlace } from '../lib/billing/checkout';
 import { billingErrorText, billingNotFound, billingUnavailable } from '../lib/billing/errors';
+import { takePlanAfterCreate } from '../lib/billing/planLink';
 import { forSale } from '../lib/billing/plans';
 import type { FixPlace } from '../lib/billing/violations';
 import { openSection } from '../features/shell/sectionNav';
@@ -159,6 +160,8 @@ export function openFixPlace(workspaceId: string, place: Exclude<FixPlace, null>
  * is already open; a 501 / 404 / error, or another dialog opened meanwhile, shows nothing.
  */
 export async function offerPlansAfterCreate(workspaceId: string): Promise<void> {
+  // A /plans?plan= link started the creation: its plan is marked in this dialog.
+  const linked = takePlanAfterCreate();
   // A new workspace has no account: only a self-serve server (READY.billing_self_serve) has a plan
   // to offer — with billing off no request at all.
   if (!billingPaymentsAllowed() || !(useSession.getState().billingSelfServe || MOCK)) return;
@@ -167,7 +170,7 @@ export async function offerPlansAfterCreate(workspaceId: string): Promise<void> 
   if (!data || !(data.selfServe || data.summary)) return;
   if (!forSale(data.offers, Plan.TEAM) && !forSale(data.offers, Plan.ENTERPRISE)) return;
   if (useUi.getState().dialog !== null) return;
-  useUi.getState().openDialog({ kind: 'billing-plans', workspaceId, welcome: true });
+  useUi.getState().openDialog({ kind: 'billing-plans', workspaceId, welcome: true, ...(linked ? { plan: linked } : {}) });
 }
 
 const checkoutReturnListeners = new Set<(outcome: CheckoutWindowOutcome) => void>();

@@ -4,6 +4,7 @@ import { setPendingInvite } from '../stores/invite';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
 import { parseMailLink } from '../features/mail/mailLink';
+import { parsePlansLink } from '../lib/billing/planLink';
 import { wikiPageIdOf } from '@calaba/wiki-doc/links';
 
 /**
@@ -218,7 +219,7 @@ export function openOwnLink(href: string): boolean {
   const origin = shareOrigin('');
   if (!origin || !href.startsWith(`${origin}/`)) return false;
   // Every in-app route (CBF-63), the same set as shared/ownLink.ts in the main process.
-  const known = parseMessageLink(href) ?? parseBoardLink(href) ?? parseWikiLink(href) ?? parseCanvasLink(href) ?? parseDiskLink(href) ?? parseEventLink(href) ?? parseDmLink(href) ?? parseRoomInviteCode(href);
+  const known = parseMessageLink(href) ?? parseBoardLink(href) ?? parseWikiLink(href) ?? parseCanvasLink(href) ?? parseDiskLink(href) ?? parseEventLink(href) ?? parseDmLink(href) ?? parseRoomInviteCode(href) ?? parsePlansLink(href);
   if (!known && !parseInviteCode(href)) return false;
   handleDeepLink(href);
   return true;
@@ -230,6 +231,12 @@ export function handleDeepLink(url: string): void {
   const mail = parseMailLink(url);
   if (mail) {
     void import('../features/mail/links').then((m) => m.openMailLink(mail)).catch(() => undefined);
+    return;
+  }
+  const plans = parsePlansLink(url);
+  if (plans) {
+    // The landing's «Купить» (/plans?plan=team|business); lazy, like the other links.
+    void import('./plansLink').then((m) => m.openPlansLink(plans.plan)).catch(() => undefined);
     return;
   }
   const msg = parseMessageLink(url);

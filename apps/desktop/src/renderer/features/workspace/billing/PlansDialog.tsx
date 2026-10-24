@@ -28,6 +28,7 @@ import { currencyOf, offeredMethods, requestId, topupLimits } from '../../../lib
 import { formatMinor, formatMoney, minorOf } from '../../../lib/billing/money';
 import {
   IDENTITY_FEATURES,
+  PLAN_LINK_TIER,
   TIERS,
   clampSeats,
   currentTier,
@@ -40,6 +41,7 @@ import {
   seatsRange,
   seatsTopup,
   type IdentityFeature,
+  type PlanLink,
   type PlanStep,
   type PlanTier,
   type ScreenPhase,
@@ -88,11 +90,14 @@ function openCabinet(workspaceId: string): void {
 export function PlansDialog({
   workspaceId,
   welcome,
+  preselect,
   inSettings = false,
   onClose,
 }: {
   workspaceId: string;
   welcome: boolean;
+  /** The plan a `/plans?plan=` link names: its card is marked (nothing is chosen for the person). */
+  preselect?: PlanLink;
   /** Opened by «Сменить тариф» in settings → «Тариф» (owner, 10.10): the cabinet is right behind it. */
   inSettings?: boolean;
   onClose: () => void;
@@ -183,6 +188,7 @@ export function PlansDialog({
         contact={contactOnly(data)}
         phase={phase}
         state={data.status?.state ?? state}
+        marked={preselect ? PLAN_LINK_TIER[preselect] : null}
         onChoose={(step) => {
           if (step.kind === 'pay') setChosen({ plan: step.plan, purpose: step.purpose });
           else if (step.kind === 'stop') setStopping(true);
@@ -351,6 +357,7 @@ function PlanGrid({
   contact,
   phase,
   state,
+  marked,
   onChoose,
 }: {
   workspaceId: string;
@@ -364,6 +371,8 @@ function PlanGrid({
   contact: boolean;
   phase: ScreenPhase;
   state: BillingState;
+  /** The tier a deep link named (null: none). */
+  marked: PlanTier | null;
   onChoose: (s: PlanStep) => void;
 }): ReactNode {
   const billable = useWorkspaces((s) => billableOf(s.byId[workspaceId]?.members));
@@ -420,6 +429,7 @@ function PlanGrid({
             tier={tier}
             offer={offerOf(offers, tier)}
             current={tier === current}
+            marked={tier === marked}
             step={planStep(phase, accountPlan, tier)}
             people={people}
             payments={payments && forSale(offers, tier)}
@@ -439,6 +449,7 @@ function PlanCard({
   tier,
   offer,
   current,
+  marked,
   step,
   people,
   payments,
@@ -449,6 +460,8 @@ function PlanCard({
   tier: PlanTier;
   offer: BillingPlanOffer | undefined;
   current: boolean;
+  /** Named by the deep link: an accent ring (and first on a phone). */
+  marked: boolean;
   step: PlanStep;
   people: number;
   payments: boolean;
@@ -519,9 +532,10 @@ function PlanCard({
       role="listitem"
       aria-current={current ? 'true' : undefined}
       data-plan={Plan[tier]}
+      data-marked={marked ? 'true' : undefined}
       data-testid="plan-card"
       // Phone: the current plan first and Free (a step down) last, so «Выбрать …» of the next paid plan is on the first screen.
-      className={cx('flex flex-col gap-3 rounded-[var(--radius-card)] border bg-[var(--color-card)] p-4', current ? 'border-[var(--color-focus)] mobile:order-first' : 'border-line', !paid && !current && 'mobile:order-last')}
+      className={cx('flex flex-col gap-3 rounded-[var(--radius-card)] border bg-[var(--color-card)] p-4', current ? 'border-[var(--color-focus)] mobile:order-first' : 'border-line', marked && 'border-[var(--color-focus)] ring-2 ring-inset ring-[var(--color-focus)] mobile:order-first', !paid && !current && 'mobile:order-last')}
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-headline font-semibold">{t(PLAN_LABEL[tier])}</h3>

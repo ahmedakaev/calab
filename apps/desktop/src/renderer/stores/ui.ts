@@ -12,6 +12,7 @@ import { leaveMail, useMailUi } from './mailUi';
 import { leaveDisk, useDiskUi } from './diskUi';
 import { leaveCanvas, useCanvasUi } from './canvasUi';
 import { leaveWiki, useWikiUi } from './wikiUi';
+import type { PlanLink } from '../lib/billing/plans';
 import { chatFollow, followTarget, type FollowEvent } from '../lib/chatFollow';
 
 export type Dialog =
@@ -70,9 +71,10 @@ export type Dialog =
   | { kind: 'web-app'; workspaceId: string; appId?: string }
   /**
    * «Тариф и оплата» (ADR-0080): the plans side by side and the one pay path; `welcome` — the step
-   * right after creating the workspace («Начать бесплатно» first).
+   * right after creating the workspace («Начать бесплатно» first). `plan`: the plan a `/plans?plan=` link
+   * names, marked in the comparison.
    */
-  | { kind: 'billing-plans'; workspaceId: string; welcome?: boolean };
+  | { kind: 'billing-plans'; workspaceId: string; welcome?: boolean; plan?: PlanLink };
 
 /** Prefill of the meeting dialog (features/calendar/EventDialog.tsx). */
 export interface EventDraftInit {

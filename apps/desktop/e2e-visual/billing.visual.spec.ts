@@ -188,6 +188,11 @@ test('billing-free: badge, plan choice, pay step', async ({ page }) => {
   await tap(page.getByTestId('plans-choose-ENTERPRISE'));
   await expect(page.getByTestId('plans-pay-step')).toBeVisible();
   await checkpoint(s, 'billing-pay-business');
+  // The landing's «Купить»: /plans?plan=team opens the plans dialog with Team marked, then the address is the app's.
+  await page.goto(`${mock.url}/plans?plan=team&visual-test&billing=selfServe`);
+  await expect(page.locator('[data-testid="plan-card"][data-marked="true"]')).toHaveAttribute('data-plan', 'TEAM');
+  expect(new URL(page.url()).pathname).toBe('/');
+  await checkpoint(s, 'billing-plans-deeplink-team');
 });
 
 // ---------------------------------------------------------------- Team: badge, plan dialog, cabinet, top-up, quotes

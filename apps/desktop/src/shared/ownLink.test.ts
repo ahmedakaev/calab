@@ -4,6 +4,15 @@ import { isOwnAppLink, ownLinkToDeepLink } from './ownLink';
 const S = 'https://app.test';
 const ID = '0190a0b0-0000-7000-80c1-0000000000d1';
 
+describe('plans link (the landing «Купить»)', () => {
+  it('is an own route and keeps its plan on the way to calab://', () => {
+    expect(isOwnAppLink(`${S}/plans?plan=team`, S)).toBe(true);
+    expect(ownLinkToDeepLink(`${S}/plans?plan=business`, S)).toBe('calab://plans?plan=business');
+    expect(ownLinkToDeepLink(`${S}/plans?plan=x%20y&z=1`, S)).toBe('calab://plans');
+    expect(isOwnAppLink(`${S}/plansx`, S)).toBe(false);
+  });
+});
+
 describe('own app links (CBF-63)', () => {
   it('maps known routes of the server host to calab://', () => {
     expect(ownLinkToDeepLink(`${S}/t/CBF-63`, S)).toBe('calab://t/CBF-63');

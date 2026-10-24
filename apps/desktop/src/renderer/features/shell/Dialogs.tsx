@@ -146,7 +146,7 @@ export function Dialogs(): ReactNode {
         node = <AppDialog key={d.appId ?? 'new'} workspaceId={d.workspaceId} appId={d.appId} onClose={close} />;
         break;
       case 'billing-plans':
-        node = <PlansDialog key={d.workspaceId} workspaceId={d.workspaceId} welcome={d.welcome ?? false} onClose={close} />;
+        node = <PlansDialog key={d.workspaceId} workspaceId={d.workspaceId} welcome={d.welcome ?? false} {...(d.plan ? { preselect: d.plan } : {})} onClose={close} />;
         break;
       case 'image': {
         const inChat = d.inChat;
