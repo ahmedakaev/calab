@@ -1,13 +1,41 @@
-// Screenshot sizes in CSS px (= the crops of scripts/assets.mjs; the @2x file is twice as large).
-// Files: public/screens/<lang>/<name>.webp and <name>@2x.webp, the app and its team in that language.
+// Screenshot sizes in CSS px (= the crops of scripts/assets.mjs, which `--check`s them against this table; the @2x file is
+// twice as large). Files: public/screens/<lang>/<name>.webp and <name>@2x.webp, the app and its team in that language;
+// a scene wider than 720 px also has <name>-720.webp, and one with `focus` (≤ 720 px, the main panel without the rail and
+// the sidebar, for phones) <name>-focus.webp and <name>-focus@2x.webp.
 export const SCREENS = {
-  voice: { width: 1440, height: 900 },
+  voice: { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  // landing v6
+  'chat-full': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  'chat-focus': { width: 860, height: 538 },
+  'kanban-full': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  'calendar-week': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  'phone-call': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  'phone-call-panel': { width: 860, height: 538 },
+  'telephony-ivr': { width: 698, height: 330 },
+  'telephony-groups': { width: 698, height: 330 },
+  'telephony-call': { width: 698, height: 638 },
+  roles: { width: 698, height: 638 },
+  'temp-room': { width: 480, height: 260 },
+  'recording-focus': { width: 860, height: 538 },
+  'recording-transcript': { width: 860, height: 230 },
+  aitask: { width: 576, height: 440 },
+  rail: { width: 72, height: 560 },
+  'story-message': { width: 860, height: 420 },
+  'story-task': { width: 860, height: 860 },
+  'story-meeting': { width: 320, height: 560 },
+  'story-wiki': { width: 720, height: 520 },
+  'story-canvas': { width: 860, height: 208 },
+  'phone-canvas': { width: 390, height: 844 },
+  canvas: { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  'canvas-panel': { width: 860, height: 538 },
+  'wiki-full': { width: 1440, height: 900, focus: { width: 720, height: 560 } },
+  'wiki-focus': { width: 860, height: 538 },
   chat: { width: 1040, height: 762 },
   call: { width: 1440, height: 870 },
   calendar: { width: 1110, height: 870 },
   findtime: { width: 1110, height: 870 },
   kanban: { width: 1110, height: 600 },
-  timeline: { width: 1110, height: 870 },
+  timeline: { width: 1110, height: 870, focus: { width: 720, height: 560 } },
   task: { width: 510, height: 870 },
   guest: { width: 600, height: 460 },
   sipdial: { width: 1110, height: 300 },
@@ -25,7 +53,7 @@ export const SCREENS = {
   stickerpicker: { width: 1110, height: 870 },
   voicelist: { width: 340, height: 440 },
   // Landing 3.3 (e2e-marketing/landing-v5.spec.ts, landing-mail.spec.ts)
-  mail: { width: 1440, height: 758 },
+  mail: { width: 1440, height: 758, focus: { width: 381, height: 560 } },
   taskhistory: { width: 1110, height: 870 },
   notify: { width: 920, height: 640 },
   notifyrelay: { width: 920, height: 640 },
@@ -39,4 +67,14 @@ export const SCREENS = {
   'phone-board': { width: 390, height: 844 },
 } as const;
 
+/** The screens that have a phone crop (<name>-focus.webp). */
+export type FocusScreenName = {
+  [K in keyof typeof SCREENS]: (typeof SCREENS)[K] extends { focus: unknown } ? K : never;
+}[keyof typeof SCREENS];
+
 export type ScreenName = keyof typeof SCREENS;
+
+/** The phone crop of a screen that has one (`<name>-focus.webp`), or undefined. */
+export function focusOf(name: ScreenName): { width: number; height: number } | undefined {
+  return (SCREENS[name] as { focus?: { width: number; height: number } }).focus;
+}

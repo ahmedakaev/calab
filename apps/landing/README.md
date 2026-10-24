@@ -130,7 +130,35 @@ Every scene is captured per language with that language's team (docs/09 #139).
    `src/lib/screens.ts`), writes `public/screens/<lang>/<name>@2x.webp`, `<name>.webp` (1x) and `<name>-720.webp`
    (phones), each ≤ 300 KB, and `public/og/<lang>.png` (1200×630). `node scripts/assets.mjs --only=sipdial,webapps` regenerates
    just those images (no other raw captures needed; OpenGraph is redrawn only when `voice` is listed). The READMEs (`README*.md`) use the same files.
-3. Rebuild and commit `public/screens` and `public/og`.
+3. Landing v6 (docs/plans/landing-v6.md §5): `e2e-marketing/landing-v6.spec.ts` (data `copy4.ts`, shared seeds `v6-kit.ts`,
+   `v6-canvas.ts`, `v6-seeds.ts`) — one day of the «Нордлайт» team: a request in the chat → the task APP-7 → the review
+   → the wiki page → the retro canvas → a phone call, plus the telephony, role, recording and AI windows.
+   ```sh
+   livekit-server --dev            # the call scenes (voice, canvas, phone-call) need the dev LiveKit
+   cd apps/desktop && CALABA_VISUAL_WORKERS=1 MOCK_LIVEKIT_ROOM_PREFIX=landing_ \
+     pnpm exec playwright test --config playwright.marketing.config.ts landing-v6
+   ```
+   `CALABA_LANDING_LOCALES=ru,en` narrows the languages, `CALABA_V6_SCENES=chat-full,chat-full-focus` the captures (a
+   scene with a phone crop has a second capture, `<scene>-focus`, taken in a window as wide as the panel so the crop follows
+   the panel's border, never the middle of a message), `CALABA_V6_TIMEOUT` the per-test limit in ms.
+   Scenes (name — crop in CSS px, see `CROPS` in `scripts/assets.mjs`): `voice`, `chat-full`, `kanban-full`, `calendar-week`,
+   `canvas`, `phone-call`, `wiki-full`, `timeline`, `mail` — 1440×900 (`timeline` 1110×870, `mail` 1440×758) with a phone
+   `focus` (720×560, `mail` 381×560); catalogue tiles ≤ 860 wide: `chat-focus`, `wiki-focus`, `canvas-panel`,
+   `phone-call-panel`, `recording-focus` (860×538), `recording-transcript`, `story-*`; windows: `telephony-ivr`,
+   `telephony-groups`, `telephony-call`, `roles` (the settings pane), `temp-room`, `aitask`; `rail`, `phone-canvas`.
+   The chat scenes show the pinned request, a reply with a quote, a voice note, a sticker and the APP-7 card; the telephony
+   frames run on the mock's exchange renamed in `v6-seeds.ts`; the retro canvas's vote is finished and its 04:32 timer paused
+   (a running one counts from the server clock, which the frozen page clock cannot follow).
+4. `pnpm -F @calaba/landing assets` — `scripts/assets.mjs` crops (CSS px at the top of the script, equal to
+   `src/lib/screens.ts`), writes `public/screens/<lang>/<name>@2x.webp`, `<name>.webp` (1x), `<name>-720.webp`
+   (phones, scenes wider than 720) and, for a crop with `focus`, `<name>-focus@2x.webp` / `<name>-focus.webp`, each ≤ 300 KB,
+   and `public/og/<lang>.png` (1200×630). `focus.own` means the rectangle is cut from the `<scene>-focus-<locale>@2x.png`
+   capture, otherwise from the scene's own crop (a scene without a raw capture keeps its committed files and only gets its
+   focus from the committed @2x). `--only=sipdial,webapps` regenerates just those, `--lang=ru` one language,
+   `--strict` fails on a missing capture. The READMEs (`README*.md`) use the same files.
+5. `node scripts/assets.mjs --check` (no captures needed) — every scene of `src/lib/screens.ts` has its files in all four
+   languages with the sizes the table says, none over 300 KB, `CROPS` equals `SCREENS`.
+6. Rebuild and commit `public/screens` and `public/og`.
 
 ## TODO
 
