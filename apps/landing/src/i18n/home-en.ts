@@ -13,7 +13,7 @@ export const en: Home = {
     scenes: [
       { key: 'voice', label: 'Talk & streams', caption: 'Step into a room and you already hear your team. Screen share, cameras, a pointer over the stream.' },
       { key: 'chat', label: 'Familiar chats', caption: 'Replies, reactions, voice messages, stickers. Turn any message into a task in one action.' },
-      { key: 'tasks', label: 'Tasks', caption: 'Boards with priorities, due dates, assignees and a change history.' },
+      { key: 'tasks', label: 'Tasks & boards', caption: 'Boards with priorities, due dates, assignees and a change history.' },
       { key: 'calendar', label: 'Calendar', caption: 'Meetings with a room link and a common time slot found from your colleagues’ calendars.' },
       { key: 'wiki', label: 'Wiki', caption: 'Pages the team edits together, in real time.' },
       { key: 'canvas', label: 'Canvas', caption: 'An online whiteboard for retros and diagrams: stickies, shapes, arrows and voting, right in the conversation.' },

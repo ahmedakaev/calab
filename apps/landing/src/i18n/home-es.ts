@@ -13,7 +13,7 @@ export const es: Home = {
     scenes: [
       { key: 'voice', label: 'Voz y streams', caption: 'Entras en la sala y ya oyes a tu equipo. Pantalla, cámaras y un puntero sobre la transmisión.' },
       { key: 'chat', label: 'Chats de siempre', caption: 'Respuestas, reacciones, mensajes de voz y stickers. Cualquier mensaje se convierte en tarea con una acción.' },
-      { key: 'tasks', label: 'Tareas', caption: 'Tableros con prioridades, plazos, responsables e historial de cambios.' },
+      { key: 'tasks', label: 'Tareas y tableros', caption: 'Tableros con prioridades, plazos, responsables e historial de cambios.' },
       { key: 'calendar', label: 'Calendario', caption: 'Reuniones con enlace a la sala y un hueco común según la agenda de tus compañeros.' },
       { key: 'wiki', label: 'Wiki', caption: 'Páginas que el equipo edita junto, en tiempo real.' },
       { key: 'canvas', label: 'Lienzo', caption: 'Una pizarra en línea para retros y esquemas: notas, formas, flechas y votación, en plena conversación.' },
