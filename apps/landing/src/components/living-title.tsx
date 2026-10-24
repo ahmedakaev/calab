@@ -20,17 +20,20 @@ function words(text: string): string[] {
 }
 
 /**
- * The live headline (CalabCondensed 900): each glyph lightens as the mouse comes near. Work happens only on
+ * The live headline (Source Serif 4, `accent` — the tail in the italic accent): each glyph lightens from the
+ * title's own weight down to 200 as the mouse comes near. Work happens only on
  * pointer moves over a visible title (one rAF per move, no idle loop); touch, reduced motion — a static title.
- * Every glyph reserves its 900-weight width, so the line never reflows while the weight changes.
+ * Every glyph reserves its full-weight width, so the line never reflows while the weight changes.
  */
-export function LivingTitle({ text, id, className }: { text: string; id: string; className?: string }) {
+export function LivingTitle({ text, accent, id, className }: { text: string; accent?: string | undefined; id: string; className?: string }) {
   const root = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const node = root.current;
     if (!node) return;
     const media = window.matchMedia('(pointer: fine) and (prefers-reduced-motion: no-preference)');
-    const glyphs = [...node.querySelectorAll<HTMLElement>('[data-glyph]')].map((el) => ({ el, x: 0, y: 0, value: 900 }));
+    const base = Number.parseFloat(getComputedStyle(node).fontWeight) || 400;
+    const range = Math.max(0, base - 200);
+    const glyphs = [...node.querySelectorAll<HTMLElement>('[data-glyph]')].map((el) => ({ el, x: 0, y: 0, value: base }));
     let frame = 0;
     let disposed = false;
     let px = 0;
@@ -51,7 +54,7 @@ export function LivingTitle({ text, id, className }: { text: string; id: string;
       measure();
       glyphs.forEach((g) => {
         const strength = Math.max(0, 1 - Math.hypot(px - g.x, py - g.y) / 400);
-        const weight = 900 - 800 * strength;
+        const weight = base - range * strength;
         if (Math.abs(weight - g.value) < 0.5) return;
         g.value = weight;
         g.el.style.fontVariationSettings = `"wght" ${weight.toFixed(1)}`;
@@ -67,7 +70,7 @@ export function LivingTitle({ text, id, className }: { text: string; id: string;
       cancelAnimationFrame(frame);
       frame = 0;
       glyphs.forEach((g) => {
-        g.value = 900;
+        g.value = base;
         g.el.style.removeProperty('font-variation-settings');
       });
     };
@@ -82,10 +85,15 @@ export function LivingTitle({ text, id, className }: { text: string; id: string;
     };
   }, []);
   let n = 0;
+  const tail = accent && text.endsWith(accent) ? accent : '';
+  const parts = [
+    ...words(text.slice(0, text.length - tail.length)).map((word) => ({ word, accent: false })),
+    ...(tail ? words(tail).map((word) => ({ word, accent: true })) : []),
+  ];
   return (
     <h1 ref={root} id={id} className={`h1 living-title ${className ?? ''}`} aria-label={text}>
-      {words(text).map((word, w) => (
-        <span key={w} aria-hidden="true">
+      {parts.map(({ word, accent: isAccent }, w) => (
+        <span key={w} aria-hidden="true" className={isAccent ? 'accent' : undefined}>
           <span className="living-word">
             {Array.from(word).map((char, i) => (
               <span className="glyph-slot" data-char={char} key={i} style={{ animationDelay: `${0.1 + n++ * 0.018}s` }}>

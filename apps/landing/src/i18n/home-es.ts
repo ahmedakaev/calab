@@ -4,6 +4,7 @@ export const es: Home = {
   nav: { features: 'Funciones', telephony: 'Telefonía', developers: 'Desarrolladores', pricing: 'Precios', download: 'Descargar', openWeb: 'Abrir en el navegador' },
   hero: {
     title: 'Todo el trabajo del equipo, en una sola ventana',
+    accent: 'en una sola ventana',
     lead: 'Salas de voz, chat, reuniones, tareas, wiki, lienzo, archivos, correo y llamadas telefónicas, todo conectado, en la nube o en tu propio servidor.',
     download: 'Descargar',
     openWeb: 'Abrir en el navegador',

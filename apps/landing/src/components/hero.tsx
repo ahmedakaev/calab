@@ -22,13 +22,18 @@ const ICONS: Record<HeroSceneKey, LucideIcon> = {
 export function Hero({ locale }: { locale: Locale }) {
   const t = getHome(locale);
   const h = t.hero;
-  // The H1 face only (subset, ~90 KB): without it the title reflows on swap (CLS). The serif text swaps in place.
-  preload('/fonts/roboto-condensed-variable.woff2', { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
-  const sizes = '(min-width: 1360px) 1200px, (min-width: 640px) calc(100vw - 64px), calc(100vw - 40px)';
+  // The H1 face for the page's script (~50 KB, CJK uses the system face): without it the title reflows on swap.
+  const serif = { ru: 'cyrillic', en: 'latin', es: 'latin', zh: null }[locale];
+  if (serif) {
+    preload(`/fonts/source-serif-4-${serif}.woff2`, { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
+    preload(`/fonts/source-serif-4-italic-${serif}.woff2`, { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
+  }
+  // The window is capped by the viewport height too (.scenes-window), so short laptop screens see the CTAs and its top.
+  const sizes = '(min-width: 640px) min(1200px, calc(100vw - 64px), calc((100vh - 112px) * 1.6)), calc(100vw - 40px)';
   return (
     <section id="top" aria-labelledby="hero-title" className="hero">
       <Container>
-        <LivingTitle id="hero-title" text={h.title} />
+        <LivingTitle id="hero-title" text={h.title} accent={h.accent} />
         <div className="hero-row">
           <p className="lead hero-lead">{nb(h.lead)}</p>
           <div className="hero-actions">

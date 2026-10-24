@@ -4,6 +4,7 @@ export const en: Home = {
   nav: { features: 'Features', telephony: 'Telephony', developers: 'Developers', pricing: 'Pricing', download: 'Download', openWeb: 'Open in browser' },
   hero: {
     title: 'Your team’s whole workday in one window',
+    accent: 'in one window',
     lead: 'Voice rooms, chat, meetings, tasks, wiki, canvas, files, mail and phone calls — connected to each other, in the cloud or on your own server.',
     download: 'Download',
     openWeb: 'Open in browser',

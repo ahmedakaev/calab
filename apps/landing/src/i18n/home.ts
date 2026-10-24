@@ -55,6 +55,8 @@ export type Home = {
   nav: { features: string; telephony: string; developers: string; pricing: string; download: string; openWeb: string };
   hero: {
     title: string;
+    /** The tail of the title set in the italic accent (chatdeck-style); must end the title. */
+    accent: string;
     lead: string;
     download: string;
     openWeb: string;
@@ -138,6 +140,7 @@ export const ru: Home = {
   nav: { features: 'Возможности', telephony: 'Телефония', developers: 'Разработчикам', pricing: 'Тарифы', download: 'Скачать', openWeb: 'Открыть в браузере' },
   hero: {
     title: 'Вся работа команды — в одном окне',
+    accent: 'в одном окне',
     lead: 'Голосовые комнаты, чат, встречи, задачи, вики, холст, диск, почта и телефония. Всё связано между собой и работает в облаке или на вашем сервере.',
     download: 'Скачать',
     openWeb: 'Открыть в браузере',

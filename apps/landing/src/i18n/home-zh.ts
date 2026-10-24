@@ -4,6 +4,7 @@ export const zh: Home = {
   nav: { features: '功能', telephony: '电话', developers: '开发者', pricing: '价格', download: '下载', openWeb: '在浏览器中打开' },
   hero: {
     title: '团队的全部工作，一个窗口搞定',
+    accent: '一个窗口搞定',
     lead: '语音房间、聊天、会议、任务、维基、画布、网盘、邮件和电话，彼此打通，可用云端，也可部署在自己的服务器上。',
     download: '下载',
     openWeb: '在浏览器中打开',
