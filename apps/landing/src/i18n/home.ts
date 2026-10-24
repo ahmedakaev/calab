@@ -21,7 +21,7 @@ export type SceneName =
   // catalogue tiles (≤ 860 px wide, about 16:10: cut out of the scenes, scripts/assets.mjs `from`)
   | 'voice-panel' | 'gallery' | 'chat-focus' | 'phone-call-panel' | 'temp-room'
   | 'kanban-panel' | 'taskhistory-panel' | 'timeline-panel' | 'findtime-panel' | 'wiki-focus' | 'canvas-panel' | 'disk-panel' | 'mail-panel'
-  | 'search-panel' | 'notifyrelay-panel' | 'roles' | 'webapps-panel' | 'aitask' | 'bot-card'
+  | 'search' | 'notifyrelay-panel' | 'roles' | 'webapps-panel' | 'aitask' | 'bot-card'
   // telephony, AI, phones
   | 'telephony-ivr' | 'telephony-groups' | 'telephony-call' | 'recording-transcript' | 'phone-canvas' | 'phone-rooms' | 'phone-voice';
 
@@ -210,9 +210,9 @@ export const ru: Home = {
         key: 'order',
         title: 'Порядок и тишина',
         tiles: [
-          { shot: 'search-panel', title: 'Поиск ⌘K', text: 'Сообщения, задачи, комментарии, встречи, файлы, заметки и расшифровки — одним запросом.', anchor: 'search' },
+          { shot: 'search', title: 'Поиск ⌘K', text: 'Сообщения, задачи, комментарии, встречи, файлы, заметки и расшифровки — одним запросом.', anchor: 'search' },
           { shot: 'notifyrelay-panel', title: 'Уведомления под контролем', text: 'Уровень для каждой комнаты, «Не беспокоить», триггеры задач и пересылка своему боту.', anchor: 'notifications' },
-          { shot: 'roles', title: 'Роли и закрытые комнаты', text: 'Права по ролям и по комнатам. Закрытая комната не видна тем, кого в неё не пустили.', anchor: 'roles' },
+          { shot: 'roles', title: 'Роли и закрытые комнаты', text: 'Роли с названием и цветом, упоминание всей роли через @. Права роли — для пространства и для каждой комнаты, закрытую комнату видят только приглашённые.', anchor: 'roles' },
           { shot: 'webapps-panel', title: 'Веб-приложения в окне', text: 'CRM, панель продаж или вики открываются внутри Calab, пока звонок продолжается.', anchor: 'webapps' },
         ],
       },
@@ -361,9 +361,9 @@ export const ru: Home = {
     'canvas-panel': 'Холст «Ретро спринта 12»: стикеры трёх цветов, стрелки, голоса, таймер и курсор коллеги',
     'disk-panel': 'Диск плитками: папки (одна закрытая), файлы с превью и занятое место',
     'mail-panel': 'Открытое письмо «Договор на внедрение Calab — финальная версия» с двумя вложениями',
-    'search-panel': 'Окно поиска ⌘K: по запросу найдены заметка, комната и сообщения',
+    'search': 'Окно поиска ⌘K: по запросу найдены заметки, комнаты, сообщения и задачи',
     'notifyrelay-panel': 'Настройки уведомлений о задачах: переключатели по событиям и блок «Передавать боту»',
-    'roles': 'Настройки роли «Поддержка»: название, цвет, упоминание и права пространства',
+    'roles': 'Настройки роли «Поддержка»: название, цвет и упоминание роли через @',
     'webapps-panel': 'Панель продаж, открытая внутри Calab из значка в рейле: выручка, сделки и график по неделям',
     'aitask': 'Окно «Умная задача»: описание задачи и два прикреплённых файла',
     'bot-card': 'Сводка бота «Продажи за вчера» с кнопками «Открыть отчёт» и «Напомнить в 18:00»',

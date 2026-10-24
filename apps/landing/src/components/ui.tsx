@@ -180,7 +180,12 @@ export function Shot({
   const base = `/screens/${LOCALE_INFO[locale].lang}/${scene}`;
   const focus = focusOf(scene);
   const srcSet = `${width > 720 ? `${base}-720.webp 720w, ` : ''}${base}.webp ${width}w, ${base}@2x.webp ${width * 2}w`;
-  if (priority) preload(`${base}.webp`, { as: 'image', imageSrcSet: srcSet, imageSizes: sizes, fetchPriority: 'high' });
+  const focusSrcSet = focus && `${base}-focus.webp ${focus.width}w, ${base}-focus@2x.webp ${focus.width * 2}w`;
+  if (priority) {
+    // One preload per <picture> source, each limited to its media: a phone fetches only the focus crop it shows.
+    preload(`${base}.webp`, { as: 'image', imageSrcSet: srcSet, imageSizes: sizes, fetchPriority: 'high', ...(focus ? { media: '(min-width: 640px)' } : {}) });
+    if (focusSrcSet) preload(`${base}-focus.webp`, { as: 'image', imageSrcSet: focusSrcSet, imageSizes: 'calc(100vw - 40px)', fetchPriority: 'high', media: '(max-width: 639px)' });
+  }
   const style = { '--ar': `${width} / ${height}`, ...(focus ? { '--ar-sm': `${focus.width} / ${focus.height}` } : {}) } as CSSProperties;
   return (
     <div className={cx('shot', phone && 'shot-phone', focus && 'shot-has-focus', className)} style={style}>
@@ -188,7 +193,7 @@ export function Shot({
         {focus && (
           <source
             media="(max-width: 639px)"
-            srcSet={`${base}-focus.webp ${focus.width}w, ${base}-focus@2x.webp ${focus.width * 2}w`}
+            srcSet={focusSrcSet || undefined}
             sizes="calc(100vw - 40px)"
             width={focus.width}
             height={focus.height}

@@ -593,3 +593,8 @@ details[open] .chevron { transform: rotate(180deg); }
 
 .split > * { min-width: 0; }
 :lang(zh-CN) .h1, :lang(zh-CN) .h2 { line-height: 1.12; }
+
+/* Below-the-fold sections skip style/layout/paint until they near the viewport (Lighthouse mobile: the 2 300-node
+   page spent ~0.6 s of a throttled CPU on layout before the hero frame counted as painted). The size is remembered
+   once rendered, so anchors and the scrollbar settle after the first pass. */
+main > .section:not(.hero) { content-visibility: auto; contain-intrinsic-size: auto 1000px; }
