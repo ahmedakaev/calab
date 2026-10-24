@@ -3,9 +3,8 @@ import { preload } from 'react-dom';
 import type { Locale } from '@/i18n';
 import { getHome, HERO_SHOT, type HeroSceneKey } from '@/i18n/home';
 import { APP_URL } from '@/lib/site';
-import { LivingTitle } from './living-title';
 import { SceneSwitcher } from './scene-switcher';
-import { Button, Container, nb, Shot } from './ui';
+import { accented, Button, Container, nb, Shot } from './ui';
 
 const ICONS: Record<HeroSceneKey, LucideIcon> = {
   voice: AudioLines,
@@ -40,7 +39,9 @@ export function Hero({ locale }: { locale: Locale }) {
         <SceneSwitcher
           copy={
             <>
-              <LivingTitle id="hero-title" text={h.title} accent={h.accent} />
+              <h1 id="hero-title" className="h1">
+                {accented(h.title, h.accent)}
+              </h1>
               <p className="lead hero-lead">{nb(h.lead)}</p>
               <div className="hero-actions">
                 <div className="hero-buttons">
