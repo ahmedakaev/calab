@@ -10,6 +10,7 @@ import * as Y from 'yjs';
 import { IDS, startMockServer, type MockServer } from '../e2e-support/mock-server';
 import { NOW, PASSWORD, settle } from '../e2e-visual/harness';
 import { startPublisher, type Publisher } from '../e2e-visual/publisher';
+import { APP_WINDOW, captureAppWindow, launchAppWindow, resizeAppWindow, type AppWindow } from './app-window';
 import { APP_LOCALE, COPY, type Copy, type Short } from './copy';
 import { COPY3, type Copy3 } from './copy3';
 import { mockupHtml, render } from './art';
@@ -123,14 +124,17 @@ interface Ctx {
   short: Short;
   pubs: Publisher[];
   phone: boolean;
+  /** The real app window (app-window.ts): the scene is the OS capture of the window, chrome included. */
+  win?: AppWindow;
 }
 
 type Seed = (mock: MockServer, c: Copy, c3: Copy3) => void;
 
 const aside = (page: Page) => page.locator('aside').first();
 
-async function boot(short: Short, seed: Seed | undefined, phone: boolean): Promise<Ctx> {
-  expect(existsSync(join(DIST, 'index.html')), 'dist-web is missing: run `pnpm build:web` first').toBe(true);
+async function boot(short: Short, seed: Seed | undefined, phone: boolean, window?: { width: number; height: number }): Promise<Ctx> {
+  const app = window && APP_WINDOW && !phone ? window : undefined;
+  if (!app) expect(existsSync(join(DIST, 'index.html')), 'dist-web is missing: run `pnpm build:web` first').toBe(true);
   const browser = phone
     ? await webkit.launch()
     : await chromium.launch({
@@ -145,6 +149,10 @@ async function boot(short: Short, seed: Seed | undefined, phone: boolean): Promi
   seedScene(mock, c, await drawArt(artBrowser, c));
   if (phone) await artBrowser.close();
   seed?.(mock, c, c3);
+  if (app) {
+    const win = await launchAppWindow(mock.url, app);
+    return { browser, page: win.page, mock, c, c3, short, pubs: [], phone, win };
+  }
   const context = phone
     ? await browser.newContext({ ...devices['iPhone 14'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'ru-RU', timezoneId: 'Europe/Moscow', reducedMotion: 'reduce' })
     : await browser.newContext({ viewport: SIZE, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'ru-RU', timezoneId: 'Europe/Moscow' });
@@ -174,6 +182,7 @@ async function insets(page: Page): Promise<void> {
 async function shutdown(ctx: Ctx | undefined): Promise<void> {
   if (!ctx) return;
   for (const p of ctx.pubs) await p.stop().catch(() => undefined);
+  await ctx.win?.close();
   await ctx.browser.close().catch(() => undefined);
   await ctx.mock.close().catch(() => undefined);
 }
@@ -189,7 +198,8 @@ async function shoot(ctx: Ctx, scene: string): Promise<void> {
   await settle(ctx.page);
   mkdirSync(OUT, { recursive: true });
   const path = join(OUT, `${scene}-${ctx.short}@2x.png`);
-  await ctx.page.screenshot({ path, animations: 'disabled', caret: 'hide' });
+  if (ctx.win) await captureAppWindow(ctx.win.app, path);
+  else await ctx.page.screenshot({ path, animations: 'disabled', caret: 'hide' });
   console.log(scene, ctx.short, `${(statSync(path).size / 1e6).toFixed(1)} MB`);
 }
 
@@ -319,6 +329,8 @@ function seedNotify(mock: MockServer, _c: Copy, c3: Copy3): void {
 interface Scene {
   seed?: Seed;
   phone?: boolean;
+  /** The whole window is the crop: captured from the real app window of this size (app-window.ts), traffic lights included. */
+  window?: { width: number; height: number };
   run(ctx: Ctx): Promise<void>;
 }
 
@@ -389,7 +401,8 @@ async function diskScene(ctx: Ctx, scene: string, size: { width: number; height:
   }
   await setLocale(page, short);
   // `disk`: a smaller window, two full rows of tiles above the storage meter, no empty floor.
-  await page.setViewportSize(size);
+  if (ctx.win) await resizeAppWindow(ctx.win, size);
+  else await page.setViewportSize(size);
   await page.getByTestId('section-disk').click();
   const tiles = page.getByTestId('disk-tile');
   await expect(tiles).toHaveCount(9, { timeout: 15_000 });
@@ -559,6 +572,7 @@ const scenes: Record<string, Scene> = {
   // The same disk, the whole window at 16:10 (hero «Облачный диск», landing v6): a smaller window, so the nine
   // tiles fill it instead of one row over an empty floor.
   'disk-full': {
+    window: { width: 1056, height: 660 },
     async run(ctx) {
       await diskScene(ctx, 'disk-full', { width: 1056, height: 660 });
     },
@@ -769,7 +783,7 @@ for (const [name, scene] of Object.entries(scenes)) {
       process.env['MOCK_LIVEKIT_ROOM_PREFIX'] = `${PREFIX}v5_${name}_${short}_${Date.now().toString(36)}_`;
       let ctx: Ctx | undefined;
       try {
-        ctx = await boot(short, scene.seed, scene.phone ?? false);
+        ctx = await boot(short, scene.seed, scene.phone ?? false, scene.window);
         await scene.run(ctx);
       } finally {
         await shutdown(ctx);

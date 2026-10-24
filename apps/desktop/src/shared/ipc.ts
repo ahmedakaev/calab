@@ -333,6 +333,8 @@ export interface AppInfo {
   forceRelay: boolean;
   /** Test flag CALABA_VISUAL_TEST=1: no animations (deterministic screenshots). */
   visualTest: boolean;
+  /** Test flag CALABA_VISUAL_VIBRANCY=1 (marketing shots, e2e-marketing): native vibrancy despite visualTest. */
+  visualVibrancy?: boolean;
   systemAudioLoopback: 'supported' | 'experimental' | 'unsupported';
   micAccess: string;
   screenAccess: string;

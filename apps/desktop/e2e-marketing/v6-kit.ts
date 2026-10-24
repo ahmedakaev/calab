@@ -7,6 +7,7 @@ import { chromium, devices, expect, webkit, type Browser, type Page } from '@pla
 import { IDS, startMockServer, type MockServer } from '../e2e-support/mock-server';
 import { NOW, PASSWORD, settle } from '../e2e-visual/harness';
 import { startPublisher, type Publisher } from '../e2e-visual/publisher';
+import { APP_WINDOW, captureAppWindow, launchAppWindow, resizeAppWindow, type AppWindow } from './app-window';
 import { APP_LOCALE, COPY, type Copy, type PersonKey, type Short } from './copy';
 import { COPY4, type Copy4 } from './copy4';
 import { cameraPhoto, dataUrl } from './photos';
@@ -53,15 +54,19 @@ export interface Ctx {
   short: Short;
   pubs: Publisher[];
   phone: boolean;
+  /** The real app window (app-window.ts): the scene is the OS capture of the window, chrome included. */
+  win?: AppWindow;
 }
 
 export type Seed = (mock: MockServer, c: Copy, c4: Copy4) => void | Promise<void>;
 
 export const aside = (page: Page) => page.locator('aside').first();
 
-export async function boot(short: Short, seed: Seed | undefined, opts: { phone?: boolean; size?: { width: number; height: number }; ui?: { sidebarWidth?: number; membersPanel?: boolean } } = {}): Promise<Ctx> {
+export async function boot(short: Short, seed: Seed | undefined, opts: { phone?: boolean; size?: { width: number; height: number }; ui?: { sidebarWidth?: number; membersPanel?: boolean }; window?: boolean } = {}): Promise<Ctx> {
   const phone = opts.phone ?? false;
-  expect(existsSync(join(DIST, 'index.html')), 'dist-web is missing: run `pnpm build:web` first').toBe(true);
+  const window = (opts.window ?? false) && APP_WINDOW && !phone;
+  if (window) expect(existsSync(join(DIST, '../out/renderer/index.html')), 'out/ is missing: run `pnpm build:app` first').toBe(true);
+  else expect(existsSync(join(DIST, 'index.html')), 'dist-web is missing: run `pnpm build:web` first').toBe(true);
   const browser = phone
     ? await webkit.launch()
     : await chromium.launch({
@@ -75,6 +80,11 @@ export async function boot(short: Short, seed: Seed | undefined, opts: { phone?:
   seedScene(mock, c, await drawArt(artBrowser, c));
   if (phone) await artBrowser.close();
   await seed?.(mock, c, c4);
+  if (window) {
+    // The art and the camera frames are still drawn by the Chromium above; the scene runs in the app.
+    const win = await launchAppWindow(mock.url, opts.size ?? SIZE, opts.ui);
+    return { browser, page: win.page, mock, c, c4, short, pubs: [], phone, win };
+  }
   const context = phone
     ? await browser.newContext({ ...devices['iPhone 14'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'ru-RU', timezoneId: 'Europe/Moscow', reducedMotion: 'reduce' })
     : await browser.newContext({ viewport: opts.size ?? SIZE, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'ru-RU', timezoneId: 'Europe/Moscow' });
@@ -97,6 +107,12 @@ export async function boot(short: Short, seed: Seed | undefined, opts: { phone?:
   return ctx;
 }
 
+/** The window's size mid-scene: the page's viewport, or the app window's content size. */
+export async function resize(ctx: Ctx, size: { width: number; height: number }): Promise<void> {
+  if (ctx.win) await resizeAppWindow(ctx.win, size);
+  else await ctx.page.setViewportSize(size);
+}
+
 export async function insets(page: Page): Promise<void> {
   await page.addStyleTag({
     content: `@media (max-width: 768px) { :root.web:not(.kb-open) { --safe-top: ${INSETS.top}px; --safe-bottom: ${INSETS.bottom}px; } }`,
@@ -106,6 +122,7 @@ export async function insets(page: Page): Promise<void> {
 export async function shutdown(ctx: Ctx | undefined): Promise<void> {
   if (!ctx) return;
   for (const p of ctx.pubs) await p.stop().catch(() => undefined);
+  await ctx.win?.close();
   await ctx.browser.close().catch(() => undefined);
   await ctx.mock.close().catch(() => undefined);
 }
@@ -121,7 +138,8 @@ export async function shoot(ctx: Ctx, scene: string, keepPointer = false): Promi
   await settle(ctx.page, keepPointer);
   mkdirSync(OUT, { recursive: true });
   const path = join(OUT, `${scene}-${ctx.short}@2x.png`);
-  await ctx.page.screenshot({ path, animations: 'disabled', caret: 'hide' });
+  if (ctx.win) await captureAppWindow(ctx.win.app, path);
+  else await ctx.page.screenshot({ path, animations: 'disabled', caret: 'hide' });
   console.log(scene, ctx.short, `${(statSync(path).size / 1e6).toFixed(1)} MB`);
 }
 

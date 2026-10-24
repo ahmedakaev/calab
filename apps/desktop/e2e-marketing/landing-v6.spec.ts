@@ -33,6 +33,7 @@ import {
   speaking,
   startPublisher,
   openRoom,
+  resize,
   seedStoryBoard,
   seedStoryChat,
 
@@ -49,6 +50,8 @@ import {
  * telephony / role / recording / AI windows. One source, the web build + the mock, 1440×900 CSS px, scale 2,
  * dark, four languages; data in copy4.ts (people / rooms / the board in copy.ts), shared seeds in v6-kit.ts.
  * The «-focus» scenes are their own captures in a window as wide as the panel (the crops follow its borders).
+ * The whole-window scenes (WINDOW below) run in the built app instead and are OS captures of its macOS window,
+ * traffic lights included (app-window.ts; `pnpm build:app` first, CALABA_LANDING_WEB=1 falls back to the web build).
  *
  *   pnpm -F @calaba/desktop build:web
  *   cd apps/desktop && CALABA_VISUAL_WORKERS=1 CALABA_VISUAL_MOCK_PORT=5224 MOCK_LIVEKIT_ROOM_PREFIX=landing_ \
@@ -202,7 +205,7 @@ async function wikiScene(ctx: Ctx, scene: string, size: { width: number; height:
   w.put({ ...base, parentId: meetings.id, title: k.tree.retro, ownerId: U.boris }, k.tree.retro);
   w.put({ ...base, title: k.tree.drafts, icon: '📝', restricted: true }, k.tree.drafts);
   await setLocale(page, short);
-  await page.setViewportSize(size);
+  await resize(ctx, size);
   await page.getByTestId('section-wiki').click();
   const nodes = page.getByTestId('wiki-node');
   await expect(nodes.first()).toContainText(k.tree.handbook);
@@ -812,6 +815,9 @@ const scenes: Record<string, Scene> = {
   },
 };
 
+/** The scenes whose crop is the whole window: captured from the real app window (app-window.ts), traffic lights included. */
+const WINDOW = new Set(['voice', 'chat-full', 'kanban-full', 'calendar-week', 'canvas', 'phone-call', 'phone-incoming', 'wiki-full']);
+
 const only = process.env['CALABA_V6_SCENES']?.split(',').map((s) => s.trim());
 
 for (const [name, scene] of Object.entries(scenes)) {
@@ -826,7 +832,7 @@ for (const [name, scene] of Object.entries(scenes)) {
         const size = f ? scene.focus?.size : scene.size;
         const ui = f ? scene.focus?.ui ?? scene.ui : scene.ui;
         try {
-          ctx = await boot(short, f ? scene.focus?.seed ?? scene.seed : scene.seed, { phone: scene.phone ?? false, ...(size ? { size } : {}), ...(ui ? { ui } : {}) });
+          ctx = await boot(short, f ? scene.focus?.seed ?? scene.seed : scene.seed, { phone: scene.phone ?? false, window: !f && WINDOW.has(name), ...(size ? { size } : {}), ...(ui ? { ui } : {}) });
           await scene.run(ctx, f);
         } finally {
           await shutdown(ctx);

@@ -1,7 +1,10 @@
 // Landing v3 / README images (docs/09 #139) from the raw captures of
 // apps/desktop/e2e-marketing/landing.spec.ts in apps/landing/shots/ (git-ignored):
 // <scene>-<locale>@2x.png — the web client at 1440×900 CSS px, device scale 2, dark theme, the UI and
-// the team in the landing locale (ru, en, es, zh → folder zh-CN).
+// the team in the landing locale (ru, en, es, zh → folder zh-CN). The whole-window scenes (voice, chat-full, kanban-full,
+// calendar-week, canvas, phone-call, phone-incoming, wiki-full, disk-full, mail) are OS captures of the macOS app window
+// instead (e2e-marketing/app-window.ts): the native title bar with the traffic lights, rounded transparent corners, and its
+// bar is 46 px tall (the web's is 38) — crops cut out of them are 8 px lower than in the web captures.
 // Output, per locale (folder = the locale's BCP 47 tag, as <html lang>):
 // - public/screens/<lang>/<name>@2x.webp — the crop at full resolution, <name>.webp — a 1x
 //   Lanczos resample and, for crops wider than 720 px, <name>-720.webp (phones); every file ≤ 300 KB (quality steps down from 88 until it fits).
@@ -51,7 +54,7 @@ export const CROPS = {
   'phone-incoming': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 360, top: 170, width: 720, height: 560 } },
   'story-incoming': { from: 'phone-incoming', left: 340, top: 230, width: 760, height: 440 },
   // the disk in a 1056×660 window (16:10, the nine tiles fill it; hero «Облачный диск»)
-  'disk-full': { left: 0, top: 0, width: 1056, height: 660, focus: { left: 76, top: 36, width: 720, height: 560 } },
+  'disk-full': { left: 0, top: 0, width: 1056, height: 660, focus: { left: 76, top: 44, width: 720, height: 560 } },
   // settings windows: the pane to the right of the section list (the dialog is 920 px wide; a tile shows ≤ 860)
   'telephony-ivr': { left: 481, top: 131, width: 698, height: 330 },
   'telephony-groups': { left: 481, top: 131, width: 698, height: 330 },
@@ -136,8 +139,8 @@ export const CROPS = {
   'phone-board': { left: 0, top: 0, width: 390, height: 844 },
   // Landing v6 catalogue tiles (≤ 860 px wide, so a 568 px tile shows them at ≥ 0.66): `from` = cut out of another
   // scene's capture (window coordinates), no capture of their own
-  'voice-panel': { from: 'voice', left: 338, top: 96, width: 853, height: 533 },
-  'kanban-panel': { from: 'kanban-full', left: 288, top: 92, width: 860, height: 538 },
+  'voice-panel': { from: 'voice', left: 338, top: 104, width: 853, height: 533 },
+  'kanban-panel': { from: 'kanban-full', left: 288, top: 100, width: 860, height: 538 },
   'timeline-panel': { from: 'timeline', left: 330, top: 90, width: 860, height: 538 },
   // the whole history down to the composer (a shorter cut would end mid-list: rows wrap differently per language)
   'taskhistory-panel': { from: 'taskhistory', left: 630, top: 30, width: 810, height: 870 },

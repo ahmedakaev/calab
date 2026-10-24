@@ -64,6 +64,7 @@ import { getMainWindow, isOwnPage, isShown } from './windows';
 import { mailRequest } from './mail';
 
 const VISUAL_TEST = process.env['CALABA_VISUAL_TEST'] === '1';
+const VISUAL_VIBRANCY = process.env['CALABA_VISUAL_VIBRANCY'] === '1';
 
 /** Only our own renderer may call privileged IPC. */
 function assertTrusted(e: IpcMainInvokeEvent): void {
@@ -220,6 +221,7 @@ export function registerIpc(): void {
     fakeMedia: process.env['CALABA_FAKE_MEDIA'] === '1',
     forceRelay: process.env['CALABA_FORCE_RELAY'] === '1',
     visualTest: VISUAL_TEST,
+    visualVibrancy: VISUAL_VIBRANCY,
     systemAudioLoopback: systemAudioSupport(),
     micAccess: mediaAccess('microphone'),
     screenAccess: mediaAccess('screen'),
