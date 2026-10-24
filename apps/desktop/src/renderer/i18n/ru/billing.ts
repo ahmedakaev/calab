@@ -530,6 +530,7 @@ export const ruBilling = {
   'billing.plans.limits': 'Лимиты тарифа',
   'billing.plans.suspended': 'Пространство приостановлено за неоплату. Погасите долг в разделе оплаты — затем можно выбрать тариф.',
   'billing.plans.current': 'Текущий',
+  'billing.plans.marked': 'Выбрано',
   'billing.plans.currentBtn': 'Ваш тариф',
   'billing.plans.debtFirst': 'Сначала погасите долг',
   'billing.plans.notForSale': 'Сейчас недоступен',

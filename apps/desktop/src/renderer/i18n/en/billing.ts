@@ -527,6 +527,7 @@ export const enBilling: DictShape<typeof ruBilling> = {
   'billing.plans.limits': 'Plan limits',
   'billing.plans.suspended': 'The workspace is suspended for non-payment. Pay the debt in billing, then choose a plan.',
   'billing.plans.current': 'Current',
+  'billing.plans.marked': 'Selected',
   'billing.plans.currentBtn': 'Your plan',
   'billing.plans.debtFirst': 'Pay the debt first',
   'billing.plans.notForSale': 'Not available now',

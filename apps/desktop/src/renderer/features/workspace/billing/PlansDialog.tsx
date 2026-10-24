@@ -212,7 +212,7 @@ export function PlansDialog({
   }
   return (
     <>
-      <Modal open initialFocus="body" onClose={onClose} wide title={title} description={mobile ? undefined : welcome ? t('billing.plans.welcomeText', { name }) : t('billing.plans.text')} footer={footer}>
+      <Modal open onClose={onClose} wide title={title} description={mobile ? undefined : welcome ? t('billing.plans.welcomeText', { name }) : t('billing.plans.text')} footer={footer}>
         <div className="pb-1" data-testid="billing-plans">
           {body}
         </div>
@@ -539,7 +539,13 @@ function PlanCard({
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-headline font-semibold">{t(PLAN_LABEL[tier])}</h3>
-        {current ? <span className="inline-flex h-5 items-center rounded-full bg-accent-strong px-2 text-caption font-semibold text-accent-fg">{t('billing.plans.current')}</span> : null}
+        {current ? (
+          <span className="inline-flex h-5 items-center rounded-full bg-accent-strong px-2 text-caption font-semibold text-accent-fg">{t('billing.plans.current')}</span>
+        ) : marked ? (
+          <span className="inline-flex h-5 items-center rounded-full bg-accent-strong px-2 text-caption font-semibold text-accent-fg" data-testid="plan-marked">
+            {t('billing.plans.marked')}
+          </span>
+        ) : null}
       </div>
       <div className="flex min-h-[64px] flex-col gap-0.5 mobile:min-h-0">
         {!paid ? (

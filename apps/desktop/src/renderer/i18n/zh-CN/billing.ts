@@ -527,6 +527,7 @@ export const zhBilling: DictShape<typeof ruBilling> = {
   'billing.plans.limits': '套餐限制',
   'billing.plans.suspended': '空间因欠费已暂停。请先在付费页面结清欠款，再选择套餐。',
   'billing.plans.current': '当前',
+  'billing.plans.marked': '已选',
   'billing.plans.currentBtn': '当前套餐',
   'billing.plans.debtFirst': '请先结清欠款',
   'billing.plans.notForSale': '暂不可用',
