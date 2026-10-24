@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { keepHashTarget } from '@/lib/hash-target';
 
 /**
  * Desktop enhancement of «Один день команды» (§4.3): the steps scroll on the left while one sticky frame on the
@@ -32,6 +33,7 @@ export function StoryScroller({ children }: { children: ReactNode }) {
       });
     };
     apply();
+    keepHashTarget();
     wide.addEventListener('change', apply);
     return () => {
       observer?.disconnect();

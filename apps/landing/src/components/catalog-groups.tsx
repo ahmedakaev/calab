@@ -1,6 +1,7 @@
 'use client';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { keepHashTarget } from '@/lib/hash-target';
 
 type Group = { key: string; title: string; icon: ReactNode; count: number; tiles: ReactNode };
 
@@ -70,6 +71,10 @@ export function CatalogGroups({ groups, label, arrows }: { groups: Group[]; labe
   useEffect(() => {
     setTabbed(true);
   }, []);
+  // One group instead of four: the page got shorter under a `#download`-style target.
+  useEffect(() => {
+    if (tabbed) keepHashTarget();
+  }, [tabbed]);
   const choose = (i: number, focus = false) => {
     setActive(i);
     if (focus) tabs.current[i]?.focus();
