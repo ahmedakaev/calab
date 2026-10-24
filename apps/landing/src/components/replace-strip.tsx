@@ -1,6 +1,6 @@
 import type { Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
-import { accented, Container, nb } from './ui';
+import { accented, Container, nb, Sticker } from './ui';
 
 /** «Вместо семи сервисов — одно окно» (§4.2): a centred pause between the hero and the story (owner, 24.10). */
 export function ReplaceStrip({ locale }: { locale: Locale }) {
@@ -12,6 +12,8 @@ export function ReplaceStrip({ locale }: { locale: Locale }) {
           {accented(t.title, t.accent)}
         </h2>
         <p className="lead">{nb(t.lead)}</p>
+        {/* Many tools, one hand: the high five sits in the free field right of the centred text (wide screens only). */}
+        <Sticker name="highfive" size={180} className="replace-sticker" />
       </Container>
     </section>
   );
