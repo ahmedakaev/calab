@@ -204,6 +204,16 @@ details[open] .chevron { transform: rotate(180deg); }
 .shot { position: relative; overflow: hidden; aspect-ratio: var(--ar); border-radius: 12px; background: var(--app-bg); }
 .shot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px solid var(--hairline); pointer-events: none; }
 .shot picture, .shot img { display: block; width: 100%; height: 100%; }
+/* A whole macOS window (lib/screens.ts isWindow): the file's alpha is the shape (native corners), so no frame of our
+   own; the shadow follows the alpha. Its phone crop (no corners) gets the usual frame back. */
+.shot-window { overflow: visible; border-radius: 0; background: transparent; }
+.shot-window::after { display: none; }
+.shot-window img { filter: drop-shadow(0 16px 32px rgb(0 0 0 / .4)); }
+@media (max-width: 639px) {
+  .shot-window.shot-has-focus { overflow: hidden; border-radius: 12px; background: var(--app-bg); }
+  .shot-window.shot-has-focus::after { display: block; }
+  .shot-window.shot-has-focus img { filter: none; }
+}
 @media (max-width: 639px) { .shot-has-focus { aspect-ratio: var(--ar-sm); } }
 /* A phone capture as is (owner, 24.10): its own aspect ratio, so nothing is cropped, small corners, no device frame. */
 .shot-phone { aspect-ratio: auto; border-radius: 12px; }
@@ -316,7 +326,6 @@ details[open] .chevron { transform: rotate(180deg); }
   .scene { transition: opacity .25s ease-out, visibility 0s linear .25s; }
   .scene[data-active='true'] { transition: opacity .25s ease-out, visibility 0s; }
 }
-.hero-shot { border-radius: 16px; }
 @media (min-width: 1024px) {
   .hero { padding: 32px 0 40px; }
   .hero-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 48px; row-gap: 64px; align-items: center;
@@ -324,7 +333,7 @@ details[open] .chevron { transform: rotate(180deg); }
   .hero-stage { perspective: 2000px; }
   /* Bleeds 32 px past the viewport edge and leans away to the right. */
   .scenes-window { width: calc(100% + (100vw - min(100vw, 1360px)) / 2 + var(--gutter) + 32px); transform: rotateY(-14deg) rotateX(4deg); }
-  .scenes-window .hero-shot { box-shadow: 0 50px 100px -30px rgb(0 0 0 / .75), 0 20px 40px -20px rgb(0 0 0 / .5); }
+  .scenes-window .shot-window img { filter: drop-shadow(0 40px 50px rgb(0 0 0 / .6)); }
   .scene-nav { grid-column: 1 / -1; }
 }
 /* Scene pills: quiet (outline, muted, small) so the download buttons stay the loudest thing on the first screen. */
@@ -402,8 +411,8 @@ details[open] .chevron { transform: rotate(180deg); }
 @media (min-width: 640px) { .fact-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; } }
 @media (min-width: 1024px) { .fact-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } }
 .fact-card { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 16px; min-height: 168px; padding: 28px 24px; border-radius: 20px; background: var(--color-card); text-align: center; font-size: 16px; line-height: 1.45; text-wrap: balance; }
-.fact-icon { display: grid; place-items: center; flex-shrink: 0; width: 52px; height: 52px; border-radius: 16px; color: #cfe0ff; background: linear-gradient(145deg, rgb(23 72 255 / .38), rgb(115 173 255 / .12)); box-shadow: inset 0 0 0 1px rgb(115 173 255 / .22); }
-@media (max-width: 639px) { .fact-card { min-height: 0; padding: 22px 20px; gap: 12px; } .fact-icon { width: 44px; height: 44px; border-radius: 14px; } }
+.fact-icon { display: grid; place-items: center; flex-shrink: 0; }
+@media (max-width: 639px) { .fact-card { min-height: 0; padding: 22px 20px; gap: 12px; } .fact-icon svg { width: 34px; height: 34px; } }
 .check-list { display: grid; gap: 12px; list-style: none; font-size: 17px; line-height: 1.45; }
 .check-list li { display: flex; gap: 12px; }
 .check-list svg { flex-shrink: 0; margin-top: 4px; color: var(--color-accent-text); }

@@ -43,13 +43,22 @@ export function TelephonySection({ locale }: { locale: Locale }) {
           </div>
         </Card>
       </div>
+      {/* The icons' stroke gradient, in the 24-unit icon space so straight segments (zero-height boxes) get it too. */}
+      <svg width="0" height="0" className="absolute" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="fact-icon-gradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#8fe3ff" />
+            <stop offset="1" stopColor="#5865ff" />
+          </linearGradient>
+        </defs>
+      </svg>
       <ul className="fact-cards telephony-points">
         {p.points.map((point, i) => {
           const Icon = POINT_ICONS[i] ?? Phone;
           return (
             <li key={point} className="fact-card">
               <span className="fact-icon" aria-hidden="true">
-                <Icon size={22} strokeWidth={1.9} />
+                <Icon size={44} strokeWidth={1.6} color="url(#fact-icon-gradient)" />
               </span>
               <span>{nb(point)}</span>
             </li>
