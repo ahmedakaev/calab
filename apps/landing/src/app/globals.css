@@ -342,6 +342,8 @@ details[open] .chevron { transform: rotate(180deg); }
 .story-step { display: grid; gap: 20px; align-items: center; }
 .story-index { display: block; margin-bottom: 6px; font-family: var(--font-display); font-size: 15px; font-weight: 800; letter-spacing: .08em; color: var(--color-accent-text); }
 .story-shot .shot { width: min(100%, calc(520px * var(--ar))); margin-inline: auto; }
+/* Phones swipe the steps: a tall frame (the meeting card) would make the whole row as tall as itself. */
+@media (max-width: 639px) { .story-shot .shot { width: min(100%, calc(320px * var(--ar))); margin-inline: 0; } }
 @media (min-width: 640px) and (max-width: 1023px) { .story-step { grid-template-columns: 5fr 7fr; gap: 32px; } }
 @media (min-width: 1024px) {
   .story-steps.story-sticky { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 64px; row-gap: 0; }
