@@ -76,7 +76,6 @@ export type Home = {
     /** Visually hidden: the section opens straight with the steps (owner, 24.10). */
     title: string;
     steps: Tuple<{ title: string; text: string; shot: SceneName }, 8>;
-    cta: string;
   };
   catalog: {
     title: string;
@@ -172,7 +171,6 @@ export const ru: Home = {
       { title: 'Ретро — на холсте', text: 'Стикеры по колонкам, голосование и таймер: команда разбирает спринт вместе и видит курсоры друг друга.', shot: 'canvas-panel' },
       { title: 'Звонок клиента — прямо в Calab', text: 'Вечером клиент звонит на номер команды: вызов приходит в приложение, ответить можно с компьютера или телефона.', shot: 'story-incoming' },
     ],
-    cta: 'Все возможности',
   },
   catalog: {
     title: 'Что есть в Calab',

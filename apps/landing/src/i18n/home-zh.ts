@@ -38,7 +38,6 @@ export const zh: Home = {
       { title: '复盘在画布上进行', text: '便签分栏、投票和计时器：团队一起回顾冲刺，彼此的光标实时可见。', shot: 'canvas-panel' },
       { title: '客户来电直接打进 Calab', text: '傍晚客户拨打团队号码：来电在应用里响起，用电脑或手机都能接听。', shot: 'story-incoming' },
     ],
-    cta: '全部功能',
   },
   catalog: {
     title: 'Calab 里有什么',

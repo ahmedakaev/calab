@@ -38,7 +38,6 @@ export const en: Home = {
       { title: 'The retro runs on a canvas', text: 'Stickies in columns, votes and a timer: the team goes over the sprint together and sees each other’s cursors.', shot: 'canvas-panel' },
       { title: 'A client’s call rings right in Calab', text: 'In the evening a client calls the team’s number: the call rings in the app, and you answer on your computer or phone.', shot: 'story-incoming' },
     ],
-    cta: 'All features',
   },
   catalog: {
     title: 'What’s in Calab',

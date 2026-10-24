@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
 import { StoryScroller } from './story-scroller';
-import { DrawnLink, nb, Section, Shot } from './ui';
+import { nb, Section, Shot } from './ui';
 
 /**
  * «Один день команды» (§4.3): the steps of one day across chat, board, calendar, recording, wiki, disk, canvas.
@@ -20,9 +20,6 @@ export function DayStory({ locale }: { locale: Locale }) {
         {s.steps.map((step, i) => (
           <li key={step.shot} data-step={i} className="story-step" style={{ '--row': i + 1 } as CSSProperties}>
             <div className="story-text">
-              <span className="story-index" aria-hidden="true">
-                {String(i + 1).padStart(2, '0')}
-              </span>
               <h3 className="h3 h3-sm">{nb(step.title)}</h3>
               <p className="tile-text">{nb(step.text)}</p>
             </div>
@@ -32,11 +29,6 @@ export function DayStory({ locale }: { locale: Locale }) {
           </li>
         ))}
       </StoryScroller>
-      <p className="story-more">
-        <DrawnLink href="#features" variant="cta" arrow="down">
-          {s.cta}
-        </DrawnLink>
-      </p>
     </Section>
   );
 }

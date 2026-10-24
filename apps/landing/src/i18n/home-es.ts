@@ -38,7 +38,6 @@ export const es: Home = {
       { title: 'La retro, en el lienzo', text: 'Notas por columnas, votación y temporizador: el equipo repasa el sprint a la vez y ve los cursores de todos.', shot: 'canvas-panel' },
       { title: 'La llamada del cliente, directamente en Calab', text: 'Por la tarde un cliente llama al número del equipo: la llamada suena en la aplicación y se contesta desde el ordenador o el móvil.', shot: 'story-incoming' },
     ],
-    cta: 'Todas las funciones',
   },
   catalog: {
     title: 'Qué hay en Calab',

@@ -369,7 +369,6 @@ details[open] .chevron { transform: rotate(180deg); }
 /* ---------- Day story ---------- */
 .story-steps { display: grid; gap: 48px; list-style: none; }
 .story-step { display: grid; gap: 20px; align-items: center; }
-.story-index { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; letter-spacing: .1em; color: var(--color-accent-text); }
 .story-shot .shot { width: min(100%, calc(520px * var(--ar))); margin-inline: auto; }
 /* Phones swipe the steps: a tall frame (the meeting card) would make the whole row as tall as itself. */
 @media (max-width: 639px) { .story-shot .shot { width: min(100%, calc(320px * var(--ar))); margin-inline: 0; } }
@@ -377,10 +376,11 @@ details[open] .chevron { transform: rotate(180deg); }
 @media (min-width: 1024px) {
   .story-steps.story-sticky { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 64px; row-gap: 0; }
   .story-sticky .story-step { display: contents; }
-  /* Each step holds a third of the screen of scroll: a 130 px step went by in one wheel notch and read as skipped. */
-  .story-sticky .story-text { grid-column: 1; grid-row: var(--row); display: flex; flex-direction: column; justify-content: center; min-height: max(160px, 34svh); padding-block: 10px; }
+  /* Each step holds about a third of the screen of scroll: a 130 px step went by in one wheel notch and read as skipped. */
+  .story-sticky .story-text { grid-column: 1; grid-row: var(--row); display: flex; flex-direction: column; justify-content: center; min-height: max(150px, 30svh); padding-block: 8px; }
   .story-sticky .story-step:not([data-active]) .h3 { color: #8d8d95; }
-  .story-sticky .story-step:not([data-active]) .story-index { color: #8d8d95; }
+  /* The active step's title in the accent (the hero's light blue), the rest muted. */
+  .story-sticky .story-step[data-active] .h3 { color: var(--color-accent-text); }
 
   .story-sticky .story-shot { grid-column: 2; grid-row: 1 / span 8; align-self: start; position: sticky; top: calc(var(--header-h) + max(24px, (100svh - var(--header-h) - 520px) / 2)); opacity: 0; visibility: hidden; }
   .story-sticky .story-step[data-active] .story-shot { opacity: 1; visibility: visible; }
@@ -391,7 +391,6 @@ details[open] .chevron { transform: rotate(180deg); }
   .story-sticky .story-shot { transform: translateY(8px); transition: opacity .35s, transform .35s, visibility 0s linear .35s; }
   .story-sticky .story-step[data-active] .story-shot { transform: none; transition: opacity .35s, transform .35s, visibility 0s; }
 }
-.story-more { margin-top: 24px; text-align: center; }
 
 /* ---------- Catalog ---------- */
 .catalog-body { display: grid; gap: 24px; }
