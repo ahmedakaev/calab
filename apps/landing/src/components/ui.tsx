@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { preload } from 'react-dom';
 import { LOCALE_INFO, type Locale } from '@/i18n/locales';
-import { SCREENS, focusOf, type ScreenName } from '@/lib/screens';
+import { SCREENS, focusOf, isWindow, type ScreenName } from '@/lib/screens';
 import { stickerSrc } from '@/lib/stickers';
 import type { SceneName } from '@/i18n/home';
 
@@ -201,7 +201,7 @@ export function Shot({
   }
   const style = { '--ar': `${width} / ${height}`, ...(focus ? { '--ar-sm': `${focus.width} / ${focus.height}` } : {}) } as CSSProperties;
   return (
-    <div className={cx('shot', phone && 'shot-phone', focus && 'shot-has-focus', className)} style={style}>
+    <div className={cx('shot', phone && 'shot-phone', isWindow(scene) && 'shot-window', focus && 'shot-has-focus', className)} style={style}>
       <picture>
         {focus && (
           <source

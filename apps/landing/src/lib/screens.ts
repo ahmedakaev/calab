@@ -75,6 +75,14 @@ export type FocusScreenName = {
 
 export type ScreenName = keyof typeof SCREENS;
 
+/**
+ * Whole-window captures (the macOS window, `screencapture -o`): the file carries the native corners as transparent
+ * pixels, so the page draws no rounded frame of its own around them (Shot → .shot-window). Their phone crops have
+ * no corners and keep the usual frame.
+ */
+const WINDOWS: ReadonlySet<ScreenName> = new Set<ScreenName>(['voice', 'chat-full', 'kanban-full', 'calendar-week', 'mail', 'mail-window', 'wiki-full', 'canvas', 'disk-full', 'phone-call', 'phone-incoming']);
+export const isWindow = (name: ScreenName): boolean => WINDOWS.has(name);
+
 /** The phone crop of a screen that has one (`<name>-focus.webp`), or undefined. */
 export function focusOf(name: ScreenName): { width: number; height: number } | undefined {
   return (SCREENS[name] as { focus?: { width: number; height: number } }).focus;
