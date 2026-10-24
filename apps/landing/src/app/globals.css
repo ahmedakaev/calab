@@ -228,6 +228,8 @@ details[open] .chevron { transform: rotate(180deg); }
 .topbar-action-dots { position: relative; display: block; width: 8px; height: 8px; }
 .topbar-action-dots i { position: absolute; inset: 0; display: block; width: 7px; height: 7px; border-radius: 50%; background: var(--action); }
 .topbar-action-dots i:nth-child(2), .topbar-action-dots i:nth-child(3) { transform: rotate(120deg) scale(0); }
+/* 360 px phones: the longest short label («VERSIÓN WEB») still keeps the 20 px gutter. */
+@media (max-width: 389px) { .site-header-row { gap: 10px; } .topbar-action { gap: 0; padding: 0 14px; font-size: 14px; } .topbar-action-dots { display: none; } }
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .locale-globe svg { transition: transform .6s cubic-bezier(.32, .72, 0, 1), color .3s; }
   .locale-globe:hover svg, .locale-globe:focus-visible svg, .locale-control[open] .locale-globe svg { transform: rotateY(180deg) rotate(-15deg); color: var(--action); }
@@ -595,8 +597,3 @@ details[open] .chevron { transform: rotate(180deg); }
 
 .split > * { min-width: 0; }
 :lang(zh-CN) .h1, :lang(zh-CN) .h2 { line-height: 1.12; }
-
-/* Below-the-fold sections skip style/layout/paint until they near the viewport (Lighthouse mobile: the 2 300-node
-   page spent ~0.6 s of a throttled CPU on layout before the hero frame counted as painted). The size is remembered
-   once rendered, so anchors and the scrollbar settle after the first pass. */
-main > .section:not(.hero) { content-visibility: auto; contain-intrinsic-size: auto 1000px; }
