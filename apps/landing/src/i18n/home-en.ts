@@ -11,7 +11,7 @@ export const en: Home = {
     platforms: 'macOS · Windows · Linux · Web · phone',
     scenesLabel: 'What’s inside Calab',
     scenes: [
-      { key: 'voice', label: 'Voice', caption: 'Step into a room and you already hear your team. Screen share, cameras, a pointer over the stream.' },
+      { key: 'voice', label: 'Talk & streams', caption: 'Step into a room and you already hear your team. Screen share, cameras, a pointer over the stream.' },
       { key: 'chat', label: 'Chat', caption: 'Replies, reactions, voice messages, stickers. Turn any message into a task in one action.' },
       { key: 'tasks', label: 'Tasks', caption: 'Boards with priorities, due dates, assignees and a change history.' },
       { key: 'calendar', label: 'Calendar', caption: 'Meetings with a room link and a common time slot found from your colleagues’ calendars.' },

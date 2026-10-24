@@ -11,7 +11,7 @@ export const zh: Home = {
     platforms: 'macOS · Windows · Linux · 网页 · 手机',
     scenesLabel: 'Calab 里有什么',
     scenes: [
-      { key: 'voice', label: '语音', caption: '进入房间，立刻听到同事。屏幕共享、摄像头，还能在画面上用指针标注。' },
+      { key: 'voice', label: '沟通与直播', caption: '进入房间，立刻听到同事。屏幕共享、摄像头，还能在画面上用指针标注。' },
       { key: 'chat', label: '聊天', caption: '回复、表情回应、语音消息、贴纸。任何消息一步变成任务。' },
       { key: 'tasks', label: '任务', caption: '带优先级、截止日期、负责人和变更历史的看板。' },
       { key: 'calendar', label: '日历', caption: '会议附房间链接，并按同事的忙闲找到共同空档。' },

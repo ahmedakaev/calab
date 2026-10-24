@@ -11,7 +11,7 @@ export const es: Home = {
     platforms: 'macOS · Windows · Linux · Web · móvil',
     scenesLabel: 'Qué hay dentro de Calab',
     scenes: [
-      { key: 'voice', label: 'Voz', caption: 'Entras en la sala y ya oyes a tu equipo. Pantalla, cámaras y un puntero sobre la transmisión.' },
+      { key: 'voice', label: 'Voz y streams', caption: 'Entras en la sala y ya oyes a tu equipo. Pantalla, cámaras y un puntero sobre la transmisión.' },
       { key: 'chat', label: 'Chat', caption: 'Respuestas, reacciones, mensajes de voz y stickers. Cualquier mensaje se convierte en tarea con una acción.' },
       { key: 'tasks', label: 'Tareas', caption: 'Tableros con prioridades, plazos, responsables e historial de cambios.' },
       { key: 'calendar', label: 'Calendario', caption: 'Reuniones con enlace a la sala y un hueco común según la agenda de tus compañeros.' },
