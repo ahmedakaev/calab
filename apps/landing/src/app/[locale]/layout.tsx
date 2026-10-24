@@ -5,6 +5,7 @@ import { getDict, hreflangAlternates, isLocale, LOCALE_INFO, LOCALES, localePath
 import { SITE_URL } from '@/lib/site';
 import { CookiePreferences } from '@/components/cookie-preferences';
 import { YandexMetrika } from '@/components/yandex-metrika';
+import { SupportChat } from '@/components/support-chat';
 import '../globals.css';
 
 type Params = Promise<{ locale: string }>;
@@ -59,7 +60,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   if (!isLocale(locale)) notFound();
   return (
     <html lang={LOCALE_INFO[locale].lang}>
-      <body className="min-h-dvh text-fg">{children}<CookiePreferences locale={locale} /><YandexMetrika /></body>
+      <body className="min-h-dvh text-fg">{children}<CookiePreferences locale={locale} /><YandexMetrika /><SupportChat /></body>
     </html>
   );
 }
