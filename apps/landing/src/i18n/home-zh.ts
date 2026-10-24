@@ -42,6 +42,7 @@ export const zh: Home = {
   },
   telephony: {
     title: '团队内的电话总机',
+    accent: '团队内',
     lead: '接入 SIP 服务商后，同事可直接在 Calab 中接听打到你号码的来电：电脑端和网页版都行，手机也不例外。拨出电话在语音房间里拨打。',
     shots: [
       { shot: 'telephony-ivr', caption: '语音菜单：问候语和按键路由。' },
@@ -64,6 +65,7 @@ export const zh: Home = {
   },
   ai: {
     title: 'AI 用在能省时间的地方',
+    accent: '省时间',
     lead: '管理员在空间设置中一次性接入模型。未接入时 AI 不可用。',
     tiles: [
       { title: '智能任务', text: '用自己的话描述任务并附上文件——AI 选择看板并整理成任务，由你修改。', shot: 'aitask' },
@@ -83,11 +85,11 @@ export const zh: Home = {
     title: '由你掌控 — 本地部署',
     accent: '本地部署',
     facts: [
-      '自己的服务器：一个 docker compose',
-      '数据留在你所在的国家，托管由你选择',
-      'SSO、Active Directory、角色',
-      '源代码开放，BSL 1.1',
-      '无通话时 CPU 0.05%，语音中约 7%',
+      '自有服务器',
+      '数据留在本国',
+      'SSO 与 Active Directory',
+      '源码公开，BSL 1.1',
+      '空闲时 CPU 0.05%',
     ],
   },
   pricing: {

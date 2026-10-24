@@ -322,7 +322,7 @@ const ru = {
     offerLink: 'Условия оплаты и возврата',
     eyebrow: 'Тарифы',
     title: 'Free, Team, Business и Enterprise',
-    accent: 'Enterprise',
+    accent: 'Business и Enterprise',
     lead: 'Начните бесплатно. Нужно больше — Team или Business в облаке, либо Enterprise: Calab на вашем собственном сервере.',
     popular: 'Популярный',
     /** Footnote for the «*» on Business limits (owner, 24.10). */

@@ -22,7 +22,7 @@ export function AiSection({ locale }: { locale: Locale }) {
   const a = t.ai;
   return (
     <Section id="ai" labelledBy="ai-title" className="ai">
-      <SectionHeading id="ai-title" title={a.title} lead={a.lead} sticker="lightning" />
+      <SectionHeading id="ai-title" title={a.title} accent={a.accent} lead={a.lead} sticker="lightning" />
       <ul className="tile-row swipe-sm">
         {a.tiles.map((tile) => (
           <Tile
@@ -33,7 +33,7 @@ export function AiSection({ locale }: { locale: Locale }) {
             title={tile.title}
             text={tile.text}
             alt={tile.shot ? t.alts[tile.shot] : ''}
-            sizes="(min-width: 1360px) 400px, (min-width: 1024px) 30vw, 86vw"
+            sizes="(min-width: 1360px) 680px, (min-width: 1024px) 50vw, 86vw"
           />
         ))}
       </ul>

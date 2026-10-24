@@ -42,6 +42,7 @@ export const es: Home = {
   },
   telephony: {
     title: 'Una centralita dentro del equipo',
+    accent: 'dentro del equipo',
     lead: 'Conecta un proveedor SIP y tus compañeros atienden las llamadas a tu número directamente en Calab: en el ordenador y en la versión web, también en el móvil. Las salientes se marcan desde una sala de voz.',
     shots: [
       { shot: 'telephony-ivr', caption: 'Menú de voz: un saludo y rutas por teclas.' },
@@ -64,6 +65,7 @@ export const es: Home = {
   },
   ai: {
     title: 'IA donde ahorra tiempo',
+    accent: 'ahorra tiempo',
     lead: 'Un administrador conecta un modelo una sola vez en los ajustes del espacio. Sin eso, la IA no funciona.',
     tiles: [
       { title: 'Tarea inteligente', text: 'Describe la tarea con tus palabras y adjunta archivos: la IA elige el tablero y redacta la tarea, y tú la ajustas.', shot: 'aitask' },
@@ -83,11 +85,11 @@ export const es: Home = {
     title: 'Bajo tu control — on‑premise',
     accent: 'on‑premise',
     facts: [
-      'Tu propio servidor: un solo docker compose',
-      'Los datos se quedan en tu país: tú eliges el alojamiento',
-      'SSO, Active Directory, roles',
-      'Código fuente abierto, BSL 1.1',
-      '0,05 % de CPU sin llamada, ≈ 7 % en voz',
+      'Tu propio servidor',
+      'Datos en tu país',
+      'SSO y Active Directory',
+      'Código disponible, BSL 1.1',
+      '0,05 % de CPU en reposo',
     ],
   },
   pricing: {

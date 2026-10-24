@@ -321,7 +321,7 @@ const en: Dict = {
     offerLink: 'Payment and refund terms',
     eyebrow: 'Pricing',
     title: 'Free, Team, Business and Enterprise',
-    accent: 'Enterprise',
+    accent: 'Business and Enterprise',
     lead: 'Start for free. Need more? Team or Business in the cloud, or Enterprise: Calab on your own server.',
     popular: 'Popular',
     /** Footnote for the «*» on Business limits (owner, 24.10). */

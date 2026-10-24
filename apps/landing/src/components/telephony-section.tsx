@@ -1,7 +1,7 @@
 import { Bot, Hash, HardDrive, ListTree, Phone, PhoneForwarded, Users, type LucideIcon } from 'lucide-react';
 import { localePath, type Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
-import { Button, Card, nb, Section, SectionHeading, Shot } from './ui';
+import { Button, Card, FactCards, nb, Section, SectionHeading, Shot } from './ui';
 
 /** One icon per fact, in the order of `telephony.points` (all languages): number, extensions, IVR, groups, transfer, recording. */
 const POINT_ICONS: LucideIcon[] = [Phone, Hash, ListTree, Users, PhoneForwarded, HardDrive];
@@ -21,7 +21,7 @@ export function TelephonySection({ locale }: { locale: Locale }) {
   );
   return (
     <Section id="telephony" labelledBy="telephony-title" className="telephony">
-      <SectionHeading id="telephony-title" title={p.title} lead={p.lead} sticker="headphones" />
+      <SectionHeading id="telephony-title" title={p.title} accent={p.accent} lead={p.lead} sticker="headphones" />
       <div className="telephony-grid">
         {figure(call)}
         {figure(ivr)}
@@ -43,28 +43,7 @@ export function TelephonySection({ locale }: { locale: Locale }) {
           </div>
         </Card>
       </div>
-      {/* The icons' stroke gradient, in the 24-unit icon space so straight segments (zero-height boxes) get it too. */}
-      <svg width="0" height="0" className="absolute" aria-hidden="true" focusable="false">
-        <defs>
-          <linearGradient id="fact-icon-gradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#8fe3ff" />
-            <stop offset="1" stopColor="#5865ff" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <ul className="fact-cards telephony-points">
-        {p.points.map((point, i) => {
-          const Icon = POINT_ICONS[i] ?? Phone;
-          return (
-            <li key={point} className="fact-card">
-              <span className="fact-icon" aria-hidden="true">
-                <Icon size={44} strokeWidth={1.6} color="url(#fact-icon-gradient)" />
-              </span>
-              <span>{nb(point)}</span>
-            </li>
-          );
-        })}
-      </ul>
+      <FactCards id="telephony" className="telephony-points" items={p.points.map((text, i) => ({ icon: POINT_ICONS[i] ?? Phone, text }))} />
     </Section>
   );
 }

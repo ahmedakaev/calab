@@ -410,7 +410,7 @@ details[open] .chevron { transform: rotate(180deg); }
 .fact-cards { display: grid; gap: 12px; list-style: none; }
 @media (min-width: 640px) { .fact-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; } }
 @media (min-width: 1024px) { .fact-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } }
-.fact-card { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 16px; min-height: 168px; padding: 28px 24px; border-radius: 20px; background: var(--color-card); text-align: center; font-size: 16px; line-height: 1.45; text-wrap: balance; }
+.fact-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 160px; padding: 28px 24px; font-weight: 600; border-radius: 20px; background: var(--color-card); text-align: center; font-size: 16px; line-height: 1.45; text-wrap: balance; }
 .fact-icon { display: grid; place-items: center; flex-shrink: 0; }
 @media (max-width: 639px) { .fact-card { min-height: 0; padding: 22px 20px; gap: 12px; } .fact-icon svg { width: 34px; height: 34px; } }
 .check-list { display: grid; gap: 12px; list-style: none; font-size: 17px; line-height: 1.45; }
@@ -442,11 +442,9 @@ details[open] .chevron { transform: rotate(180deg); }
 
 /* ---------- Phone panel ---------- */
 /* A neutral card like the rest of the page (the dark blue read as a foreign block on the grey); «Скоро» is a corner badge. */
-.phone-panel { position: relative; display: grid; gap: 40px; align-items: center; padding: 28px 24px; border-radius: 28px; background: var(--color-card); }
-.phone-corner { position: absolute; top: 20px; left: 24px; z-index: 1; }
-@media (max-width: 1023px) { .phone-panel { padding-top: 60px; } }
-@media (min-width: 1024px) { .phone-corner { top: 28px; left: 56px; } }
-@media (min-width: 1024px) { .phone-panel { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 56px; padding: 40px 56px; } }
+.phone-panel { display: grid; gap: 32px; align-items: center; padding: 28px; border-radius: 28px; background: var(--color-card); }
+.phone-corner { margin-bottom: 16px; }
+@media (min-width: 1024px) { .phone-panel { grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 56px; padding: 56px; } }
 .phone-soon { margin-top: 20px; font-size: 16px; line-height: 1.5; }
 .phone-open { margin-top: 28px; }
 .phone-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(8px, 2vw, 20px); align-items: start; list-style: none; max-width: 520px; margin-inline: auto; width: 100%; }
@@ -504,10 +502,8 @@ details[open] .chevron { transform: rotate(180deg); }
 .control-hub > img:first-child { width: 49px; height: 56px; object-fit: contain; }
 .control-hub > strong { max-width: 150px; text-align: center; font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1.1; }
 .control-hub .control-hub-sticker { position: absolute; width: 88px; height: 88px; object-fit: contain; right: -16px; bottom: -36px; transform: rotate(-15deg); pointer-events: none; }
-.control-facts { display: grid; gap: 12px; margin-top: 32px; list-style: none; }
-.control-facts li { display: flex; align-items: center; min-height: 64px; padding: 16px 18px; border-radius: 16px; background: var(--color-card); font-size: 16px; line-height: 1.35; }
-@media (min-width: 640px) { .control-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { .control-facts { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; } }
+.control-facts { margin-top: 32px; }
+@media (min-width: 1024px) { .control-facts { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .control-foundations { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px 24px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--action-hover); }
 .control-foundations > div { display: flex; flex-direction: column; gap: 6px; }
 .control-foundations > div > span { color: var(--color-text-secondary); font-size: 13px; }

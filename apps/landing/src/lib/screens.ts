@@ -80,7 +80,8 @@ export type ScreenName = keyof typeof SCREENS;
  * pixels, so the page draws no rounded frame of its own around them (Shot → .shot-window). Their phone crops have
  * no corners and keep the usual frame.
  */
-const WINDOWS: ReadonlySet<ScreenName> = new Set<ScreenName>(['voice', 'chat-full', 'kanban-full', 'calendar-week', 'mail', 'mail-window', 'wiki-full', 'canvas', 'disk-full', 'phone-call', 'phone-incoming']);
+// aitask: its committed files are masked to the dialog's rounded shape (transparent outside), so it shows frameless too.
+const WINDOWS: ReadonlySet<ScreenName> = new Set<ScreenName>(['voice', 'chat-full', 'kanban-full', 'calendar-week', 'mail', 'mail-window', 'wiki-full', 'canvas', 'disk-full', 'phone-call', 'phone-incoming', 'aitask']);
 export const isWindow = (name: ScreenName): boolean => WINDOWS.has(name);
 
 /** The phone crop of a screen that has one (`<name>-focus.webp`), or undefined. */

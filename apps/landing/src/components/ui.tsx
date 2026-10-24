@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { preload } from 'react-dom';
 import { LOCALE_INFO, type Locale } from '@/i18n/locales';
 import { SCREENS, focusOf, isWindow, type ScreenName } from '@/lib/screens';
@@ -140,6 +141,34 @@ export function Card({ children, className, as: Tag = 'div', id }: { children: R
 }
 
 /** Plan / «Скоро» / «Приложение для компьютера». */
+/** One-line facts as centred cards with a large gradient-stroked icon (telephony, «Под вашим контролем»). `id` names the gradient. */
+export function FactCards({ id, items, className }: { id: string; items: ReadonlyArray<{ icon: LucideIcon; text: string }>; className?: string | undefined }) {
+  const gradient = `fact-gradient-${id}`;
+  return (
+    <>
+      {/* The stroke gradient in the 24-unit icon space, so straight segments (zero-height boxes) get it too. */}
+      <svg width="0" height="0" className="absolute" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id={gradient} x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor="#8fe3ff" />
+            <stop offset="1" stopColor="#5865ff" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <ul className={cx('fact-cards', className)}>
+        {items.map(({ icon: Icon, text }) => (
+          <li key={text} className="fact-card">
+            <span className="fact-icon" aria-hidden="true">
+              <Icon size={44} strokeWidth={1.6} color={`url(#${gradient})`} />
+            </span>
+            <span>{nb(text)}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function Badge({ children, tone = 'outline', className }: { children: ReactNode; tone?: 'solid' | 'outline'; className?: string | undefined }) {
   return <span className={cx('badge', `badge-${tone}`, className)}>{children}</span>;
 }

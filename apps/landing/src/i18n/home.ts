@@ -67,6 +67,8 @@ export type Home = {
   };
   telephony: {
     title: string;
+    /** The words of the title set in the accent (must occur in it). */
+    accent: string;
     lead: string;
     shots: Tuple<{ shot: SceneName; caption: string }, 3>;
     points: Tuple<string, 6>;
@@ -78,6 +80,8 @@ export type Home = {
   };
   ai: {
     title: string;
+    /** The words of the title set in the accent (must occur in it). */
+    accent: string;
     lead: string;
     /** Third tile has no screenshot: a three-line MCP snippet is drawn instead (`shot` is null). */
     tiles: Tuple<{ title: string; text: string; shot: SceneName | null }, 3>;
@@ -157,6 +161,7 @@ export const ru: Home = {
   },
   telephony: {
     title: 'Телефонная станция в команде',
+    accent: 'в команде',
     lead: 'Подключите SIP-провайдера, и входящие на ваш номер принимают сотрудники прямо в Calab: на компьютере и в веб-версии, в том числе на телефоне. Исходящие набираются из голосовой комнаты.',
     shots: [
       { shot: 'telephony-ivr', caption: 'Голосовое меню: приветствие и маршруты по кнопкам.' },
@@ -179,6 +184,7 @@ export const ru: Home = {
   },
   ai: {
     title: 'AI там, где он экономит время',
+    accent: 'экономит время',
     lead: 'Администратор один раз подключает модель в настройках пространства. Без этого AI не работает.',
     tiles: [
       { title: 'Умная задача', text: 'Опишите задачу своими словами и приложите файлы — ИИ выберет доску и оформит задачу, а вы её поправите.', shot: 'aitask' },
@@ -198,11 +204,11 @@ export const ru: Home = {
     title: 'Под вашим контролем — on‑premise',
     accent: 'on‑premise',
     facts: [
-      'Свой сервер: один docker compose',
-      'Данные в вашей стране — вы выбираете хостинг',
-      'SSO, Active Directory, роли',
-      'Исходный код открыт, BSL 1.1',
-      '0,05 % CPU без звонка, ≈ 7 % в голосе',
+      'Свой сервер',
+      'Данные в вашей стране',
+      'SSO и Active Directory',
+      'Код открыт, BSL 1.1',
+      '0,05 % CPU без звонка',
     ],
   },
   pricing: {

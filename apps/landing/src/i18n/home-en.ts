@@ -42,6 +42,7 @@ export const en: Home = {
   },
   telephony: {
     title: 'A phone system inside your team',
+    accent: 'inside your team',
     lead: 'Connect a SIP provider and your colleagues answer calls to your number right in Calab: on desktop and on the web, phones included. Outgoing calls are dialed from a voice room.',
     shots: [
       { shot: 'telephony-ivr', caption: 'Voice menu: a greeting and routes on the keys.' },
@@ -64,6 +65,7 @@ export const en: Home = {
   },
   ai: {
     title: 'AI where it saves time',
+    accent: 'saves time',
     lead: 'An administrator connects a model once in the workspace settings. Without that, AI does not work.',
     tiles: [
       { title: 'Smart task', text: 'Describe the task in your own words and attach files — the AI picks a board and drafts the task, and you adjust it.', shot: 'aitask' },
@@ -83,11 +85,11 @@ export const en: Home = {
     title: 'Under your control — on‑premise',
     accent: 'on‑premise',
     facts: [
-      'Your own server: one docker compose',
-      'Data stays in your country — you choose the hosting',
-      'SSO, Active Directory, roles',
-      'Open source code, BSL 1.1',
-      '0.05% CPU without a call, ≈ 7% in voice',
+      'Your own server',
+      'Data in your country',
+      'SSO and Active Directory',
+      'Source available, BSL 1.1',
+      '0.05% CPU when idle',
     ],
   },
   pricing: {
