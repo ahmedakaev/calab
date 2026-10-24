@@ -402,13 +402,15 @@ details[open] .chevron { transform: rotate(180deg); }
 .telephony-grid { display: grid; gap: 32px 24px; align-items: start; }
 .telephony-grid figcaption { margin-top: 12px; }
 @media (min-width: 1024px) { .telephony-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-.telephony-points { margin-top: 24px; }
-/* Compact fact cards (telephony): icon + one line, 3 / 2 / 1 columns. */
+.telephony-points { margin-top: 56px; }
+@media (min-width: 1024px) { .telephony-points { margin-top: 72px; } }
+/* Fact cards (telephony): an icon chip on top, the line centred under it; 3 / 2 / 1 columns, equal heights in a row. */
 .fact-cards { display: grid; gap: 12px; list-style: none; }
-@media (min-width: 640px) { .fact-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { .fact-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
-.fact-card { display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 14px 18px; border-radius: 16px; background: var(--color-card); font-size: 16px; line-height: 1.35; }
-.fact-card svg { flex-shrink: 0; color: var(--color-accent-text); }
+@media (min-width: 640px) { .fact-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; } }
+@media (min-width: 1024px) { .fact-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; } }
+.fact-card { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 16px; min-height: 168px; padding: 28px 24px; border-radius: 20px; background: var(--color-card); text-align: center; font-size: 16px; line-height: 1.45; text-wrap: balance; }
+.fact-icon { display: grid; place-items: center; flex-shrink: 0; width: 52px; height: 52px; border-radius: 16px; color: #cfe0ff; background: linear-gradient(145deg, rgb(23 72 255 / .38), rgb(115 173 255 / .12)); box-shadow: inset 0 0 0 1px rgb(115 173 255 / .22); }
+@media (max-width: 639px) { .fact-card { min-height: 0; padding: 22px 20px; gap: 12px; } .fact-icon { width: 44px; height: 44px; border-radius: 14px; } }
 .check-list { display: grid; gap: 12px; list-style: none; font-size: 17px; line-height: 1.45; }
 .check-list li { display: flex; gap: 12px; }
 .check-list svg { flex-shrink: 0; margin-top: 4px; color: var(--color-accent-text); }

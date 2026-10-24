@@ -48,7 +48,9 @@ export function TelephonySection({ locale }: { locale: Locale }) {
           const Icon = POINT_ICONS[i] ?? Phone;
           return (
             <li key={point} className="fact-card">
-              <Icon aria-hidden="true" size={20} strokeWidth={1.9} />
+              <span className="fact-icon" aria-hidden="true">
+                <Icon size={22} strokeWidth={1.9} />
+              </span>
               <span>{nb(point)}</span>
             </li>
           );
