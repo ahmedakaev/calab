@@ -68,10 +68,9 @@ export function Section({
   );
 }
 
-/** Eyebrow + H2 + lead (max 760), an optional sticker on the right (180 / 90 px). */
+/** H2 + lead (max 760), an optional sticker on the right (180 / 90 px). No eyebrow (owner, 24.10). */
 export function SectionHeading({
   id,
-  eyebrow,
   title,
   lead,
   sticker,
@@ -79,7 +78,6 @@ export function SectionHeading({
   as: Tag = 'h2',
 }: {
   id: string;
-  eyebrow?: string | undefined;
   title: string;
   lead?: ReactNode | undefined;
   sticker?: string | undefined;
@@ -89,7 +87,6 @@ export function SectionHeading({
   return (
     <div className={cx('heading', center && 'heading-center')}>
       <div className="heading-copy">
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <Tag id={id} className={Tag === 'h1' ? 'h1 heading-h1' : 'h2'}>
           {nb(title)}
         </Tag>

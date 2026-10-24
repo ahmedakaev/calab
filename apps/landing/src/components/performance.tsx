@@ -44,7 +44,7 @@ export function Performance({ t, locale }: { t: T; locale: Locale }) {
   const val = (n: number, unit: 'mb' | '%'): string => (unit === 'mb' ? `${num(n, 1)}\u00a0${t.mb}` : pct(n));
   return (
     <Section id="performance" labelledBy="performance-title">
-      <SectionHeading id="performance-title" eyebrow={t.eyebrow} title={t.title} lead={t.lead} />
+      <SectionHeading id="performance-title" title={t.title} lead={t.lead} />
 
       <div className="mt-12 rounded-[20px] border border-line bg-card p-6 sm:mt-16 sm:p-8">
         <h3 className="text-[21px] leading-7 font-semibold tracking-tight">{t.idleTitle}</h3>

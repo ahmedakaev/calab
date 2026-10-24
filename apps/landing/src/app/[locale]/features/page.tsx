@@ -19,7 +19,6 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
       <main id="main" className="site">
         <section className="section page-hero" aria-labelledby="features-page-title">
           <Container>
-            <p className="eyebrow">Calab</p>
             <h1 id="features-page-title" className="h1 heading-h1">
               {s.detail}
             </h1>

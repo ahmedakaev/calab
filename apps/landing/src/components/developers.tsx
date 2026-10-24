@@ -53,7 +53,7 @@ export function DevelopersPage({ locale, bots }: { locale: Locale; bots: Dict['b
     <>
       <section id="top" aria-labelledby="developers-title" className="section page-hero">
         <Container>
-          <SectionHeading id="developers-title" as="h1" eyebrow={d.eyebrow} title={d.title} lead={d.lead} sticker="lightning" />
+          <SectionHeading id="developers-title" as="h1" title={d.title} lead={d.lead} sticker="lightning" />
           <nav aria-label={d.eyebrow} className="page-nav">
             {nav.map((n) => (
               <a key={n.id} href={`#${n.id}`} className="chip">
@@ -65,7 +65,7 @@ export function DevelopersPage({ locale, bots }: { locale: Locale; bots: Dict['b
       </section>
 
       <Section id="bots" labelledBy="bots-title">
-        <SectionHeading id="bots-title" eyebrow={bots.eyebrow} title={bots.title} lead={bots.lead} />
+        <SectionHeading id="bots-title" title={bots.title} lead={bots.lead} />
         <ul className="card-grid card-grid-4">
           {CARDS.map((c) => (
             <Card as="li" key={c.id}>
@@ -85,7 +85,7 @@ export function DevelopersPage({ locale, bots }: { locale: Locale; bots: Dict['b
       </Section>
 
       <Section id="mcp" labelledBy="mcp-title">
-        <SectionHeading id="mcp-title" eyebrow={mcp.eyebrow} title={mcp.title} lead={mcp.lead} />
+        <SectionHeading id="mcp-title" title={mcp.title} lead={mcp.lead} />
         <div className="split">
           <ul className="card-grid card-grid-2">
             {mcp.points.map((p) => (
@@ -116,7 +116,7 @@ export function DevelopersPage({ locale, bots }: { locale: Locale; bots: Dict['b
       </Section>
 
       <Section id="sdk" labelledBy="sdk-title">
-        <SectionHeading id="sdk-title" eyebrow="@calaba/bot-sdk" title={d.sdkTitle} lead={d.sdkLead} />
+        <SectionHeading id="sdk-title" title={d.sdkTitle} lead={d.sdkLead} />
         <figure className="code-figure">
           <div className="code-window">
             <pre lang="en">
@@ -160,7 +160,7 @@ export function DevelopersPage({ locale, bots }: { locale: Locale; bots: Dict['b
 
       <Section id="oauth" labelledBy="oauth-title">
         <div className="split">
-          <SectionHeading id="oauth-title" eyebrow="OAuth 2.0 · OpenID Connect" title={d.oauthTitle} lead={d.oauthLead} />
+          <SectionHeading id="oauth-title" title={d.oauthTitle} lead={d.oauthLead} />
           <Card>
             <Points items={d.oauthPoints} />
             <div className="button-row button-row-start">

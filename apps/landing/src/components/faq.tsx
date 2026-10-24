@@ -18,7 +18,7 @@ export function Faq({ t, locale }: { t: Dict['faq']; locale: Locale }) {
   );
   return (
     <Section id="faq" labelledBy="faq-title">
-      <SectionHeading id="faq-title" eyebrow={t.eyebrow} title={t.title} sticker="faq" />
+      <SectionHeading id="faq-title" title={t.title} sticker="faq" />
       <div className="faq-grid">
         {ORDER.map((id) => (
           <details key={id} className="faq-card">

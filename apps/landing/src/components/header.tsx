@@ -4,6 +4,7 @@ import { localePath } from '@/i18n/locales';
 import { APP_URL } from '@/lib/site';
 import { DrawnLink } from './drawn-link';
 import { LocaleSwitcher } from './locale-switcher';
+import { SiteMenu } from './site-menu';
 import { Container } from './ui';
 
 /**
@@ -43,11 +44,7 @@ export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Lo
         </nav>
         <div className="site-header-actions">
           <LocaleSwitcher locale={locale} label={t.language} page={page} />
-          <details className="site-menu">
-            <summary aria-label={t.navLabel}>
-              <span />
-              <span />
-            </summary>
+          <SiteMenu label={t.navLabel}>
             <nav aria-label={t.navLabel}>
               {nav.map((l) => (
                 <a href={l.href} key={l.href} aria-current={l.current ? 'page' : undefined}>
@@ -55,7 +52,7 @@ export function Header({ t, locale, page = '' }: { t: Dict['header']; locale: Lo
                 </a>
               ))}
             </nav>
-          </details>
+          </SiteMenu>
           {/* Phones: the short label, so logo + language + menu + button fit 360 px in every locale. */}
           <a href={APP_URL} className="topbar-action">
             <span className="topbar-action-dots" aria-hidden="true">

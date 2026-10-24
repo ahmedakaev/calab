@@ -1,31 +1,14 @@
 import {
   ArrowRight,
-  AppWindow,
-  AudioLines,
-  Bot,
   CalendarCheck,
   CalendarClock,
   CalendarSync,
   Check,
-  DoorOpen,
-  FolderOpen,
   KeyRound,
-  LayoutGrid,
   Lock,
-  MessagesSquare,
-  BookOpenText,
-  Bell,
-  CircleDot,
-  Shapes,
-  Sparkles,
-  Server,
   ShieldCheck,
   Globe,
   Guitar,
-  Headphones,
-  Phone,
-  Mail,
-  Search,
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -42,17 +25,11 @@ import { Container, nb, Shot, cx } from './ui';
 
 type T = Dict['features'];
 
-/** Section title block: an icon chip + eyebrow, a large title, the text. */
-function Intro({ id, icon: Icon, eyebrow, title, text, center }: { id: string; icon: LucideIcon; eyebrow: string; title: string; text: string; center?: boolean }) {
+/** Section title block: a large title and the text (no eyebrow above headings, owner 24.10). */
+function Intro({ id, title, text, center }: { id: string; title: string; text: string; center?: boolean }) {
   return (
     <div className={center ? 'mx-auto max-w-[760px] text-center' : undefined}>
-      <p className={cx('flex items-center gap-2 text-[15px] leading-5 font-semibold text-accent-text', center && 'justify-center')}>
-        <span className="inline-flex size-7 items-center justify-center rounded-lg bg-accent-tint">
-          <Icon aria-hidden="true" className="size-4" strokeWidth={2} />
-        </span>
-        {eyebrow}
-      </p>
-      <h2 id={id} className="h2 mt-5">
+      <h2 id={id} className="h2">
         {nb(title)}
       </h2>
       <p className="lead">{nb(text)}</p>
@@ -150,7 +127,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         text={
           <>
             <span id="video" className="anchor-alias" />
-            <Intro id="voice-title" icon={AudioLines} {...t.voice} />
+            <Intro id="voice-title" {...t.voice} />
             <Points items={t.voice.points} className="mt-7" />
           </>
         }
@@ -163,7 +140,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="sound-title" icon={Headphones} {...t.sound} />
+            <Intro id="sound-title" {...t.sound} />
             <Points items={t.sound.points} className="mt-7" />
             <div id="musician" className="mt-8 rounded-[20px] border border-line bg-card p-6">
               <p className="flex items-center gap-2 text-[14px] leading-5 font-semibold text-accent-text">
@@ -183,7 +160,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         <Container>
           <div className="grid items-center gap-10 lg:grid-cols-12 lg:gap-14">
             <div className="min-w-0 lg:col-span-5">
-              <Intro id="sip-title" icon={Phone} {...t.sip} />
+              <Intro id="sip-title" {...t.sip} />
               <Points items={t.sip.points} className="mt-7" />
               <p className="mt-5 text-[14px] leading-5 text-fg-2">{t.sip.note}</p>
             </div>
@@ -205,7 +182,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="chat-title" icon={MessagesSquare} {...t.chat} />
+            <Intro id="chat-title" {...t.chat} />
             <Points items={t.chat.points} className="mt-7" />
           </>
         }
@@ -217,7 +194,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="canvas-title" icon={Shapes} {...x.canvas} />
+            <Intro id="canvas-title" {...x.canvas} />
             <Points items={x.canvas.points} className="mt-7" />
           </>
         }
@@ -229,7 +206,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         alt
         text={
           <>
-            <Intro id="recording-title" icon={CircleDot} {...x.recording} />
+            <Intro id="recording-title" {...x.recording} />
             <Points items={x.recording.points} className="mt-7" />
           </>
         }
@@ -238,7 +215,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
 
       <section id="calendar" aria-labelledby="calendar-title" className="section">
         <Container>
-          <Intro id="calendar-title" icon={CalendarCheck} center {...t.calendar} />
+          <Intro id="calendar-title" center {...t.calendar} />
           <ul className="mt-10 grid gap-4 md:grid-cols-3">
             <Card icon={CalendarCheck} {...t.calendar.cards.invites} />
             <Card icon={CalendarClock} {...t.calendar.cards.find} />
@@ -255,7 +232,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         <Container>
           <div className="grid gap-8 lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-7">
-              <Intro id="boards-title" icon={LayoutGrid} {...t.boards} />
+              <Intro id="boards-title" {...t.boards} />
             </div>
             <div className="lg:col-span-5">
               <Points items={t.boards.points} />
@@ -276,7 +253,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         id="mail"
         text={
           <>
-            <Intro id="mail-title" icon={Mail} {...t.mail} />
+            <Intro id="mail-title" {...t.mail} />
             <Points items={t.mail.points} className="mt-7" />
             <p className="mt-5 text-[14px] leading-5 text-fg-2">{t.mail.note}</p>
           </>
@@ -290,7 +267,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="search-title" icon={Search} {...t.search} />
+            <Intro id="search-title" {...t.search} />
             <Points items={t.search.points} className="mt-7" />
           </>
         }
@@ -305,7 +282,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         id="wiki"
         text={
           <>
-            <Intro id="wiki-title" icon={BookOpenText} {...t.wiki} />
+            <Intro id="wiki-title" {...t.wiki} />
             <Points items={t.wiki.points} className="mt-7" />
           </>
         }
@@ -318,7 +295,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="disk-title" icon={FolderOpen} {...t.disk} />
+            <Intro id="disk-title" {...t.disk} />
             <Points items={t.disk.points} className="mt-7" />
           </>
         }
@@ -329,7 +306,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         id="guests"
         text={
           <>
-            <Intro id="guests-title" icon={DoorOpen} {...t.guests} />
+            <Intro id="guests-title" {...t.guests} />
             <Points items={t.guests.points} className="mt-7" />
           </>
         }
@@ -349,7 +326,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="webapps-title" icon={AppWindow} {...t.webapps} />
+            <Intro id="webapps-title" {...t.webapps} />
             <Points items={t.webapps.points} className="mt-7" />
           </>
         }
@@ -360,7 +337,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         id="notifications"
         text={
           <>
-            <Intro id="notifications-title" icon={Bell} eyebrow={notify.eyebrow} title={notify.title} text={notify.lead} />
+            <Intro id="notifications-title" title={notify.title} text={notify.lead} />
             <Points items={notify.levels} className="mt-7" />
           </>
         }
@@ -373,7 +350,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         flip
         text={
           <>
-            <Intro id="ai-title" icon={Sparkles} {...x.ai} />
+            <Intro id="ai-title" {...x.ai} />
             <Points items={x.ai.points} className="mt-7" />
           </>
         }
@@ -384,7 +361,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
         id="bots"
         text={
           <>
-            <Intro id="bots-title" icon={Bot} {...t.bots} />
+            <Intro id="bots-title" {...t.bots} />
             <Points items={t.bots.points} className="mt-7" />
             <a href={localePath(locale, 'developers/')} className="link mt-7 inline-flex items-center gap-1 text-[16px] leading-6 font-medium">
               {t.bots.link}
@@ -410,7 +387,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
       <section id="self-hosted" aria-labelledby="self-hosted-title" className="section">
         <span id="roles" className="anchor-alias" />
         <Container>
-          <Intro id="self-hosted-title" icon={Server} center {...t.selfhost} />
+          <Intro id="self-hosted-title" center {...t.selfhost} />
           <ol className="mt-12 grid gap-4 md:grid-cols-3 md:gap-6">
             {(['server', 'install', 'invite'] as const).map((id, i) => (
               <li key={id} className="card">

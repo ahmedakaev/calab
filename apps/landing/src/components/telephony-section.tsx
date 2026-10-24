@@ -1,7 +1,6 @@
 import { Bot, Check } from 'lucide-react';
 import { localePath, type Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
-import { getTelephony } from '@/i18n/telephony';
 import { Button, Card, nb, Section, SectionHeading, Shot } from './ui';
 
 /** «Телефония» (§4.5): the live calls, the IVR and the groups, the bot block, six one-line facts, the bot block. Business and Enterprise. */
@@ -19,7 +18,7 @@ export function TelephonySection({ locale }: { locale: Locale }) {
   );
   return (
     <Section id="telephony" labelledBy="telephony-title" className="telephony">
-      <SectionHeading id="telephony-title" eyebrow={getTelephony(locale).eyebrow} title={p.title} lead={p.lead} sticker="headphones" />
+      <SectionHeading id="telephony-title" title={p.title} lead={p.lead} sticker="headphones" />
       <div className="telephony-grid">
         {figure(call)}
         {figure(ivr)}
