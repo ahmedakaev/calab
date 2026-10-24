@@ -17,7 +17,7 @@ export type SceneName =
   // hero: whole windows (a phone crop each, lib/screens.ts `focus`)
   | 'voice' | 'chat-full' | 'kanban-full' | 'calendar-week' | 'wiki-full' | 'canvas' | 'phone-call'
   // the day story
-  | 'story-message' | 'story-task' | 'story-meeting' | 'recording-focus' | 'story-wiki' | 'story-canvas'
+  | 'story-message' | 'story-task' | 'story-meeting' | 'recording-focus' | 'story-wiki'
   // catalogue tiles (≤ 860 px wide, about 16:10: cut out of the scenes, scripts/assets.mjs `from`)
   | 'voice-panel' | 'gallery' | 'chat-focus' | 'phone-call-panel' | 'temp-room'
   | 'kanban-panel' | 'taskhistory-panel' | 'timeline-panel' | 'findtime-panel' | 'wiki-focus' | 'canvas-panel' | 'disk-panel' | 'mail-panel'
@@ -73,9 +73,9 @@ export type Home = {
     lead: string;
   };
   story: {
+    /** Visually hidden: the section opens straight with the steps (owner, 24.10). */
     title: string;
-    lead: string;
-    steps: Tuple<{ title: string; text: string; shot: SceneName }, 6>;
+    steps: Tuple<{ title: string; text: string; shot: SceneName }, 7>;
     cta: string;
   };
   catalog: {
@@ -161,14 +161,14 @@ export const ru: Home = {
   },
   story: {
     title: 'Один день команды — не выходя из окна',
-    lead: 'Сообщение становится задачей, у задачи появляется встреча, встреча оставляет запись и расшифровку, итог — на странице вики и на холсте. Всё ссылается друг на друга.',
     steps: [
       { title: 'Из сообщения — в задачу', text: 'Клиент просит выгрузку? Откройте меню сообщения и выберите «Создать задачу» — задача заводится прямо из чата.', shot: 'story-message' },
       { title: 'Задача с чек-листом и согласованием', text: 'Исполнители, срок, чек-лист и согласующий — всё в одной панели задачи.', shot: 'story-task' },
       { title: 'Встреча прямо в комнате', text: 'Событие в календаре открывает голосовую комнату: участникам достаточно нажать «Перейти».', shot: 'story-meeting' },
       { title: 'Запись и расшифровка — в чат', text: 'После встречи в чате комнаты появляется карточка: решения, запись и полный транскрипт.', shot: 'recording-focus' },
       { title: 'Итог — на странице вики', text: 'На странице — план работ и ссылки на задачу и холст. Один клик — и вы на месте.', shot: 'story-wiki' },
-      { title: 'Ретро — на холсте', text: 'Ссылка на холст приходит в чат и открывается в один клик. Стикеры и голосование — всей командой.', shot: 'story-canvas' },
+      { title: 'Файлы — на облачном диске', text: 'Макеты, договоры и записи встреч лежат на диске команды: папки с доступом, превью и публичные ссылки.', shot: 'disk-panel' },
+      { title: 'Ретро — на холсте', text: 'Стикеры по колонкам, голосование и таймер: команда разбирает спринт вместе и видит курсоры друг друга.', shot: 'canvas-panel' },
     ],
     cta: 'Все возможности',
   },
@@ -346,7 +346,6 @@ export const ru: Home = {
     'story-meeting': 'Событие «Ревью экспорта CSV» в 15:00 в комнате «Переговорка» с кнопкой «Перейти» и ответами четырёх участников',
     'recording-focus': 'Карточка записанной встречи в чате комнаты: три решения, кнопка воспроизведения и «Полный транскрипт»',
     'story-wiki': 'Страница вики «Экспорт в CSV»: план работ и ссылки на задачу APP-7 и холст «Ретро спринта 12»',
-    'story-canvas': 'Карточка холста «Ретро спринта 12» в чате и ответ Дины Лебедевой',
     'voice-panel': 'Сцена голосовой комнаты: Вера Ким показывает экран, внизу панель инструментов',
     'gallery': 'Видеовстреча в режиме «Галерея»: три камеры и плитка с аватаром, говорящий подсвечен',
     'chat-focus': 'Лента чата: закреплённое сообщение, ответ с цитатой и реакцией, карточка задачи APP-7',

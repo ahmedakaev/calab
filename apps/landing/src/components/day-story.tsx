@@ -2,15 +2,20 @@ import type { CSSProperties } from 'react';
 import type { Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
 import { StoryScroller } from './story-scroller';
-import { DrawnLink, nb, Section, SectionHeading, Shot } from './ui';
+import { DrawnLink, nb, Section, Shot } from './ui';
 
-/** «Один день команды» (§4.3): six steps of one task (APP-7) across chat, board, calendar, recording, wiki, canvas. */
+/**
+ * «Один день команды» (§4.3): the steps of one day across chat, board, calendar, recording, wiki, disk, canvas.
+ * The heading is visually hidden (owner, 24.10): the section opens straight with the steps.
+ */
 export function DayStory({ locale }: { locale: Locale }) {
   const t = getHome(locale);
   const s = t.story;
   return (
     <Section id="story" labelledBy="story-title" className="story">
-      <SectionHeading id="story-title" title={s.title} lead={s.lead} />
+      <h2 id="story-title" className="sr-only">
+        {s.title}
+      </h2>
       <StoryScroller>
         {s.steps.map((step, i) => (
           <li key={step.shot} data-step={i} className="story-step" style={{ '--row': i + 1 } as CSSProperties}>

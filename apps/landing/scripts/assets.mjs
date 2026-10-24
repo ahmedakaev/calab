@@ -63,7 +63,6 @@ export const CROPS = {
   'story-task': { left: 329, top: 39, width: 860, height: 860 },
   'story-meeting': { left: 1120, top: 39, width: 320, height: 560 },
   'story-wiki': { left: 527, top: 318, width: 720, height: 520 },
-  'story-canvas': { left: 329, top: 636, width: 860, height: 208 },
   'phone-canvas': { left: 0, top: 0, width: 390, height: 844 },
   'wiki-full': { left: 0, top: 0, width: 1440, height: 900, focus: { left: 333, top: 89, width: 720, height: 560, own: true } },
   'wiki-focus': { left: 333, top: 39, width: 860, height: 538 },

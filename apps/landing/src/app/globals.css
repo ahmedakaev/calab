@@ -372,11 +372,12 @@ details[open] .chevron { transform: rotate(180deg); }
 @media (min-width: 1024px) {
   .story-steps.story-sticky { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 64px; row-gap: 0; }
   .story-sticky .story-step { display: contents; }
-  .story-sticky .story-text { grid-column: 1; grid-row: var(--row); display: flex; flex-direction: column; justify-content: center; min-height: 120px; padding-block: 10px; }
+  /* Each step holds a third of the screen of scroll: a 130 px step went by in one wheel notch and read as skipped. */
+  .story-sticky .story-text { grid-column: 1; grid-row: var(--row); display: flex; flex-direction: column; justify-content: center; min-height: max(160px, 34svh); padding-block: 10px; }
   .story-sticky .story-step:not([data-active]) .h3 { color: #8d8d95; }
   .story-sticky .story-step:not([data-active]) .story-index { color: #8d8d95; }
 
-  .story-sticky .story-shot { grid-column: 2; grid-row: 1 / span 6; align-self: start; position: sticky; top: calc(var(--header-h) + max(24px, (100svh - var(--header-h) - 520px) / 2)); opacity: 0; visibility: hidden; }
+  .story-sticky .story-shot { grid-column: 2; grid-row: 1 / span 8; align-self: start; position: sticky; top: calc(var(--header-h) + max(24px, (100svh - var(--header-h) - 520px) / 2)); opacity: 0; visibility: hidden; }
   .story-sticky .story-step[data-active] .story-shot { opacity: 1; visibility: visible; }
   .story-steps:not(.story-sticky) .story-step { grid-template-columns: 5fr 7fr; gap: 64px; }
 }

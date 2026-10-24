@@ -24,8 +24,20 @@ export function StoryScroller({ children }: { children: ReactNode }) {
       list.classList.toggle('story-sticky', wide.matches);
       if (!wide.matches) return;
       show('0');
-      observer = new IntersectionObserver((entries) => {
-        for (const e of entries) if (e.isIntersecting) show(e.target.closest<HTMLElement>('[data-step]')?.dataset.step ?? '0');
+      // The callback only says «something crossed the middle band»; the active step is then the one whose text
+      // spans the middle of the screen (or the nearest), so a batch of entries never picks a stale one.
+      const texts = steps.map((st) => st.querySelector<HTMLElement>('.story-text'));
+      observer = new IntersectionObserver(() => {
+        const mid = window.innerHeight / 2;
+        let best = 0;
+        let dist = Infinity;
+        texts.forEach((t, i) => {
+          if (!t) return;
+          const r = t.getBoundingClientRect();
+          const d = r.top <= mid && r.bottom >= mid ? 0 : Math.min(Math.abs(r.top - mid), Math.abs(r.bottom - mid));
+          if (d < dist) { dist = d; best = i; }
+        });
+        show(String(best));
       }, { rootMargin: '-45% 0px -45% 0px' });
       steps.forEach((s) => {
         const text = s.querySelector('.story-text');

@@ -24,7 +24,6 @@ export const SCREENS = {
   'story-task': { width: 860, height: 860 },
   'story-meeting': { width: 320, height: 560 },
   'story-wiki': { width: 720, height: 520 },
-  'story-canvas': { width: 860, height: 208 },
   'phone-canvas': { width: 390, height: 844 },
   canvas: { width: 1440, height: 900, focus: { width: 720, height: 560 } },
   'canvas-panel': { width: 860, height: 538 },

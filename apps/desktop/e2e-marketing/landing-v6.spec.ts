@@ -11,7 +11,7 @@ import { NOW, PASSWORD } from '../e2e-visual/harness';
 import { cameraPhoto, heroStream } from './photos';
 import { decodeFrame, encodeAwareness, FRAME_SNAPSHOT, FRAME_UPDATE } from '../src/renderer/lib/wiki/frames';
 import { appIconHtml, pdfBytes, render } from './art';
-import { postStoryCanvas, seedStoryCanvas } from './v6-canvas';
+import { seedStoryCanvas } from './v6-canvas';
 import { seedRecordingText, seedRoles, seedTelephony } from './v6-seeds';
 import {
   LOCALES,
@@ -733,25 +733,6 @@ const scenes: Record<string, Scene> = {
     },
     async run(ctx) {
       await storyWikiScene(ctx);
-    },
-  },
-
-  // The canvas card in the chat and the team's answer.
-  'story-canvas': {
-    ui: { membersPanel: false },
-    size: { width: 1189, height: 899 },
-    seed: (mock, c, c4) => {
-      storySeed(mock, c, c4);
-      postStoryCanvas(mock, c4, seedStoryCanvas(mock, c4));
-    },
-    async run(ctx) {
-      const { page } = ctx;
-      await chatRu(ctx);
-      await expect(page.getByTestId('canvas-link-card')).toHaveAttribute('data-state', 'page', { timeout: 15_000 });
-      await feedBottom(page);
-      await page.mouse.move(0, 0);
-      console.log('story-canvas boxes', 'card', await box(page, '[data-testid="canvas-link-card"]'), 'feed', await box(page, '[data-virtuoso-scroller]'));
-      await shoot(ctx, 'story-canvas');
     },
   },
 
