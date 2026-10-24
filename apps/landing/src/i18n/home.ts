@@ -2,6 +2,7 @@ import { en } from './home-en';
 import { es } from './home-es';
 import { zh } from './home-zh';
 import type { Locale } from './locales';
+import type { ScreenName } from '@/lib/screens';
 
 /**
  * Landing v6 home page copy (docs/plans/landing-v6.md §4, §5): the typed contract the home components read.
@@ -17,12 +18,15 @@ export type SceneName =
   | 'voice' | 'chat-full' | 'kanban-full' | 'calendar-week' | 'wiki-full' | 'canvas' | 'phone-call'
   // the day story
   | 'story-message' | 'story-task' | 'story-meeting' | 'recording-focus' | 'story-wiki' | 'story-canvas'
-  // catalogue tiles (≤ 860 px wide); `voice-focus`, `kanban-focus`, `timeline-focus` are the phone crops of their scenes
-  | 'voice-focus' | 'gallery' | 'chat-focus' | 'phone-call-panel' | 'temp-room'
-  | 'kanban-focus' | 'taskhistory-panel' | 'timeline-focus' | 'findtime-panel' | 'wiki-focus' | 'canvas-panel' | 'disk-panel' | 'mail-panel'
-  | 'search' | 'notifyrelay-panel' | 'roles' | 'webapps-panel' | 'aitask' | 'bot-card'
+  // catalogue tiles (≤ 860 px wide, about 16:10: cut out of the scenes, scripts/assets.mjs `from`)
+  | 'voice-panel' | 'gallery' | 'chat-focus' | 'phone-call-panel' | 'temp-room'
+  | 'kanban-panel' | 'taskhistory-panel' | 'timeline-panel' | 'findtime-panel' | 'wiki-focus' | 'canvas-panel' | 'disk-panel' | 'mail-panel'
+  | 'search-panel' | 'notifyrelay-panel' | 'roles' | 'webapps-panel' | 'aitask' | 'bot-card'
   // telephony, AI, phones
   | 'telephony-ivr' | 'telephony-groups' | 'telephony-call' | 'recording-transcript' | 'phone-canvas' | 'phone-rooms' | 'phone-voice';
+
+/** Every scene is a screenshot of lib/screens.ts (fails typecheck otherwise). */
+export const SCENES_ARE_SCREENS: Exclude<SceneName, ScreenName> extends never ? true : never = true;
 
 /** Scene order of the hero chips and the screenshot each chip shows (§4.1). */
 export const HERO_SCENES = ['voice', 'chat', 'tasks', 'calendar', 'wiki', 'canvas', 'phone'] as const;
@@ -180,7 +184,7 @@ export const ru: Home = {
         key: 'talk',
         title: 'Общение',
         tiles: [
-          { shot: 'voice-focus', title: 'Голосовые комнаты и экран', text: 'Комнаты всегда открыты: зашли — и говорите. Показ экрана, указка и рисование поверх стрима, шумо- и эхоподавление.', anchor: 'voice' },
+          { shot: 'voice-panel', title: 'Голосовые комнаты и экран', text: 'Комнаты всегда открыты: зашли — и говорите. Показ экрана, указка и рисование поверх стрима, шумо- и эхоподавление.', anchor: 'voice' },
           { shot: 'gallery', title: 'Видеовстречи', text: 'Все участники одинаковыми плитками, до 25 на экране. Заговоривший сам оказывается на первой странице.', anchor: 'video' },
           { shot: 'chat-focus', title: 'Чат с ответами и реакциями', text: 'Ответы с цитатой, реакции и закреплённые сообщения. Карточка задачи — прямо в ленте.', anchor: 'chat' },
           { shot: 'phone-call-panel', badge: 'business', title: 'Звонки на телефон', text: 'Подключите SIP-провайдера и звоните на любые номера из голосовой комнаты. Перевести звонок коллеге — одна кнопка.', anchor: 'telephony' },
@@ -192,9 +196,9 @@ export const ru: Home = {
         key: 'work',
         title: 'Работа',
         tiles: [
-          { shot: 'kanban-focus', title: 'Доски задач', text: 'Доска, список и таймлайн, приоритеты, метки, сроки и исполнители. Формы, автоматизации и согласования.', anchor: 'boards' },
+          { shot: 'kanban-panel', title: 'Доски задач', text: 'Доска, список и таймлайн, приоритеты, метки, сроки и исполнители. Формы, автоматизации и согласования.', anchor: 'boards' },
           { shot: 'taskhistory-panel', title: 'Задача: история и согласование', text: 'Вкладка «История» показывает, кто и что поменял в задаче, по дням.', anchor: 'boards' },
-          { shot: 'timeline-focus', title: 'Таймлайн', text: 'Задачи на шкале времени: сроки и пересечения видно сразу.', anchor: 'boards' },
+          { shot: 'timeline-panel', title: 'Таймлайн', text: 'Задачи на шкале времени: сроки и пересечения видно сразу.', anchor: 'boards' },
           { shot: 'findtime-panel', title: 'Календарь и подбор времени', text: 'Встречи со ссылкой на комнату, общее окно по занятости коллег, синхронизация CalDAV.', anchor: 'calendar' },
           { shot: 'wiki-focus', title: 'Вики', text: 'Страницы деревом, совместное редактирование, версии и доступ по страницам.', anchor: 'wiki' },
           { shot: 'canvas-panel', title: 'Холст', text: 'Онлайн-доска: стикеры, фигуры, стрелки, голосование и таймер. Курсоры коллег видны сразу.', anchor: 'canvas' },
@@ -206,7 +210,7 @@ export const ru: Home = {
         key: 'order',
         title: 'Порядок и тишина',
         tiles: [
-          { shot: 'search', title: 'Поиск ⌘K', text: 'Сообщения, задачи, комментарии, встречи, файлы, заметки и расшифровки — одним запросом.', anchor: 'search' },
+          { shot: 'search-panel', title: 'Поиск ⌘K', text: 'Сообщения, задачи, комментарии, встречи, файлы, заметки и расшифровки — одним запросом.', anchor: 'search' },
           { shot: 'notifyrelay-panel', title: 'Уведомления под контролем', text: 'Уровень для каждой комнаты, «Не беспокоить», триггеры задач и пересылка своему боту.', anchor: 'notifications' },
           { shot: 'roles', title: 'Роли и закрытые комнаты', text: 'Права по ролям и по комнатам. Закрытая комната не видна тем, кого в неё не пустили.', anchor: 'roles' },
           { shot: 'webapps-panel', title: 'Веб-приложения в окне', text: 'CRM, панель продаж или вики открываются внутри Calab, пока звонок продолжается.', anchor: 'webapps' },
@@ -344,22 +348,22 @@ export const ru: Home = {
     'recording-focus': 'Карточка записанной встречи в чате комнаты: три решения, кнопка воспроизведения и «Полный транскрипт»',
     'story-wiki': 'Страница вики «Экспорт в CSV»: план работ и ссылки на задачу APP-7 и холст «Ретро спринта 12»',
     'story-canvas': 'Карточка холста «Ретро спринта 12» в чате и ответ Дины Лебедевой',
-    'voice-focus': 'Сцена голосовой комнаты: экран Веры Ким и три камеры участников',
+    'voice-panel': 'Сцена голосовой комнаты: Вера Ким показывает экран, внизу панель инструментов',
     'gallery': 'Видеовстреча в режиме «Галерея»: три камеры и плитка с аватаром, говорящий подсвечен',
     'chat-focus': 'Лента чата: закреплённое сообщение, ответ с цитатой и реакцией, карточка задачи APP-7',
     'phone-call-panel': 'Плашка звонка на +7 916 123-45-67 с кнопкой «Перевести» и лента чата',
     'temp-room': 'Комната «Встреча с клиентом» готова: ссылка, кнопка «Скопировать» и дата, когда комната закроется',
-    'kanban-focus': 'Доска «Продукт»: колонки «Бэклог», «К работе» и «В работе» с карточками задач',
-    'taskhistory-panel': 'Задача на вкладке «История»: кто и когда поменял описание, исполнителей, приоритет и срок, кто согласовал',
-    'timeline-focus': 'Таймлайн: задачи на шкале времени, линия сегодняшнего дня и задачи без дат',
+    'kanban-panel': 'Доска «Продукт»: колонки «Бэклог», «К работе» и «В работе» с карточками задач',
+    'taskhistory-panel': 'Доска и задача на вкладке «История»: кто и когда поменял описание, исполнителей, приоритет и срок, кто согласовал',
+    'timeline-panel': 'Таймлайн: задачи на шкале времени, линия сегодняшнего дня и веха «Релиз 1.1»',
     'findtime-panel': 'Подбор времени для четырёх человек: занятость по колонкам и выбранное окно 10:00–10:30',
     'wiki-focus': 'Страница вики «Экспорт в CSV» с обложкой, чек-листом и курсорами двух коллег',
     'canvas-panel': 'Холст «Ретро спринта 12»: стикеры трёх цветов, стрелки, голоса, таймер и курсор коллеги',
     'disk-panel': 'Диск плитками: папки (одна закрытая), файлы с превью и занятое место',
     'mail-panel': 'Открытое письмо «Договор на внедрение Calab — финальная версия» с двумя вложениями',
-    'search': 'Окно поиска ⌘K: по запросу найдены заметки, комната, сообщения, задачи и комментарии',
+    'search-panel': 'Окно поиска ⌘K: по запросу найдены заметка, комната и сообщения',
     'notifyrelay-panel': 'Настройки уведомлений о задачах: переключатели по событиям и блок «Передавать боту»',
-    'roles': 'Настройки роли «Поддержка»: название, цвет и переключатели прав',
+    'roles': 'Настройки роли «Поддержка»: название, цвет, упоминание и права пространства',
     'webapps-panel': 'Панель продаж, открытая внутри Calab из значка в рейле: выручка, сделки и график по неделям',
     'aitask': 'Окно «Умная задача»: описание задачи и два прикреплённых файла',
     'bot-card': 'Сводка бота «Продажи за вчера» с кнопками «Открыть отчёт» и «Напомнить в 18:00»',

@@ -52,8 +52,8 @@ export const CROPS = {
   'telephony-groups': { left: 481, top: 131, width: 698, height: 330 },
   // the three live calls, as tall as the IVR and groups frames (below the title bar, above the call journal)
   'telephony-call': { left: 481, top: 180, width: 698, height: 330 },
-  // down to «Управлять стикерами», above the «Участники» block
-  roles: { left: 481, top: 131, width: 698, height: 572 },
+  // down to the first permission, «Управлять пространством»
+  roles: { left: 481, top: 131, width: 698, height: 436 },
   'temp-room': { left: 480, top: 320, width: 480, height: 260 },
   'recording-focus': { left: 329, top: 39, width: 860, height: 538 },
   'recording-transcript': { left: 284, top: 108, width: 860, height: 230 },
@@ -132,11 +132,15 @@ export const CROPS = {
   'phone-board': { left: 0, top: 0, width: 390, height: 844 },
   // Landing v6 catalogue tiles (≤ 860 px wide, so a 568 px tile shows them at ≥ 0.66): `from` = cut out of another
   // scene's capture (window coordinates), no capture of their own
-  'taskhistory-panel': { from: 'taskhistory', left: 960, top: 30, width: 480, height: 516 },
+  'voice-panel': { from: 'voice', left: 338, top: 96, width: 853, height: 533 },
+  'kanban-panel': { from: 'kanban-full', left: 288, top: 92, width: 860, height: 538 },
+  'timeline-panel': { from: 'timeline', left: 330, top: 90, width: 860, height: 538 },
+  'taskhistory-panel': { from: 'taskhistory', left: 630, top: 138, width: 810, height: 496 },
+  'search-panel': { from: 'search', left: 390, top: 115, width: 660, height: 350 },
   'findtime-panel': { from: 'findtime', left: 330, top: 30, width: 860, height: 538 },
   'disk-panel': { from: 'disk', left: 70, top: 87, width: 860, height: 513 },
   'mail-panel': { from: 'mail', left: 495, top: 46, width: 903, height: 564 },
-  'notifyrelay-panel': { from: 'notifyrelay', left: 482, top: 130, width: 698, height: 640 },
+  'notifyrelay-panel': { from: 'notifyrelay', left: 482, top: 339, width: 698, height: 431 },
   'webapps-panel': { from: 'webapps', left: 0, top: 30, width: 757, height: 540 },
   // the bot's summary card laid over the dashboard (OVERLAYS.webapps) + 24 px
   'bot-card': { from: 'webapps', left: 948, top: 678, width: 480, height: 210 },

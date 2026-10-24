@@ -24,7 +24,7 @@ export function StoryScroller({ children }: { children: ReactNode }) {
       if (!wide.matches) return;
       show('0');
       observer = new IntersectionObserver((entries) => {
-        for (const e of entries) if (e.isIntersecting) show((e.target as HTMLElement).dataset.step ?? '0');
+        for (const e of entries) if (e.isIntersecting) show(e.target.closest<HTMLElement>('[data-step]')?.dataset.step ?? '0');
       }, { rootMargin: '-45% 0px -45% 0px' });
       steps.forEach((s) => {
         const text = s.querySelector('.story-text');

@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { preload } from 'react-dom';
 import { LOCALE_INFO, type Locale } from '@/i18n/locales';
-import { focusOf, type ScreenName } from '@/lib/screens';
+import { SCREENS, focusOf, type ScreenName } from '@/lib/screens';
 import { stickerSrc } from '@/lib/stickers';
-import { sceneFile, type SceneName } from './scenes';
+import type { SceneName } from '@/i18n/home';
 
 export { DrawnLink } from './drawn-link';
 
@@ -151,7 +151,7 @@ export function Sticker({ name, size = 120, className, eager }: { name: string; 
  * A screenshot of the app (dark theme, the UI and the team in the page's language, `public/screens/<lang>/<name>`):
  * a r12 frame with a hairline, always in the crop's own proportion — no `object-fit`, nothing is cut or letterboxed.
  * Files: `<name>.webp` 1x, `<name>@2x.webp`, `<name>-720.webp` for phones; a scene with a `focus` crop serves
- * `<name>-focus(.webp|@2x.webp)` below 640 px through `<picture>` (a focus scene of scenes.ts shows that crop everywhere).
+ * `<name>-focus(.webp|@2x.webp)` below 640 px through `<picture>`.
  * width/height are CSS px: no layout shift.
  */
 export function Shot({
@@ -176,10 +176,9 @@ export function Shot({
   phone?: boolean | undefined;
   className?: string | undefined;
 }) {
-  const { screen, focus: isFocus, width, height } = sceneFile(scene);
-  const dir = `/screens/${LOCALE_INFO[locale].lang}/${screen}`;
-  const base = isFocus ? `${dir}-focus` : dir;
-  const focus = isFocus ? undefined : focusOf(screen);
+  const { width, height } = SCREENS[scene];
+  const base = `/screens/${LOCALE_INFO[locale].lang}/${scene}`;
+  const focus = focusOf(scene);
   const srcSet = `${width > 720 ? `${base}-720.webp 720w, ` : ''}${base}.webp ${width}w, ${base}@2x.webp ${width * 2}w`;
   if (priority) preload(`${base}.webp`, { as: 'image', imageSrcSet: srcSet, imageSizes: sizes, fetchPriority: 'high' });
   const style = { '--ar': `${width} / ${height}`, ...(focus ? { '--ar-sm': `${focus.width} / ${focus.height}` } : {}) } as CSSProperties;

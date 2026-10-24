@@ -401,8 +401,10 @@ details[open] .chevron { transform: rotate(180deg); }
   .tile-row > :first-child { grid-row: span 2; }
 }
 .shot-row figcaption { margin-top: 12px; }
-.telephony-facts { display: grid; gap: 24px; margin-top: 32px; align-items: start; }
-@media (min-width: 1024px) { .telephony-facts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; } }
+.telephony-grid { display: grid; gap: 32px; align-items: start; }
+.telephony-main, .telephony-side { display: grid; gap: 32px; align-content: start; }
+.telephony-grid figcaption { margin-top: 12px; }
+@media (min-width: 1024px) { .telephony-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; } }
 .check-list { display: grid; gap: 12px; list-style: none; font-size: 17px; line-height: 1.45; }
 .check-list li { display: flex; gap: 12px; }
 .check-list svg { flex-shrink: 0; margin-top: 4px; color: var(--color-accent-text); }
