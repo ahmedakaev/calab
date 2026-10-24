@@ -1,7 +1,7 @@
 import type { Locale } from '@/i18n';
 import { getHome } from '@/i18n/home';
 import { ControlConnections } from './control-connections';
-import { nb } from './ui';
+import { nb, SectionHeading } from './ui';
 
 const copy = {
   ru: { lead: 'Данные, доступ и интеграции — под вашим управлением.', center: 'On-premise', server: 'Ваш сервер', serverText: 'Вы выбираете, где хранятся данные.', sso: 'Единый вход', ssoText: 'SSO и каталог сотрудников Active Directory.', oauth: 'Ваши приложения', oauthText: 'Вход через Calab. OAuth-клиенты внутри пространства.', roles: 'Ваши правила', rolesText: 'Роли и права: кому доступны комнаты и действия.', source: 'Доступный исходный код', transport: 'Защита при передаче' },
@@ -21,7 +21,7 @@ export function ControlInfographic({ locale }: { locale: Locale }) {
     { name: t.roles, text: t.rolesText, protocol: 'RBAC', plan: '', className: 'control-node-roles' },
   ];
   return <div className="control-infographic">
-    <div className="control-heading"><h2 id="control-title" className="h2">{trust.title}</h2><p className="lead">{t.lead}</p></div>
+    <SectionHeading id="control-title" title={trust.title} accent={trust.accent} lead={t.lead} />
     <div className="control-map">
       <ControlConnections />
       <div className="control-hub"><img src="/calab-mark.svg" width={218} height={249} alt="Calab" loading="lazy" /><strong>{t.center}</strong><img className="control-hub-sticker" src="/editorial/access-sticker.webp" width={420} height={420} alt="" loading="lazy" /></div>

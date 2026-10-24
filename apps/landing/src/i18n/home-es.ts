@@ -80,7 +80,8 @@ export const es: Home = {
     shots: ['phone-rooms', 'phone-voice', 'phone-canvas'],
   },
   trust: {
-    title: 'Bajo tu control',
+    title: 'Bajo tu control — on‑premise',
+    accent: 'on‑premise',
     facts: [
       'Tu propio servidor: un solo docker compose',
       'Los datos se quedan en tu país: tú eliges el alojamiento',

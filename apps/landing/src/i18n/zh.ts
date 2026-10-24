@@ -325,6 +325,7 @@ const zh: Dict = {
     offerLink: '付款与退款条款（英语）',
     eyebrow: '价格',
     title: 'Free、Team、Business 与 Enterprise',
+    accent: 'Enterprise',
     lead: '免费开始。需要更多？选择云端的 Team 或 Business，或选择 Enterprise：把 Calab 部署在你自己的服务器上。',
     popular: '最受欢迎',
     /** Footnote for the «*» on Business limits (owner, 24.10). */
@@ -421,6 +422,7 @@ const zh: Dict = {
     contactLink: '联系表单',
     eyebrow: '常见问题',
     title: '要点速览',
+    lead: '常见问题',
     items: {
       server: {
         q: "自有服务器需要什么？",

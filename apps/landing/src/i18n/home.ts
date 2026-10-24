@@ -92,6 +92,8 @@ export type Home = {
   };
   trust: {
     title: string;
+    /** The part of the title in the accent. */
+    accent: string;
     facts: Tuple<string, 5>;
   };
   pricing: {
@@ -193,7 +195,8 @@ export const ru: Home = {
     shots: ['phone-rooms', 'phone-voice', 'phone-canvas'],
   },
   trust: {
-    title: 'Под вашим контролем',
+    title: 'Под вашим контролем — on‑premise',
+    accent: 'on‑premise',
     facts: [
       'Свой сервер: один docker compose',
       'Данные в вашей стране — вы выбираете хостинг',

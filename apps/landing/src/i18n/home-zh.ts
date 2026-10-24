@@ -80,7 +80,8 @@ export const zh: Home = {
     shots: ['phone-rooms', 'phone-voice', 'phone-canvas'],
   },
   trust: {
-    title: '一切尽在掌控',
+    title: '由你掌控 — 本地部署',
+    accent: '本地部署',
     facts: [
       '自己的服务器：一个 docker compose',
       '数据留在你所在的国家，托管由你选择',

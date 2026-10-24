@@ -484,8 +484,6 @@ details[open] .chevron { transform: rotate(180deg); }
 }
 
 /* ---------- Control infographic ---------- */
-.control-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; }
-.control-heading .lead { max-width: 320px; margin-top: 0; }
 .control-map { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(170px, 19vw, 220px) minmax(0, 1fr); grid-template-rows: 1fr 1fr; gap: 24px clamp(40px, 5vw, 80px); min-height: 300px; margin-top: 24px; align-items: stretch; }
 .control-connections { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .control-connections path { fill: none; stroke: #397cff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
@@ -513,8 +511,6 @@ details[open] .chevron { transform: rotate(180deg); }
 .control-foundations > div > span { color: var(--color-text-secondary); font-size: 13px; }
 .control-foundations strong { font-size: 15px; font-weight: 600; }
 @media (max-width: 767px) {
-  .control-heading { display: block; }
-  .control-heading .lead { margin-top: 16px; }
   .control-map { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto auto; gap: 24px 20px; margin-top: 32px; }
   .control-connections { display: none; }
   .control-hub { grid-area: 1 / 1 / 2 / 3; width: 168px; margin: 8px 0 24px; justify-self: start; }

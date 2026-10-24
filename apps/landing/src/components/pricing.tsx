@@ -113,7 +113,7 @@ export function Pricing({ t, locale }: { t: Dict['pricing']; locale: Locale }) {
   const h = getHome(locale).pricing;
   return (
     <Section id="pricing" labelledBy="pricing-title">
-      <SectionHeading id="pricing-title" title={t.title} lead={t.lead} sticker="pricing" />
+      <SectionHeading id="pricing-title" title={t.title} accent={t.accent} lead={t.lead} sticker="pricing" />
       <PricesBar locale={locale} t={t.live} />
       <ul className="swipe-sm mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {PLAN_IDS.map((id, col) => {

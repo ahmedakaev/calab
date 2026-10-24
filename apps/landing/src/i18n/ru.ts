@@ -325,6 +325,7 @@ const ru = {
     offerLink: 'Условия оплаты и возврата',
     eyebrow: 'Тарифы',
     title: 'Free, Team, Business и Enterprise',
+    accent: 'Enterprise',
     lead: 'Начните бесплатно. Нужно больше — Team или Business в облаке, либо Enterprise: Calab на вашем собственном сервере.',
     popular: 'Популярный',
     /** Footnote for the «*» on Business limits (owner, 24.10). */
@@ -421,6 +422,7 @@ const ru = {
     contactLink: 'форму связи',
     eyebrow: 'Вопросы',
     title: 'Коротко о главном',
+    lead: 'Часто задаваемые вопросы',
     items: {
       server: {
         q: "Что нужно для своего сервера?",

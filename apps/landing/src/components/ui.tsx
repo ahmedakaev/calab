@@ -72,6 +72,7 @@ export function Section({
 export function SectionHeading({
   id,
   title,
+  accent,
   lead,
   sticker,
   center,
@@ -79,6 +80,8 @@ export function SectionHeading({
 }: {
   id: string;
   title: string;
+  /** A part of the title in the italic accent (see accented()). */
+  accent?: string | undefined;
   lead?: ReactNode | undefined;
   sticker?: string | undefined;
   center?: boolean | undefined;
@@ -88,7 +91,7 @@ export function SectionHeading({
     <div className={cx('heading', center && 'heading-center')}>
       <div className="heading-copy">
         <Tag id={id} className={Tag === 'h1' ? 'h1 heading-h1' : 'h2'}>
-          {nb(title)}
+          {accented(title, accent)}
         </Tag>
         {lead && <p className="lead">{typeof lead === 'string' ? nb(lead) : lead}</p>}
       </div>

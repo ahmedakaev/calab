@@ -324,6 +324,7 @@ const en: Dict = {
     offerLink: 'Payment and refund terms',
     eyebrow: 'Pricing',
     title: 'Free, Team, Business and Enterprise',
+    accent: 'Enterprise',
     lead: 'Start for free. Need more? Team or Business in the cloud, or Enterprise: Calab on your own server.',
     popular: 'Popular',
     /** Footnote for the «*» on Business limits (owner, 24.10). */
@@ -420,6 +421,7 @@ const en: Dict = {
     contactLink: 'contact form',
     eyebrow: 'FAQ',
     title: 'The short version',
+    lead: 'Frequently asked questions',
     items: {
       server: {
         q: "What does my own server need?",
