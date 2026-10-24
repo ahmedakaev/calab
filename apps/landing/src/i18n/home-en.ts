@@ -8,7 +8,7 @@ export const en: Home = {
     lead: 'Voice rooms, chat, meetings, tasks, wiki, canvas, files, mail and phone calls — connected to each other, in the cloud or on your own server.',
     download: 'Download',
     openWeb: 'Open in browser',
-    platforms: 'macOS · Windows · Linux · Web · phone',
+    platforms: 'macOS · Windows · Linux · Web · iOS · Android',
     scenesLabel: 'What’s inside Calab',
     scenes: [
       { key: 'voice', label: 'Talk & streams' },
@@ -21,8 +21,9 @@ export const en: Home = {
     ],
   },
   replace: {
-    title: 'One window instead of seven services',
-    lead: 'Messenger, video calls, task tracker, wiki, online whiteboard, file storage, mail and phone — a team usually pays for seven tools in seven tabs. In Calab it is one rail on the left.',
+    title: 'One window instead of ten services',
+    accent: 'One window',
+    lead: 'Messenger, video calls, task tracker, wiki, online canvas, file storage, mail, phone system, bots and AI assistants — a team usually pays for each in its own tab. In Calab it is all one window, and one search finds anything across the system.',
   },
   story: {
     title: 'A team’s day, without leaving the window',

@@ -8,7 +8,7 @@ export const es: Home = {
     lead: 'Salas de voz, chat, reuniones, tareas, wiki, lienzo, archivos, correo y llamadas telefónicas, todo conectado, en la nube o en tu propio servidor.',
     download: 'Descargar',
     openWeb: 'Abrir en el navegador',
-    platforms: 'macOS · Windows · Linux · Web · móvil',
+    platforms: 'macOS · Windows · Linux · Web · iOS · Android',
     scenesLabel: 'Qué hay dentro de Calab',
     scenes: [
       { key: 'voice', label: 'Voz y streams' },
@@ -21,8 +21,9 @@ export const es: Home = {
     ],
   },
   replace: {
-    title: 'Una ventana en lugar de siete servicios',
-    lead: 'Mensajería, videollamadas, gestor de tareas, wiki, pizarra en línea, archivos, correo y telefonía: un equipo suele tener siete pestañas y siete facturas. En Calab es una sola barra a la izquierda.',
+    title: 'Una ventana en lugar de diez servicios',
+    accent: 'Una ventana',
+    lead: 'Mensajería, videollamadas, gestor de tareas, wiki, lienzo en línea, archivos, correo, telefonía, bots y asistentes de IA: un equipo suele tener una pestaña y una factura para cada uno. En Calab todo está en una sola ventana, y una búsqueda encuentra cualquier cosa en todo el sistema.',
   },
   story: {
     title: 'Un día del equipo sin salir de la ventana',

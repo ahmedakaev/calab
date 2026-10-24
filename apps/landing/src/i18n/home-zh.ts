@@ -8,7 +8,7 @@ export const zh: Home = {
     lead: '语音房间、聊天、会议、任务、维基、画布、网盘、邮件和电话，彼此打通，可用云端，也可部署在自己的服务器上。',
     download: '下载',
     openWeb: '在浏览器中打开',
-    platforms: 'macOS · Windows · Linux · 网页 · 手机',
+    platforms: 'macOS · Windows · Linux · 网页 · iOS · Android',
     scenesLabel: 'Calab 里有什么',
     scenes: [
       { key: 'voice', label: '沟通与直播' },
@@ -21,8 +21,9 @@ export const zh: Home = {
     ],
   },
   replace: {
-    title: '一个窗口，取代七个服务',
-    lead: '即时通讯、视频通话、任务管理、维基、在线白板、网盘、邮件和电话：团队通常要开七个标签页、付七份账单。在 Calab 里，它们只是左边的一列导航栏。',
+    title: '一个窗口，取代十个服务',
+    accent: '一个窗口',
+    lead: '即时通讯、视频通话、任务管理、维基、在线画布、网盘、邮件、电话、机器人和 AI 助手：团队通常要为每一样单开标签页、单付账单。在 Calab 里，它们都在一个窗口中，一次搜索就能找遍整个系统。',
   },
   story: {
     title: '团队的一天，不必离开这个窗口',

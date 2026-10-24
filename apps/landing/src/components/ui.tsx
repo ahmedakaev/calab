@@ -21,6 +21,19 @@ export const nb = (text: string): string =>
     .replace(/≈ /g, '≈\u00a0')
     .replace(/(?<=^|[\s(«])([вкосуиаВКОСУИА]) /g, '$1\u00a0');
 
+/** A heading with `accent` (a part of it) set in the italic accent colour; nb() typography on both parts. */
+export function accented(title: string, accent?: string): ReactNode {
+  const at = accent ? title.indexOf(accent) : -1;
+  if (!accent || at < 0) return nb(title);
+  return (
+    <>
+      {nb(title.slice(0, at))}
+      <span className="accent">{nb(accent)}</span>
+      {nb(title.slice(at + accent.length))}
+    </>
+  );
+}
+
 /** The same helper under the name used in reviews. */
 export const nbsp = nb;
 
