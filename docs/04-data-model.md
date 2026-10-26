@@ -591,6 +591,11 @@ roomAdmin           = MUTE_MEMBERS (позволяет серверные mute/r
 - **Приглашения по email.** Право — `INVITE_MEMBERS` (ADR-0043) + подтверждённый адрес. `lookup` — точное совпадение среди подтверждённых активных не-гостей, 20/мин на пользователя, в лог — id действующего и sha256-префикс адреса. `members {user_id}` добавляет сразу (`member`) + письмо `workspace_added`. `invites/email` создаёт одноразовую ссылку, привязанную к адресу (регистрация/вход по ней с другим адресом → `INVITE_INVALID`; с этим — адрес сразу подтверждён), повтор тому же адресу — не чаще раза в 24 ч (новая ссылка, старая удаляется); 20 подряд / 30 в час на пользователя. Подтверждение адреса (код, сброс пароля, ссылка) принимает **все** живые email-приглашения этого адреса.
 - Позже: OIDC (Google Workspace / Keycloak) — таблица `users` уже без привязки к паролю как единственному способу (`password_hash` nullable).
 
+## Атрибуция регистраций и конверсии Метрики (ADR-0135, миграция 00123)
+
+- `user_attribution` (PK `user_id`, `ON DELETE CASCADE`): first touch аккаунта из `RegisterRequest.attribution` — `utm_source/medium/campaign/content/term`, `yclid`, `ym_client_id` (ClientID Метрики, только цифры; лендинг передаёт его лишь после согласия на аналитику). Пишется один раз в транзакции регистрации, значения ≤ 200 символов; IP, user agent и прочего нет.
+- `metrika_conversions` — outbox хитов Measurement Protocol: `dedupe_key` UNIQUE (`signup:<user_id>`, `purchase:<payment_id>`) — маркер «уже учтено», повторный вебхук ничего не добавляет; `goal` (`signup`/`purchase`), `client_id`, `occurred_at`, для оплаты `amount_minor`/`currency`/`plan`/`transaction_id` (= id `billing_payments`). Без email/имени. Воркер: аренда `next_at`, `attempts`, `sent_at`, `failed_at` + `error`. `signup` — в транзакции регистрации (есть ClientID), `purchase` — в транзакции `core.CreditPayment` при создании лота живого платежа, ClientID владельца пространства. Без `YM_MP_TOKEN` строки не пишутся.
+
 ## Боты (ADR-0031)
 
 - Бот — пользователь `is_bot` (без email/пароля, `email_verified_at` ставится при создании), участник пространств со встроенной ролью `member`; права — свои роли и переопределения комнат, `computePermissions` не меняется. `admin`/`guest` боту не выдаются (`422`), `owner` — никогда. Ограниченные комнаты (ADR-0029) действуют как на людей.

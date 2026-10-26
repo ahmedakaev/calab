@@ -473,7 +473,7 @@ GET    /api/me/blocked-bots                      ListBlockedBotsResponse; POST /
 Реализовано (stage 2, server core):
 
 ```
-POST   /api/auth/register              RegisterRequest → 201 RegisterResponse
+POST   /api/auth/register              RegisterRequest → 201 RegisterResponse   (attribution: utm_*/yclid/ym_client_id первого открытия, ADR-0135)
 POST   /api/auth/login                 LoginRequest → LoginResponse          (rate-limit по IP)
 POST   /api/auth/refresh               RefreshRequest → RefreshResponse      (ротация; повтор старого токена = отзыв сессии)
 POST   /api/auth/logout                LogoutRequest{allSessions, refreshToken?} → 204   (сессия — по access-токену, иначе по refresh из тела или cookie)

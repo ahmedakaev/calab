@@ -341,6 +341,8 @@ Docker compose в этом документе — тестовый стенд и
 
 Не использовать: private/serverless кластеры (NAT ломает WebRTC), LB перед 7881.
 
+Секреты API в проде — строками в Vault KV v2 `kv/app/calab` → `timenote/calab-env-sync` → Secret `calab-env` (подробнее — «Identity» ниже). Так же ставится `YM_MP_TOKEN` (серверные конверсии Метрики, ADR-0135; значение — токен Measurement Protocol счётчика 113761661, пусто = выключено; `YM_COUNTER_ID`/`YM_MP_URL` — по умолчанию верные). После правки Vault — дождаться env-sync и rollout API.
+
 ### Образы API и веба, выкатка в прод (`.github/workflows/images.yml`)
 
 После зелёного `ci` релизного тега `v*` workflow `images` собирает `apps/server/Dockerfile` на том же коммите
