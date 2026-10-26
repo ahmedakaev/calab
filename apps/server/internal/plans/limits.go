@@ -440,7 +440,7 @@ func (l Limits) CapAudio(kbps uint32) uint32 {
 func (l Limits) CapMedia(m *v1.RoomMediaSettings) *v1.RoomMediaSettings {
 	out := &v1.RoomMediaSettings{
 		AudioBitrateKbps: l.CapAudio(m.GetAudioBitrateKbps()), MaxStreamPreset: m.GetMaxStreamPreset(),
-		MaxStreams: m.GetMaxStreams(), CameraLimit: m.GetCameraLimit(),
+		MaxStreams: m.GetMaxStreams(), CameraLimit: m.GetCameraLimit(), JoinLeaveSoundMax: m.JoinLeaveSoundMax,
 	}
 	if out.MaxStreamPreset == v1.ScreenSharePreset_SCREEN_SHARE_PRESET_UNSPECIFIED {
 		out.MaxStreamPreset = l.StreamMaxPreset

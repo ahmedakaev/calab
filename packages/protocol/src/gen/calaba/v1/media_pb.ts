@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file calaba/v1/media.proto.
  */
 export const file_calaba_v1_media: GenFile = /*@__PURE__*/
-  fileDesc("ChVjYWxhYmEvdjEvbWVkaWEucHJvdG8SCWNhbGFiYS52MSKTAQoRUm9vbU1lZGlhU2V0dGluZ3MSGgoSYXVkaW9fYml0cmF0ZV9rYnBzGAEgASgNEjcKEW1heF9zdHJlYW1fcHJlc2V0GAIgASgOMhwuY2FsYWJhLnYxLlNjcmVlblNoYXJlUHJlc2V0EhMKC21heF9zdHJlYW1zGAMgASgNEhQKDGNhbWVyYV9saW1pdBgEIAEoDSq4AQoRU2NyZWVuU2hhcmVQcmVzZXQSIwofU0NSRUVOX1NIQVJFX1BSRVNFVF9VTlNQRUNJRklFRBAAEh8KG1NDUkVFTl9TSEFSRV9QUkVTRVRfRUNPTk9NWRABEhwKGFNDUkVFTl9TSEFSRV9QUkVTRVRfSDcyMBACEh0KGVNDUkVFTl9TSEFSRV9QUkVTRVRfSDEwODAQAxIgChxTQ1JFRU5fU0hBUkVfUFJFU0VUX09SSUdJTkFMEARCmAEKDWNvbS5jYWxhYmEudjFCCk1lZGlhUHJvdG9QAVo2Z2l0aHViLmNvbS9jYWxhYmEvY2FsYWJhL3NlcnZlci9nZW4vY2FsYWJhL3YxO2NhbGFiYXYxogIDQ1hYqgIJQ2FsYWJhLlYxygIJQ2FsYWJhXFYx4gIVQ2FsYWJhXFYxXEdQQk1ldGFkYXRh6gIKQ2FsYWJhOjpWMWIGcHJvdG8z");
+  fileDesc("ChVjYWxhYmEvdjEvbWVkaWEucHJvdG8SCWNhbGFiYS52MSLPAQoRUm9vbU1lZGlhU2V0dGluZ3MSGgoSYXVkaW9fYml0cmF0ZV9rYnBzGAEgASgNEjcKEW1heF9zdHJlYW1fcHJlc2V0GAIgASgOMhwuY2FsYWJhLnYxLlNjcmVlblNoYXJlUHJlc2V0EhMKC21heF9zdHJlYW1zGAMgASgNEhQKDGNhbWVyYV9saW1pdBgEIAEoDRIhChRqb2luX2xlYXZlX3NvdW5kX21heBgFIAEoDUgAiAEBQhcKFV9qb2luX2xlYXZlX3NvdW5kX21heCq4AQoRU2NyZWVuU2hhcmVQcmVzZXQSIwofU0NSRUVOX1NIQVJFX1BSRVNFVF9VTlNQRUNJRklFRBAAEh8KG1NDUkVFTl9TSEFSRV9QUkVTRVRfRUNPTk9NWRABEhwKGFNDUkVFTl9TSEFSRV9QUkVTRVRfSDcyMBACEh0KGVNDUkVFTl9TSEFSRV9QUkVTRVRfSDEwODAQAxIgChxTQ1JFRU5fU0hBUkVfUFJFU0VUX09SSUdJTkFMEARCmAEKDWNvbS5jYWxhYmEudjFCCk1lZGlhUHJvdG9QAVo2Z2l0aHViLmNvbS9jYWxhYmEvY2FsYWJhL3NlcnZlci9nZW4vY2FsYWJhL3YxO2NhbGFiYXYxogIDQ1hYqgIJQ2FsYWJhLlYxygIJQ2FsYWJhXFYx4gIVQ2FsYWJhXFYxXEdQQk1ldGFkYXRh6gIKQ2FsYWJhOjpWMWIGcHJvdG8z");
 
 /**
  * Effective per-room media settings (workspace defaults already applied).
@@ -41,6 +41,14 @@ export type RoomMediaSettings = Message<"calaba.v1.RoomMediaSettings"> & {
    * @generated from field: uint32 camera_limit = 4;
    */
   cameraLimit: number;
+
+  /**
+   * Others' join/leave cues play only while the room (with that person) has at most this many
+   * people: 0..99, 0 = never; default 10. Always set by the server; unset (older server) = 10.
+   *
+   * @generated from field: optional uint32 join_leave_sound_max = 5;
+   */
+  joinLeaveSoundMax?: number | undefined;
 };
 
 /**

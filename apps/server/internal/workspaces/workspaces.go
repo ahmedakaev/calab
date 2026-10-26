@@ -630,6 +630,13 @@ func (h *Handlers) update(w http.ResponseWriter, r *http.Request) error {
 		v := int32(req.GetDefaultCameraLimit()) //nolint:gosec // validated
 		p.DefaultCameraLimit, mediaChanged = &v, true
 	}
+	if req.DefaultJoinLeaveSoundMax != nil {
+		if req.GetDefaultJoinLeaveSoundMax() > rooms.MaxJoinLeaveSoundMax {
+			return httpx.Validation("defaultJoinLeaveSoundMax", "join/leave sound limit must be 0..99")
+		}
+		v := int32(req.GetDefaultJoinLeaveSoundMax()) //nolint:gosec // validated
+		p.DefaultJoinLeaveSoundMax, mediaChanged = &v, true
+	}
 	p.AllowSelfNickname = req.AllowSelfNickname
 	if req.TimeFormat != nil {
 		f, ok := pbconv.TimeFormatToDB(req.GetTimeFormat())

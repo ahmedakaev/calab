@@ -1360,30 +1360,31 @@ type ReadState struct {
 }
 
 type Room struct {
-	ID               uuid.UUID
-	WorkspaceID      *uuid.UUID
-	Type             string
-	Name             string
-	Topic            string
-	Position         int32
-	IsPrivate        bool
-	AudioBitrateKbps *int32
-	MaxStreamPreset  *string
-	MaxStreams       *int32
-	CreatedAt        time.Time
-	ArchivedAt       *time.Time
-	CategoryID       *uuid.UUID
-	UserLimit        int32
-	VoiceStatus      *string
-	CameraLimit      *int32
-	DmKey            *string
-	AllowRecording   bool
-	Restricted       bool
-	Emoji            string
-	GuestApproval    bool
-	ExpiresAt        *time.Time
-	CreatedBy        *uuid.UUID
-	IconFileID       *uuid.UUID
+	ID                uuid.UUID
+	WorkspaceID       *uuid.UUID
+	Type              string
+	Name              string
+	Topic             string
+	Position          int32
+	IsPrivate         bool
+	AudioBitrateKbps  *int32
+	MaxStreamPreset   *string
+	MaxStreams        *int32
+	CreatedAt         time.Time
+	ArchivedAt        *time.Time
+	CategoryID        *uuid.UUID
+	UserLimit         int32
+	VoiceStatus       *string
+	CameraLimit       *int32
+	DmKey             *string
+	AllowRecording    bool
+	Restricted        bool
+	Emoji             string
+	GuestApproval     bool
+	ExpiresAt         *time.Time
+	CreatedBy         *uuid.UUID
+	IconFileID        *uuid.UUID
+	JoinLeaveSoundMax *int32
 }
 
 type RoomAdmission struct {
@@ -2010,30 +2011,31 @@ type WikiPermission struct {
 }
 
 type Workspace struct {
-	ID                      uuid.UUID
-	Slug                    string
-	Name                    string
-	IconFileID              *uuid.UUID
-	Visibility              string
-	OwnerID                 uuid.UUID
-	CreatedAt               time.Time
-	DefaultAudioBitrateKbps int32
-	DefaultMaxStreamPreset  string
-	DefaultMaxStreams       int32
-	StorageQuotaBytes       int64
-	StorageUsedBytes        int64
-	AllowSelfNickname       bool
-	DefaultCameraLimit      int32
-	SuspendedAt             *time.Time
-	SuspendedReason         string
-	SuspendedBy             *uuid.UUID
-	TimeFormat              string
-	SipEnabled              bool
-	DiskTrashDays           *int32
-	WikiTrashDays           *int32
-	TempArchiveDays         int32
-	OwnerSeesPrivate        bool
-	CanvasTrashDays         *int32
+	ID                       uuid.UUID
+	Slug                     string
+	Name                     string
+	IconFileID               *uuid.UUID
+	Visibility               string
+	OwnerID                  uuid.UUID
+	CreatedAt                time.Time
+	DefaultAudioBitrateKbps  int32
+	DefaultMaxStreamPreset   string
+	DefaultMaxStreams        int32
+	StorageQuotaBytes        int64
+	StorageUsedBytes         int64
+	AllowSelfNickname        bool
+	DefaultCameraLimit       int32
+	SuspendedAt              *time.Time
+	SuspendedReason          string
+	SuspendedBy              *uuid.UUID
+	TimeFormat               string
+	SipEnabled               bool
+	DiskTrashDays            *int32
+	WikiTrashDays            *int32
+	TempArchiveDays          int32
+	OwnerSeesPrivate         bool
+	CanvasTrashDays          *int32
+	DefaultJoinLeaveSoundMax int32
 }
 
 type WorkspaceAdminLog struct {
