@@ -77,12 +77,12 @@ claim universal desktop OS capability parity or silently re-open frozen native U
 Files: apps/mobile/package.json, pnpm-lock.yaml, apps/mobile/metro.config.js,
 .github/workflows/ci.yml; .github/dependabot.yml only if needed for runtime grouping.
 
-- [ ] Use the installed SDK's compatibility manifest and `expo install --check`;
+- [x] Use the installed SDK's compatibility manifest and `expo install --check`;
   align SDK57 patch, React/ReactDOM19.2.3, RN0.86.3, types and TS6.0.3. Keep desktop
   React/TS independent. Do not upgrade SDK major or WebView/patched ABI.
-- [ ] Add `check:sdk` using Expo's offline dependency check and run it in CI after
+- [x] Add `check:sdk` using Expo's offline dependency check and run it in CI after
   frozen install, plus a deterministic iOS export with a non-production test origin.
-- [ ] Verify frozen install, mobile types/lint/125+ tests/plugin tests, Expo config,
+- [x] Verify frozen install, mobile types/lint/125+ tests/plugin tests, Expo config,
   compatible iOS export and unchanged desktop type safety. Inspect actual bundled
   React resolution, not just package manifests.
 
@@ -92,16 +92,16 @@ Files: features/wiki/editor/{PhoneToolbar,Menus,extensions,env,WikiEditor} as
 needed, a small shared content-link helper and focused tests. Also inspect Disk
 Markdown links for the same defect. No native allowlist widening.
 
-- [ ] Write failing behavior tests for the rich editor's internal task, board,
+- [x] Write failing behavior tests for the rich editor's internal task, board,
   disk and canvas links, Wiki page callback, external HTTPS, invalid schemes,
   same-origin lookalikes, and read-only vs editing clicks.
-- [ ] Use the existing `services/links.openOwnLink` for known application routes;
+- [x] Use the existing `services/links.openOwnLink` for known application routes;
   preserve the editor's `PageSource.open` callback for wiki-page links. External
   safe links keep normal platform opening. Never replace the page for an internal
   link, join voice on navigation or bypass permissions.
-- [ ] Route phone/bubble/modifier/read-only activation through the same behavior;
+- [x] Route phone/bubble/modifier/read-only activation through the same behavior;
   leave normal editing caret clicks alone and prevent duplicate opens.
-- [ ] Run focused editor/links tests, native navigation tests, renderer typecheck
+- [x] Run focused editor/links tests, native navigation tests, renderer typecheck
   and lint. Check a phone-size editor with a real clickable internal route.
 
 ### 3. Reproducible binary identity and release checks
@@ -109,15 +109,15 @@ Markdown links for the same defect. No native allowlist widening.
 Files: apps/mobile/app.config.ts, src/config.{js,d.ts}, src/config.test.ts,
 .env.example, plugin tests, docs/mobile release instructions.
 
-- [ ] Add `CALAB_APP_VERSION` (default 0.1.0) and `CALAB_IOS_BUILD_NUMBER` (default
+- [x] Add `CALAB_APP_VERSION` (default 0.1.0) and `CALAB_IOS_BUILD_NUMBER` (default
   1) with strict validation. No signing, bundle IDs, hosts or provider credentials
   in source. Store builds require an explicit greater build number chosen from
   current distribution history at release time; do not infer live history from
   old notes or upload automatically.
-- [ ] Test default/valid/malformed identity and matching app/WidgetKit/notification
+- [x] Test default/valid/malformed identity and matching app/WidgetKit/notification
   extension version values after repeated prebuild. Preserve existing plugin
   idempotence and disabled-by-default APNs/call capabilities.
-- [ ] Prepare a new unsigned local Release with existing incoming-call native
+- [x] Prepare a new unsigned local Release with existing incoming-call native
   module enabled, plus simulator compilation/launch if tooling permits. Verify
   actual compiled metadata and embedded bundle; preserve existing signed artifacts.
 
@@ -151,7 +151,7 @@ Reviewed by `claude-opus-5-5` (confirmed by CLI modelUsage), before implementati
 Required amendments accepted:
 - First hide Disk storage packs and buy CTA in iOS via the existing billing policy; keep usage read-only. Audit other recent monetary surfaces.
 - Make the SDK check part of existing required CI `ts`, disable independent native runtime Dependabot bumps, triage mobile manifest changes for review.
-- Normalize relative/uppercase-origin content links synchronously, preserve page callbacks, mailto and room confirmation; cover every activation path and prove same-origin links never open a new window. Include chat Markdown synchronous fallback.
+- Normalize relative/uppercase-origin content links synchronously, preserve page callbacks, mailto and room confirmation; cover every activation path and prove recognized same-origin application routes never open a new window. Include chat Markdown synchronous fallback.
 - Run actual WKWebView Simulator checks if local trusted HTTPS tooling permits, otherwise record unavailable, never pass Chromium off as iOS.
 - Native validation: EXPO_NO_DOTENV=1; explicit test origin and identity; APS=development, incomingCalls=1, nativeCallAudio=1, then pod install and inspect lockfile. Defaults remain off.
 - Add to unresolved parity boundaries: SIP incoming ringing has no APNs path; task/canvas-comment/calendar/guest events have no background phone push; background room resume after SIP still depends on WebKit microphone capture; SSO-enforced workspaces remain unavailable in this shell. These are not solved by this catch-up.
@@ -190,3 +190,63 @@ is not evidence that these interactions passed. Device/locked-call gates remain.
 
 The implementation review and final disposition will be recorded separately after
 reviewing the committed source. No production deployment, push or TestFlight upload.
+
+### Additional manual acceptance and review corrections
+
+On the rebuilt production web bundle, the 375px Wiki editor autolinked a synthetic
+local CAL-3 URL. Plain tap kept editing; the phone open-link button opened CAL-3
+with one browser tab and no page reload. Task and Disk usage-dialog screenshots
+were inspected in dark/light themes. These are Chromium results, not WKWebView.
+
+The independent safety review found a noncanonical configured-server edge case.
+Three new tests failed for uppercase hosts/schemes and explicit default ports;
+canonicalizing the configured share origin fixes the mismatch. Protocol-relative
+external links retain normal external routing and now have an explicit regression.
+The helper's boolean documents handoff, not OS acknowledgement. Unknown same-origin
+paths are outside the known-route repair and stay blocked by the existing host.
+The fixed-string CI manifest match was tightened. Native SDK security monitoring
+and unsupported-link feedback are recorded in the existing technical/UI backlogs.
+
+### Explicit unsupported links and release preparation
+
+The known-route repair does not cover public Canvas `/c/<code>`, event RSVP
+`/e/<id>/rsvp?...`, public Disk pages or arbitrary server URLs. They retain the
+platform fallback; the iOS host blocks own-origin new windows, so these taps may
+do nothing. Do not describe this as universal internal-link support. Tests now
+record that boundary; user feedback for unsupported paths is in the UI backlog.
+
+Distribution builds must generate iOS from a fresh checkout/generated tree with
+explicit final bundle ID, identity and capability flags. Do not reuse this local
+APNs-enabled tree with APS disabled: the pre-existing plugin early return retains
+an old NSE target. Do not delete the owner's signed artifacts. This fresh-tree
+release gate replaces an unsafe blanket recommendation to clean the working tree.
+A local unsigned build with test identity is not a distribution candidate.
+
+Current source checks use the repository-pinned Corepack pnpm 10.17.0, including
+the lockfile rewrite; the deleted libc metadata is not evidence of a different
+package manager. For release, also run required remote Linux CI. Visual suites
+remain disabled by the newer AGENTS.md owner rule; actual manual screenshot QA
+and positive unit controls are the available UI acceptance evidence here.
+
+## Integrated verification after review corrections
+
+`corepack pnpm -r test`: PASS, 6,224 tests passed, 18 explicitly skipped.
+Breakdown: desktop 4,990; mobile 141 + 8 Node plugin tests; protocol 987; wiki-doc 24;
+bot-sdk 41; landing 10; claude-bot tooling 23. No disabled visual suite was run.
+
+The first full run found the unchanged silent TCP mail test fixture waiting for
+EOF while it left handshake bytes unread. The failure reproduced using files
+extracted from base e0018e108. A three-line test-only drain/comment repair resolved
+it without changing timeout/closure assertions or any mail feature. The subsequent
+full run above passed. Mail remains excluded from mobile implementation.
+
+Renderer typecheck, changed-file ESLint (including the fixture), mobile types/lint,
+production web build, frozen install, offline SDK check and iOS export passed.
+Workflow YAML/shell syntax and isolated triage cases passed. The two previously
+verified unsigned native builds remain valid: no native source changed in review.
+
+Both initial Opus reviews and their dispositions are preserved in
+[ios-catchup-implementation-review-2026-10-26.md](ios-catchup-implementation-review-2026-10-26.md).
+Final delta review must name the final source commit; its local response is kept
+with verification artifacts. A green local code result does not waive remote CI,
+WKWebView/physical acceptance or signing/distribution gates.

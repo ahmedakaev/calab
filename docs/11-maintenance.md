@@ -90,8 +90,10 @@
 
 The Expo SDK, React Native, mobile React/ReactDOM and WebView are a tested set.
 Update them together from Expo's compatibility manifest. Dependabot does not
-independently bump Expo/RN/WebView; changes to `apps/mobile/package.json` require
-review even when semver calls a 0.x RN upgrade minor. Desktop React is independent;
+independently bump Expo/RN/WebView. React, ReactDOM, React types and TypeScript
+updates arrive outside the general tools group; when they change the mobile
+manifest, triage requires an SDK review. Test/lint-only changes retain normal
+auto-merge eligibility. Desktop React is independent;
 Metro pins mobile React to the mobile package resolution. The required `ts` CI job
 runs `check:sdk` offline and `export:check:ios` with dotenv disabled and a test
 origin. Also run mobile types, lint, tests and a native build before release.

@@ -2,6 +2,8 @@
 
 Сюда попадают minor-находки ревью и не-блокеры релиза (правило CLAUDE.md «Одно ревью на изменение»). Формат: дата · где · что · почему не сейчас.
 
+- 2026-10-26 · iOS SDK maintenance · Expo/RN/WebView are deliberately excluded from independent Dependabot bumps. Review upstream security advisories manually on every SDK maintenance pass; a bare ignore rule can also suppress security PRs ([GitHub docs](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/controlling-dependencies-updated)). CI SDK/export checks do not compile native transitive dependencies; keep the local native compile gate. Follow-up: a coordinated native dependency update lane that retains security PR visibility.
+
 - 2026-09-26 · `apps/server/internal/rtc/sync.go` `reconcileStreams` · нет grace-окна (в отличие от `joinGrace` для состояний): стрим из `track_published`, пришедшего между `ListParticipants` и `voice.Streams`, удаляется (VOICE_STREAM_STOP ENDED) и добавляется обратно следующим тиком — клиенты видят «моргание». Фикс: снимок стримов до листинга или проверка `startedAt > start − joinGrace`. Не блокер 0.1.1 (поведение существовало с v0.1.0, окно 30 с × редкое совпадение); сделать в 0.1.2 отдельным агентом с интеграционным тестом.
 - 2026-09-26 · `internal/events` · при зависшем Redis guest cleanup ограничен 5 с + 3 с на гостя с живыми сессиями, logout-all — до ~6 с. Приемлемо; пересмотреть, если появятся жалобы на задержку logout.
 - 2026-09-26 · `visual-nightly.yml` · после разделения на test/publish не проверялся живым запуском — проверить по первому ночному прогону.

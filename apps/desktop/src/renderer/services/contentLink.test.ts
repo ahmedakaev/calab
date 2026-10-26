@@ -22,6 +22,15 @@ describe('synchronous content navigation', () => {
     openContentLink(href);
     expect(external).toHaveBeenCalledWith(href); // No microtask/timer awaited.
   });
+  it('keeps a protocol-relative foreign authority external', () => {
+    openContentLink('//external.test/path');
+    expect(external).toHaveBeenCalledWith('https://external.test/path');
+  });
+  it.each(['/c/public-code', '/e/event/rsvp?t=token', '/unsupported'])('hands unsupported own path %s to the platform; the native host may block it', (path) => {
+    expect(openContentLink(path)).toBe(true);
+    expect(own).toHaveBeenCalledWith(`https://app.test${path}`);
+    expect(external).toHaveBeenCalledWith(`https://app.test${path}`);
+  });
   it('hands mailto to the platform without invoking the Mail deep-link parser', () => {
     openContentLink('mailto:test@example.com');
     expect(own).not.toHaveBeenCalled(); expect(external).toHaveBeenCalledWith('mailto:test@example.com');

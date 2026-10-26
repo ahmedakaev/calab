@@ -28,7 +28,7 @@ export function parseInviteCode(input: string): string | null {
   return m?.[1] ?? null;
 }
 
-const HTTP_ORIGIN = /^https?:\/\/[^/\s]+/;
+const HTTP_ORIGIN = /^https?:\/\/[^/\s]+/i;
 
 /**
  * The base for shared links: the session's server, else the configured server (settings), else
@@ -39,7 +39,10 @@ export function shareOrigin(serverUrl: string): string | null {
   const web = import.meta.env.VITE_PLATFORM === 'web' && typeof location !== 'undefined' ? location.origin : '';
   for (const c of [serverUrl, useSession.getState().settings?.serverUrl ?? '', web]) {
     const o = c.trim().replace(/\/+$/, '');
-    if (HTTP_ORIGIN.test(o)) return o;
+    if (HTTP_ORIGIN.test(o)) {
+      // Content URLs use URL.href; compare them against the same canonical origin.
+      try { return new URL(o).origin; } catch { /* Try the next configured origin. */ }
+    }
   }
   return null;
 }

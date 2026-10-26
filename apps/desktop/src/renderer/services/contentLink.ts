@@ -1,7 +1,7 @@
 import { platform } from '../platform';
 import { openOwnLink, shareOrigin } from './links';
 
-/** Content links are untrusted. Resolve root-relative routes against this server, never a base tag. */
+/** Content links are untrusted. Resolve relative authorities/routes against this server, never a base tag. */
 export function contentHref(raw: string): string | null {
   const href = raw.trim();
   if (!href) return null;
@@ -16,7 +16,7 @@ export function contentHref(raw: string): string | null {
   } catch { return null; }
 }
 
-/** Stay synchronous in the user gesture: WebKit blocks external popups after an awaited import. */
+/** Synchronous gesture routing. True means handed off, not that the platform confirmed opening. */
 export function openContentLink(raw: string, pages?: { idOf: (href: string) => string | null; open: (id: string) => void } | null): boolean {
   const href = contentHref(raw);
   if (!href) return false;

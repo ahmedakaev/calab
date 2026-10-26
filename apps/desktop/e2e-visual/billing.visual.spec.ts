@@ -777,6 +777,7 @@ test('billing-ios-shell: the plan tab without payment UI', async ({ page }) => {
   await expect(settings.getByTestId('plan-switch')).toHaveCount(0);
   await expect(settings.getByTestId('billing-payer-edit')).toHaveCount(0);
   await settings.getByTestId('billing-payments-elsewhere').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await expect(settings.getByTestId('disk-meter')).toBeVisible();
   await expect(settings.getByTestId('disk-buy')).toHaveCount(0);
   await expect(settings.getByTestId('disk-pack')).toHaveCount(0);
   await checkpoint(s, 'billing-cabinet-ios');

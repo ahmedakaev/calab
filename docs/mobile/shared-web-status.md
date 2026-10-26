@@ -8,8 +8,8 @@ by the owner for a separate mobile connection. See
 [Opus 5.5 plan review](ios-catchup-plan-review-2026-10-26.md).
 
 Local changes align Expo 57.0.31 with RN 0.86.3 / mobile React 19.2.3; CI checks SDK
-compatibility and an iOS bundle. Internal rich-editor and Disk links route inside
-the client synchronously; chat external links retain their user gesture. Disk
+compatibility and an iOS bundle. Known in-app rich-editor and Disk routes stay inside
+the client with synchronous dispatch; chat external links retain their user gesture. Disk
 storage prices/CTA follow the existing iOS billing suppression. App version/build
 are validated env inputs; extension bundle IDs and versions update on repeated
 prebuild. Existing generated native projects need `pod install` after dependency

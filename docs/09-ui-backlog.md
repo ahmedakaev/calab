@@ -2,6 +2,11 @@
 
 Референс — Discord desktop (структура, плотность, привычные паттерны), визуальный язык — macOS (docs/08). Каждая задача — с критерием готовности; закрывается visual-тестом.
 
+## iOS catch-up review follow-ups (2026-10-26)
+
+- Content-link opening has no success acknowledgement from the platform. Known app routes are handled internally, but unsupported same-origin paths and recipient-less `mailto:` can still do nothing in the native host. Add an explicit unsupported-link result/feedback without replacing the WebView or widening its allowlist; validate in WKWebView. This predates the catch-up route fix and remains a minor UX limitation.
+
+
 ## P0 — хром окна и каркас
 
 1. **Верхняя полоса окна (title bar)** — 38 px на всю ширину, `-webkit-app-region: drag`; на macOS `titleBarStyle: 'hiddenInset'` + `trafficLightPosition {x:12,y:12}`, слева зарезервировано 80 px под светофор — **ничего под ним не рисуется**. В полосе: ← → навигация (история комнат), по центру — имя workspace (или «Calaba»), справа — поиск (см. 3), «Входящие/упоминания», «?». На Windows/Linux — свои кнопки окна справа (`titleBarOverlay`) или стандартная рамка. Веб — та же полоса без drag.

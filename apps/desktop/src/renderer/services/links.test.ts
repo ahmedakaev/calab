@@ -85,6 +85,13 @@ describe('shared links are https only (docs/09 #53)', () => {
     expect(inviteUrl('', 'abcd1234')).toBe('https://app.calab.io/join/abcd1234');
     expect(roomInviteUrl('', 'abcd1234')).toBe('https://app.calab.io/r/abcd1234');
   });
+  it.each(['https://App.Calab.IO', 'https://app.calab.io:443/', 'HTTPS://APP.CALAB.IO/'])('matches canonical content links against configured %s', (serverUrl) => {
+    session.settings = { serverUrl };
+    const id = '00000000-0000-7000-8003-000000000021';
+    expect(inviteUrl('', 'abcd1234')).toBe('https://app.calab.io/join/abcd1234');
+    expect(openOwnLink(`https://app.calab.io/dm/${id}`)).toBe(true);
+    expect(openOwnLink(`https://app.calab.io.evil.test/dm/${id}`)).toBe(false);
+  });
   it('prefers the session server over settings', () => {
     session.settings = { serverUrl: 'https://old.example.org' };
     expect(inviteUrl('https://app.calab.io', 'abcd1234')).toBe('https://app.calab.io/join/abcd1234');

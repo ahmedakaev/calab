@@ -48,7 +48,8 @@ updates:
         patterns: ["uiohook-napi"]
       minor-and-patch:
         patterns: ["*"]
-        exclude-patterns: ["electron", "uiohook-napi"]
+        # Mobile's React/types/TS pins need an independent SDK review, not a blocked tools group.
+        exclude-patterns: ["electron", "uiohook-napi", "react", "react-dom", "@types/react", "typescript"]
         update-types: [minor, patch]
 
   - package-ecosystem: docker
