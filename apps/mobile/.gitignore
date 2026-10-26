@@ -13,3 +13,4 @@ dist/
 *.p8
 *.mobileprovision
 credentials.json
+dist-ios/

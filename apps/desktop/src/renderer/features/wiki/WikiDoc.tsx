@@ -187,7 +187,7 @@ export default function WikiDoc({ workspaceId, pageId, editable, editing, phone 
     <>
       {phone ? <PeersReporter awareness={awareness} me={me} /> : <MetaLine workspaceId={workspaceId} pageId={pageId} awareness={awareness} me={me} />}
       <WikiEditor doc={doc} awareness={awareness} editable={editable && editing} me={user} onUploadImage={upload} mentionSource={mentions} pageSource={pages} onError={onError} onReady={onReady} phone={phone} className={phone ? 'mt-2' : 'mt-4'} />
-      {phone && editable && editing && toolbarHost && phoneApi ? createPortal(<PhoneToolbar editor={phoneApi.editor} onBlocks={() => phoneApi.openBlocks()} />, toolbarHost) : null}
+      {phone && editable && editing && toolbarHost && phoneApi ? createPortal(<PhoneToolbar pages={pages} editor={phoneApi.editor} onBlocks={() => phoneApi.openBlocks()} />, toolbarHost) : null}
     </>
   );
 }

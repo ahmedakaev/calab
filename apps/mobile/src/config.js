@@ -32,4 +32,15 @@ function parseWebOrigin(raw) {
   return url.origin;
 }
 
-module.exports = { WebOriginError, parseWebOrigin };
+/** Local defaults; store uploads must supply an identity checked against distribution history. */
+function parseReleaseIdentity(version = '0.1.0', buildNumber = '1') {
+  if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version) || version.trim() !== version) {
+    throw new Error('CALAB_APP_VERSION must be three non-negative integers (for example 1.2.3)');
+  }
+  if (!/^[1-9][0-9]{0,3}$/.test(buildNumber) || buildNumber.trim() !== buildNumber) {
+    throw new Error('CALAB_IOS_BUILD_NUMBER must be an integer from 1 to 9999');
+  }
+  return { version, buildNumber };
+}
+
+module.exports = { WebOriginError, parseWebOrigin, parseReleaseIdentity };

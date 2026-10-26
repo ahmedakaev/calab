@@ -1,5 +1,37 @@
 # Телефон: общий веб в оболочке — статус
 
+## 2026-10-26: desktop catch-up (local, not published)
+
+The shared web host remains the supported mobile architecture; Mail is excluded
+by the owner for a separate mobile connection. See
+[iOS catch-up audit and plan](ios-catchup-2026-10-26.md) and its
+[Opus 5.5 plan review](ios-catchup-plan-review-2026-10-26.md).
+
+Local changes align Expo 57.0.31 with RN 0.86.3 / mobile React 19.2.3; CI checks SDK
+compatibility and an iOS bundle. Internal rich-editor and Disk links route inside
+the client synchronously; chat external links retain their user gesture. Disk
+storage prices/CTA follow the existing iOS billing suppression. App version/build
+are validated env inputs; extension bundle IDs and versions update on repeated
+prebuild. Existing generated native projects need `pod install` after dependency
+changes; if CocoaPods reports a changed local podspec, update the named Expo pods.
+
+Both unsigned arm64 Release targets (iOS and Simulator) compiled locally with
+APS=development, incomingCalls=1, nativeCallAudio=1 and an explicit local HTTPS
+origin, `EXPO_NO_DOTENV=1`. App, WidgetKit and NSE agree on version/build and bundle
+prefix. These are test binaries, not distribution builds. Interactive WKWebView
+acceptance is not yet proven: the installed local runtime only supports iPhone
+Duo, its captured displays were blank/system UI and the computer-use connector
+cannot select Simulator. Do not infer device or locked-audio readiness from a
+successful compiler or running process.
+
+Outstanding parity: SIP ringing has no APNs path; task, canvas-comment,
+calendar and guest events have no background phone push; room microphone resume
+after a SIP call can wait for foreground WebKit capture. SSO-enforced workspaces,
+iOS screen broadcast/system-audio capture and native PiP remain unsupported.
+These require separate implementation/acceptance, not a claim of full OS parity.
+Historical device reports and TestFlight state below were not revalidated.
+
+
 ## Native microphone/camera permissions (2026-10-09)
 
 - **Implemented locally:** shared settings and microphone onboarding use iOS

@@ -6,8 +6,12 @@ import * as Y from 'yjs';
 import { fromMarkdown, toMarkdown, type PmNode } from '../../../lib/wiki/markdown';
 import { docPlainText } from '../../../lib/wiki/plainText';
 import WikiEditor from './WikiEditor';
+import { PhoneToolbar } from './PhoneToolbar';
+import { t } from '../../../i18n';
 
-vi.mock('../../../platform', () => ({ platform: { kind: 'web', apiBase: '', directMedia: false, mediaUrl: () => new Promise<string>(() => undefined), apiFetch: vi.fn() } }));
+const { own, external } = vi.hoisted(() => ({ own: vi.fn(() => true), external: vi.fn() }));
+vi.mock('../../../services/links', () => ({ openOwnLink: own, shareOrigin: () => 'https://app.test' }));
+vi.mock('../../../platform', () => ({ platform: { kind: 'web', apiBase: '', directMedia: false, mediaUrl: () => new Promise<string>(() => undefined), apiFetch: vi.fn(), app: { openExternal: external } } }));
 import type { Editor } from '@tiptap/core';
 import { Slice } from '@tiptap/pm/model';
 import type { PageSource, WikiEditorApi, WikiEditorProps } from './types';
@@ -28,6 +32,7 @@ let host: HTMLElement | null = null;
 afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
+  own.mockClear(); external.mockClear();
   root = null;
   host = null;
 });
@@ -339,4 +344,75 @@ describe('WikiEditor', () => {
     });
     expect(document.querySelectorAll('[role=option]')).toHaveLength(0);
   });
+});
+
+
+describe('content link activation in the shared editor', () => {
+  it.each(['/t/DEV-1', '/b/0190a0b0-0000-7000-80c1-000000000001', '/disk/0190a0b0-0000-7000-80c1-000000000001', '/canvas/0190a0b0-0000-7000-80c1-000000000001'])('read-only %s routes inside the app without a new window', (path) => {
+    const { el } = mount(seeded(`[Open](https://app.test${path})`), false);
+    const popup = vi.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      act(() => el.querySelector<HTMLAnchorElement>('.wiki-prose a')?.click());
+      expect(own).toHaveBeenCalledWith(`https://app.test${path}`);
+      expect(popup).not.toHaveBeenCalled(); expect(external).not.toHaveBeenCalled();
+    } finally { popup.mockRestore(); }
+  });
+  it('editing leaves caret clicks alone, modifier activation routes once', () => {
+    const { el } = mount(seeded('[Open](https://app.test/t/DEV-1)'), true);
+    const a = el.querySelector<HTMLAnchorElement>('.wiki-prose a');
+    act(() => a?.click()); expect(own).not.toHaveBeenCalled();
+    act(() => { a?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })); });
+    expect(own).toHaveBeenCalledTimes(1); expect(external).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('editor open-link buttons', () => {
+  it('phone toolbar opens an internal route without a popup', async () => {
+    const { editor } = mount(seeded('[Open](https://app.test/t/DEV-1)'), true, { phone: true });
+    const slot = document.createElement('div'); document.body.append(slot);
+    const toolbar = createRoot(slot);
+    const popup = vi.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      await act(async () => {
+        editor().commands.setTextSelection(2);
+        editor().commands.focus();
+        await new Promise((r) => setTimeout(r, 30));
+        toolbar.render(createElement(PhoneToolbar, { editor: editor(), onBlocks: () => undefined }));
+      });
+      const button = slot.querySelector<HTMLButtonElement>('[data-testid="wiki-tool-open-link"]');
+      expect(button).not.toBeNull(); act(() => button?.click());
+      expect(own).toHaveBeenCalledWith('https://app.test/t/DEV-1'); expect(popup).not.toHaveBeenCalled();
+    } finally { act(() => toolbar.unmount()); slot.remove(); popup.mockRestore(); }
+  });
+  it('bubble link field opens an internal route without a popup', async () => {
+    const { editor } = mount(seeded('[Open](https://app.test/t/DEV-1)'), true);
+    const popup = vi.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      await act(async () => {
+        editor().commands.setTextSelection({ from: 1, to: 5 });
+        editor().commands.focus();
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      const link = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === t('wiki.link'));
+      expect(link).toBeDefined(); act(() => link?.click());
+      const open = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.getAttribute('aria-label') === t('wiki.link.open'));
+      expect(open).toBeDefined(); act(() => open?.click());
+      expect(own).toHaveBeenCalledWith('https://app.test/t/DEV-1'); expect(popup).not.toHaveBeenCalled();
+    } finally { popup.mockRestore(); }
+  });
+});
+
+
+it('routes a root-relative link mark already stored in the rich editor', () => {
+  const { editor, el } = mount(seeded('Open'), true);
+  act(() => {
+    editor().commands.setTextSelection({ from: 1, to: 5 });
+    editor().commands.setLink({ href: '/t/DEV-1' });
+  });
+  const a = el.querySelector<HTMLAnchorElement>('.wiki-prose a');
+  expect(a?.getAttribute('href')).toBe('/t/DEV-1');
+  act(() => { a?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })); });
+  expect(own).toHaveBeenCalledWith('https://app.test/t/DEV-1');
+  expect(external).not.toHaveBeenCalled();
 });

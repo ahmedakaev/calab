@@ -51,6 +51,7 @@ import type { MentionCandidate } from '../../../lib/mentions';
 import { str } from '../../../lib/wiki/markdown';
 import { BLOCKS, currentBlock, type BlockDef, type BlockId } from './blocks';
 import type { EditorEnv } from './env';
+import { contentHref, openContentLink } from '../../../services/contentLink';
 import { isAllowedHref } from './extensions';
 import type { MenuState } from './menuStore';
 import type { PageCandidate } from './types';
@@ -395,7 +396,7 @@ export function BubbleBar({ editor, env }: { editor: Editor; env: EditorEnv }): 
       </div>
       {panel === 'turn' ? <TurnInto editor={editor} env={env} current={s.block} onDone={() => setPanel(null)} /> : null}
       {panel === 'color' ? <Colors editor={editor} current={s.highlight} onDone={() => setPanel(null)} /> : null}
-      {panel === 'link' ? <LinkField editor={editor} href={s.link} onDone={() => setPanel(null)} /> : null}
+      {panel === 'link' ? <LinkField env={env} editor={editor} href={s.link} onDone={() => setPanel(null)} /> : null}
     </div>,
     portalHost(editor).el,
   );
@@ -467,7 +468,7 @@ function Colors({ editor, current, onDone }: { editor: Editor; current: Highligh
   );
 }
 
-function LinkField({ editor, href, onDone }: { editor: Editor; href: string; onDone: () => void }): ReactNode {
+function LinkField({ editor, href, onDone, env }: { editor: Editor; href: string; onDone: () => void; env: EditorEnv }): ReactNode {
   const [value, setValue] = useState(href);
   const apply = (): void => {
     const v = value.trim();
@@ -496,8 +497,8 @@ function LinkField({ editor, href, onDone }: { editor: Editor; href: string; onD
       <BarButton label={t('wiki.link.apply')} onClick={apply}>
         <Check className="size-4" strokeWidth={1.75} aria-hidden />
       </BarButton>
-      {href && isAllowedHref(href) ? (
-        <BarButton label={t('wiki.link.open')} onClick={() => window.open(href, '_blank', 'noopener,noreferrer')}>
+      {href && contentHref(href) ? (
+        <BarButton label={t('wiki.link.open')} onClick={() => { openContentLink(href, env.pages); }}>
           <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
         </BarButton>
       ) : null}

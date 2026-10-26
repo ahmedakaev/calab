@@ -1,5 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
-import { parseWebOrigin } from './src/config';
+import { parseWebOrigin, parseReleaseIdentity } from './src/config';
 
 /**
  * Phone host (ADR-0067). Hosts, identifiers and the EAS link come from env only — a local,
@@ -22,11 +22,13 @@ if (nativeCallAudio && !incomingCalls) throw new Error('CALAB_IOS_NATIVE_CALL_AU
 const owner = env('CALAB_EXPO_OWNER');
 const projectId = env('CALAB_EAS_PROJECT_ID');
 
+const identity = parseReleaseIdentity(process.env.CALAB_APP_VERSION, process.env.CALAB_IOS_BUILD_NUMBER);
+
 const config: ExpoConfig = {
   name: 'Calab',
   slug: 'calab',
   ...(owner ? { owner } : {}),
-  version: '0.1.0',
+  version: identity.version,
   platforms: ['ios', 'android'],
   orientation: 'portrait',
   // Existing Calab mark, full-bleed RGB at store resolution; iOS applies its own corner mask.
@@ -34,6 +36,7 @@ const config: ExpoConfig = {
   backgroundColor: '#1c1c1e',
   userInterfaceStyle: 'automatic',
   ios: {
+    buildNumber: identity.buildNumber,
     supportsTablet: false,
     ...(iosBundleId ? { bundleIdentifier: iosBundleId } : {}),
     // Explicit opt-in only; requires a matching APNs-capable profile. Default local builds request no APS grant.

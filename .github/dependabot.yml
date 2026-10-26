@@ -21,6 +21,12 @@ updates:
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
     ignore:
+      # Expo/RN are one tested SDK set. Update together with the mobile React pair.
+      - dependency-name: expo
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: react-native
+      - dependency-name: react-native-webview
       # bumped by hand: new Chromium/Node ABI (uiohook rebuild, visual snapshots) / new Next major
       - dependency-name: electron
         update-types: ["version-update:semver-major"]
