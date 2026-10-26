@@ -15,8 +15,9 @@ export function GoalTracking() {
       const path = e.composedPath();
       const a = path.find((n): n is HTMLAnchorElement => n instanceof HTMLAnchorElement && !!n.href);
       if (!a) {
-        // The support widget lives in a Shadow DOM: a click retargeted to its host is the visitor opening it.
-        if (path[0] !== e.target && !chatCounted) {
+        // The support widget (ChatDeck) lives in a Shadow DOM on #chatdeck-widget and exposes no open event:
+        // the first click inside it counts as opening the chat.
+        if (!chatCounted && (e.target as Element | null)?.id === 'chatdeck-widget') {
           chatCounted = true;
           goal('support_chat_open');
         }
