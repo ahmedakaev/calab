@@ -22,8 +22,8 @@ export interface Config {
   logDir: string;
   /** Where the editable prompts live: the lead checkout first, then the installed copy. */
   promptDirs: string[];
-  cooldownMs: number;
-  leadTimeoutMs: number;
+  /** Request file for /check: the owner's Claude session picks it up (the bot starts no CLI). */
+  checkRequest: string;
   assistTimeoutMs: number;
   timeZone: string | undefined;
   /** Values from the env file that must never be posted (redaction). */
@@ -76,8 +76,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, installDir = ''
     workspaceId: get('CLAUDE_BOT_WORKSPACE_ID'),
     logDir: get('CLAUDE_BOT_LOG_DIR', join(home, 'Library', 'Logs', 'calab-claude-bot')),
     promptDirs: [join(leadRepo, 'tools', 'claude-bot'), ...(installDir ? [installDir] : [])],
-    cooldownMs: minutes('CLAUDE_BOT_COOLDOWN_MIN', 10),
-    leadTimeoutMs: minutes('CLAUDE_BOT_LEAD_TIMEOUT_MIN', 240),
+    checkRequest: get('CLAUDE_BOT_CHECK_REQUEST', join(home, '.calab-tools', 'check-request.json')),
     assistTimeoutMs: minutes('CLAUDE_BOT_ASSIST_TIMEOUT_MIN', 3),
     timeZone: get('CLAUDE_BOT_TZ') || undefined,
     secrets: [...new Set([token, ...file.values()].filter((v) => v.length >= 8))],

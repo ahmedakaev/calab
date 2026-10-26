@@ -1,21 +1,20 @@
 // Mr.Claude daemon (tools/claude-bot/README.md): `/check` starts one headless lead run on Opus; a DM or a
 // mention in a task chat gets an answer from a sandboxed Sonnet assistant.
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
 import { ApiError, Bot, GatewayFatalError, type CommandEvent, type Message, type WorkspaceMember } from '@calaba/bot-sdk';
 import { MessageKind, RoomType } from '@calaba/protocol';
-import { assistArgv, leadArgv } from './argv.js';
+import { assistArgv } from './argv.js';
 import { buildChatPrompt, CONTEXT_MESSAGES, MAX_ANSWER } from './chat.js';
-import { runAssistant, runLead } from './claude.js';
+import { runAssistant } from './claude.js';
 import { childEnv, loadConfig } from './config.js';
 import { gate, roomAllowed } from './gate.js';
 import { RateLimiter } from './ratelimit.js';
 import { redact, trimTo } from './redact.js';
-import { RunLock } from './runlock.js';
 
 const installDir = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, installDir);
@@ -24,8 +23,6 @@ mkdirSync(cfg.logDir, { recursive: true });
 const log = (...a: unknown[]): void => {
   console.log(new Date().toISOString(), ...a);
 };
-
-const hhmm = (t: number): string => new Date(t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', ...(cfg.timeZone ? { timeZone: cfg.timeZone } : {}) });
 
 function readPrompt(name: string): string {
   for (const dir of cfg.promptDirs) {
@@ -38,7 +35,6 @@ function readPrompt(name: string): string {
 const bot = new Bot(cfg.token, { server: cfg.apiUrl, log: (m) => {
   log('[sdk]', m);
 } });
-const lock = new RunLock(cfg.cooldownMs);
 const limiter = new RateLimiter(10, 10 * 60_000);
 const env = childEnv(process.env);
 let workspaceId = cfg.workspaceId;
@@ -86,7 +82,9 @@ async function say(to: Message, text: string): Promise<void> {
   await bot.reply(to, trimTo(redact(text, cfg.secrets), MAX_ANSWER));
 }
 
-// ---- /check: one lead run ----
+// ---- /check: hand the request to the Claude session ----
+// The bot starts no CLI: it drops a request file that the lead's session (the one the owner works in)
+// picks up and acts on itself (CBF bugboard Todo sweep).
 
 async function onCheck(cmd: CommandEvent): Promise<void> {
   const m = cmd.message;
@@ -98,40 +96,13 @@ async function onCheck(cmd: CommandEvent): Promise<void> {
     return;
   }
   const now = Date.now();
-  const got = lock.tryAcquire(now);
-  if (!got.ok) {
-    if (got.reason === 'running') await say(m, `Уже работаю с ${hhmm(got.since)}, отпишусь по готовности.`);
-    else await say(m, `Последний запуск был в ${hhmm(got.lastStart)}; следующий — не раньше ${hhmm(got.nextAt)}.`);
+  if (existsSync(cfg.checkRequest)) {
+    await say(m, 'Заявка уже в очереди — сессия Claude возьмёт её при ближайшей проверке.');
     return;
   }
-  try {
-    await say(m, 'Принял — смотрю доску, отпишусь в задачах.');
-    const stamp = new Date(now).toISOString().replace(/[:.]/g, '-');
-    const logFile = join(cfg.logDir, `lead-${stamp}.log`);
-    const prompt = `${readPrompt('lead-prompt.md')}\n\nЗапуск попросил(а): ${who.name}, ${new Date(now).toISOString()}.`;
-    log('/check by', who.name, '→ lead run, log', logFile);
-    void runLead({ bin: cfg.claudeBin, argv: leadArgv(prompt), cwd: cfg.leadRepo, env, logFile, timeoutMs: cfg.leadTimeoutMs })
-      .then(async (r) => {
-        const mins = Math.round((Date.now() - now) / 60_000);
-        log('lead run done', { code: r.code, isError: r.isError, timedOut: r.timedOut, mins });
-        const head = `Итог /check (запуск ${hhmm(now)}, ${mins} мин):`;
-        const body = r.result.trim()
-          ? trimTo(r.result, 3500)
-          : r.timedOut
-            ? 'Запуск прерван по таймауту, итога нет. Подробности — в логе на машине владельца.'
-            : `Запуск завершился без итога (код ${String(r.code)}). Подробности — в логе на машине владельца.`;
-        await say(m, `${head}\n${body}`);
-      })
-      .catch((err: unknown) => {
-        log('lead run report failed', err);
-      })
-      .finally(() => {
-        got.release();
-      });
-  } catch (err) {
-    got.release();
-    throw err;
-  }
+  writeFileSync(cfg.checkRequest, `${JSON.stringify({ by: who.name, at: new Date(now).toISOString() })}\n`);
+  log('/check by', who.name, '→ queued for the session', cfg.checkRequest);
+  await say(m, 'Принял — передал сессии Claude, она проверит Todo.');
 }
 
 // ---- chat on Sonnet ----
