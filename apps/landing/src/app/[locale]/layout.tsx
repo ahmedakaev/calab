@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { getDict, hreflangAlternates, isLocale, LOCALE_INFO, LOCALES, localePath } from '@/i18n';
 import { SITE_URL } from '@/lib/site';
 import { CookiePreferences } from '@/components/cookie-preferences';
+import { GoalTracking } from '@/components/goal-tracking';
 import { YandexMetrika } from '@/components/yandex-metrika';
 import { SupportChat } from '@/components/support-chat';
 import '../globals.css';
@@ -60,7 +61,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   if (!isLocale(locale)) notFound();
   return (
     <html lang={LOCALE_INFO[locale].lang}>
-      <body className="min-h-dvh text-fg">{children}<CookiePreferences locale={locale} /><YandexMetrika /><SupportChat /></body>
+      <body className="min-h-dvh text-fg">{children}<CookiePreferences locale={locale} /><YandexMetrika /><GoalTracking /><SupportChat /></body>
     </html>
   );
 }

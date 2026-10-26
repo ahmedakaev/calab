@@ -68,6 +68,8 @@ a provider: disclose recipients/purposes/lifetimes, bump the consent version, up
 and root-router validation together, and gate loading plus withdrawal through the purpose
 check. Never add a tracker via an unconditional script. Active now: preferences and analytics. The landing CSP (`infra/docker/caddy/sites.caddy`) allows `mc.yandex.ru/.com` + `yastatic.net` for it.
 Run `pnpm -F @calaba/landing test:preferences` for consent and root-router regression checks.
+Metrika goals (`lib/metrika.ts`, delegated clicks in `components/goal-tracking.tsx`; `goal()` is a no-op without consent, nothing is queued): `download_click` {os}, `open_web_app`, `plan_buy_click` {plan}, `payment_success` (OnPay success page), `contact_click`, `support_chat_open` (first click into the chat widget), `pricing_view` (one IntersectionObserver), `docs_open`. Ids must match the JS-event goals in Metrika exactly.
+UTM passthrough: `utm_*`/`yclid` of the landing URL are kept in sessionStorage and appended to `APP_URL` links at click time so the app can attribute signups; no personal data and no third party, so it works without consent.
 No analytics SDK, third-party CMP or payment functionality is enabled by these pages.
 
 ## Where it is served
