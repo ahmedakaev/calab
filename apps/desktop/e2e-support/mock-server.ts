@@ -3482,8 +3482,13 @@ class MockImpl {
       if (b.defaultMaxStreamPreset !== undefined) media.maxStreamPreset = b.defaultMaxStreamPreset;
       if (b.defaultMaxStreams !== undefined) media.maxStreams = b.defaultMaxStreams;
       if (b.defaultCameraLimit !== undefined) media.cameraLimit = b.defaultCameraLimit;
+      if (b.defaultJoinLeaveSoundMax !== undefined) media.joinLeaveSoundMax = b.defaultJoinLeaveSoundMax;
       const mediaChanged =
-        media.audioBitrateKbps !== undefined || media.maxStreamPreset !== undefined || media.maxStreams !== undefined || media.cameraLimit !== undefined;
+        media.audioBitrateKbps !== undefined ||
+        media.maxStreamPreset !== undefined ||
+        media.maxStreams !== undefined ||
+        media.cameraLimit !== undefined ||
+        media.joinLeaveSoundMax !== undefined;
       if (mediaChanged) ws.mediaDefaults = effectiveMedia(ws, media);
       this.toWorkspace(ws.id, { event: { case: 'workspaceUpdate', value: { workspace: ws } } });
       if (mediaChanged) {

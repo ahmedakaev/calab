@@ -495,6 +495,7 @@ export const DEFAULT_MEDIA: RoomMediaSettings = create(RoomMediaSettingsSchema, 
   maxStreamPreset: ScreenSharePreset.H1080,
   maxStreams: 3,
   cameraLimit: 6,
+  joinLeaveSoundMax: 10,
 });
 
 /** Plan limits of the mock (ADR-0024, docs/04 «Тарифы»): the server's built-in defaults. */
@@ -555,6 +556,7 @@ export function effectiveMedia(ws: Workspace | undefined, o: RoomMediaOverride |
     maxStreamPreset: o?.maxStreamPreset ?? d.maxStreamPreset,
     maxStreams: o?.maxStreams ?? d.maxStreams,
     cameraLimit: o?.cameraLimit ?? d.cameraLimit,
+    joinLeaveSoundMax: o?.joinLeaveSoundMax ?? d.joinLeaveSoundMax ?? 10,
   });
 }
 
