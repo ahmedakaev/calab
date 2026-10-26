@@ -429,15 +429,12 @@ export function CameraGrid({ box, wsId, top, emptyFeed = false }: { box: Box; ws
   const { w, h } = useSize(area);
   const me = useMe();
   const gallery = view === 'gallery';
+  const go = useCallback((p: number) => voice.setGalleryPage(Math.max(0, p)), []);
   // Re-renders only when the page's tiles change, not on every speaking start (useGallery).
-  const { gallery: g, pageOf } = useGallery(gallery ? { people, pinned: focused, me, hideSelf, hideNoVideo, size, page } : null);
+  // The page clamped (people left, a bigger page size): the store follows (onClamp).
+  const { gallery: g, pageOf } = useGallery(gallery ? { people, pinned: focused, me, hideSelf, hideNoVideo, size, page, onClamp: go } : null);
   const pages = g?.pages ?? 1;
   const shownPage = g?.page ?? 0;
-  // The page clamped (people left, a bigger page size): the store follows.
-  useEffect(() => {
-    if (g && g.page !== page) voice.setGalleryPage(g.page);
-  }, [g, page]);
-  const go = useCallback((p: number) => voice.setGalleryPage(Math.max(0, p)), []);
   // Esc returns a pinned tile to the grid (not while a menu or dialog handles its own Esc).
   useEffect(() => {
     if (!focused) return;
