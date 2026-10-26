@@ -35,6 +35,7 @@ import { AUTH_TIMEOUT_MS, refreshGate } from '../../shared/refreshGate';
 import type { GuestJoin, Platform } from './types';
 import { createHostCapabilities } from './hostActivity';
 import { saveWebResume, takeWebResume, tabStorage } from '../lib/webResume';
+import { captureFromLocation, clearAttribution, storedAttribution } from '../lib/attribution';
 
 /**
  * Web platform (ADR-0015). Same origin as the API (`https://app.<domain>`):
@@ -485,6 +486,9 @@ function takeDeepLink(): Promise<string | null> {
 const noop = (): (() => void) => () => undefined;
 
 export function createWebPlatform(): Platform {
+  // ADR-0135: the landing's campaign params (utm_*, yclid, ym_cid) of the first open, sent
+  // once with a registration; removed from the address bar before the router reads it.
+  captureFromLocation();
   const hostCapabilities = createHostCapabilities();
   clearHostSession = () => hostCapabilities.sessionActivity?.clear('logout');
   return {
@@ -571,15 +575,20 @@ export function createWebPlatform(): Platform {
         };
       },
       login: (a: LoginArgs) => authenticate('/api/auth/login', { email: a.email, password: a.password }),
-      register: (a: RegisterArgs) =>
-        authenticate('/api/auth/register', {
+      register: async (a: RegisterArgs) => {
+        const attribution = storedAttribution();
+        const r = await authenticate('/api/auth/register', {
           email: a.email,
           password: a.password,
           displayName: a.displayName,
           inviteCode: a.inviteCode,
           locale: a.locale ?? '',
           ...(a.checkSimilar ? { checkSimilarAccount: true } : {}),
-        }),
+          ...(attribution ? { attribution } : {}),
+        });
+        if (r.ok) clearAttribution();
+        return r;
+      },
       guestJoin,
       logout: async (allSessions) => {
         const started = ++epoch; ++ssoGeneration;

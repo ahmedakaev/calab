@@ -70,6 +70,7 @@ check. Never add a tracker via an unconditional script. Active now: preferences 
 Run `pnpm -F @calaba/landing test:preferences` for consent and root-router regression checks.
 Metrika goals (`lib/metrika.ts`, delegated clicks in `components/goal-tracking.tsx`; `goal()` is a no-op without consent, nothing is queued): `download_click` {os}, `open_web_app`, `plan_buy_click` {plan}, `payment_success` (OnPay success page), `contact_click`, `support_chat_open` (first click into the chat widget), `pricing_view` (one IntersectionObserver), `docs_open`. Ids must match the JS-event goals in Metrika exactly.
 UTM passthrough: `utm_*`/`yclid` of the landing URL are kept in sessionStorage and appended to `APP_URL` links at click time so the app can attribute signups; no personal data and no third party, so it works without consent.
+Server-side conversions (ADR-0135): after consent the tag's ClientID (`ym(…, 'getClientID')`) is appended to `APP_URL` links as `ym_cid` (never without consent; forgotten on withdrawal). The web client keeps `utm_*`/`yclid`/`ym_cid` of the first open and sends them with the registration; the server reports the goals `signup` and `purchase` (amount, currency, plan, payment id) over the Measurement Protocol. The desktop app opened from an installer gets no landing params, so desktop sign-ups are not attributed.
 No analytics SDK, third-party CMP or payment functionality is enabled by these pages.
 
 ## Where it is served

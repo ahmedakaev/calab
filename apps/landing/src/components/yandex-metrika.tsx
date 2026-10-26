@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { forgetClientId, rememberClientId } from '@/lib/metrika';
 import { hasSiteConsent, PREFERENCES_CHANGED } from '@/lib/site-preferences';
 
 // Yandex Metrika (counter 113761661), loaded only after the visitor opts into the `analytics` purpose.
@@ -39,11 +40,14 @@ function load() {
     ssr: true, webvisor: true, clickmap: true, ecommerce: 'dataLayer',
     referrer: document.referrer, url: location.href, accurateTrackBounce: true, trackLinks: true,
   });
+  // The ClientID goes with links to the app (lib/metrika.ts withUtm) for server-side conversions (ADR-0135).
+  w.ym(COUNTER_ID, 'getClientID', rememberClientId);
 }
 
 // Best effort: first-party `_ym*` cookies and storage keys set by the tag on this origin. Cookies on
 // mc.yandex.ru itself belong to Yandex and are not reachable from here.
 function clean() {
+  forgetClientId();
   try {
     const parts = location.hostname.split('.');
     const domains = ['', ...parts.slice(0, -1).map((_, i) => `.${parts.slice(i).join('.')}`)];

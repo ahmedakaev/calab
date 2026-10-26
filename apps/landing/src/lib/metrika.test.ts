@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { captureUtm, goal, goalForHref, withUtm } from './metrika';
+import { captureUtm, forgetClientId, goal, goalForHref, rememberClientId, withUtm } from './metrika';
 import { APP_URL, CONTACT_FORM_URL, DOWNLOADS } from './site';
 
 function memoryStorage() {
@@ -35,6 +35,16 @@ describe('utm', () => {
   });
   it('leaves links alone with nothing stored', () => {
     expect(withUtm(APP_URL)).toBe(APP_URL);
+  });
+  it('adds the Metrika ClientID only once the tag reported a valid one', () => {
+    rememberClientId('abc');
+    expect(withUtm(APP_URL)).toBe(APP_URL);
+    rememberClientId(1710232430899999999n.toString());
+    captureUtm('?utm_source=ya');
+    expect(withUtm(`${APP_URL}/`)).toBe(`${APP_URL}/?utm_source=ya&ym_cid=1710232430899999999`);
+    expect(withUtm(`${APP_URL}/?ym_cid=1`)).toBe(`${APP_URL}/?ym_cid=1&utm_source=ya`);
+    forgetClientId();
+    expect(withUtm(`${APP_URL}/`)).toBe(`${APP_URL}/?utm_source=ya`);
   });
 });
 

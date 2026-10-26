@@ -2,7 +2,9 @@
 // Goals reach Metrika only when the tag is loaded, i.e. after the visitor opted into `analytics`
 // (components/yandex-metrika.tsx): without consent window.ym does not exist and goal() does nothing.
 // Nothing is queued before consent. UTM passthrough does not touch a third party and holds no personal
-// data, so it works without consent.
+// data, so it works without consent. The Metrika ClientID (`ym_cid`) is added to app links only after
+// consent: it comes from the tag itself (getClientID), which loads only then. The app sends it with the
+// registration, and the server reports sign-up and payment conversions for it (ADR-0135).
 import { APP_URL, CONTACT_FORM_URL, DOWNLOADS } from './site';
 
 export const COUNTER_ID = 113761661;
@@ -36,13 +38,30 @@ export function captureUtm(search: string = location.search): void {
   } catch { /* Storage blocked: attribution is best effort. */ }
 }
 
-/** `href` with the stored campaign params added (existing params win). Unchanged when nothing is stored. */
+let clientId = '';
+
+/** Remember the Metrika ClientID the tag reports (ym getClientID callback; the tag runs only after consent). */
+export function rememberClientId(id: unknown): void {
+  const v = typeof id === 'string' || typeof id === 'number' ? String(id) : '';
+  if (/^\d{1,32}$/.test(v)) clientId = v;
+}
+
+/** Forget the ClientID (consent withdrawn). */
+export function forgetClientId(): void {
+  clientId = '';
+}
+
+/**
+ * `href` with the stored campaign params and, after analytics consent, the Metrika ClientID (`ym_cid`)
+ * added (existing params win). Unchanged when there is nothing to add.
+ */
 export function withUtm(href: string): string {
   try {
     const stored = sessionStorage.getItem(UTM_KEY);
-    if (!stored) return href;
+    if (!stored && !clientId) return href;
     const url = new URL(href);
-    for (const [k, v] of new URLSearchParams(stored)) if (!url.searchParams.has(k)) url.searchParams.set(k, v);
+    for (const [k, v] of new URLSearchParams(stored ?? '')) if (!url.searchParams.has(k)) url.searchParams.set(k, v);
+    if (clientId && !url.searchParams.has('ym_cid')) url.searchParams.set('ym_cid', clientId);
     return url.toString();
   } catch {
     return href;
