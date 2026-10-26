@@ -47,6 +47,7 @@ import (
 	"github.com/calaba/calaba/server/internal/mailbox"
 	"github.com/calaba/calaba/server/internal/mcp"
 	"github.com/calaba/calaba/server/internal/messages"
+	"github.com/calaba/calaba/server/internal/metrika"
 	"github.com/calaba/calaba/server/internal/moderation"
 	"github.com/calaba/calaba/server/internal/notes"
 	"github.com/calaba/calaba/server/internal/oauthprovider"
@@ -174,6 +175,7 @@ type App struct {
 	// Mailbox: the bot-driven mailbox password recovery (ADR-0101).
 	Mailbox    *mailbox.Service
 	billing    *billingRuntime
+	metrika    *metrika.Service
 	redis      rueidis.Client
 	identityDB *db.DB
 	// dueTZ: TASKS_DUE_TZ, the zone of the due notices of tasks (ADR-0089).
@@ -224,6 +226,7 @@ func (a *App) Run(ctx context.Context) {
 	go a.IVR.Run(ctx)        // returns at once without IVR_AGENT_TOKEN
 	go a.SIPReg.Run(ctx)     // returns at once without SIPREG_AGENT_TOKEN
 	go a.billing.Run(ctx)    // returns at once while BILLING_ENABLED=false
+	go a.metrika.Run(ctx)    // returns at once without YM_MP_TOKEN
 	if a.OAuth != nil {
 		go a.OAuth.Run(ctx, a.redis, oauthprovider.SweepInterval) // provider retention
 	}
@@ -314,7 +317,11 @@ func New(d Deps) *App {
 		PerHour: d.Config.MailPerHour, Secret: []byte(d.Config.JWTSecret),
 	}, d.DB, d.Redis, sender)
 
-	billingRT := newBilling(d, planSvc, pub, mailSvc) // ADR-0080 v5: billingwiring.go
+	// Server-side Metrika conversions (ADR-0135): disabled without YM_MP_TOKEN.
+	metrikaSvc := metrika.New(d.DB, metrika.Config{
+		Token: d.Config.MetrikaMPToken, CounterID: d.Config.MetrikaCounterID, Endpoint: d.Config.MetrikaMPURL, PageURL: d.Config.PublicAppURL,
+	})
+	billingRT := newBilling(d, planSvc, pub, mailSvc, metrikaSvc) // ADR-0080 v5: billingwiring.go
 	authSvc := auth.NewService(d.Config, d.DB, d.Redis, pub)
 	pushSvc.Auth = authSvc
 	pushSvc.DeviceLimit = redisx.NewRateLimiter(d.Redis, "rl:push-device:", 20, 20)   // 20 at once, 20 per minute
@@ -327,6 +334,7 @@ func New(d Deps) *App {
 		return planSvc.AdmitSeat(ctx, q, wsID, userID, userID, role)
 	}
 	authSvc.Mail = mailSvc
+	authSvc.Conversions = metrikaSvc
 	botSvc.SetAuth(authSvc)
 	botPerSec, botMsgsPerMin := d.Config.BotLimits()
 	authSvc.BotLimiter = redisx.NewRateLimiter(d.Redis, "rl:bot:req:", botPerSec, float64(botPerSec*60))
@@ -651,7 +659,7 @@ func New(d Deps) *App {
 	)
 	mcpHandler.API = h
 	return &App{SSO: rp, Directory: ds, OAuth: op, Handler: h, Auth: authSvc, Gateway: hub, Files: filesSvc, Guests: guestSvc, RTC: rtcSvc, Plans: planSvc, Mail: mailSvc,
-		Recording: recSvc, Search: searchSvc, Bots: botSvc, Birthdays: bdSvc, Achievements: achSvc, Calls: callSvc, Push: pushSvc, Calendar: calSvc, CalDAV: cdSvc, Boards: boardSvc, BoardWebhooks: boardHooks, Disk: diskSvc, Wiki: wikiSvc, Canvas: canvasSvc, Rooms: roomHandlers, SIP: sipSvc, IVR: ivrHub, SIPReg: sipregHub, billing: billingRT, redis: d.Redis, identityDB: d.DB, Routes: mux.patterns,
+		Recording: recSvc, Search: searchSvc, Bots: botSvc, Birthdays: bdSvc, Achievements: achSvc, Calls: callSvc, Push: pushSvc, Calendar: calSvc, CalDAV: cdSvc, Boards: boardSvc, BoardWebhooks: boardHooks, Disk: diskSvc, Wiki: wikiSvc, Canvas: canvasSvc, Rooms: roomHandlers, SIP: sipSvc, IVR: ivrHub, SIPReg: sipregHub, billing: billingRT, metrika: metrikaSvc, redis: d.Redis, identityDB: d.DB, Routes: mux.patterns,
 		dueTZ: boards.DueZone(d.Config.TasksDueTZ), Mailbox: mailboxSvc}
 }
 

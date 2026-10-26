@@ -63,6 +63,12 @@ type Config struct {
 	// answers them with CORS (ADR-0083). Empty: same-origin only.
 	PublicLandingURLs []string `env:"PUBLIC_LANDING_URLS" envSeparator:","`
 	LogLevel          string   `env:"LOG_LEVEL" envDefault:"info"`
+	// Server-side Yandex Metrika conversions for Yandex Direct (ADR-0135): YM_MP_TOKEN is the
+	// counter's Measurement Protocol token (secret; empty = no conversions are recorded or
+	// sent), YM_COUNTER_ID the counter, YM_MP_URL the collector.
+	MetrikaMPToken   string `env:"YM_MP_TOKEN"`
+	MetrikaCounterID int64  `env:"YM_COUNTER_ID" envDefault:"113761661"`
+	MetrikaMPURL     string `env:"YM_MP_URL" envDefault:"https://mc.yandex.ru/collect"`
 
 	DatabaseURL string `env:"DATABASE_URL,required"`
 	RedisURL    string `env:"REDIS_URL,required"`
@@ -416,6 +422,9 @@ func (c *Config) Validate() error {
 	}
 	if Origin(c.GPTunnelWebURL) == "" {
 		errs = append(errs, fmt.Errorf("GPTUNNEL_WEB_URL must be an absolute http(s) URL, got %q", c.GPTunnelWebURL))
+	}
+	if c.MetrikaMPToken != "" && (c.MetrikaCounterID <= 0 || Origin(c.MetrikaMPURL) == "") {
+		errs = append(errs, errors.New("YM_MP_TOKEN needs a positive YM_COUNTER_ID and an absolute http(s) YM_MP_URL"))
 	}
 	if c.CalDAVSyncInterval != 0 && (c.CalDAVSyncInterval < time.Minute || c.CalDAVSyncInterval > 24*time.Hour) {
 		errs = append(errs, fmt.Errorf("CALDAV_SYNC_INTERVAL must be between 1m and 24h, got %s", c.CalDAVSyncInterval))

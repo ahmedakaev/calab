@@ -1152,6 +1152,24 @@ type MessageReaction struct {
 	CreatedAt time.Time
 }
 
+type MetrikaConversion struct {
+	ID            uuid.UUID
+	DedupeKey     string
+	Goal          string
+	ClientID      string
+	OccurredAt    time.Time
+	AmountMinor   int64
+	Currency      string
+	Plan          string
+	TransactionID string
+	Attempts      int32
+	NextAt        time.Time
+	SentAt        *time.Time
+	FailedAt      *time.Time
+	Error         string
+	CreatedAt     time.Time
+}
+
 type OauthAuthorizationCode struct {
 	ID            uuid.UUID
 	WorkspaceID   uuid.UUID
@@ -1886,6 +1904,18 @@ type User struct {
 	Phone                          *string
 	TaskNotifyOff                  []string
 	TaskNotifyBots                 []uuid.UUID
+}
+
+type UserAttribution struct {
+	UserID      uuid.UUID
+	UtmSource   string
+	UtmMedium   string
+	UtmCampaign string
+	UtmContent  string
+	UtmTerm     string
+	Yclid       string
+	YmClientID  string
+	CreatedAt   time.Time
 }
 
 type UserNote struct {
