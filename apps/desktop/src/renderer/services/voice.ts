@@ -47,6 +47,7 @@ import { VoiceGate, rmsToDb } from '../lib/media/vad';
 import { denoiseMode, wakeDbFor } from '../lib/media/denoiseSleep';
 import { isMobileNow } from '../lib/mobile';
 import { playSound } from '../lib/sounds';
+import { joinLeaveCue, joinLeaveSoundMax } from '../lib/media/joinLeaveSound';
 import { PttRelease } from '../lib/pttRelease';
 import { SpeakingDebouncer, speakingUserIds } from '../lib/speaking';
 import { AUTO_MUTE_TOAST, AutoMuteTimer, autoMuteArmed, type AutoMuteSec } from '../lib/autoMute';
@@ -1679,11 +1680,13 @@ class VoiceEngine {
         if (pub.source === Track.Source.ScreenShare) this.syncAnnounce();
         if (pub.source === Track.Source.ScreenShare || pub.source === Track.Source.Camera) setVoice({ trackEpoch: useVoice.getState().trackEpoch + 1 });
       })
-      .on(RoomEvent.ParticipantConnected, () => playSound('join'))
+      .on(RoomEvent.ParticipantConnected, (p) => {
+        if (this.joinLeaveCue(room, p.identity)) playSound('join');
+      })
       .on(RoomEvent.ParticipantDisconnected, (p) => {
         const gone = userIdOf(p.identity);
         if (![...room.remoteParticipants.values()].some((o) => userIdOf(o.identity) === gone)) this.active.drop(gone);
-        playSound('leave');
+        if (this.joinLeaveCue(room, p.identity)) playSound('leave');
         for (const set of this.viewers.values()) set.delete(p.identity);
         annot.participantLeft(p.identity);
         this.publishViewers();
@@ -2069,6 +2072,14 @@ class VoiceEngine {
         this.showVideo();
       },
     });
+  }
+
+  /** Others' join/leave cue: only while the room with that person has ≤ join_leave_sound_max people. */
+  private joinLeaveCue(room: Room, identity: string): boolean {
+    const max = joinLeaveSoundMax(this.roomId ? useRooms.getState().byId[this.roomId]?.media : undefined);
+    if (max <= 0) return false;
+    const others = Array.from(room.remoteParticipants.values(), (o) => userIdOf(o.identity));
+    return joinLeaveCue(others, userIdOf(identity), userIdOf(room.localParticipant.identity), max);
   }
 
   private inRoom(userId: string): boolean {

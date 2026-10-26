@@ -44,6 +44,7 @@ import { AudioTierHint, AudioTierOptions } from './AudioTierOptions';
 import { GptunnelTab } from './GptunnelTab';
 import { TelephonyTab } from './TelephonyTab';
 import { capMax, clampToCap, planHasIdentity, workspacePlanName } from '../../lib/plan';
+import { JOIN_LEAVE_OPTIONS, joinLeaveSoundMax } from '../../lib/media/joinLeaveSound';
 import { reportPlanError, workspacePlan } from '../../services/plan';
 import { fromTimeFormatPref, toTimeFormatPref } from '../../services/timeFormat';
 import { RoomGuestInviteCard } from '../people/RoomGuestInviteCard';
@@ -377,6 +378,15 @@ function MediaTab({ workspaceId }: { workspaceId: string }): ReactNode {
       <Row label={t('media.cameraLimit')} hint={<ClampHint base={t('media.cameraLimitHint')} show={camerasCap > 0} limit={String(camerasCap)} />}>
         <Select aria-label={t('media.cameraLimit')} className="w-20" value={clampToCap(md?.cameraLimit ?? 6, camerasCap)} onChange={(e) => apply({ defaultCameraLimit: Number(e.target.value) })}>
           {Array.from({ length: camerasMax + 1 }, (_, i) => (
+            <option key={i} value={i}>
+              {i}
+            </option>
+          ))}
+        </Select>
+      </Row>
+      <Row label={t('media.joinLeaveSoundMax')} hint={t('media.joinLeaveSoundMaxHint')}>
+        <Select aria-label={t('media.joinLeaveSoundMax')} className="w-20" value={joinLeaveSoundMax(md)} onChange={(e) => apply({ defaultJoinLeaveSoundMax: Number(e.target.value) })}>
+          {JOIN_LEAVE_OPTIONS.map((i) => (
             <option key={i} value={i}>
               {i}
             </option>

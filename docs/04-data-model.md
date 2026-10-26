@@ -22,7 +22,7 @@ sessions            id, user_id, refresh_token_hash, prev_refresh_token_hash, ro
 workspaces          id, slug (unique), name, icon_file_id, visibility ('private'|'open'),
                     owner_id, created_at,
                     default_audio_bitrate_kbps (32), default_max_stream_preset ('h1080'),
-                    default_max_streams (3),
+                    default_max_streams (3), default_camera_limit (6), default_join_leave_sound_max (10, 0..99),
                     storage_quota_bytes (10 GB), storage_used_bytes (0),
                     time_format ('auto'|'h24'|'h12', 'auto') — формат часов для всех времён в пространстве (docs/09 #73; PATCH — MANAGE_WORKSPACE),
                     owner_sees_private (false) — «Владелец видит приватное» (миграция 00097; PATCH — только владелец)
@@ -58,6 +58,8 @@ rooms               id, workspace_id? (NULL только у DM), type ('voice'|'
                     audio_bitrate_kbps?  (8|16|32|64; 24, 48 legacy),
                     max_stream_preset?   ('economy'|'h720'|'h1080'|'original'),
                     max_streams?         (0..10),
+                    camera_limit?        (0..25; 0 = камеры выключены),
+                    join_leave_sound_max? (0..99; звук входа/выхода других, пока людей ≤ N; 0 = никогда),
                     created_at, archived_at,
                     expires_at?  (временная комната, ADR-0044: архивируется свипером в этот момент),
                     created_by?  (создатель; у временной — неявный MANAGE_ROOM на неё),
@@ -363,7 +365,7 @@ roomAdmin           = MUTE_MEMBERS (позволяет серверные mute/r
 
 ## Медиа-настройки комнаты
 
-Админ (право `MANAGE_ROOM`) задаёт на комнате, как в Discord: битрейт голоса, максимальный пресет стрима, лимит стримов. Пусто → дефолт workspace. Клиент получает эффективные значения в объекте комнаты (`room.media`) и применяет при публикации; сервер использует `max_streams` при выдаче права STREAM и режет пресет выше разрешённого в `POST /rooms/:id/stream/request`.
+Админ (право `MANAGE_ROOM`) задаёт на комнате, как в Discord: битрейт голоса, максимальный пресет стрима, лимит стримов, лимит камер, порог звука входа/выхода (`join_leave_sound_max`). Пусто → дефолт workspace. Клиент получает эффективные значения в объекте комнаты (`room.media`) и применяет при публикации; сервер использует `max_streams` при выдаче права STREAM и режет пресет выше разрешённого в `POST /rooms/:id/stream/request`.
 
 ## Тарифы и лимиты пространств (ADR-0024)
 
