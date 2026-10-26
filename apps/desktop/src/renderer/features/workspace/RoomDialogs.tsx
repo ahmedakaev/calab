@@ -16,7 +16,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { confirmAction } from '../../components/Confirm';
 import { AvatarButtons } from '../../components/AvatarPicker';
 import { RoomIcon } from '../../components/RoomIcon';
-import { Button, Card, Field, IconButton, Input, Modal, Row, Select, Tip, Toggle, cx } from '../../components/ui';
+import { Button, Card, Field, IconButton, Input, Modal, Row, Select, Stepper, Tip, Toggle, cx } from '../../components/ui';
 import { t, type MessageKey } from '../../i18n';
 import { errorText } from '../../lib/api/errors';
 import { audioTierLabel } from '../../lib/audioTierLabel';
@@ -58,7 +58,7 @@ import { RoomLinkTab } from '../people/RoomLinkTab';
 import { RoomAccessCard } from './RoomAccessCard';
 import { AudioTierHint, AudioTierOptions } from './AudioTierOptions';
 import { capAudioKbps } from '../../lib/plan';
-import { JOIN_LEAVE_OPTIONS, joinLeaveSoundMax } from '../../lib/media/joinLeaveSound';
+import { joinLeaveSoundMax } from '../../lib/media/joinLeaveSound';
 import { reportPlanError } from '../../services/plan';
 
 const err = (e: unknown): string => errorText(e);
@@ -354,15 +354,34 @@ function MediaTab({ roomId }: { roomId: string }): ReactNode {
           ))}
         </Select>
       </Row>
-      <Row label={t('media.joinLeaveSoundMax')} hint={t('media.joinLeaveSoundMaxHint')}>
-        <Select aria-label={t('media.joinLeaveSoundMax')} className="w-60" value={ov?.joinLeaveSoundMax ?? ''} onChange={(e) => apply({ joinLeave: num(e.target.value) })}>
-          <option value="">{def(String(joinLeaveSoundMax(wsDefaults)))}</option>
-          {JOIN_LEAVE_OPTIONS.map((i) => (
-            <option key={i} value={i}>
-              {i}
-            </option>
-          ))}
-        </Select>
+      {/* A stepper over the effective value; the workspace value in the hint, «Как в пространстве»
+          resets an override back to it. */}
+      <Row
+        label={t('media.joinLeaveSoundMax')}
+        htmlFor={`join-leave-${roomId}`}
+        hint={
+          <>
+            {t('media.joinLeaveSoundMaxHint')}
+            <br />
+            {t('media.inheritHint', { v: String(joinLeaveSoundMax(wsDefaults)) })}
+          </>
+        }
+      >
+        <div className="flex items-center gap-2">
+          {ov?.joinLeaveSoundMax !== undefined ? (
+            <Button variant="ghost" size="sm" onClick={() => apply({ joinLeave: '' })}>
+              {t('media.inherit')}
+            </Button>
+          ) : null}
+          <Stepper
+            id={`join-leave-${roomId}`}
+            label={t('media.joinLeaveSoundMax')}
+            value={ov?.joinLeaveSoundMax ?? joinLeaveSoundMax(wsDefaults)}
+            min={0}
+            max={99}
+            onCommit={(n) => apply({ joinLeave: n })}
+          />
+        </div>
       </Row>
     </Card>
     <RecordingCard roomId={roomId} />

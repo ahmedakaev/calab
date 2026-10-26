@@ -3,9 +3,6 @@ import type { RoomMediaSettings } from '@calaba/protocol';
 /** RoomMediaSettings.join_leave_sound_max when the server did not send it (older server, DM call). */
 export const DEFAULT_JOIN_LEAVE_SOUND_MAX = 10;
 
-/** The values of the setting's select: 0 (never) … 99. */
-export const JOIN_LEAVE_OPTIONS: readonly number[] = Array.from({ length: 100 }, (_, i) => i);
-
 /** The room's join/leave cue threshold: N people at most, 0 = never. */
 export function joinLeaveSoundMax(media: RoomMediaSettings | undefined): number {
   return media?.joinLeaveSoundMax ?? DEFAULT_JOIN_LEAVE_SOUND_MAX;

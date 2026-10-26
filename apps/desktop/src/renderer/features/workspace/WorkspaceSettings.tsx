@@ -17,7 +17,7 @@ import { confirmAction } from '../../components/Confirm';
 import { slugError } from './slugError';
 import { MediaImg } from '../../components/MediaImg';
 import { SettingsWindow, type SettingsSection } from '../../components/SettingsWindow';
-import { Button, Card, Empty, IconButton, Input, Row, Segmented, Select, Spinner, Toggle } from '../../components/ui';
+import { Button, Card, Empty, IconButton, Input, Row, Segmented, Select, Spinner, Stepper, Toggle } from '../../components/ui';
 import { getLocale, t, type MessageKey } from '../../i18n';
 import { errorText, identityNotConfigured } from '../../lib/api/errors';
 import { api, thumbnailPath, uploadFile, uploadPath } from '../../lib/api/endpoints';
@@ -44,7 +44,7 @@ import { AudioTierHint, AudioTierOptions } from './AudioTierOptions';
 import { GptunnelTab } from './GptunnelTab';
 import { TelephonyTab } from './TelephonyTab';
 import { capMax, clampToCap, planHasIdentity, workspacePlanName } from '../../lib/plan';
-import { JOIN_LEAVE_OPTIONS, joinLeaveSoundMax } from '../../lib/media/joinLeaveSound';
+import { joinLeaveSoundMax } from '../../lib/media/joinLeaveSound';
 import { reportPlanError, workspacePlan } from '../../services/plan';
 import { fromTimeFormatPref, toTimeFormatPref } from '../../services/timeFormat';
 import { RoomGuestInviteCard } from '../people/RoomGuestInviteCard';
@@ -384,14 +384,15 @@ function MediaTab({ workspaceId }: { workspaceId: string }): ReactNode {
           ))}
         </Select>
       </Row>
-      <Row label={t('media.joinLeaveSoundMax')} hint={t('media.joinLeaveSoundMaxHint')}>
-        <Select aria-label={t('media.joinLeaveSoundMax')} className="w-20" value={joinLeaveSoundMax(md)} onChange={(e) => apply({ defaultJoinLeaveSoundMax: Number(e.target.value) })}>
-          {JOIN_LEAVE_OPTIONS.map((i) => (
-            <option key={i} value={i}>
-              {i}
-            </option>
-          ))}
-        </Select>
+      <Row label={t('media.joinLeaveSoundMax')} hint={t('media.joinLeaveSoundMaxHint')} htmlFor={`join-leave-${workspaceId}`}>
+        <Stepper
+          id={`join-leave-${workspaceId}`}
+          label={t('media.joinLeaveSoundMax')}
+          value={joinLeaveSoundMax(md)}
+          min={0}
+          max={99}
+          onCommit={(n) => apply({ defaultJoinLeaveSoundMax: n })}
+        />
       </Row>
     </Card>
   );

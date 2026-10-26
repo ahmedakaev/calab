@@ -1974,15 +1974,18 @@ test('room-settings-picture', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('room-picture-remove')).toBeVisible();
   await checkpoint(shot, 'room-settings-picture');
   // «Голос и стрим» of a voice room (without joining the voice): the join/leave cue threshold
-  // overridden to 20, its row at the bottom of the card.
+  // overridden to 20 (stepper + «Как в пространстве» reset), its row at the bottom of the card.
   await win.keyboard.press('Escape');
   await expect(win.getByRole('dialog')).toHaveCount(0);
   await win.locator('aside').getByRole('button', { name: /Переговорка/ }).first().click();
   await openSettingsTab(win, () => win.getByRole('button', { name: 'Настройки комнаты' }).click(), 2);
-  const joinLeave = win.getByRole('dialog').getByRole('combobox', { name: 'Звук входа и выхода — до N человек' });
-  await joinLeave.selectOption('20');
+  const joinLeave = win.getByRole('dialog').getByRole('spinbutton', { name: 'Звук входа и выхода' });
+  await joinLeave.fill('20');
+  await joinLeave.press('Enter');
   await expect.poll(() => mock.state.rooms.get(IDS.rooms.meeting)?.mediaOverride?.joinLeaveSoundMax).toBe(20);
   await joinLeave.scrollIntoViewIfNeeded();
+  await joinLeave.blur();
+  await expect(joinLeave).not.toBeFocused();
   await checkpoint(shot, 'room-settings-voice-media');
 });
 

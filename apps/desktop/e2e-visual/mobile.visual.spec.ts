@@ -1616,7 +1616,7 @@ test('m-settings-bots', async ({ page }) => {
   await expect(dialog.getByRole('tab', { name: 'Боты' })).toBeVisible();
   // «Голос и стрим»: the workspace defaults down to the join/leave cue threshold (review shot).
   await dialog.getByRole('tab', { name: 'Голос и стрим' }).tap();
-  const joinLeave = dialog.getByRole('combobox', { name: 'Звук входа и выхода — до N человек' });
+  const joinLeave = dialog.getByRole('spinbutton', { name: 'Звук входа и выхода' });
   await expect(joinLeave).toHaveValue('10');
   await joinLeave.scrollIntoViewIfNeeded();
   await checkpoint(page, 'm-settings-media', { snapshot: false });
