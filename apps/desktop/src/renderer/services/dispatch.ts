@@ -261,6 +261,8 @@ export function applyDispatch(ev: DispatchEvent): void {
       openAdminRoute(r.me?.isSuperadmin === true);
       // After a reconnect the server's record of this device and LiveKit may disagree (docs/09 #71).
       voice.checkSeat();
+      // My mic / deafen intent may not have reached the server while away (ADR-0134).
+      voice.onGatewayBack();
       // ADR-0034: the ringing / in-call UI as the server has it now.
       onReadyCall(r.call);
       // The first READY after a restart for an update: back into the same room / call (docs/09 #126).
@@ -274,6 +276,7 @@ export function applyDispatch(ev: DispatchEvent): void {
     case 'resumed':
       log.info(`gateway resumed, replayed ${e.value.replayed}`);
       voice.checkSeat();
+      voice.onGatewayBack();
       void retryFailedLoads(); // a room left on «Не удалось загрузить» (docs/09 #146)
       return;
     case 'workspaceCreate': {

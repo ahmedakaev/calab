@@ -142,6 +142,11 @@ export interface VoiceStore {
   /** A moderator muted my mic (not me): shown as a red crossed mic, distinct from self-mute. */
   serverMuted: boolean;
   /**
+   * My mic / deafen intent is not applied yet for the others for over 1.5 s (ADR-0134): the
+   * track's mute or PATCH /api/voice/self is still being retried on a flaky link.
+   */
+  micSyncLag: boolean;
+  /**
    * userId → speaking, for the rings and bright names (lib/speaking.ts): remote LiveKit active
    * speakers of our room (any of a user's devices) + me from the local VAD / PTT; on at once,
    * off 300 ms after the speech, batched. Subscribe per user (`s.speaking[id]`), never the map.
@@ -205,6 +210,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   micError: null,
   micErrorAction: null,
   serverMuted: false,
+  micSyncLag: false,
   speaking: {},
   quality: 'unknown',
   rttMs: null,

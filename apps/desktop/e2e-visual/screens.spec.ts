@@ -2230,6 +2230,13 @@ test('voice-room-speaking', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('mic-live-dot')).toHaveCount(0);
   await win.keyboard.press(`${MOD}+Shift+m`);
   await expect(win.getByTestId('mic-live-dot')).toBeVisible();
+  // ADR-0134: the click has not reached the others yet (flaky link) - an amber dot replaces the green one.
+  await win.evaluate(() => (window as unknown as { __calabaMicSyncLag?: (on: boolean) => void }).__calabaMicSyncLag?.(true));
+  await expect(win.getByTestId('mic-sync-dot')).toBeVisible();
+  await expect(win.getByTestId('mic-live-dot')).toHaveCount(0);
+  await checkpoint(shot, 'voice-room-mic-sync');
+  await win.evaluate(() => (window as unknown as { __calabaMicSyncLag?: (on: boolean) => void }).__calabaMicSyncLag?.(false));
+  await expect(win.getByTestId('mic-live-dot')).toBeVisible();
   await win.getByRole('button', { name: 'Выбор микрофона' }).click();
   await win.getByTestId('mic-menu').getByRole('menuitemradio', { name: 'Push-to-talk' }).click();
   await win.keyboard.press('Escape');

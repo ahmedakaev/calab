@@ -100,19 +100,21 @@ export function VoiceControls(): ReactNode {
   const muted = useVoice((s) => s.muted);
   const serverMuted = useVoice((s) => s.serverMuted);
   const deafened = useVoice((s) => s.deafened);
+  // ADR-0134: my mic / deafen click has not reached the others yet (flaky link, retrying).
+  const lag = useVoice((s) => s.micSyncLag && s.roomId !== null);
   const muteKeys = useHotkeyLabel('mute');
   const deafenKeys = useHotkeyLabel('deafen');
   return (
     <>
     <SplitButton
-      label={serverMuted ? t('voiceUi.serverMuted') : muted ? t('voice.unmute') : t('voice.mute')}
+      label={`${serverMuted ? t('voiceUi.serverMuted') : muted ? t('voice.unmute') : t('voice.mute')}${lag ? ` · ${t('voiceUi.micSyncing')}` : ''}`}
       shortcut={muteKeys}
       danger={muted}
       onClick={() => voice.toggleMute()}
       menuLabel={t('shell.micOptions')}
       menu={<MicMenu />}
     >
-      <MicGlyphIcon muted={muted} />
+      <MicGlyphIcon muted={muted} lag={lag} />
     </SplitButton>
     <SplitButton
       label={deafened ? t('voice.undeafen') : t('voice.deafen')}
@@ -133,7 +135,7 @@ export function VoiceControls(): ReactNode {
  * (not muted, and not waiting for the push-to-talk key). A leaf with its own subscriptions: a
  * key press redraws only this icon.
  */
-function MicGlyphIcon({ muted }: { muted: boolean }): ReactNode {
+function MicGlyphIcon({ muted, lag }: { muted: boolean; lag: boolean }): ReactNode {
   const deafened = useVoice((s) => s.deafened);
   const inCall = useVoice((s) => s.roomId !== null);
   const pttPref = usePrefs((s) => s.micMode === 'ptt');
@@ -143,7 +145,12 @@ function MicGlyphIcon({ muted }: { muted: boolean }): ReactNode {
   return (
     <span className="relative grid place-items-center">
       {muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
-      {live ? <span className="absolute -bottom-px -right-px size-2 rounded-full bg-ok" data-testid="mic-live-dot" aria-hidden /> : null}
+      {lag ? (
+        // ADR-0134: not on air for the others as shown yet — an amber dot instead of the green one.
+        <span className="absolute -bottom-px -right-px size-2 rounded-full bg-warn" data-testid="mic-sync-dot" aria-hidden />
+      ) : live ? (
+        <span className="absolute -bottom-px -right-px size-2 rounded-full bg-ok" data-testid="mic-live-dot" aria-hidden />
+      ) : null}
     </span>
   );
 }

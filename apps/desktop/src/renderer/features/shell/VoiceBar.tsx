@@ -566,6 +566,8 @@ declare global {
     __calabaSpeaking?: (userIds: string[]) => void;
     /** Visual tests only: back-date my room join (docs/09 #10 — the invite row's 30 s window). */
     __calabaJoinedAt?: (ms: number) => void;
+    /** Visual tests only: my mic intent not applied for the others yet (ADR-0134, the amber dot). */
+    __calabaMicSyncLag?: (on: boolean) => void;
     /** e2e tests (docs/09 #71): the LiveKit connection as it really is (voice.linkTruth). */
     __calabaVoiceLink?: () => { state: string | null; room: string | null; identity: string | null };
     /** e2e tests: an unexpected LiveKit loss (the reconnect cycle starts). */
@@ -582,6 +584,7 @@ export function VoiceBar(): ReactNode {
     window.__calabaCameras = () => useVoice.getState().cameras.length;
     window.__calabaSpeaking = (ids) => setVoice({ speaking: Object.fromEntries(ids.map((id) => [id, true])) });
     window.__calabaJoinedAt = (ms) => setVoice({ joinedAt: ms });
+    window.__calabaMicSyncLag = (on) => setVoice({ micSyncLag: on });
     window.__calabaVoiceLink = () => voice.linkTruth();
     window.__calabaVoiceDrop = () => voice.simulateLinkLoss();
     return () => {
@@ -591,6 +594,7 @@ export function VoiceBar(): ReactNode {
       delete window.__calabaVoicePhase;
       delete window.__calabaCameras;
       delete window.__calabaJoinedAt;
+      delete window.__calabaMicSyncLag;
     };
   }, [visualTest]);
   const roomId = useVoice((s) => s.roomId);

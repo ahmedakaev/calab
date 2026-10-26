@@ -73,13 +73,30 @@ class FakeLocalAudioTrack {
   replaced: FakeTrack[] = [];
   /** Pending mute/unmute resolvers (tests settle them to simulate LiveKit's async lock). */
   static lockMs = 0;
+  /** The next N mute/unmute calls reject (a signalling failure during Reconnecting). */
+  static failOps = 0;
+  /** The next N mute/unmute calls never settle (a lock held across a dead link). */
+  static hangOps = 0;
+  static ops = 0;
   constructor(public mediaStreamTrack: FakeTrack) {}
-  async mute(): Promise<void> {
+  private async op(): Promise<void> {
+    FakeLocalAudioTrack.ops++;
+    if (FakeLocalAudioTrack.hangOps > 0) {
+      FakeLocalAudioTrack.hangOps--;
+      await new Promise(() => undefined);
+    }
     await new Promise((r) => setTimeout(r, FakeLocalAudioTrack.lockMs));
+    if (FakeLocalAudioTrack.failOps > 0) {
+      FakeLocalAudioTrack.failOps--;
+      throw new Error('signal not connected');
+    }
+  }
+  async mute(): Promise<void> {
+    await this.op();
     this.isMuted = true;
   }
   async unmute(): Promise<void> {
-    await new Promise((r) => setTimeout(r, FakeLocalAudioTrack.lockMs));
+    await this.op();
     this.isMuted = false;
     this.mediaStreamTrack.enabled = true;
   }
@@ -294,6 +311,9 @@ beforeEach(async () => {
   FakeRoom.all = [];
   FakeChannel.all = [];
   FakeLocalAudioTrack.lockMs = 0;
+  FakeLocalAudioTrack.failOps = 0;
+  FakeLocalAudioTrack.hangOps = 0;
+  FakeLocalAudioTrack.ops = 0;
   FakeLocalAudioTrack.failReplace = false;
   FakeRoom.disconnectGate = null;
   FakeRoom.onConnect = null;
@@ -304,7 +324,8 @@ beforeEach(async () => {
   joinVoice.mockClear();
   leaveVoice.mockReset();
   leaveVoice.mockImplementation(() => Promise.resolve());
-  updateSelf.mockClear();
+  updateSelf.mockReset();
+  updateSelf.mockImplementation(() => Promise.resolve());
   reportMediaError.mockClear();
   deviceChange.length = 0;
   deviceList = [];
@@ -2448,5 +2469,110 @@ describe('a phone call parks the room (ADR-0133)', () => {
     await voice.join('dm', '', { call: true });
     expect(await voice.park()).toBe(false);
     expect(useVoice.getState().parked).toBeNull();
+  });
+});
+
+describe('mic state convergence on a flaky link (ADR-0134)', () => {
+  const offline = (): Promise<void> => Promise.reject(new Error('Failed to fetch'));
+
+  it('a failed PATCH /voice/self is retried until it lands, the UI flags the lag meanwhile', async () => {
+    await voice.join('A', 'ws');
+    updateSelf.mockClear();
+    updateSelf.mockImplementationOnce(offline).mockImplementationOnce(offline);
+    voice.toggleMute();
+    await settle();
+    expect(updateSelf).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(updateSelf).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(useVoice.getState().micSyncLag).toBe(true);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(updateSelf).toHaveBeenCalledTimes(3);
+    expect(updateSelf).toHaveBeenLastCalledWith(expect.objectContaining({ muted: true }));
+    expect(useVoice.getState().micSyncLag).toBe(false);
+  });
+
+  it('an older PATCH never lands after a newer one: one in flight, the latest intent last', async () => {
+    await voice.join('A', 'ws');
+    await settle();
+    updateSelf.mockClear();
+    let release!: () => void;
+    updateSelf.mockImplementationOnce(() => new Promise<void>((r) => (release = r)));
+    voice.toggleMute();
+    voice.toggleMute();
+    voice.toggleMute();
+    expect(updateSelf).toHaveBeenCalledTimes(1);
+    release();
+    await settle();
+    expect(updateSelf).toHaveBeenCalledTimes(2);
+    expect(updateSelf).toHaveBeenLastCalledWith(expect.objectContaining({ muted: true }));
+  });
+
+  it('the gateway back: my flags are re-asserted when the server copy differs', async () => {
+    const { useSession } = await import('../stores/session');
+    const { useWorkspaces } = await import('../stores/workspaces');
+    useSession.setState({ me: { user: { id: 'u1' } } } as never);
+    await voice.join('A', 'ws');
+    voice.toggleMute();
+    await settle();
+    updateSelf.mockClear();
+    // The server lost the PATCH meanwhile (READY carries its copy: unmuted).
+    useWorkspaces.setState({ byId: { ws: { ws: {}, voice: { u1: { userId: 'u1', roomId: 'A', muted: false, deafened: false } } } } as never });
+    voice.onGatewayBack();
+    await settle();
+    expect(updateSelf).toHaveBeenCalledWith(expect.objectContaining({ muted: true }));
+  });
+
+  it('a rejecting unmute during Reconnecting is retried with backoff, not in a tight loop', async () => {
+    await voice.join('A', 'ws');
+    voice.toggleMute();
+    await settle();
+    const track = FakeRoom.all[0]?.published[0];
+    expect(track?.isMuted).toBe(true);
+    FakeLocalAudioTrack.ops = 0;
+    FakeLocalAudioTrack.failOps = 3;
+    voice.toggleMute();
+    await settle();
+    expect(FakeLocalAudioTrack.ops).toBe(1);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(useVoice.getState().micSyncLag).toBe(true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(track?.isMuted).toBe(false);
+    expect(FakeLocalAudioTrack.ops).toBe(4);
+    expect(useVoice.getState().micSyncLag).toBe(false);
+  });
+
+  it('a hung unmute does not block the mic for good: timed out and tried again', async () => {
+    await voice.join('A', 'ws');
+    voice.toggleMute();
+    await settle();
+    const track = FakeRoom.all[0]?.published[0];
+    FakeLocalAudioTrack.hangOps = 1;
+    voice.toggleMute();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(useVoice.getState().muted).toBe(false);
+    expect(track?.isMuted).toBe(false);
+  });
+
+  it('LiveKit Reconnected re-asserts the mic and my flags', async () => {
+    await voice.join('A', 'ws');
+    voice.toggleMute();
+    await settle();
+    updateSelf.mockClear();
+    FakeRoom.all[0]?.emit('Reconnected');
+    await settle();
+    expect(updateSelf).toHaveBeenCalledWith(expect.objectContaining({ muted: true }));
+  });
+
+  it('leaving voice stops every retry timer', async () => {
+    await voice.join('A', 'ws');
+    updateSelf.mockImplementation(offline);
+    voice.toggleMute();
+    await settle();
+    await voice.leave();
+    const n = updateSelf.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(updateSelf.mock.calls.length).toBe(n);
+    expect(useVoice.getState().micSyncLag).toBe(false);
   });
 });

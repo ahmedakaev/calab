@@ -179,6 +179,7 @@ export const enShell: DictShape<typeof ruShell> = {
   // voice states (#15)
   'voiceUi.serverMuted': 'Muted by a moderator',
   'voiceUi.serverUnmuted': 'A moderator allowed you to speak — unmute your mic',
+  'voiceUi.micSyncing': 'Not applied for the others yet — retrying',
   'voiceUi.reconnectHint': 'Voice will reconnect on its own once the connection is back',
   'voiceUi.blocked': 'The connection to {host} is blocked by the app policy — update the app',
   'voiceUi.cantReach': 'Can’t connect to {host}',

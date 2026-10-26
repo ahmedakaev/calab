@@ -178,6 +178,7 @@ export const ruShell = {
   // voice states (#15)
   'voiceUi.serverMuted': 'Микрофон выключен модератором',
   'voiceUi.serverUnmuted': 'Модератор разрешил вам говорить — включите микрофон',
+  'voiceUi.micSyncing': 'Ещё не применилось у собеседников — повторяем',
   'voiceUi.reconnectHint': 'Голос вернётся сам, как только появится связь',
   'voiceUi.blocked': 'Соединение с {host} заблокировано политикой приложения — обновите приложение',
   'voiceUi.cantReach': 'Не удаётся подключиться к {host}',

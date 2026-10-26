@@ -74,7 +74,8 @@ import { ActiveSpeaker } from '../lib/activeSpeaker';
 import { lastSpoke, speakingStarts } from '../lib/lastSpoke';
 import { cspBlockedHost, describeConnectError, describeDisconnect, hostOfUrl } from '../lib/voiceLink';
 import { seatAction, seatRefused, type SeatView } from '../lib/voiceSeat';
-import { CONNECT_STUCK_MS, ConnectWatchdog, DISCONNECT_WAIT_MS, RECONNECT_STUCK_MS, STOP_STREAM_WAIT_MS, TEARDOWN_WAIT_MS, reconnectVerdict, settleWithin, type ConnectStage, type StuckKind } from '../lib/voiceWatchdog';
+import { SELF_SYNC_LAG_MS, SelfStateSync, type SelfFlags } from '../lib/selfStateSync';
+import { CONNECT_STUCK_MS, ConnectWatchdog, DISCONNECT_WAIT_MS, RECONNECT_STUCK_MS, STOP_STREAM_WAIT_MS, TEARDOWN_WAIT_MS, reconnectVerdict, rejectAfter, settleWithin, type ConnectStage, type StuckKind } from '../lib/voiceWatchdog';
 import { annot } from './annot';
 import { ANNOT_TOPIC } from '../lib/annot/codec';
 import { CameraController, cameraGrantMissing } from './camera';
@@ -122,6 +123,13 @@ const SEAT_SELF_GRACE_MS = 3000;
  * a moderator's (docs/05 «Несколько устройств»).
  */
 const REMOVED_GRACE_MS = 500;
+/**
+ * Mic track mute / unmute (ADR-0134): an op unsettled after this counts as failed (a lock held
+ * across a dead link), and a failed one is retried after MUTE_RETRY_MS (by attempt, capped) —
+ * never at once, so a link that refuses it cannot spin the renderer.
+ */
+const MUTE_OP_TIMEOUT_MS = 3000;
+const MUTE_RETRY_MS = [500, 1000, 2000, 4000, 5000] as const;
 
 /** One connect() attempt in flight (docs/09 #131): where it is and since when (the watchdog's reason). */
 interface ConnectAttempt {
@@ -192,6 +200,22 @@ function lapsedPerms(workspaceId: string, perms: bigint): bigint {
 }
 
 class VoiceEngine {
+  /** My flags → PATCH /api/voice/self, converging on the latest intent (ADR-0134). */
+  private readonly selfSync = new SelfStateSync({
+    send: (flags) => api.voice.updateSelf(flags),
+    retriable: (e, flags) => this.selfSyncRetriable(e, flags),
+    onLag: (on) => {
+      this.serverLag = on;
+      this.syncLag();
+    },
+    onError: (e) => log.warn('voice/self failed', e),
+  });
+  private serverLag = false;
+  /** The mic track's mute differs from the intent for over SELF_SYNC_LAG_MS (a failing / hung op). */
+  private trackLag = false;
+  private trackLagTimer: number | null = null;
+  private muteRetryTimer: number | null = null;
+  private muteFails = 0;
   private room: Room | null = null;
   private nativeAudio: HostCallAudioSession | null = null;
   private nativeCallEvent: string | undefined;
@@ -598,10 +622,8 @@ class VoiceEngine {
       // The server recorded this device as pending with default flags: tell it my mute /
       // deafen now, so the others' pending row is right before LiveKit connects.
       if ('pending' in res && res.pending) {
-        const { muted, deafened } = useVoice.getState();
-        const musician = prefs().musicianMode;
-        const ptt = this.micMode() === 'ptt';
-        if (muted || deafened || musician || ptt) void api.voice.updateSelf({ muted, deafened, musician, ptt }).catch((e: unknown) => log.warn('voice/self failed', e));
+        const flags = this.selfFlags();
+        if (flags.muted || flags.deafened || flags.musician || flags.ptt) this.selfSync.push(flags);
       }
       this.lastJoin = { url: res.url, token: res.token };
       setLink({ rtcHost: hostOfUrl(res.url) });
@@ -1113,10 +1135,8 @@ class VoiceEngine {
     if (!same() || !res.pending) return;
     // The server had lost this device: recorded again with default flags — my mute / deafen.
     log.info('voice: the server had lost this device, seat restored');
-    const { muted, deafened } = useVoice.getState();
-    const musician = prefs().musicianMode;
-    const ptt = this.micMode() === 'ptt';
-    if (muted || deafened || musician || ptt) void api.voice.updateSelf({ muted, deafened, musician, ptt }).catch((e: unknown) => log.warn('voice/self failed', e));
+    const flags = this.selfFlags();
+    if (flags.muted || flags.deafened || flags.musician || flags.ptt) this.selfSync.push(flags);
   }
 
   /**
@@ -1525,6 +1545,9 @@ class VoiceEngine {
     this.roomId = null;
     this.micTrack = null;
     this.autoMute.cancel(); // left: no timer outside voice
+    this.clearMuteRetry();
+    this.setTrackLag(false);
+    if (!keepSeat && !park) this.selfSync.stop(); // out of voice: nothing to converge
     // disconnect(false): unpublish without stopping. disconnect(true) would stop the pipeline's
     // publish track, and a running mic test keeps that pipeline for the next call → a dead
     // mic there (review M1). The pipeline is stopped below when nobody needs it.
@@ -1647,8 +1670,14 @@ class VoiceEngine {
         this.refreshCameras();
       })
       // Full reconnect (a new LiveKit session): bring the camera back (services/camera.ts restore).
+      // The mic and my flags are re-asserted too (ADR-0134): a toggle made while the link was
+      // down may not have reached LiveKit or the server.
       .on(RoomEvent.Reconnected, () => {
-        if (this.room === room) void this.camera.restore();
+        if (this.room !== room) return;
+        void this.camera.restore();
+        this.clearMuteRetry();
+        this.applyTransmit();
+        this.pushSelfState();
       })
       // LiveKit switched the remote audio output itself (a device appeared / went away): its
       // setSinkId hit our elements — put our sink and the playback state (deafen) back.
@@ -2603,21 +2632,73 @@ class VoiceEngine {
     // UI shows (review L2).
     if (this.muteOp) return;
     if (d.livekitMuted !== t.isMuted) {
+      // A failed op is retried by its timer (ADR-0134), not by every gate / key event.
+      if (this.muteRetryTimer !== null) return;
       if (d.livekitMuted) this.selfMuting = true;
-      const op = d.livekitMuted ? t.mute() : t.unmute();
-      this.muteOp = op
+      this.armTrackLag();
+      let failed = false;
+      this.muteOp = rejectAfter(d.livekitMuted ? t.mute() : t.unmute(), MUTE_OP_TIMEOUT_MS)
         .then(
-          () => undefined,
-          (e: unknown) => log.warn('mic mute/unmute failed', e),
+          () => {
+            this.muteFails = 0;
+          },
+          (e: unknown) => {
+            failed = true;
+            this.muteFails++;
+            log.warn('mic mute/unmute failed', e);
+          },
         )
         .finally(() => {
           this.muteOp = null;
           this.selfMuting = false;
-          if (this.micTrack === t) this.applyTransmit();
+          if (this.micTrack !== t) return;
+          if (!failed) {
+            this.applyTransmit();
+            return;
+          }
+          const delay = MUTE_RETRY_MS[Math.min(this.muteFails - 1, MUTE_RETRY_MS.length - 1)];
+          this.muteRetryTimer = window.setTimeout(() => {
+            this.muteRetryTimer = null;
+            if (this.micTrack === t) this.applyTransmit();
+          }, delay);
         });
       return;
     }
+    // Converged: the track carries the intent.
+    this.clearMuteRetry();
+    this.muteFails = 0;
+    this.setTrackLag(false);
     if (!t.isMuted) t.mediaStreamTrack.enabled = d.audioEnabled;
+  }
+
+  private clearMuteRetry(): void {
+    if (this.muteRetryTimer !== null) window.clearTimeout(this.muteRetryTimer);
+    this.muteRetryTimer = null;
+  }
+
+  private armTrackLag(): void {
+    if (this.trackLag || this.trackLagTimer !== null) return;
+    this.trackLagTimer = window.setTimeout(() => {
+      this.trackLagTimer = null;
+      const t = this.micTrack;
+      if (t && this.decision().livekitMuted !== t.isMuted) this.setTrackLag(true);
+    }, SELF_SYNC_LAG_MS);
+  }
+
+  private setTrackLag(on: boolean): void {
+    if (!on && this.trackLagTimer !== null) {
+      window.clearTimeout(this.trackLagTimer);
+      this.trackLagTimer = null;
+    }
+    if (this.trackLag === on) return;
+    this.trackLag = on;
+    this.syncLag();
+  }
+
+  /** One flag for the UI (ADR-0134): the track or the server still lags my intent. */
+  private syncLag(): void {
+    const lag = this.trackLag || this.serverLag;
+    if (useVoice.getState().micSyncLag !== lag) setVoice({ micSyncLag: lag });
   }
 
   private muteOp: Promise<void> | null = null;
@@ -2888,19 +2969,45 @@ class VoiceEngine {
   private pushSelfState(extra: { onPhone?: boolean } = {}): void {
     if (!this.room && !this.nativeAudio) return;
     if (isPhoneRoom(this.roomId)) return; // a phone call's session is in no voice list (ADR-0117)
+    // Serialized and retried until the server has it (ADR-0134): latest intent wins.
+    this.selfSync.push({ ...this.selfFlags(), ...extra });
+  }
+
+  /** My flags as the server keeps them. Push-to-talk is a mode, not a key press (ADR-0130). */
+  private selfFlags(): SelfFlags {
     const v = useVoice.getState();
-    const musician = prefs().musicianMode;
-    // Push-to-talk is a mode, not a key press (ADR-0130): sent when the mode changes, never per press.
-    const ptt = this.micMode() === 'ptt';
-    void api.voice.updateSelf({ muted: v.muted, deafened: v.deafened, musician, ptt, ...extra }).catch((e: unknown) => {
-      // The plan does not include musician mode (ADR-0052, 409 PLAN_LIMIT): back to the processed mic.
-      if (musician && e instanceof ApiError && e.reason === 'PLAN_LIMIT' && prefs().musicianMode) {
+    return { muted: v.muted, deafened: v.deafened, musician: prefs().musicianMode, ptt: this.micMode() === 'ptt' };
+  }
+
+  /**
+   * A PATCH refusal worth retrying: the network, 5xx, 408 / 429, and 409 «not in voice yet»
+   * (the join / rejoin settles it). Others (403 moderator mute, 400) would be refused again.
+   */
+  private selfSyncRetriable(e: unknown, flags: SelfFlags): boolean {
+    if (!(e instanceof ApiError)) return true;
+    // The plan does not include musician mode (ADR-0052, 409 PLAN_LIMIT): back to the processed mic.
+    if (e.reason === 'PLAN_LIMIT') {
+      if (flags.musician && prefs().musicianMode) {
         usePrefs.getState().setPrefs({ musicianMode: false });
         musicianLockedToast();
-        return;
       }
-      log.warn('voice/self failed', e);
-    });
+      return false;
+    }
+    if (e.status < 400 || e.status >= 500) return true;
+    return e.status === 408 || e.status === 409 || e.status === 429;
+  }
+
+  /**
+   * The gateway is back (READY / RESUMED, ADR-0134): an unconfirmed PATCH goes again at once,
+   * and my flags are compared with the server's copy READY brought — a toggle made while the
+   * link was down is pushed even if no VOICE_STATE_UPDATE of mine ever arrives.
+   */
+  onGatewayBack(): void {
+    this.selfSync.kick();
+    const v = useVoice.getState();
+    if (!v.roomId || !v.workspaceId || (!this.room && !this.nativeAudio)) return;
+    const sv = useWorkspaces.getState().byId[v.workspaceId]?.voice[this.myId()];
+    if (sv?.roomId) this.reconcileSelfState(sv);
   }
 
   /** Server view of our voice state differs from local (e.g. PATCH raced the join) → push again. */
