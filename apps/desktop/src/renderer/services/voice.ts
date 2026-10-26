@@ -2448,9 +2448,14 @@ class VoiceEngine {
           next.stop();
           return;
         }
-        if (this.micTrack) {
-          next.track.enabled = !this.micTrack.isMuted && this.gateWantsAudio();
-          await this.micTrack.replaceTrack(next.track, { userProvidedTrack: true });
+        const t = this.micTrack;
+        if (t) {
+          next.track.enabled = !t.isMuted && this.gateWantsAudio();
+          await t.replaceTrack(next.track, { userProvidedTrack: true });
+          // LiveKit's replaceTrack re-syncs `enabled` with its own mute only (`!isMuted`), so with
+          // the PTT key up / the VAD gate closed the new capture went on air (musician-mode leak,
+          // 4.3.0). Re-close it at once, in the same task; applyTransmit below settles the rest.
+          next.track.enabled = !t.isMuted && this.gateWantsAudio();
           if (this.mic !== old || !this.micWanted()) {
             next.stop(); // torn down while the track was being swapped
             return;
@@ -2459,8 +2464,10 @@ class VoiceEngine {
         // Only now is `next` the live capture: a failed swap keeps `old` (still published)
         // and drops `next`, so neither capture leaks (review N4).
         this.mic = next;
-        this.applyDenoise();
         old.stop();
+        // Invariant: every capture swap ends with the transmit decision applied to the live
+        // track (gate, PTT, explicit mute; ADR-0134 convergence) — and denoise with it.
+        this.applyTransmit();
       } catch (err) {
         if (next && this.mic !== next) next.stop();
         const h = humanMediaError(err, 'mic');

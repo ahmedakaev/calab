@@ -78,7 +78,10 @@ class FakeLocalAudioTrack {
   /** The next N mute/unmute calls never settle (a lock held across a dead link). */
   static hangOps = 0;
   static ops = 0;
-  constructor(public mediaStreamTrack: FakeTrack) {}
+  constructor(public mediaStreamTrack: FakeTrack) {
+    // LiveKit's constructor syncs `enabled` with its (unmuted) state.
+    mediaStreamTrack.enabled = true;
+  }
   private async op(): Promise<void> {
     FakeLocalAudioTrack.ops++;
     if (FakeLocalAudioTrack.hangOps > 0) {
@@ -94,6 +97,7 @@ class FakeLocalAudioTrack {
   async mute(): Promise<void> {
     await this.op();
     this.isMuted = true;
+    this.mediaStreamTrack.enabled = false;
   }
   async unmute(): Promise<void> {
     await this.op();
@@ -113,6 +117,9 @@ class FakeLocalAudioTrack {
     }
     this.replaced.push(t);
     this.mediaStreamTrack = t;
+    // As LiveKit's setMediaStreamTrack: the new track's `enabled` follows the LiveKit mute only,
+    // whatever the caller set before (the VAD / PTT gate is ours to re-apply).
+    t.enabled = !this.isMuted;
     return Promise.resolve();
   }
   getRTCStatsReport(): Promise<undefined> {
@@ -1847,6 +1854,96 @@ describe('musician mode (ADR-0052)', () => {
     await vi.waitFor(() => expect(r2?.published.length).toBe(1));
     expect(pipelines.at(-1)?.musician).toBe(false);
     expect(r2?.localParticipant.publishTrack.mock.calls.at(-1)?.[1]).toMatchObject({ dtx: true, audioPreset: { maxBitrate: 32_000 } });
+    await voice.leave();
+  });
+});
+
+describe('a restarted capture never transmits past the gate or the mute (musician mode, device, RNNoise)', () => {
+  const ptt = { micMode: 'ptt' as const, pttReleaseMs: 0, pttBinding: { kind: 'key' as const, code: 66, label: 'F8', mode: 'hold' as const } };
+  const join = async (): Promise<FakeLocalAudioTrack | undefined> => {
+    await voice.join('A', 'ws');
+    const r = FakeRoom.all.at(-1);
+    await vi.waitFor(() => expect(r?.published.length).toBe(1));
+    await settle();
+    return r?.published[0];
+  };
+  const swapped = async (pub: FakeLocalAudioTrack | undefined, n: number): Promise<void> => {
+    await vi.waitFor(() => expect(pipelines.length).toBe(n));
+    await vi.waitFor(() => expect(pub?.mediaStreamTrack).toBe(pipelines.at(-1)?.track));
+    await settle();
+  };
+  afterEach(() => {
+    usePrefs.getState().setPrefs({ micMode: 'voice', musicianMode: false, micDeviceId: null });
+  });
+
+  it('PTT key not held: musician mode on / off keeps the mic silent', async () => {
+    usePrefs.getState().setPrefs(ptt);
+    const pub = await join();
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    usePrefs.getState().setPrefs({ musicianMode: true });
+    await swapped(pub, 2);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    expect(useVoice.getState().transmitting).toBe(false);
+    usePrefs.getState().setPrefs({ musicianMode: false });
+    await swapped(pub, 3);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    // The key still opens the new capture.
+    (voice as unknown as { onPtt(ev: { down: boolean }): void }).onPtt({ down: true });
+    expect(pub?.mediaStreamTrack.enabled).toBe(true);
+    (voice as unknown as { onPtt(ev: { down: boolean }): void }).onPtt({ down: false });
+    await settle();
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    await voice.leave();
+  });
+
+  it('PTT key not held: a device switch and an RNNoise flip keep the mic silent', async () => {
+    usePrefs.getState().setPrefs(ptt);
+    const pub = await join();
+    usePrefs.getState().setPrefs({ micDeviceId: 'd1' });
+    await swapped(pub, 2);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    usePrefs.getState().setPrefs({ rnnoise: !usePrefs.getState().rnnoise });
+    await swapped(pub, 3);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    await voice.leave();
+  });
+
+  it('VAD with the gate closed: a device switch keeps the mic silent', async () => {
+    const pub = await join();
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    usePrefs.getState().setPrefs({ micDeviceId: 'd1' });
+    await swapped(pub, 2);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    expect(useVoice.getState().transmitting).toBe(false);
+    await voice.leave();
+  });
+
+  it.each(['voice', 'ptt'] as const)('muted (%s): musician mode on / off keeps the track muted and silent', async (mode) => {
+    usePrefs.getState().setPrefs(mode === 'ptt' ? ptt : { micMode: 'voice' });
+    const pub = await join();
+    voice.toggleMute();
+    await settle();
+    expect(pub?.isMuted).toBe(true);
+    usePrefs.getState().setPrefs({ musicianMode: true });
+    await swapped(pub, 2);
+    expect(pub?.isMuted).toBe(true);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    expect(useVoice.getState().transmitting).toBe(false);
+    usePrefs.getState().setPrefs({ musicianMode: false });
+    await swapped(pub, 3);
+    expect(pub?.isMuted).toBe(true);
+    expect(pub?.mediaStreamTrack.enabled).toBe(false);
+    await voice.leave();
+  });
+
+  it('listen-only (no SPEAK): musician mode captures and publishes nothing', async () => {
+    joinVoice.mockImplementationOnce((roomId: string) => Promise.resolve({ url: 'wss://lk', token: `t-${roomId}`, canSpeak: false, canStream: false, media: { audioBitrateKbps: 32 } }));
+    await voice.join('A', 'ws');
+    await settle();
+    usePrefs.getState().setPrefs({ musicianMode: true });
+    await settle();
+    expect(pipelines).toHaveLength(0);
+    expect(FakeRoom.all.at(-1)?.published).toHaveLength(0);
     await voice.leave();
   });
 });
