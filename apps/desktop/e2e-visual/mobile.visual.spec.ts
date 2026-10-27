@@ -2008,6 +2008,8 @@ test('m-telephony', async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId('mobile-shell')).toBeVisible();
   await tab(page, 'telephony');
+  await expect(root.getByTestId('tel-settings-open')).toBeVisible();
+  await checkpoint(page, 'm-tel-root-admin');
   await root.getByTestId('tel-settings-open').tap();
   const list = page.getByTestId('tset-list');
   await expect(list.getByTestId('tset-row-numbers')).toContainText('4');
