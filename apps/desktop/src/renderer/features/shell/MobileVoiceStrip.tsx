@@ -14,7 +14,9 @@ import { useConnectingRing, useVoiceStateOf } from '../../stores/voicePending';
 import { useVoice } from '../../stores/voice';
 import { dmPeer } from '../../stores/dms';
 import { ParkedRoomLine } from '../call/ParkedRoom';
-import { usePhoneCallLabel } from '../call/phoneCall';
+import { usePhoneAnsweredAt, usePhoneCallLabel } from '../call/phoneCall';
+import { callTimer } from '../../lib/callModel';
+import { useNow } from './voiceFormat';
 import { DtmfButton } from '../call/DtmfKeypad';
 import { usePersonalDialing } from '../../stores/sipOutbound';
 import { isPersonalRoom } from '../../lib/sipInbound';
@@ -60,6 +62,7 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
   const peerName = useMemberName(null, call && roomId ? dmPeer(roomId) : '');
   // A phone call (ADR-0117 inbound, ADR-0137 §3 personal): who it is with; «Набираем…» until the answer.
   const phone = usePhoneCallLabel(roomId);
+  const phoneName = usePhoneCallLabel(roomId, true);
   const dialing = usePersonalDialing(roomId);
   const callLabel = phone !== null ? t('call.sipPanel', { number: phone || t('call.sipUnknown') }) : t('call.panel', { name: peerName });
   const onAir = useVoice((s) => s.pttDown && s.transmitting);
@@ -87,7 +90,8 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
       {/* The room the phone call parked (ADR-0133). */}
       {phone !== null ? <ParkedRoomLine className="mb-2 shadow-[var(--shadow-island)]" /> : null}
       <div role="region" aria-label={t('mobile.voiceStrip')} className="mat-toolbar flex h-14 items-center gap-1 rounded-[var(--radius-panel)] pl-2 pr-1.5 shadow-[var(--shadow-island)]">
-        {me ? (
+        {/* A phone call reads like the iPhone «Телефон»: no avatar — who it is with and the timer get its room. */}
+        {me && phone === null ? (
           <span
             className="mr-0.5 flex shrink-0"
             data-speaking={(speaking && !muted && !connectingRing) || undefined}
@@ -107,6 +111,19 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
             className="absolute inset-0 rounded-[var(--radius-row)]"
             onClick={() => (phone !== null ? undefined : call ? openDm(roomId) : wsId && openRoom(wsId, roomId))}
           />
+          {phone !== null ? (
+            // A phone call (ADR-0137 §7): line 1 — who (one line, ellipsis), line 2 — «Набираем…», the
+            // connection state while not connected, else the call's timer (a leaf).
+            <>
+              <span className="pointer-events-none max-w-full truncate pl-1 text-[15px] font-semibold leading-[19px] text-fg" data-testid="mobile-voice-label">
+                {phoneName || t('call.sipUnknown')}
+              </span>
+              <span className={cx('pointer-events-none max-w-full truncate pl-1 text-[13px] leading-[17px] tabular-nums', connected && !dialing ? 'text-ok' : 'text-warn')} data-testid="mobile-voice-status">
+                {dialing ? t('telc.call.dialing') : connected ? <PhoneCallTimer roomId={roomId} /> : phaseText}
+              </span>
+            </>
+          ) : (
+            <>
           <span className="pointer-events-none flex max-w-full items-center gap-1">
             {/* A long status («Переподключение…») wraps instead of being cut; the room name then gives way
                 (line-clamp keeps the strip 56 px). A single word wider than the slot (≈ 75–90 px between the
@@ -121,8 +138,10 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
             {call ? null : <TempExpiry roomId={roomId} workspaceId={wsId} compact />}
           </span>
           <span className="pointer-events-none max-w-full truncate text-[12px] leading-[15px] text-muted" data-testid="mobile-voice-label">
-            {phone !== null ? phone || t('call.sipUnknown') : call ? callLabel : (room?.name ?? '')}
+            {call ? callLabel : (room?.name ?? '')}
           </span>
+            </>
+          )}
         </div>
         <button
           type="button"
@@ -159,8 +178,9 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
         ) : (
           <StripCamera roomId={roomId} />
         )}
-        {/* Soundboard (ADR-0036): the island's panel as a bottom sheet, «Ещё → Звуки». */}
-        {call ? (
+        {/* Soundboard (ADR-0036): the island's panel as a bottom sheet, «Ещё → Звуки». A phone call
+            has no «Ещё» (no sounds, no camera, voice activation only): the name keeps its room. */}
+        {phone !== null ? null : call ? (
           <MoreMenu roomId={roomId} cameraItem={false} />
         ) : (
           <SoundboardAnchored open={sounds} onOpenChange={setSounds}>
@@ -354,4 +374,11 @@ function PttHoldButton({ disabled }: { disabled: boolean }): ReactNode {
       <span className="text-[13px] leading-4 opacity-80">{t('mobile.pttHoldHint')}</span>
     </button>
   );
+}
+
+/** The phone call's «0:42» since the answer (its own 1 s clock; a leaf, docs/14). */
+function PhoneCallTimer({ roomId }: { roomId: string }): ReactNode {
+  const since = usePhoneAnsweredAt(roomId);
+  const now = useNow(since ? 1000 : 0);
+  return <>{since ? callTimer(Math.max(0, now - since) / 1000) : t('voice.connected')}</>;
 }

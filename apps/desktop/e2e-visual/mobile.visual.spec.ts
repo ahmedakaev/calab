@@ -1907,14 +1907,17 @@ test('m-telephony-dial', async ({ page }) => {
   await expect(calling).toHaveCount(0);
   const strip = page.getByTestId('mobile-voice-strip');
   await expect(strip).toContainText('Анна Петрова');
-  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Голос подключён', { timeout: 30_000 });
+  // Like the iPhone «Телефон»: the name on one line, the call's timer under it.
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText(/^\d{2}:\d{2}$/, { timeout: 30_000 });
   // WebKit here has no microphone: its toast is not what the frame is about.
   while (await page.getByTestId('toast').count()) await page.getByTestId('toast').first().getByRole('button', { name: 'Закрыть' }).tap();
+  expect(await strip.getByTestId('mobile-voice-label').evaluate((el) => el.getBoundingClientRect().height < 24), 'name on one line').toBe(true);
+  await checkpoint(page, 'm-tel-in-call', { mask: [strip.getByTestId('mobile-voice-status')] });
   await strip.getByTestId('dtmf-open').tap();
   const pad = page.getByTestId('dtmf-pad');
   for (const k of '12#') await pad.locator(`[data-key="${k}"]`).tap();
   await expect(page.getByTestId('dtmf-typed')).toHaveText('12#');
-  await checkpoint(page, 'm-tel-in-call-dtmf');
+  await checkpoint(page, 'm-tel-in-call-dtmf', { mask: [strip.getByTestId('mobile-voice-status')] });
   await page.keyboard.press('Escape');
   await strip.getByRole('button', { name: 'Отключиться' }).tap();
   await expect(strip).toHaveCount(0);
