@@ -88,7 +88,7 @@ const TabItem = memo(function TabItem({ id }: { id: string }): ReactNode {
   }, [id]);
   return (
     <div
-      className={cx('group flex h-7 min-w-0 max-w-[200px] shrink-0 items-center rounded-[var(--radius-row)] text-control', active ? 'bg-active text-fg' : 'text-muted hover:bg-hover hover:text-fg')}
+      className={cx('group flex h-7 min-w-[120px] max-w-[200px] shrink items-center rounded-[var(--radius-row)] text-control', active ? 'bg-active text-fg' : 'text-muted hover:bg-hover hover:text-fg')}
       onAuxClick={(e) => e.button === 1 && close()}
       data-testid="task-tab"
       data-task-tab={id}
