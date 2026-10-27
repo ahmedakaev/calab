@@ -102,6 +102,12 @@ Valkey; `ParseLegacyRoute`; REST `journal`, `journal/{cid}`, `journal/seen`, `po
 
 ## T2 — Контакты, определитель номера, личный исходящий (Opus, второе независимое ревью)
 
+**Статус: сделан** (ветка `feat/telephony-t2`), ждёт второго ревью. Отличия от плана: текста пуша нет —
+SIP-пушей пока нет вовсе (CallKit для SIP — отдельный ADR, ADR-0137 §7), строка в docs/12; `SipCall.origin`
+добавлен (клиенту отличить личный звонок); `ApiError.conflict_id/conflict_name` — владелец номера в
+`SIP_CONTACT_NUMBER_TAKEN`; токен личного звонка с `canPublishData` (DTMF в T4); импорт — 20 в час на
+пространство вместе с предпросмотрами; имя по телефону сотрудника ботам не уходит (ни в событиях, ни в REST).
+
 **Что.** ADR-0137 §2, §3: `sip_contacts`, `sip_contact_phones`, CRUD, импорт/экспорт CSV (`,`/`;`, BOM,
 cp1251, предпросмотр), нормализация (+ правило 10 цифр на `9` при `+7`-номере), общие векторы
 `proto/testdata/phone_numbers.json` (Go-тест читает их; TS-зеркало — в T4); caller ID: контакт →

@@ -179,7 +179,7 @@ func TestHeaderColumns(t *testing.T) {
 		"Имя": {kind: "name"}, " ФИО ": {kind: "name"}, "Full Name": {kind: "name"}, "Компания": {kind: "company"},
 		"Organization": {kind: "company"}, "Телефон": {kind: "phone", label: "other"}, "Мобильный": {kind: "phone", label: "mobile"},
 		"Телефон (рабочий)": {kind: "phone", label: "work"}, "Home Phone": {kind: "phone", label: "home"}, "Phone 2": {kind: "phone", label: "other"},
-		"Заметка": {kind: "note"}, "Должность": {}, "E-mail": {},
+		"Заметка": {kind: "note"}, "Должность": {}, "E-mail": {}, "Телеграм": {}, "Тел. моб.": {kind: "phone", label: "mobile"},
 	} {
 		if got := headerColumn(cell); got != want {
 			t.Fatalf("%q: %+v, want %+v", cell, got, want)

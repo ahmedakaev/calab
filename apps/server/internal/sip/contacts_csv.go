@@ -81,8 +81,8 @@ func headerColumn(cell string) csvColumn {
 	case "другой", "other":
 		return csvColumn{kind: "phone", label: "other"}
 	}
-	if strings.HasPrefix(h, "телефон") || strings.HasPrefix(h, "phone") || strings.HasPrefix(h, "тел") ||
-		strings.Contains(h, " телефон") || strings.Contains(h, " phone") {
+	if strings.HasPrefix(h, "телефон") || strings.HasPrefix(h, "phone") || h == "тел" || strings.HasPrefix(h, "тел.") ||
+		strings.HasPrefix(h, "тел ") || strings.Contains(h, " телефон") || strings.Contains(h, " phone") {
 		switch {
 		case strings.Contains(h, "моб") || strings.Contains(h, "mobile") || strings.Contains(h, "сот"):
 			return csvColumn{kind: "phone", label: "mobile"}
