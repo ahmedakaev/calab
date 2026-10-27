@@ -912,6 +912,12 @@ test('m-calendar-datepicker', async ({ page }) => {
   await page.getByTestId('day-date-card').locator('[data-day="2026-01-20"]').tap();
   await expect(page.getByTestId('day-date-card')).toHaveCount(0);
   await expect(page.getByTestId('day-date')).toContainText('20');
+  // A new meeting repeating on working days (ADR-0136): the hint under the repeat.
+  await page.getByTestId('day-new-event').tap();
+  const dialog = page.getByTestId('event-dialog');
+  await dialog.getByTestId('event-repeat').selectOption({ label: 'В рабочие дни' });
+  await dialog.getByText('по производственному календарю РФ').scrollIntoViewIfNeeded();
+  await checkpoint(page, 'm-calendar-dialog-workdays', { snapshot: false });
 });
 
 // docs/08 «Свайпы и долгое нажатие»: a sideways swipe over the hours flips the day (left → next).

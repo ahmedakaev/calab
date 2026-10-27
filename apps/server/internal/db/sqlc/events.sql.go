@@ -1475,3 +1475,25 @@ func (q *Queries) UpdateExternalAttendeeRequired(ctx context.Context, arg Update
 	_, err := q.db.Exec(ctx, updateExternalAttendeeRequired, arg.EventID, arg.Email, arg.Required)
 	return err
 }
+
+const workspaceHolidaySignal = `-- name: WorkspaceHolidaySignal :one
+SELECT COALESCE((SELECT a.market FROM billing_accounts a
+                 WHERE a.workspace_id = w.id AND a.status <> 'closed'), '')::text AS market,
+       COALESCE(u.locale, '')::text AS owner_locale
+FROM workspaces w JOIN users u ON u.id = w.owner_id
+WHERE w.id = $1
+`
+
+type WorkspaceHolidaySignalRow struct {
+	Market      string
+	OwnerLocale string
+}
+
+// What decides the holiday calendar of a new working-days series (ADR-0136): the market of
+// the workspace's live billing account (” = none) and its owner's email language (” = unset).
+func (q *Queries) WorkspaceHolidaySignal(ctx context.Context, id uuid.UUID) (WorkspaceHolidaySignalRow, error) {
+	row := q.db.QueryRow(ctx, workspaceHolidaySignal, id)
+	var i WorkspaceHolidaySignalRow
+	err := row.Scan(&i.Market, &i.OwnerLocale)
+	return i, err
+}

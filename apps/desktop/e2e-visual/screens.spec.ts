@@ -3993,6 +3993,10 @@ test('calendar-dialog', async ({ open, win, mock, shot }) => {
   await expect(dialog.getByTestId('event-chip')).toHaveCount(3);
   await dialog.getByTestId('event-title-input').blur();
   await checkpoint(shot, 'calendar-dialog');
+  // ADR-0136: «В рабочие дни» with the calendar it follows as the field's hint.
+  await dialog.getByTestId('event-repeat').selectOption({ label: 'В рабочие дни' });
+  await dialog.getByText('по производственному календарю РФ').scrollIntoViewIfNeeded();
+  await checkpoint(shot, 'calendar-dialog-workdays');
 });
 
 // ---------------------------------------------------------------- task boards (ADR-0042 §5)

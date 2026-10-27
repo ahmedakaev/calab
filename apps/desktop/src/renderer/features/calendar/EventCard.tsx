@@ -33,7 +33,14 @@ export const REPEAT_LABEL: Record<EventRepeat, MessageKey> = {
   [EventRepeat.WEEKLY]: 'cal.repeat.weekly',
   [EventRepeat.BIWEEKLY]: 'cal.repeat.biweekly',
   [EventRepeat.MONTHLY]: 'cal.repeat.monthly',
+  [EventRepeat.WORKDAYS]: 'cal.repeat.workdays',
 };
+
+/** A series' repeat as shown on its card: «В рабочие дни» names its calendar (ADR-0136). */
+export function repeatName(repeat: EventRepeat, holidayCalendar: string): string {
+  if (repeat === EventRepeat.WORKDAYS && holidayCalendar === 'ru') return t('cal.repeat.workdaysRuFull');
+  return t(REPEAT_LABEL[repeat]);
+}
 
 const STATUS_LABEL: Record<AttendeeStatus, MessageKey> = {
   [AttendeeStatus.UNSPECIFIED]: 'cal.status.pending',
@@ -158,8 +165,8 @@ export function EventCard({
         {ev.repeat !== EventRepeat.UNSPECIFIED ? (
           <Line icon={<Repeat className="size-4" aria-hidden />}>
             {ev.repeatUntil
-              ? t('cal.repeatUntil', { repeat: t(REPEAT_LABEL[ev.repeat]), date: fmt.date(new Date(timestampMs(ev.repeatUntil))) })
-              : t(REPEAT_LABEL[ev.repeat])}
+              ? t('cal.repeatUntil', { repeat: repeatName(ev.repeat, ev.holidayCalendar), date: fmt.date(new Date(timestampMs(ev.repeatUntil))) })
+              : repeatName(ev.repeat, ev.holidayCalendar)}
           </Line>
         ) : null}
         {room ? (

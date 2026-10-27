@@ -32,7 +32,8 @@ import {
 import { dayKey, dayStart, eventSpan, formatMinutes, viewerZone } from '../../lib/calendar/time';
 import { useMobile } from '../../lib/mobile';
 import { mayCreateTempRooms } from '../../lib/permissions';
-import { createEvent, eventOf, updateEvent } from '../../services/calendar';
+import { createEvent, ensureHolidayCalendar, eventOf, updateEvent } from '../../services/calendar';
+import { useCalendar } from '../../stores/calendar';
 import { roomsOfWorkspace, useRooms } from '../../stores/rooms';
 import { myUserId } from '../../stores/session';
 import { toast } from '../../stores/toasts';
@@ -49,7 +50,7 @@ import { dragKind, dragPayload, useRoomDropHover } from './dragState';
 import { AvailabilityStrip } from './AvailabilityStrip';
 import { FindTimeDialog } from './FindTime';
 
-const REPEATS = [EventRepeat.UNSPECIFIED, EventRepeat.DAILY, EventRepeat.WEEKLY, EventRepeat.BIWEEKLY, EventRepeat.MONTHLY] as const;
+const REPEATS = [EventRepeat.UNSPECIFIED, EventRepeat.DAILY, EventRepeat.WORKDAYS, EventRepeat.WEEKLY, EventRepeat.BIWEEKLY, EventRepeat.MONTHLY] as const;
 /** 00:00 … 23:45. */
 const STARTS = Array.from({ length: 96 }, (_, i) => i * 15);
 
@@ -106,6 +107,15 @@ export function EventDialog({ workspaceId, eventKey, draft: init, onClose }: { w
       live = false;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // «В рабочие дни» (ADR-0136): a series keeps the calendar it was made with; a new choice takes
+  // the workspace's (known once a list answered).
+  const workdays = d.repeat === EventRepeat.WORKDAYS;
+  const wsHolidays = useCalendar((st) => st.holidays[workspaceId]);
+  const holidays = editing?.repeat === EventRepeat.WORKDAYS ? editing.holidayCalendar : wsHolidays;
+  useEffect(() => {
+    if (workdays) ensureHolidayCalendar(workspaceId);
+  }, [workdays, workspaceId]);
 
   // A series' first start is needed to move it by the occurrence's shift: saving waits for it.
   const seriesPending = !!editing && editing.repeat !== EventRepeat.UNSPECIFIED && seriesStart === undefined;
@@ -291,8 +301,9 @@ export function EventDialog({ workspaceId, eventKey, draft: init, onClose }: { w
             className="min-h-[72px]"
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t('cal.f.repeat')}>
+        {/* A phone stacks the repeat and its end: «В рабочие дни» and its hint need the full width. */}
+        <div className={mobile ? 'grid gap-3' : 'grid grid-cols-2 gap-3'}>
+          <Field label={t('cal.f.repeat')} hint={workdays && holidays !== undefined ? t(holidays === 'ru' ? 'cal.repeat.workdaysRu' : 'cal.repeat.workdaysWeek') : undefined}>
             <Select
               value={d.repeat}
               onChange={(e) => {

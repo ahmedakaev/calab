@@ -84,6 +84,10 @@ export const ruCalendar = {
   'cal.repeat.weekly': 'Каждую неделю',
   'cal.repeat.biweekly': 'Каждые две недели',
   'cal.repeat.monthly': 'Каждый месяц',
+  'cal.repeat.workdays': 'В рабочие дни',
+  'cal.repeat.workdaysRu': 'по производственному календарю РФ',
+  'cal.repeat.workdaysWeek': 'пн–пт',
+  'cal.repeat.workdaysRuFull': 'В рабочие дни по календарю РФ',
   'cal.repeatUntil': '{repeat} до {date}',
   // the dialog
   'cal.createTitle': 'Новая встреча',

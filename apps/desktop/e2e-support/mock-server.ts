@@ -7789,6 +7789,7 @@ class MockImpl {
       id, workspaceId: a.workspaceId, roomId: a.roomId ?? '', title: a.title.trim(), description: a.description ?? '',
       startsAt: timestampFromMs(a.startMs), endsAt: timestampFromMs(a.endMs), allDay: a.allDay ?? false, tz: a.tz ?? 'UTC',
       organizerId: organizer, record: a.record ?? false, repeat: a.repeat ?? EventRepeat.UNSPECIFIED,
+      holidayCalendar: a.repeat === EventRepeat.WORKDAYS ? 'ru' : '',
       ...(a.repeatUntilMs ? { repeatUntil: timestampFromMs(a.repeatUntilMs) } : {}),
       attendees, createdAt: timestampFromMs(nowMs), updatedAt: timestampFromMs(nowMs),
     });
@@ -8778,7 +8779,8 @@ class MockImpl {
         for (const occ of occurrences(rec, from, to)) rows.push({ rec, occ, v });
       }
       rows.sort((a, b) => a.occ.startMs - b.occ.startMs || a.occ.endMs - b.occ.endMs);
-      sendMsg(c.res, 200, ListCalendarEventsResponseSchema, { events: rows.map((r) => eventOut(r.rec, r.occ, r.v.view, me, r.v.canEdit)) });
+      // The mock workspace follows the Russian production calendar (ADR-0136; the mock expands Mon–Fri only).
+      sendMsg(c.res, 200, ListCalendarEventsResponseSchema, { events: rows.map((r) => eventOut(r.rec, r.occ, r.v.view, me, r.v.canEdit)), holidayCalendar: 'ru' });
     });
 
     this.route('POST', '/api/workspaces/:id/events', (c) => {
@@ -8849,6 +8851,7 @@ class MockImpl {
         roomId: next.roomId, allDay: b.allDay ?? ev.allDay, tz: b.tz ?? ev.tz, record: b.record ?? ev.record, repeat: b.repeat ?? ev.repeat,
         updatedAt: timestampFromMs(this.calNow()), sequence: ev.sequence + (significant || removed ? 1 : 0),
       });
+      if (b.repeat !== undefined && b.repeat !== before.repeat) ev.holidayCalendar = ev.repeat === EventRepeat.WORKDAYS ? 'ru' : '';
       if (next.repeatUntilMs) ev.repeatUntil = timestampFromMs(next.repeatUntilMs);
       else delete ev.repeatUntil;
       if (roomChanged || removed) {

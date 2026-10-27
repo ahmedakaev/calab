@@ -225,3 +225,12 @@ WHERE id = sqlc.arg('id') AND temp_room AND room_id IS NULL;
 -- The room stops being a meeting's own temporary room (made permanent, deleted for good,
 -- ADR-0112): its meetings no longer ask for one, so the sweep makes no other.
 UPDATE events SET temp_room = false WHERE room_id = sqlc.arg('room_id') AND temp_room;
+
+-- name: WorkspaceHolidaySignal :one
+-- What decides the holiday calendar of a new working-days series (ADR-0136): the market of
+-- the workspace's live billing account ('' = none) and its owner's email language ('' = unset).
+SELECT COALESCE((SELECT a.market FROM billing_accounts a
+                 WHERE a.workspace_id = w.id AND a.status <> 'closed'), '')::text AS market,
+       COALESCE(u.locale, '')::text AS owner_locale
+FROM workspaces w JOIN users u ON u.id = w.owner_id
+WHERE w.id = $1;

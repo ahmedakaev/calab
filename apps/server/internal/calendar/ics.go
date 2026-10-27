@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	v1 "github.com/calaba/calaba/server/gen/calaba/v1"
 )
 
 // ICS methods (RFC 5546).
@@ -79,21 +81,32 @@ func BuildICS(e ICSEvent) string {
 	}
 	if rr := s.Rule.format(s.AllDay, s.Loc); rr != "" {
 		line("RRULE:" + rr)
+		// A date-time property in the value type of DTSTART.
+		prop := func(name string, t time.Time) string {
+			switch {
+			case s.AllDay:
+				return name + ";VALUE=DATE:" + t.In(s.Loc).Format(icsDate)
+			case tzid != "":
+				return name + ";TZID=" + tzid + ":" + t.In(s.Loc).Format(icsLocal)
+			}
+			return name + ":" + t.UTC().Format(icsUTC)
+		}
 		ex := make([]int64, 0, len(s.Except))
 		for k := range s.Except {
 			ex = append(ex, k)
 		}
+		off, working := s.holidayDates()
+		for _, t := range off {
+			if !s.Except[t.Unix()] {
+				ex = append(ex, t.Unix())
+			}
+		}
 		slices.Sort(ex)
 		for _, k := range ex {
-			t := time.Unix(k, 0)
-			switch {
-			case s.AllDay:
-				line("EXDATE;VALUE=DATE:" + t.In(s.Loc).Format(icsDate))
-			case tzid != "":
-				line("EXDATE;TZID=" + tzid + ":" + t.In(s.Loc).Format(icsLocal))
-			default:
-				line("EXDATE:" + t.UTC().Format(icsUTC))
-			}
+			line(prop("EXDATE", time.Unix(k, 0)))
+		}
+		for _, t := range working {
+			line(prop("RDATE", t))
 		}
 	}
 	line("SUMMARY:" + icsText(e.Title))
@@ -255,4 +268,37 @@ func vtimezone(loc *time.Location, start time.Time) ([]string, bool) {
 		out = append(out, "END:"+kind)
 	}
 	return append(out, "END:VTIMEZONE"), true
+}
+
+// holidayDates are the occurrence starts that a working-days series on the Russian calendar
+// differs by from its RRULE (Mon–Fri) in the years the table covers (ADR-0136): off = weekday
+// holidays (EXDATE), working = transferred working Saturdays / Sundays (RDATE, bounded by
+// UNTIL, which does not limit RDATE in RFC 5545). Both from the series' start on, in order.
+func (s Series) holidayDates() (off, working []time.Time) {
+	if s.Rule.Repeat != v1.EventRepeat_EVENT_REPEAT_WORKDAYS || s.Rule.Holidays != HolidaysRU {
+		return nil, nil
+	}
+	ls := s.Start.In(s.Loc)
+	last := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
+	if u := s.Rule.Until; u != nil {
+		last = u.In(s.Loc)
+	}
+	from := time.Date(ls.Year(), ls.Month(), ls.Day(), 0, 0, 0, 0, time.UTC)
+	to := time.Date(last.Year(), last.Month(), last.Day(), 0, 0, 0, 0, time.UTC)
+	at := func(d time.Time) time.Time {
+		if s.AllDay {
+			return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, s.Loc).UTC()
+		}
+		return time.Date(d.Year(), d.Month(), d.Day(), ls.Hour(), ls.Minute(), ls.Second(), 0, s.Loc).UTC()
+	}
+	offD, workD := prodRUChanges(from, to)
+	for _, d := range offD {
+		off = append(off, at(d))
+	}
+	for _, d := range workD {
+		if t := at(d); s.Rule.Until == nil || !t.After(*s.Rule.Until) {
+			working = append(working, t)
+		}
+	}
+	return off, working
 }

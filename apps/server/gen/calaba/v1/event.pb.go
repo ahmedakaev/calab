@@ -87,6 +87,9 @@ const (
 	EventRepeat_EVENT_REPEAT_WEEKLY      EventRepeat = 2
 	EventRepeat_EVENT_REPEAT_BIWEEKLY    EventRepeat = 3
 	EventRepeat_EVENT_REPEAT_MONTHLY     EventRepeat = 4 // the same day of the month; months without that day are skipped
+	// Working days (ADR-0136): Mon–Fri in the series' zone; with holiday_calendar "ru" the Russian
+	// production calendar instead (holidays out, transferred working Saturdays / Sundays in).
+	EventRepeat_EVENT_REPEAT_WORKDAYS EventRepeat = 5
 )
 
 // Enum value maps for EventRepeat.
@@ -97,6 +100,7 @@ var (
 		2: "EVENT_REPEAT_WEEKLY",
 		3: "EVENT_REPEAT_BIWEEKLY",
 		4: "EVENT_REPEAT_MONTHLY",
+		5: "EVENT_REPEAT_WORKDAYS",
 	}
 	EventRepeat_value = map[string]int32{
 		"EVENT_REPEAT_UNSPECIFIED": 0,
@@ -104,6 +108,7 @@ var (
 		"EVENT_REPEAT_WEEKLY":      2,
 		"EVENT_REPEAT_BIWEEKLY":    3,
 		"EVENT_REPEAT_MONTHLY":     4,
+		"EVENT_REPEAT_WORKDAYS":    5,
 	}
 )
 
@@ -488,9 +493,12 @@ type CalendarEvent struct {
 	// The meeting has its own temporary room (ADR-0112): with room_id empty the server creates it
 	// 1 h before the start on behalf of the organizer; with room_id set that room is the
 	// meeting's own (its end follows the meeting: end + 1 h). One-off meetings only.
-	TempRoom      bool `protobuf:"varint,26,opt,name=temp_room,json=tempRoom,proto3" json:"temp_room,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	TempRoom bool `protobuf:"varint,26,opt,name=temp_room,json=tempRoom,proto3" json:"temp_room,omitempty"`
+	// EVENT_REPEAT_WORKDAYS only: the holiday calendar the series follows, fixed by the server
+	// when the repeat was chosen (ADR-0136): "ru" = the Russian production calendar, "" = Mon–Fri.
+	HolidayCalendar string `protobuf:"bytes,27,opt,name=holiday_calendar,json=holidayCalendar,proto3" json:"holiday_calendar,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CalendarEvent) Reset() {
@@ -705,6 +713,13 @@ func (x *CalendarEvent) GetTempRoom() bool {
 	return false
 }
 
+func (x *CalendarEvent) GetHolidayCalendar() string {
+	if x != nil {
+		return x.HolidayCalendar
+	}
+	return ""
+}
+
 // Attendee as sent by the client: a member (user_id) or an external address (email).
 type CalendarEventAttendeeInput struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -769,10 +784,13 @@ func (x *CalendarEventAttendeeInput) GetRequired() bool {
 // GET /api/workspaces/{id}/events?from=<RFC 3339>&to=<RFC 3339> — occurrences overlapping
 // [from, to) that the caller may see, earliest first. The window is at most 62 days; guests → 403.
 type ListCalendarEventsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Events        []*CalendarEvent       `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Events []*CalendarEvent       `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	// The holiday calendar a new EVENT_REPEAT_WORKDAYS series of this workspace would follow
+	// (ADR-0136): "ru" | "" (Mon–Fri). The event dialog shows it as a hint.
+	HolidayCalendar string `protobuf:"bytes,2,opt,name=holiday_calendar,json=holidayCalendar,proto3" json:"holiday_calendar,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ListCalendarEventsResponse) Reset() {
@@ -810,6 +828,13 @@ func (x *ListCalendarEventsResponse) GetEvents() []*CalendarEvent {
 		return x.Events
 	}
 	return nil
+}
+
+func (x *ListCalendarEventsResponse) GetHolidayCalendar() string {
+	if x != nil {
+		return x.HolidayCalendar
+	}
+	return ""
 }
 
 // POST /api/workspaces/{id}/events → 201 CalendarEventResponse. A member, not a guest.
@@ -1335,14 +1360,15 @@ type EventRsvpTokenResponse struct {
 	// empty without a room or when links are unavailable (no MANAGE_ROOM of the organizer,
 	// revoked). It works in [guest_from, guest_until): «ссылка станет активной за 15 минут до
 	// начала».
-	GuestUrl       string                 `protobuf:"bytes,18,opt,name=guest_url,json=guestUrl,proto3" json:"guest_url,omitempty"`
-	GuestFrom      *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=guest_from,json=guestFrom,proto3" json:"guest_from,omitempty"`
-	GuestUntil     *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=guest_until,json=guestUntil,proto3" json:"guest_until,omitempty"`
-	Repeat         EventRepeat            `protobuf:"varint,21,opt,name=repeat,proto3,enum=calaba.v1.EventRepeat" json:"repeat,omitempty"`
-	RepeatUntil    *timestamppb.Timestamp `protobuf:"bytes,22,opt,name=repeat_until,json=repeatUntil,proto3" json:"repeat_until,omitempty"`
-	OrganizerEmail string                 `protobuf:"bytes,23,opt,name=organizer_email,json=organizerEmail,proto3" json:"organizer_email,omitempty"` // only a confirmed address, else empty
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	GuestUrl        string                 `protobuf:"bytes,18,opt,name=guest_url,json=guestUrl,proto3" json:"guest_url,omitempty"`
+	GuestFrom       *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=guest_from,json=guestFrom,proto3" json:"guest_from,omitempty"`
+	GuestUntil      *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=guest_until,json=guestUntil,proto3" json:"guest_until,omitempty"`
+	Repeat          EventRepeat            `protobuf:"varint,21,opt,name=repeat,proto3,enum=calaba.v1.EventRepeat" json:"repeat,omitempty"`
+	RepeatUntil     *timestamppb.Timestamp `protobuf:"bytes,22,opt,name=repeat_until,json=repeatUntil,proto3" json:"repeat_until,omitempty"`
+	OrganizerEmail  string                 `protobuf:"bytes,23,opt,name=organizer_email,json=organizerEmail,proto3" json:"organizer_email,omitempty"`    // only a confirmed address, else empty
+	HolidayCalendar string                 `protobuf:"bytes,24,opt,name=holiday_calendar,json=holidayCalendar,proto3" json:"holiday_calendar,omitempty"` // as CalendarEvent.holiday_calendar
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *EventRsvpTokenResponse) Reset() {
@@ -1532,6 +1558,13 @@ func (x *EventRsvpTokenResponse) GetRepeatUntil() *timestamppb.Timestamp {
 func (x *EventRsvpTokenResponse) GetOrganizerEmail() string {
 	if x != nil {
 		return x.OrganizerEmail
+	}
+	return ""
+}
+
+func (x *EventRsvpTokenResponse) GetHolidayCalendar() string {
+	if x != nil {
+		return x.HolidayCalendar
 	}
 	return ""
 }
@@ -3600,7 +3633,7 @@ const file_calaba_v1_event_proto_rawDesc = "" +
 	"\bdeclined\x18\x02 \x01(\rR\bdeclined\x12\x14\n" +
 	"\x05maybe\x18\x03 \x01(\rR\x05maybe\x12\x18\n" +
 	"\apending\x18\x04 \x01(\rR\apending\x12\x1a\n" +
-	"\bcomments\x18\x05 \x01(\rR\bcomments\"\xe3\b\n" +
+	"\bcomments\x18\x05 \x01(\rR\bcomments\"\x8e\t\n" +
 	"\rCalendarEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12\x17\n" +
@@ -3631,13 +3664,15 @@ const file_calaba_v1_event_proto_rawDesc = "" +
 	"\vguest_links\x18\x18 \x01(\bR\n" +
 	"guestLinks\x12\x19\n" +
 	"\bcan_edit\x18\x19 \x01(\bR\acanEdit\x12\x1b\n" +
-	"\ttemp_room\x18\x1a \x01(\bR\btempRoom\"g\n" +
+	"\ttemp_room\x18\x1a \x01(\bR\btempRoom\x12)\n" +
+	"\x10holiday_calendar\x18\x1b \x01(\tR\x0fholidayCalendar\"g\n" +
 	"\x1aCalendarEventAttendeeInput\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x1a\n" +
-	"\brequired\x18\x03 \x01(\bR\brequired\"N\n" +
+	"\brequired\x18\x03 \x01(\bR\brequired\"y\n" +
 	"\x1aListCalendarEventsResponse\x120\n" +
-	"\x06events\x18\x01 \x03(\v2\x18.calaba.v1.CalendarEventR\x06events\"\xed\x03\n" +
+	"\x06events\x18\x01 \x03(\v2\x18.calaba.v1.CalendarEventR\x06events\x12)\n" +
+	"\x10holiday_calendar\x18\x02 \x01(\tR\x0fholidayCalendar\"\xed\x03\n" +
 	"\x1aCreateCalendarEventRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
@@ -3687,7 +3722,7 @@ const file_calaba_v1_event_proto_rawDesc = "" +
 	"\x05count\x18\x01 \x01(\rR\x05count\x120\n" +
 	"\x06events\x18\x02 \x03(\v2\x18.calaba.v1.CalendarEventR\x06events\"-\n" +
 	"\x15EventRsvpTokenRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\xa2\a\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\xcd\a\n" +
 	"\x16EventRsvpTokenResponse\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x127\n" +
@@ -3715,7 +3750,8 @@ const file_calaba_v1_event_proto_rawDesc = "" +
 	"guestUntil\x12.\n" +
 	"\x06repeat\x18\x15 \x01(\x0e2\x16.calaba.v1.EventRepeatR\x06repeat\x12=\n" +
 	"\frepeat_until\x18\x16 \x01(\v2\x1a.google.protobuf.TimestampR\vrepeatUntil\x12'\n" +
-	"\x0forganizer_email\x18\x17 \x01(\tR\x0eorganizerEmail\"\x9b\x02\n" +
+	"\x0forganizer_email\x18\x17 \x01(\tR\x0eorganizerEmail\x12)\n" +
+	"\x10holiday_calendar\x18\x18 \x01(\tR\x0fholidayCalendar\"\x9b\x02\n" +
 	"\fBusyInterval\x127\n" +
 	"\tstarts_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\bstartsAt\x123\n" +
 	"\aends_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x06endsAt\x12\x19\n" +
@@ -3875,13 +3911,14 @@ const file_calaba_v1_event_proto_rawDesc = "" +
 	"\x17ATTENDEE_STATUS_PENDING\x10\x01\x12\x1c\n" +
 	"\x18ATTENDEE_STATUS_ACCEPTED\x10\x02\x12\x1c\n" +
 	"\x18ATTENDEE_STATUS_DECLINED\x10\x03\x12\x19\n" +
-	"\x15ATTENDEE_STATUS_MAYBE\x10\x04*\x91\x01\n" +
+	"\x15ATTENDEE_STATUS_MAYBE\x10\x04*\xac\x01\n" +
 	"\vEventRepeat\x12\x1c\n" +
 	"\x18EVENT_REPEAT_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12EVENT_REPEAT_DAILY\x10\x01\x12\x17\n" +
 	"\x13EVENT_REPEAT_WEEKLY\x10\x02\x12\x19\n" +
 	"\x15EVENT_REPEAT_BIWEEKLY\x10\x03\x12\x18\n" +
-	"\x14EVENT_REPEAT_MONTHLY\x10\x04*T\n" +
+	"\x14EVENT_REPEAT_MONTHLY\x10\x04\x12\x19\n" +
+	"\x15EVENT_REPEAT_WORKDAYS\x10\x05*T\n" +
 	"\bBusyKind\x12\x19\n" +
 	"\x15BUSY_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11BUSY_KIND_MEETING\x10\x01\x12\x16\n" +

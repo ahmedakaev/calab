@@ -390,7 +390,8 @@ func (b *bundle) proto(occ *Occurrence, v *viewer) *v1.CalendarEvent {
 		Id: e.ID.String(), WorkspaceId: e.WorkspaceID.String(), Title: e.Title, Description: e.Description,
 		StartsAt: timestamppb.New(e.StartsAt), EndsAt: timestamppb.New(e.EndsAt), AllDay: e.AllDay, Tz: e.Tz,
 		OrganizerId: e.OrganizerID.String(), Record: e.Record, Repeat: b.series.Rule.Repeat, TempRoom: e.TempRoom,
-		Counts: b.counts(), CreatedAt: timestamppb.New(e.CreatedAt), UpdatedAt: timestamppb.New(e.UpdatedAt),
+		HolidayCalendar: b.series.Rule.Holidays,
+		Counts:          b.counts(), CreatedAt: timestamppb.New(e.CreatedAt), UpdatedAt: timestamppb.New(e.UpdatedAt),
 		Sequence: uint32(max(e.Sequence, 0)), //nolint:gosec // non-negative counter
 	}
 	if e.RoomID != nil {

@@ -69,7 +69,11 @@ async function fetchMonth(workspaceId: string, month: string): Promise<void> {
   const [from, to] = gridWindow(month);
   try {
     const r = await api.calendar.list(workspaceId, new Date(from), new Date(to));
-    useCalendar.setState((s) => ({ occ: replaceWindow(s.occ, workspaceId, from, to, r.events), months: s.months[id] ? s.months : { ...s.months, [id]: true } }));
+    useCalendar.setState((s) => ({
+      occ: replaceWindow(s.occ, workspaceId, from, to, r.events),
+      months: s.months[id] ? s.months : { ...s.months, [id]: true },
+      holidays: s.holidays[workspaceId] === r.holidayCalendar ? s.holidays : { ...s.holidays, [workspaceId]: r.holidayCalendar },
+    }));
   } catch (e) {
     // A guest (403) or a network error: nothing to show; the next open tries again.
     log.warn('calendar: list failed', e);
@@ -89,6 +93,23 @@ export function ensureMonth(workspaceId: string, month: string): void {
   useCalendar.setState((s) => ({ months: { ...s.months, [id]: true } }));
   const p = fetchMonth(workspaceId, month).finally(() => inflight.delete(id));
   inflight.set(id, p);
+}
+
+/**
+ * The holiday calendar of a workspace's new working-days series (ADR-0136) for the event dialog's
+ * hint: known from any listed month, else asked once with an empty one-minute list.
+ */
+export function ensureHolidayCalendar(workspaceId: string): void {
+  if (cal().holidays[workspaceId] !== undefined || inflight.has(workspaceId)) return;
+  const now = Date.now();
+  const p = api.calendar
+    .list(workspaceId, new Date(now), new Date(now + 60_000))
+    .then(
+      (r) => useCalendar.setState((s) => ({ holidays: { ...s.holidays, [workspaceId]: r.holidayCalendar } })),
+      (e: unknown) => log.warn('calendar: holiday calendar failed', e),
+    )
+    .finally(() => inflight.delete(workspaceId));
+  inflight.set(workspaceId, p);
 }
 
 const refetchTimers = new Map<string, number>();
