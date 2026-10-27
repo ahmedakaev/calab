@@ -96,7 +96,7 @@ func TestSIPContacts(t *testing.T) {
 	// Before telephony is connected only MANAGE_INTEGRATIONS sees the section.
 	o.must(200, "GET", contacts, nil, nil)
 	bob.must(403, "GET", contacts, nil, nil)
-	o.must(200, "PUT", base, &v1.PutSipSettingsRequest{Enabled: true, Provider: "Zadarma", Host: "203.0.113.10", CallerId: "+74951230137"}, nil)
+	o.must(200, "PUT", base, &v1.PutSipSettingsRequest{Enabled: true, Provider: "Zadarma", Host: "203.0.113.10", CallerId: "+74951230237"}, nil)
 	var bobExt v1.SipExtensionResponse
 	o.must(201, "POST", base+"/extensions", &v1.CreateSipExtensionRequest{Number: "101", UserId: bob.id}, &bobExt)
 	role := newRole(t, o, wid, "Журналы", perm.ViewJournals)

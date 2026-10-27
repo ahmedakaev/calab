@@ -78,7 +78,7 @@ func TestSIPPersonalCall(t *testing.T) {
 	// Telephony off: SIP_DISABLED (after the bit and the plan).
 	call(o, 409, num)
 	pushHTTP(t, server, o, 200, "PUT", base, &v1.PutSipSettingsRequest{Enabled: true, Provider: "Zadarma", Host: "203.0.113.10",
-		CallerId: "+74951230138", AllowedPrefixes: []string{"+7"}}, nil)
+		CallerId: "+74951230338", AllowedPrefixes: []string{"+7"}}, nil)
 	o.must(200, "PUT", base+"/recording", &v1.PutSipRecordingRequest{RecordOutbound: true}, nil)
 
 	// The bit of the workspace itself: an allow in a room does not count.
@@ -134,8 +134,8 @@ func TestSIPPersonalCall(t *testing.T) {
 	// Busy: a second call, and a one-to-one call to bob.
 	call(bob, 409, num)
 	var dm v1.CreateDmResponse
-	o.must(201, "POST", "/api/dms", &v1.CreateDmRequest{UserId: bob.id}, &dm)
-	if code := errCode(t, o, "POST", "/api/dms/"+dm.GetDm().GetRoom().GetId()+"/call"); code != v1.ErrorCode_ERROR_CODE_BUSY {
+	carol.must(201, "POST", "/api/dms", &v1.CreateDmRequest{UserId: bob.id}, &dm)
+	if code := errCode(t, carol, "POST", "/api/dms/"+dm.GetDm().GetRoom().GetId()+"/call"); code != v1.ErrorCode_ERROR_CODE_BUSY {
 		t.Fatalf("a DM call to bob on the phone: %v", code)
 	}
 	// READY carries it for bob.
