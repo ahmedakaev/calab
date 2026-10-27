@@ -14,10 +14,12 @@ import { useConnectingRing, useVoiceStateOf } from '../../stores/voicePending';
 import { useVoice } from '../../stores/voice';
 import { dmPeer } from '../../stores/dms';
 import { ParkedRoomLine } from '../call/ParkedRoom';
-import { usePhoneCallNumber } from '../../stores/sipInbound';
+import { usePhoneCallLabel } from '../call/phoneCall';
+import { DtmfButton } from '../call/DtmfKeypad';
+import { usePersonalDialing } from '../../stores/sipOutbound';
+import { isPersonalRoom } from '../../lib/sipInbound';
 import { phoneCallId } from '../../lib/sipInbound';
 import { PhoneTransferButton, PhoneTransferStatus } from '../call/PhoneTransfer';
-import { formatPhone } from '../../lib/sip';
 import { useMemberName } from '../../stores/workspaces';
 import { openDm } from '../../services/dms';
 import { menuBox, menuItem, menuLabel, menuSeparator } from './menu';
@@ -56,8 +58,10 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
   const call = useVoice((s) => s.call);
   const ptt = usePrefs((s) => s.micMode === 'ptt') && !call;
   const peerName = useMemberName(null, call && roomId ? dmPeer(roomId) : '');
-  const phone = usePhoneCallNumber(roomId); // an inbound phone call (ADR-0117)
-  const callLabel = phone !== null ? t('call.sipPanel', { number: phone ? formatPhone(phone) : t('call.sipUnknown') }) : t('call.panel', { name: peerName });
+  // A phone call (ADR-0117 inbound, ADR-0137 §3 personal): who it is with; «Набираем…» until the answer.
+  const phone = usePhoneCallLabel(roomId);
+  const dialing = usePersonalDialing(roomId);
+  const callLabel = phone !== null ? t('call.sipPanel', { number: phone || t('call.sipUnknown') }) : t('call.panel', { name: peerName });
   const onAir = useVoice((s) => s.pttDown && s.transmitting);
   const room = useRooms((s) => (roomId ? s.byId[roomId] : undefined));
   const me = useSession((s) => s.me?.user);
@@ -73,7 +77,7 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
   if (!roomId) return null;
   const connected = phase === 'connected';
   // While the PTT button is held the status line says so (the button itself is a 40 px circle).
-  const phaseText = connected && ptt && onAir ? t('mobile.pttOn') : connected ? t('voice.connected') : phase === 'reconnecting' ? t('voice.reconnecting') : phase === 'blocked' ? t('voice.blocked') : t('voice.connecting');
+  const phaseText = dialing && (connected || phase === 'connecting') ? t('telc.call.dialing') : connected && ptt && onAir ? t('mobile.pttOn') : connected ? t('voice.connected') : phase === 'reconnecting' ? t('voice.reconnecting') : phase === 'blocked' ? t('voice.blocked') : t('voice.connecting');
   return (
     <div className={cx('shrink-0 px-4 pt-1 [.kb-open_&]:hidden', aboveTabs ? 'pb-2' : 'pb-[calc(var(--safe-bottom,0px)+8px)]')} data-testid="mobile-voice-strip">
       {/* Push-to-talk: a big hold button above the island, in the flow — the feed and the composer above it shrink by its height. */}
@@ -108,7 +112,7 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
                 (line-clamp keeps the strip 56 px). A single word wider than the slot (≈ 75–90 px between the
                 avatar and five buttons: «Подключение…») is hyphenated by the document language
                 («Подклю-чение…»), not broken at an arbitrary letter. */}
-            <span className={cx('line-clamp-2 min-w-0 break-words text-[12px] font-semibold leading-[15px] [hyphens:auto]', connected ? 'text-ok' : 'text-warn')} data-testid="mobile-voice-status">
+            <span className={cx('line-clamp-2 min-w-0 break-words text-[12px] font-semibold leading-[15px] [hyphens:auto]', connected && !dialing ? 'text-ok' : 'text-warn')} data-testid="mobile-voice-status">
               {phaseText}
             </span>
             {/* Recording (docs/09 #30): the red dot only — the strip has no room for the timer; a tap
@@ -142,8 +146,17 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
         >
           {deafened ? <HeadphoneOff className="size-5" aria-hidden /> : <Headphones className="size-5" aria-hidden />}
         </button>
-        {/* A phone call has no camera: «Перевести» takes its place (ADR-0132). */}
-        {phone !== null ? <PhoneTransferButton callId={phoneCallId(roomId)} className={cx(round, idle)} /> : <StripCamera roomId={roomId} />}
+        {/* A phone call has no camera: «Перевести» takes its place (ADR-0132) — on a personal call
+            the tone keypad (ADR-0137 §7). */}
+        {phone !== null ? (
+          isPersonalRoom(roomId) ? (
+            <DtmfButton roomId={roomId} className={cx(round, idle)} />
+          ) : (
+            <PhoneTransferButton callId={phoneCallId(roomId)} className={cx(round, idle)} />
+          )
+        ) : (
+          <StripCamera roomId={roomId} />
+        )}
         {/* Soundboard (ADR-0036): the island's panel as a bottom sheet, «Ещё → Звуки». */}
         {call ? (
           <MoreMenu roomId={roomId} cameraItem={false} />

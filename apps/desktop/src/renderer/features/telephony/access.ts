@@ -45,6 +45,29 @@ export function useMayManageTelephony(ws: string): boolean {
   return useWorkspaces((s) => rights(s.byId[ws], me).manage);
 }
 
+/** «Позвонить» over the trunk (ADR-0137 §3): PLACE_CALLS of the workspace (the server checks the rest). */
+export function usePlaceCalls(ws: string): boolean {
+  const me = useSession((s) => s.me?.user?.id ?? '');
+  return useWorkspaces((s) => rights(s.byId[ws], me).placeCalls);
+}
+
+export function placeCallsNow(ws: string): boolean {
+  return rights(useWorkspaces.getState().byId[ws], myUserId()).placeCalls;
+}
+
+/** Somebody else (a person) has an internal number: the dial pad can call them (ADR-0137 §3.8). */
+export function useHasExtensions(ws: string): boolean {
+  const me = useSession((s) => s.me?.user?.id ?? '');
+  return useWorkspaces((s) => Object.values(s.byId[ws]?.members ?? {}).some((m) => !!m.extension && m.user?.id !== me && !m.user?.isBot));
+}
+
+/** May I delete this contact: its author or MANAGE_INTEGRATIONS (the server checks). */
+export function useMayDeleteContact(ws: string, createdBy: string): boolean {
+  const me = useSession((s) => s.me?.user?.id ?? '');
+  const manage = useWorkspaces((s) => rights(s.byId[ws], me).manage);
+  return manage || (!!createdBy && createdBy === me);
+}
+
 /** Outside React (⌘K, the phone's tab list). */
 export function telephonyVisibleNow(ws: string | null | undefined): boolean {
   return ws ? rights(useWorkspaces.getState().byId[ws], myUserId()).visible : false;

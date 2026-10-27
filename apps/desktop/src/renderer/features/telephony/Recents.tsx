@@ -129,7 +129,8 @@ const MoreFooter = (): ReactNode => (
     <Spinner className="size-4" />
   </div>
 );
-const PhoneFooter = (): ReactNode => <div className="h-4" />;
+// The phone's FAB «Набор» floats over the list's end: the last row stays above it (56 + 32, ADR-0137 §7).
+const PhoneFooter = (): ReactNode => <div className="h-[88px]" />;
 const DesktopFooter = (): ReactNode => <div className="h-3" />;
 
 /** Six static rows while the first page loads (no endless shimmer: docs/08). */

@@ -1,22 +1,31 @@
-import { Phone } from 'lucide-react';
+import { Grid3x3, Phone } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Bar } from '../../components/Bar';
+import { CreateButton } from '../../components/CreateButton';
 import { HeaderIcon } from '../../components/PhoneHeader';
 import { Segmented } from '../../components/ui';
 import { t, useLocale } from '../../i18n';
 import { openTab } from '../../services/phoneNav';
+import { usePersonalCallOn } from '../../stores/sipOutbound';
 import { useTelephonyUi } from '../../stores/telephonyUi';
-import { useTelephonyVisible } from './access';
+import { useVoice } from '../../stores/voice';
+import { useHasExtensions, usePlaceCalls, useTelephonyVisible } from './access';
+import { ContactSearch, ContactsList } from './contacts/ContactsList';
+import { editContact, openDial } from './contacts/data';
+import { ImportDialog } from './contacts/ImportDialog';
 import { JournalList } from './Recents';
 import { FilterButton, FilterCard, FilterChips, SearchField, setFilter } from './RecentsFilters';
 
 /**
  * «Телефония» on the phone (ADR-0137 §7 — the owner's priority: one hand, actions at the thumb,
- * the iPhone «Телефон» patterns): the tab root — the title, «Недавние | Пропущенные» segments (the
- * third, «Контакты», arrives with T4), the list with the search pill that scrolls away with it
- * (as iOS Contacts) and the funnel at its right end → a centred card with the other filters; the
- * set ones as chips. A row's tap calls back an employee or opens the detail (a pushed screen).
+ * the iPhone «Телефон» patterns): the tab root — the title with «＋» (a new contact), the segments
+ * «Недавние | Пропущенные | Контакты», the list with its search pill that scrolls away with it (as
+ * iOS Contacts; the journal's funnel at its right end → a centred card, the set filters as chips),
+ * and the FAB «Набор» at the thumb over the list. A journal row's tap calls back; ⓘ opens the
+ * detail (a pushed screen); a contact's tap opens its card.
  */
+type PhoneSegment = 'all' | 'missed' | 'contacts';
+
 export function PhoneTelephony({ workspaceId }: { workspaceId: string }): ReactNode {
   useLocale();
   const visible = useTelephonyVisible(workspaceId);
@@ -24,30 +33,47 @@ export function PhoneTelephony({ workspaceId }: { workspaceId: string }): ReactN
     // The section went away (telephony off, a right taken): back to «Команда».
     if (!visible) openTab('chats');
   }, [visible]);
-  const segment = useTelephonyUi((s) => s.filter.segment);
+  // «Контакты» is the section's contacts page (stores/telephonyUi `page`); the other two are the journal's segment.
+  const segment = useTelephonyUi((s): PhoneSegment => (s.page === 'contacts' ? 'contacts' : s.filter.segment));
   const [filters, setFilters] = useState(false);
   if (!visible) return null;
+  const pick = (v: PhoneSegment): void => {
+    if (v === 'contacts') {
+      useTelephonyUi.getState().setPage('contacts');
+      return;
+    }
+    useTelephonyUi.getState().setPage('recents');
+    setFilter({ segment: v });
+  };
   return (
-    <section className="mat-content flex min-h-0 flex-1 flex-col" data-testid="phone-telephony">
+    <section className="mat-content relative flex min-h-0 flex-1 flex-col" data-testid="phone-telephony">
       <Bar>
         <HeaderIcon icon={Phone} />
         <h1 className="min-w-0 flex-1 truncate text-headline font-semibold">{t('tel.section')}</h1>
+        <CreateButton label={t('telc.newTitle')} tip={false} onClick={() => editContact('')} data-testid="tel-create" />
       </Bar>
       <div className="shrink-0 px-3 pb-2 pt-1">
         <Segmented
           value={segment}
-          onChange={(v) => setFilter({ segment: v })}
+          onChange={pick}
           label={t('tel.seg.label')}
           fill
           options={[
             { value: 'all', label: t('tel.seg.recents') },
             { value: 'missed', label: t('tel.seg.missed') },
+            { value: 'contacts', label: t('telc.contacts') },
           ]}
           testId="tel-segment"
         />
       </div>
-      <JournalList ws={workspaceId} phone header={<ListHeader ws={workspaceId} onFilters={() => setFilters(true)} />} />
+      {segment === 'contacts' ? (
+        <ContactsList ws={workspaceId} phone header={<ContactsHeader />} />
+      ) : (
+        <JournalList ws={workspaceId} phone header={<ListHeader ws={workspaceId} onFilters={() => setFilters(true)} />} />
+      )}
+      <DialFab ws={workspaceId} />
       <FilterCard ws={workspaceId} open={filters} onClose={() => setFilters(false)} />
+      <ImportDialog ws={workspaceId} />
     </section>
   );
 }
@@ -61,5 +87,37 @@ function ListHeader({ ws, onFilters }: { ws: string; onFilters: () => void }): R
       </div>
       <FilterChips ws={ws} />
     </div>
+  );
+}
+
+function ContactsHeader(): ReactNode {
+  return (
+    <div className="px-3 pb-2 pt-1">
+      <ContactSearch phone />
+    </div>
+  );
+}
+
+/**
+ * FAB «Набор» (ADR-0137 §7): a 56 px accent circle at the thumb, 16 px from the edge and above the
+ * tab bar; hidden in a call (the call band is down there, a second call does not start from it)
+ * and without PLACE_CALLS and internal numbers to dial.
+ */
+function DialFab({ ws }: { ws: string }): ReactNode {
+  const place = usePlaceCalls(ws);
+  const exts = useHasExtensions(ws);
+  const inCall = useVoice((s) => s.roomId !== null);
+  const personal = usePersonalCallOn();
+  if ((!place && !exts) || inCall || personal) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => openDial()}
+      aria-label={t('telc.dial')}
+      className="absolute bottom-4 right-4 z-[2] grid size-14 place-items-center rounded-full bg-accent-strong text-accent-fg shadow-[var(--shadow-island)] transition-[filter] duration-[var(--motion-fast)] active:brightness-90"
+      data-testid="tel-fab"
+    >
+      <Grid3x3 className="size-6" aria-hidden />
+    </button>
   );
 }

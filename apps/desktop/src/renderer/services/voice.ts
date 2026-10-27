@@ -22,7 +22,7 @@ import type { PttEvent } from '../../shared/ipc';
 import { t } from '../i18n';
 import { ApiError } from '../lib/api/client';
 import { api } from '../lib/api/endpoints';
-import { isPhoneRoom, phoneCallId, takePhoneJoin } from '../lib/sipInbound';
+import { isPersonalRoom, isPhoneRoom, phoneCallId, takePhoneJoin } from '../lib/sipInbound';
 import { log } from '../lib/log';
 import { isLapsed } from '../lib/billing/model';
 import { restrictedPerms, roomPerms, voiceCaps } from '../lib/permissions';
@@ -1472,8 +1472,15 @@ class VoiceEngine {
   private sendJoin(roomId: string): ReturnType<typeof api.voice.join> {
     // An inbound phone call's session (ADR-0117): the accept's token once, then a fresh one
     // for each reconnect — never the room /join.
+    // A personal call (ADR-0137 §3) has only the token its POST gave (kept for the call's life).
     const pre = isPhoneRoom(roomId) ? takePhoneJoin(roomId) : undefined;
-    const req = isPhoneRoom(roomId) ? (pre ? Promise.resolve(pre) : api.sip.joinInbound(phoneCallId(roomId))) : api.voice.join(roomId);
+    const req = isPhoneRoom(roomId)
+      ? pre
+        ? Promise.resolve(pre)
+        : isPersonalRoom(roomId)
+          ? Promise.reject(new ApiError('ERROR_CODE_NOT_FOUND', 'the personal call is over', 404))
+          : api.sip.joinInbound(phoneCallId(roomId))
+      : api.voice.join(roomId);
     const settled = req.then(
       () => undefined,
       () => undefined,
@@ -2939,6 +2946,19 @@ class VoiceEngine {
     if (!next) return;
     setVoice(next);
     if (this.room) this.afterSelfChange();
+  }
+
+  /**
+   * A tone digit to the line of my personal phone call (ADR-0137 §3.7): a SipDTMF data packet
+   * (livekit-client publishDtmf; livekit/sip sends it to the provider as RFC 2833). Data, not
+   * sound: the echo rules (docs/02) are untouched. Only in a connected personal call's room.
+   */
+  publishDtmf(digit: string): boolean {
+    const room = this.room;
+    if (!room || !isPersonalRoom(this.roomId) || room.state !== ConnectionState.Connected || !/^[0-9*#]$/.test(digit)) return false;
+    const code = digit === '*' ? 10 : digit === '#' ? 11 : Number(digit);
+    room.localParticipant.publishDtmf(code, digit).catch((err: unknown) => log.warn('voice: dtmf failed', err));
+    return true;
   }
 
   toggleMute(): void {

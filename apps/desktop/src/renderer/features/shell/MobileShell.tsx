@@ -39,6 +39,9 @@ import { PhoneDisk } from '../disk/PhoneDisk';
 import { PhoneWiki, PhoneWikiPage, PhoneWikiTrash } from '../wiki/PhoneWiki';
 import { PhoneTelephony } from '../telephony/PhoneTelephony';
 import { PhoneCallDetail } from '../telephony/CallDetail';
+import { PhoneContactCard } from '../telephony/contacts/ContactCard';
+import { PhoneContactEdit } from '../telephony/contacts/ContactForm';
+import { PhoneDial } from '../telephony/keypad/DialPage';
 import { SearchResultsPanel } from '../search/SearchResultsPanel';
 import { MembersPanel } from './MembersPanel';
 import { MobileVoiceStrip } from './MobileVoiceStrip';
@@ -326,6 +329,12 @@ function PushedScreen({ screen }: { screen: PhoneScreen }): ReactNode {
       return <ActiveWorkspace>{(ws) => <PhoneCanvasScreen key={screen.itemId} workspaceId={ws} itemId={screen.itemId} />}</ActiveWorkspace>;
     case 'telCall':
       return <ActiveWorkspace>{(ws) => <PhoneCallDetail key={screen.callId} ws={ws} callId={screen.callId} />}</ActiveWorkspace>;
+    case 'telContact':
+      return <ActiveWorkspace>{(ws) => <PhoneContactCard key={screen.contactId} ws={ws} id={screen.contactId} />}</ActiveWorkspace>;
+    case 'telContactEdit':
+      return <ActiveWorkspace>{(ws) => <PhoneContactEdit key={screen.contactId || 'new'} ws={ws} id={screen.contactId} />}</ActiveWorkspace>;
+    case 'telDial':
+      return <ActiveWorkspace>{(ws) => <PhoneDial ws={ws} />}</ActiveWorkspace>;
     case 'wiki':
       return <ActiveWorkspace>{(ws) => (screen.trash ? <PhoneWikiTrash workspaceId={ws} /> : <PhoneWikiPage key={screen.pageId} workspaceId={ws} pageId={screen.pageId} />)}</ActiveWorkspace>;
   }

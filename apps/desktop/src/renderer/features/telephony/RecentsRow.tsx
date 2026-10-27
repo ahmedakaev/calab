@@ -1,7 +1,7 @@
 import * as ContextMenu from '../../components/radix/context-menu';
 import { SipCallStatus, type SipJournalEntry } from '@calaba/protocol';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDownLeft, ArrowUpRight, Copy, Info, MessageCircle, Phone, PhoneMissed, Play } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Copy, Info, MessageCircle, Phone, PhoneMissed, Play, UserRound, UserRoundPlus } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
 import { Avatar, avatarColor } from '../../components/Avatar';
 import { IconButton, cx } from '../../components/ui';
@@ -18,8 +18,8 @@ import { useWorkspaces } from '../../stores/workspaces';
 import { useShallow } from 'zustand/react/shallow';
 import { menuBox, menuItem } from '../shell/menu';
 import { formatDuration, useNow } from '../shell/voiceFormat';
-import { useMayManageTelephony } from './access';
-import { callBack, copyNumber, internalPeer, openCallDetail, writeTo } from './actions';
+import { useMayManageTelephony, usePlaceCalls } from './access';
+import { callBack, copyNumber, internalPeer, openCallDetail, openOrAddContact, writeTo } from './actions';
 import { toggleRecording } from './RecordingPlayer';
 import { journalEntryKey } from '../../services/sipJournal';
 import { liveText, outcomeText, partyName, rowTime } from './texts';
@@ -29,9 +29,9 @@ import { directionOf, isLiveCall, numberOf, outcomeOf, startOf } from './timelin
  * A row of «Недавние» (ADR-0137 §6 desktop 52 px, §7 phone 64 px): the party's circle with the
  * direction badge · the name (a missed call in red) with the company · the outcome line · the
  * time and ⓘ. Desktop: a click opens the detail on the right; «Позвонить» shows on hover / focus
- * when the number is an employee's (the internal call; the trunk call comes with T4). Phone: a
- * tap calls back (an employee) or opens the detail, a left swipe offers «Подробнее» · «Копировать»,
- * a long press the row's menu.
+ * (an employee — the internal call; a number — a personal call over the trunk with PLACE_CALLS).
+ * Phone: a tap calls back (iPhone «Недавние») or, when it cannot, opens the detail; a left swipe
+ * offers «Контакт» · «Копировать», a long press the row's menu.
  *
  * Re-renders: memo by id; the row subscribes to its own entry (a SIP_JOURNAL_ENTRY of another call
  * leaves it alone); a live call's timer and step are leaves.
@@ -51,7 +51,7 @@ export const RecentsRow = memo(function RecentsRow({ id, ws, phone }: { id: stri
 function DesktopRow({ e, ws, name, company }: { e: SipJournalEntry; ws: string; name: string; company: string }): ReactNode {
   const id = e.call?.id ?? '';
   const selected = useTelephonyUi((s) => s.detail === id);
-  const peer = internalPeer(e, ws);
+  const callable = useCallable(e, ws);
   return (
     <RowMenu e={e} ws={ws}>
       <div className={cx('group relative mx-2 flex h-[52px] items-center gap-3 rounded-[8px] px-2', selected ? 'bg-active' : 'hover:bg-row-hover')} data-testid="tel-row" data-call={id} data-selected={selected || undefined}>
@@ -59,7 +59,7 @@ function DesktopRow({ e, ws, name, company }: { e: SipJournalEntry; ws: string; 
         <PartyCircle e={e} ws={ws} name={name} size={32} ring="var(--color-bg)" />
         <RowText e={e} ws={ws} name={name} company={company} phone={false} />
         <span className="relative flex shrink-0 items-center gap-1">
-          {peer ? (
+          {callable ? (
             <IconButton label={t('tel.callName', { name })} onClick={() => callBack(e, ws)} className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 text-ok" data-testid="tel-row-call">
               <Phone className="size-4" aria-hidden />
             </IconButton>
@@ -74,9 +74,16 @@ function DesktopRow({ e, ws, name, company }: { e: SipJournalEntry; ws: string; 
   );
 }
 
+/** The row can be called back (an employee I may call, or a number with PLACE_CALLS). */
+function useCallable(e: SipJournalEntry, ws: string): boolean {
+  const place = usePlaceCalls(ws);
+  return !!internalPeer(e, ws) || (place && numberOf(e) !== '');
+}
+
 function PhoneRow({ e, ws, name, company }: { e: SipJournalEntry; ws: string; name: string; company: string }): ReactNode {
   const id = e.call?.id ?? '';
-  // A left swipe: «Подробнее» · «Копировать» (no delete: the journal is shared and serves as a record).
+  // A left swipe: «Контакт» · «Копировать» (no delete: the journal is shared and serves as a record);
+  // a hidden number: «Подробнее» only.
   const copy = numberOf(e) !== '';
   const swipe = useRowSwipe(true, copy ? 2 : 1);
   const shifted = swipe.offset !== 0;
@@ -229,20 +236,26 @@ function RowMenu({ e, ws, children }: { e: SipJournalEntry; ws: string; children
 
 function RowMenuItems({ e, ws }: { e: SipJournalEntry; ws: string }): ReactNode {
   const id = e.call?.id ?? '';
-  const peer = internalPeer(e, ws);
+  const callable = useCallable(e, ws);
+  const hasContact = !!e.contact?.id;
   // «Прослушать запись»: the list entry does not say whether a recording exists (and I may hear
   // it) — the menu (mounted only while open) asks the detail, cached for the detail screen too.
   const rec = useQuery({ queryKey: journalEntryKey(ws, id), queryFn: ({ signal }) => api.sip.journalEntry(ws, id, signal), enabled: !!id, select: (d) => d.recording }).data;
   return (
     <>
-      {peer ? (
-        <ContextMenu.Item className={menuItem} onSelect={() => callBack(e, ws)}>
+      {callable ? (
+        <ContextMenu.Item className={menuItem} onSelect={() => callBack(e, ws)} data-testid="tel-menu-call">
           <Phone className="size-4" aria-hidden /> {t('tel.call')}
         </ContextMenu.Item>
       ) : null}
       <ContextMenu.Item className={menuItem} onSelect={() => openCallDetail(id)} data-testid="tel-menu-details">
         <Info className="size-4" aria-hidden /> {t('tel.details')}
       </ContextMenu.Item>
+      {numberOf(e) ? (
+        <ContextMenu.Item className={menuItem} onSelect={() => openOrAddContact(e)} data-testid="tel-menu-contact">
+          {hasContact ? <UserRound className="size-4" aria-hidden /> : <UserRoundPlus className="size-4" aria-hidden />} {hasContact ? t('telc.openContact') : t('telc.addContact')}
+        </ContextMenu.Item>
+      ) : null}
       {rec ? (
         <ContextMenu.Item
           className={menuItem}
@@ -274,18 +287,33 @@ function SwipeActions({ e, width, close, copy }: { e: SipJournalEntry; width: nu
   const action = 'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 overflow-hidden px-1 text-center text-micro font-medium';
   return (
     <div className="absolute inset-y-0 right-0 flex overflow-hidden" style={{ width }} data-testid="tel-swipe">
-      <button
-        type="button"
-        className={cx(action, 'bg-accent-strong text-accent-fg')}
-        onClick={() => {
-          close();
-          openCallDetail(e.call?.id ?? '');
-        }}
-        data-testid="tel-swipe-details"
-      >
-        <Info className="size-4 shrink-0" aria-hidden />
-        <span className="line-clamp-2">{t('tel.details')}</span>
-      </button>
+      {copy ? (
+        <button
+          type="button"
+          className={cx(action, 'bg-accent-strong text-accent-fg')}
+          onClick={() => {
+            close();
+            openOrAddContact(e);
+          }}
+          data-testid="tel-swipe-contact"
+        >
+          {e.contact?.id ? <UserRound className="size-4 shrink-0" aria-hidden /> : <UserRoundPlus className="size-4 shrink-0" aria-hidden />}
+          <span className="line-clamp-2">{t('telc.contactShort')}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={cx(action, 'bg-accent-strong text-accent-fg')}
+          onClick={() => {
+            close();
+            openCallDetail(e.call?.id ?? '');
+          }}
+          data-testid="tel-swipe-details"
+        >
+          <Info className="size-4 shrink-0" aria-hidden />
+          <span className="line-clamp-2">{t('tel.details')}</span>
+        </button>
+      )}
       {copy ? (
         <button
           type="button"
