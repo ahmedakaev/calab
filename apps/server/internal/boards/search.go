@@ -291,7 +291,8 @@ func (s *Service) search(w http.ResponseWriter, r *http.Request) error {
 // SearchMatch is the task part of unified search (ADR-0062), shared by GET /api/search and
 // tasks/search: the condition over tasks t (JOIN boards b) — words of title and description
 // (searchq tsquery, simple config: tasks_search_idx), the title with typos or as a substring
-// (pg_trgm: tasks_title_trgm_idx), the key ABC-12 exactly, or a board key prefix (ABC) — and
+// (pg_trgm: tasks_title_trgm_idx), the key ABC-12 in any spelling (ParseLooseKey: abc12, abc 12, abc_12, the Russian layout; a bare
+// number 12 is the number on every board), or a board key prefix (ABC) — and
 // keyMatch, the exact-key condition ("false" when q is no key) that callers list first, and
 // rank, which adds its own parameters when called (after cond's, so that a count over cond
 // alone has no unused parameter): the best of ts_rank_cd and the title's word similarity, 0..1.
@@ -303,8 +304,8 @@ func SearchMatch(pq searchq.Query, raw string, a *Args) (cond, keyMatch string, 
 	}
 	keyMatch = "false"
 	raw = strings.TrimSpace(raw)
-	if k, n, ok := ParseKey(raw); ok {
-		keyMatch = "(t.number = " + a.Add(n) + " AND b.key = " + a.Add(k) + ")"
+	if kq, ok := ParseLooseKey(raw); ok {
+		keyMatch = kq.KeyMatchSQL(a)
 		parts = append(parts, keyMatch)
 	} else if keyRE.MatchString(strings.ToUpper(raw)) {
 		parts = append(parts, "b.key LIKE "+a.Add(strings.ToUpper(raw)+"%"))

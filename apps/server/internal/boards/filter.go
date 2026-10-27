@@ -207,8 +207,12 @@ func TextCondition(q string, a *Args) string {
 		SearchVector + " @@ plainto_tsquery('simple', " + a.Add(q) + ")",
 		"t.title ILIKE " + like,
 	}
-	if key, n, ok := ParseKey(q); ok {
-		parts = append(parts, "(t.number = "+a.Add(n)+" AND t.board_id IN (SELECT kb.id FROM boards kb WHERE kb.key = "+a.Add(key)+"))")
+	if kq, ok := ParseLooseKey(q); ok {
+		if len(kq.Prefixes) == 0 {
+			parts = append(parts, "t.number = "+a.Add(kq.Number))
+		} else {
+			parts = append(parts, "(t.number = "+a.Add(kq.Number)+" AND t.board_id IN (SELECT kb.id FROM boards kb WHERE kb.key = ANY("+a.Add(kq.Prefixes)+"::text[])))")
+		}
 	} else if keyRE.MatchString(strings.ToUpper(q)) {
 		parts = append(parts, "t.board_id IN (SELECT kb.id FROM boards kb WHERE kb.key LIKE "+a.Add(strings.ToUpper(q)+"%")+")")
 	}
