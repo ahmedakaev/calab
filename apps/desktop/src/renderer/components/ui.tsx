@@ -624,8 +624,8 @@ export function Row({ label, hint, children, htmlFor }: { label: string; hint?: 
         )}
         {hint ? <span className="text-caption text-faint">{hint}</span> : null}
       </div>
-      {/* Phone (ADR-0073 §6): a select / field takes its own full-width line under the label; a toggle or a button stays beside it. */}
-      <div className="flex shrink-0 items-center gap-2 mobile:max-w-full mobile:shrink mobile:has-[select,textarea,input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=button])]:w-full mobile:[&_select]:w-full mobile:[&_textarea]:w-full mobile:[&_input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=button])]:w-full">{children}</div>
+      {/* Phone (ADR-0073 §6): a select / field takes its own full-width line under the label (a field-like button too: `data-row-field`); a toggle or a button stays beside it. */}
+      <div className="flex shrink-0 items-center gap-2 mobile:max-w-full mobile:shrink mobile:has-[[data-row-field]]:w-full mobile:has-[select,textarea,input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=button])]:w-full mobile:[&_select]:w-full mobile:[&_textarea]:w-full mobile:[&_input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=button])]:w-full">{children}</div>
     </div>
   );
 }

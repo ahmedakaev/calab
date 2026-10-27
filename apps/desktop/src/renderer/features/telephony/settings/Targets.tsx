@@ -107,6 +107,7 @@ export function TargetField(props: TargetOptions & { value: string; onChange: (v
         className={cx('flex min-h-11 w-full min-w-0 items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-fill)] px-3 text-left text-list active:bg-[var(--color-fill-hover)]', props.value === 'missing' && 'text-danger-text')}
         data-testid={props.testId}
         data-value={props.value}
+        data-row-field
       >
         <span className="min-w-0 flex-1 truncate">{current}</span>
         <ChevronRight className="size-4 shrink-0 text-faint" aria-hidden />

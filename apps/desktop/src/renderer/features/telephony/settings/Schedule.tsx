@@ -388,6 +388,7 @@ function DayRow({
 /** The off-hours notice: ▶, its length, «Загрузить» / «Заменить», «Удалить» — saved at once over the saved schedule. */
 function NoticeRow({ workspaceId, settings }: { workspaceId: string; settings: SipSettings }): ReactNode {
   const qc = useQueryClient();
+  const phone = usePhoneSettings();
   const s = settings.schedule;
   const busy = usePromptUpload((x) => x.menuId === SCHEDULE_NOTICE);
   const pct = usePromptUpload((x) => (x.menuId === SCHEDULE_NOTICE ? x.pct : null));
@@ -421,8 +422,8 @@ function NoticeRow({ workspaceId, settings }: { workspaceId: string; settings: S
           inputTestId="tset-schedule-notice-file"
         />
         {ready ? (
-          <Button variant="ghost" size="sm" busy={clear.isPending} onClick={() => clear.mutate()} data-testid="tset-schedule-notice-remove">
-            {t('pbx.menu.noticeRemove')}
+          <Button variant={phone ? 'secondary' : 'ghost'} size="sm" busy={clear.isPending} onClick={() => clear.mutate()} data-testid="tset-schedule-notice-remove">
+            {t('tset.sched.noticeRemove')}
           </Button>
         ) : null}
       </div>

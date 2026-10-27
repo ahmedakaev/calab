@@ -103,7 +103,8 @@ export function TelSettingsPage({ workspaceId }: { workspaceId: string }): React
       <Bar className="px-4">
         <h2 className="min-w-0 flex-1 truncate text-headline font-semibold">{def ? t(def.label) : ''}</h2>
       </Bar>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* The grouped background of System Settings: the cards stand out in the light theme too. */}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--color-sheet-pane)]">
         <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-6 pb-10 pt-5" data-testid={`tel-settings-${page}`}>
           {body}
         </div>

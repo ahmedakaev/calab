@@ -64,6 +64,7 @@ export const zhTelephonySettings = {
   'tset.sched.offFooter': '例如转给前台机器人或“我们已下班”菜单。此类来电会作为未接来电留在记录中，方便回拨。',
   'tset.sched.notice': '之前播放的提示',
   'tset.sched.noticeHint': 'MP3、WAV 或 OGG，最大 10 MB、3 分钟。立即保存；没有文件则直接继续。',
+  'tset.sched.noticeRemove': '删除提示',
   'tset.sched.noticeSaved': '提示已保存',
   'tset.sched.open': '修改',
   'tset.sched.err.blank': '请填写开始和结束时间',

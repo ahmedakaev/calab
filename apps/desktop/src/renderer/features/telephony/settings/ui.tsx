@@ -140,11 +140,11 @@ export function DrillRow({ icon: Icon, label, value, sub, onOpen, testId, lead }
 }
 
 /** The plate of a phone list (the profile's settings list look). */
-export function DrillList({ children, testId, title }: { children: ReactNode; testId?: string; title?: string }): ReactNode {
+export function DrillList({ children, testId, title, label }: { children: ReactNode; testId?: string; title?: string; label?: string }): ReactNode {
   return (
     <section className="flex flex-col gap-1">
       {title ? <h2 className="px-1 text-micro font-semibold uppercase tracking-[0.04em] text-muted">{title}</h2> : null}
-      <ul className="overflow-hidden rounded-[var(--radius-panel)] bg-[var(--color-fill)]" data-testid={testId}>
+      <ul className="overflow-hidden rounded-[var(--radius-panel)] bg-[var(--color-fill)]" aria-label={label} data-testid={testId}>
         {children}
       </ul>
     </section>

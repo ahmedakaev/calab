@@ -64,6 +64,7 @@ export const enTelephonySettings = {
   'tset.sched.offFooter': 'For example, to a receptionist bot or a “We are closed” menu. Such a call shows in the log as missed so you can call back.',
   'tset.sched.notice': 'Message before that',
   'tset.sched.noticeHint': 'MP3, WAV or OGG up to 10 MB and 3 minutes. Saved at once; without a file the call goes on right away.',
+  'tset.sched.noticeRemove': 'Remove message',
   'tset.sched.noticeSaved': 'Message saved',
   'tset.sched.open': 'Edit',
   'tset.sched.err.blank': 'Set the start and the end',

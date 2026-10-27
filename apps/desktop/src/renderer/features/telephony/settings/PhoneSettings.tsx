@@ -35,7 +35,7 @@ export function PhoneTelSettings({ workspaceId, page }: { workspaceId: string; p
   if (!manage) return null;
   return (
     <PhoneSettingsProvider value>
-      <section className="mat-content flex min-h-0 flex-1 flex-col" data-testid="tel-phone-settings" data-page={page}>
+      <section className="flex min-h-0 flex-1 flex-col bg-[var(--color-sheet-pane)]" data-testid="tel-phone-settings" data-page={page}>
         <Screen workspaceId={workspaceId} page={page} />
       </section>
     </PhoneSettingsProvider>

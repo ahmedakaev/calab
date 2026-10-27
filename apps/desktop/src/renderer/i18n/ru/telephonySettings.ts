@@ -69,6 +69,7 @@ export const ruTelephonySettings = {
   'tset.sched.offFooter': 'Например, на бота-секретаря или в меню «Мы не работаем». Такой звонок попадёт в журнал как пропущенный, чтобы перезвонить.',
   'tset.sched.notice': 'Сообщение перед этим',
   'tset.sched.noticeHint': 'MP3, WAV или OGG до 10 МБ и 3 минут. Сохраняется сразу; без файла звонок сразу идёт дальше.',
+  'tset.sched.noticeRemove': 'Удалить сообщение',
   'tset.sched.noticeSaved': 'Сообщение сохранено',
   'tset.sched.open': 'Изменить',
   'tset.sched.err.blank': 'Укажите время начала и конца',

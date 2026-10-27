@@ -318,7 +318,7 @@ function PhoneList({
           {empty}
         </p>
       ) : (
-        <DrillList title={title} testId={testId}>
+        <DrillList testId={testId} label={title}>
           {children}
         </DrillList>
       )}
@@ -1584,6 +1584,7 @@ function PromptLine({
 /** A saved menu's greeting: listen, upload / replace (promptUpload.ts — progress, conversion), remove. */
 function PromptRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMenu }): ReactNode {
   const refresh = useRefresh(workspaceId);
+  const phone = usePhoneSettings();
   const busy = usePromptUpload((s) => s.menuId === menu.id);
   const pct = usePromptUpload((s) => (s.menuId === menu.id ? s.pct : null));
   const err = usePromptUpload((s) => (s.errMenu === menu.id ? s.err : ''));
@@ -1611,7 +1612,7 @@ function PromptRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMen
             inputTestId="sip-menu-prompt-file"
           />
           {ready ? (
-            <Button variant="ghost" size="sm" busy={clear.isPending} onClick={() => clear.mutate()}>
+            <Button variant={phone ? 'secondary' : 'ghost'} size="sm" busy={clear.isPending} onClick={() => clear.mutate()}>
               {t('pbx.menu.removePrompt')}
             </Button>
           ) : null}
@@ -1655,6 +1656,7 @@ function DraftPromptRow({ file, onFile }: { file: File | null; onFile: (f: File 
 /** A saved menu's recording notice (ADR-0131): listen, upload / replace, remove — like the greeting. */
 function NoticeRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMenu }): ReactNode {
   const refresh = useRefresh(workspaceId);
+  const phone = usePhoneSettings();
   const slot = promptSlot(menu.id, 'notice');
   const busy = usePromptUpload((s) => s.menuId === slot);
   const pct = usePromptUpload((s) => (s.menuId === slot ? s.pct : null));
@@ -1684,7 +1686,7 @@ function NoticeRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMen
             inputTestId="sip-menu-notice-file"
           />
           {ready ? (
-            <Button variant="ghost" size="sm" busy={clear.isPending} onClick={() => clear.mutate()} data-testid="sip-menu-notice-remove">
+            <Button variant={phone ? 'secondary' : 'ghost'} size="sm" busy={clear.isPending} onClick={() => clear.mutate()} data-testid="sip-menu-notice-remove">
               {t('pbx.menu.noticeRemove')}
             </Button>
           ) : null}
@@ -1920,7 +1922,6 @@ function KeyTile({ digit, value, warn, onOpen, targets }: { digit: string; value
     <button
       type="button"
       onClick={() => onOpen(digit)}
-      aria-label={`${t('pbx.menu.key', { key: digit })}: ${label}`}
       className={cx(
         'flex h-[72px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius-card)] bg-[var(--color-fill)] px-1.5 text-center active:bg-[var(--color-fill-hover)]',
         warn && 'ring-2 ring-inset ring-[var(--color-yellow)]',
@@ -1928,7 +1929,10 @@ function KeyTile({ digit, value, warn, onOpen, targets }: { digit: string; value
       data-testid={`sip-menu-key-${digit}`}
       data-value={value}
     >
-      <span className="text-title font-semibold leading-none tabular-nums">{digit}</span>
+      <span className="text-title font-semibold leading-none tabular-nums">
+        <span className="sr-only">{t('pbx.menu.key', { key: '' }).trim()} </span>
+        {digit}
+      </span>
       <span className={cx('line-clamp-2 max-w-full break-words text-caption leading-tight', value ? 'text-muted' : 'text-faint')}>{value ? label : '—'}</span>
     </button>
   );

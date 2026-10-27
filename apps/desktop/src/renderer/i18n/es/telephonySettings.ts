@@ -64,6 +64,7 @@ export const esTelephonySettings = {
   'tset.sched.offFooter': 'Por ejemplo, a un bot recepcionista o a un menú «Estamos cerrados». La llamada queda en el registro como perdida para devolverla.',
   'tset.sched.notice': 'Mensaje previo',
   'tset.sched.noticeHint': 'MP3, WAV u OGG de hasta 10 MB y 3 minutos. Se guarda al instante; sin archivo la llamada sigue enseguida.',
+  'tset.sched.noticeRemove': 'Quitar mensaje',
   'tset.sched.noticeSaved': 'Mensaje guardado',
   'tset.sched.open': 'Editar',
   'tset.sched.err.blank': 'Indique el inicio y el final',

@@ -56,7 +56,7 @@ export function ProfileExtension({ workspaceId, userId, extension }: { workspace
             type="button"
             onClick={() => void startCall(userId)}
             aria-label={t('tset.profile.call', { number: extension })}
-            className="min-w-0 text-accent-text tabular-nums hover:underline mobile:min-h-11"
+            className="min-w-0 text-left text-accent-text tabular-nums hover:underline mobile:min-h-11"
             data-testid="profile-extension-call"
           >
             {extension}
