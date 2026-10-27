@@ -84,6 +84,7 @@ func (s *Service) SetInbound(agent rtc.IVRAgent, cfg InboundConfig) {
 
 func (s *Service) inboundRoutes(mux httpx.Router, wrap func(http.Handler) http.Handler) {
 	mux.Handle("PUT /api/workspaces/{id}/sip/inbound", wrap(httpx.HandlerFunc(s.putInbound)))
+	mux.Handle("PUT /api/workspaces/{id}/sip/schedule", wrap(httpx.HandlerFunc(s.putSchedule)))
 	mux.Handle("POST /api/sip/inbound/{cid}/accept", wrap(httpx.HandlerFunc(s.acceptInbound)))
 	mux.Handle("POST /api/sip/inbound/{cid}/join", wrap(httpx.HandlerFunc(s.joinInbound)))
 	mux.Handle("POST /api/sip/inbound/{cid}/decline", wrap(httpx.HandlerFunc(s.declineInbound)))
@@ -97,8 +98,10 @@ func (s *Service) inboundReady() bool {
 
 // ---------------------------------------------------------------- settings
 
-// fillInbound adds the inbound part of the settings (the entry point resolved against ex).
+// fillInbound adds the inbound part of the settings (the entry point and its schedule resolved
+// against ex).
 func fillInbound(out *v1.SipSettings, a sqlc.SipAccount, ex *exchange) {
+	fillSchedule(out, a, ex)
 	out.InboundEnabled = a.InboundEnabled
 	out.InboundAllowedCidrs = a.InboundAllowedCidrs
 	if out.InboundAllowedCidrs == nil {
@@ -734,6 +737,7 @@ func nonNil(u []uuid.UUID) []uuid.UUID {
 func (s *Service) announce(ctx context.Context, row sqlc.SipCall, r *inRec, fx *Effects) {
 	// Caller ID (ADR-0137 §2): the contact or the employee the number is, as of now.
 	pb := FillCaller(pbconv.SipCall(row), s.callerOf(ctx, row.WorkspaceID, row.PeerE164))
+	pb.OffHours, pb.ViaFallback = r.OffHours, r.ViaFallback // why it rings who it rings (ADR-0138)
 	to := append(append([]uuid.UUID{}, fx.Stopped...), r.Ringing...)
 	if r.Answered != nil {
 		to = append(to, *r.Answered)
@@ -998,10 +1002,11 @@ func (s *Service) inboundJoined(ctx context.Context, wid uuid.UUID, room string,
 		return nil
 	}
 	entry := routeTarget(a.InboundKind, a.InboundMenuID, a.InboundExtensionID, a.InboundGroupID)
-	var pause int64 // digits pressed before the entry point began a number (ADR-0129)
+	sched := scheduleOf(a) // ADR-0138: checked once, now
+	var pause int64        // digits pressed before the entry point began a number (ADR-0129)
 	if err := s.withCall(ctx, id, func(r *inRec, e Env, fx *Effects) error {
 		r.log(e, started, fx)
-		r.Enter(e, entry, fx)
+		r.EnterEntry(e, entry, sched, fx)
 		if r.Phase == PhaseMenu && r.Digits != "" {
 			pause = r.Deadline
 		}

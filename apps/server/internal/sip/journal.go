@@ -210,6 +210,7 @@ var eventKindPB = map[EventKind]v1.SipCallEventKind{
 	EvTransferEnd: v1.SipCallEventKind_SIP_CALL_EVENT_KIND_TRANSFER_END, EvDialing: v1.SipCallEventKind_SIP_CALL_EVENT_KIND_DIALING,
 	EvProviderRinging: v1.SipCallEventKind_SIP_CALL_EVENT_KIND_PROVIDER_RINGING,
 	EvRecording:       v1.SipCallEventKind_SIP_CALL_EVENT_KIND_RECORDING, EvEnded: v1.SipCallEventKind_SIP_CALL_EVENT_KIND_ENDED,
+	EvSchedule: v1.SipCallEventKind_SIP_CALL_EVENT_KIND_SCHEDULE,
 }
 
 var targetKindPB = map[TargetKind]v1.SipCallTargetKind{

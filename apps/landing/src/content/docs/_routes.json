@@ -560,6 +560,7 @@
 {"method":"GET","path":"/api/workspaces/{id}/sip/journal/{cid}","decision":"allow","group":"workspaces"},
 {"method":"POST","path":"/api/workspaces/{id}/sip/journal/seen","decision":"allow","group":"workspaces"},
 {"method":"PUT","path":"/api/workspaces/{id}/sip/policy","decision":"allow","group":"workspaces"},
+{"method":"PUT","path":"/api/workspaces/{id}/sip/schedule","decision":"allow","group":"workspaces"},
 {"method":"POST","path":"/api/workspaces/{id}/sip/test","decision":"allow","group":"workspaces"},
 {"method":"POST","path":"/api/workspaces/{id}/smart-tasks","decision":"deny","group":"workspaces"},
 {"method":"GET","path":"/api/workspaces/{id}/users","decision":"allow","group":"workspaces"},

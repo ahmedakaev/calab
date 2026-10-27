@@ -453,6 +453,7 @@ var identityRoutes = map[string]identityScope{
 	"PUT /api/workspaces/{id}/sip/inbound":                                scopeWorkspace,
 	"PUT /api/workspaces/{id}/sip/recording":                              scopeWorkspace,
 	"PUT /api/workspaces/{id}/sip/policy":                                 scopeWorkspace,
+	"PUT /api/workspaces/{id}/sip/schedule":                               scopeWorkspace,
 	"GET /api/workspaces/{id}/sip/journal":                                scopeWorkspace,
 	"GET /api/workspaces/{id}/sip/journal/{cid}":                          scopeWorkspace,
 	"POST /api/workspaces/{id}/sip/journal/seen":                          scopeWorkspace,

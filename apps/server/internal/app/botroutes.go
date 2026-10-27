@@ -407,7 +407,7 @@ var botRouteGroups = []botRouteGroup{
 		"POST /api/boards/{id}/webhook/ping",
 		"PUT /api/boards/{id}/permissions",
 	}},
-	{access: botAllow, onBehalf: onBehalfClosed, why: "ADR-0109: workspace integrations by MANAGE_INTEGRATIONS — web apps (members read them), GPTunneL pairing, telephony settings and test (the provider password is never returned) and the exchange — internal numbers, groups, voice menus (ADR-0117; the list of numbers is open to every member but guests), the live calls (ADR-0128; numbers masked without VIEW_JOURNALS), the AI provider and its check (CBF-60; the key is never returned); the calls journal by VIEW_JOURNALS; the call journal of the telephony section (ADR-0137: the bot's own calls, all by VIEW_JOURNALS) and the telephony policy (retention, outbound limits; MANAGE_INTEGRATIONS)", routes: []string{
+	{access: botAllow, onBehalf: onBehalfClosed, why: "ADR-0109: workspace integrations by MANAGE_INTEGRATIONS — web apps (members read them), GPTunneL pairing, telephony settings and test (the provider password is never returned) and the exchange — internal numbers, groups, voice menus (ADR-0117; the list of numbers is open to every member but guests), the live calls (ADR-0128; numbers masked without VIEW_JOURNALS), the AI provider and its check (CBF-60; the key is never returned); the calls journal by VIEW_JOURNALS; the call journal of the telephony section (ADR-0137: the bot's own calls, all by VIEW_JOURNALS) and the telephony policy (retention, outbound limits; MANAGE_INTEGRATIONS); the working-hours schedule of the entry point (ADR-0138, MANAGE_INTEGRATIONS)", routes: []string{
 		"GET /api/workspaces/{id}/apps",
 		"POST /api/workspaces/{id}/apps",
 		"PATCH /api/workspace-apps/{appId}",
@@ -421,6 +421,7 @@ var botRouteGroups = []botRouteGroup{
 		"PUT /api/workspaces/{id}/sip/inbound",
 		"PUT /api/workspaces/{id}/sip/recording",
 		"PUT /api/workspaces/{id}/sip/policy",
+		"PUT /api/workspaces/{id}/sip/schedule",
 		"GET /api/workspaces/{id}/sip/journal",
 		"GET /api/workspaces/{id}/sip/journal/{cid}",
 		"POST /api/workspaces/{id}/sip/journal/seen",

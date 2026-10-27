@@ -97,6 +97,41 @@ message SipSettings {
   uint32 retention_months = 27;
   uint32 out_per_hour = 28;
   uint32 out_per_user_hour = 29;
+  // The working-hours schedule of the entry point (ADR-0138, PUT /api/workspaces/{id}/sip/schedule).
+  SipSchedule schedule = 30;
+}
+
+// One span of working time (ADR-0138): it starts on weekday at start_min minutes after midnight
+// and ends at end_min — the same day when end_min > start_min, the next day when end_min <
+// start_min (a night shift, 22:00–02:00 = 1320 → 120). Times are the schedule's time zone.
+message SipScheduleInterval {
+  uint32 weekday = 1;   // 1 = Monday … 7 = Sunday
+  uint32 start_min = 2; // 0..1439
+  uint32 end_min = 3;   // 1..1440 (1440 = midnight), never start_min
+}
+
+// The working-hours schedule of the inbound entry point (ADR-0138). Off: every inbound call
+// follows the entry point (inbound_target). On: a call that comes outside the working hours
+// follows off_hours instead — after the notice when one is uploaded (any route; a typical
+// one is «hang up» with a message). Checked once, when the call comes in.
+message SipSchedule {
+  bool enabled = 1;
+  string time_zone = 2; // IANA zone; empty in requests = Europe/Moscow
+  // At most 6 intervals starting on one weekday, none overlapping (a night shift counts into the
+  // next day, Sunday's into Monday). Enabled needs at least one.
+  repeated SipScheduleInterval hours = 3;
+  // The Russian production calendar (the table of ADR-0136): a weekday off (a public holiday, a
+  // moved day off) has no working hours; a working Saturday / Sunday works by its own hours, or —
+  // without them — by the first weekday Monday–Friday that has some. Years the table lacks: as
+  // without the calendar.
+  bool production_calendar_ru = 4;
+  // Where an off-hours call goes: a menu, a person or a bot (EXTENSION), a group, or HANGUP
+  // (SipCall.reason "off_hours"); REPEAT is refused. missing: the object was deleted (the call
+  // hangs up).
+  SipRouteTarget off_hours = 5;
+  // Output only: the notice played to an off-hours call before its route (empty = none).
+  string notice_file_id = 6;
+  uint32 notice_duration_ms = 7;
 }
 
 // How inbound calls reach the server (ADR-0121). UNSPECIFIED in PutSipInboundRequest = keep the
@@ -244,7 +279,8 @@ message SipCall {
   // Inbound calls (direction IN, ADR-0117). number is the caller's number; status is RINGING
   // from the moment the line got in (menu and ringing alike) until somebody answers (ACTIVE).
   // More reasons: "hangup_menu" (a route to «hang up»), "no_input", "no_answer", "no_members",
-  // "loop", "declined" (everybody who rang declined), FAILED "busy_limit", "agent_unavailable",
+  // "loop", "declined" (everybody who rang declined), "off_hours" (outside the schedule's working
+  // hours, its route is «hang up», ADR-0138), FAILED "busy_limit", "agent_unavailable",
   // "plan", "disabled".
   string answered_by = 14;               // the user who took the call
   string route = 15;                     // the path for the journal: «menu:<id>/2 → group:<id>»
@@ -265,6 +301,14 @@ message SipCall {
   string caller_user_id = 22;
   // Where the call comes from (personal: a call from the telephony section, no room).
   SipCallOrigin origin = 23;
+  // Inbound calls, output only (SIP_INBOUND_RING, SIP_CALL_UPDATE; ADR-0138) — why the call
+  // rings who it rings: off_hours = it came outside the working hours of the schedule and
+  // follows its off-hours route; via_fallback = the current route was reached through a group's
+  // fallback (ADR-0124: nobody answered in time, everybody busy or declined). Neither: the
+  // regular route (the entry point in working hours, a menu key, a dialed number). Both: an
+  // off-hours route whose group fell back.
+  bool off_hours = 24;
+  bool via_fallback = 25;
 }
 
 // POST /api/rooms/{id}/calls (PLACE_CALLS + VIEW_ROOM + CONNECT in the room, not a guest; a
@@ -749,7 +793,9 @@ enum SipCallEventKind {
   SIP_CALL_EVENT_KIND_KEY = 3;      // the caller pressed digits; reason "invalid": the menu has no such key
   SIP_CALL_EVENT_KIND_DIALED = 4;   // the caller dialed an internal number digits; reason "found" / "not_found"
   SIP_CALL_EVENT_KIND_NO_INPUT = 5; // the menu got no key in time
-  SIP_CALL_EVENT_KIND_NOTICE = 6;   // the recording notice of target (a menu) plays (ADR-0131)
+  // The recording notice of target (a menu) plays (ADR-0131); reason "off_hours", no target: the
+  // schedule's off-hours notice (ADR-0138).
+  SIP_CALL_EVENT_KIND_NOTICE = 6;
   // A group takes the call: target = the group, reason "ring_all" / "round_robin".
   SIP_CALL_EVENT_KIND_GROUP = 7;
   // user_id's devices start ringing: target = the group, or the number (extension) rung.
@@ -772,6 +818,10 @@ enum SipCallEventKind {
   SIP_CALL_EVENT_KIND_RECORDING = 16;
   // The end: reason = SipCall.reason; user_id = the member who hung up (empty: the caller or the system).
   SIP_CALL_EVENT_KIND_ENDED = 17;
+  // The schedule (ADR-0138): reason "off_hours" — the call came outside the working hours;
+  // target = the off-hours route (empty: hang up). A NOTICE with reason "off_hours" (no
+  // target) follows when the schedule has a notice.
+  SIP_CALL_EVENT_KIND_SCHEDULE = 18;
 }
 
 enum SipCallTargetKind {
@@ -848,6 +898,23 @@ message GetSipJournalEntryResponse {
   SipJournalEntry entry = 1;
   repeated SipCallEvent events = 2; // in order
   SipJournalRecording recording = 3;
+}
+
+// PUT /api/workspaces/{id}/sip/schedule (MANAGE_INTEGRATIONS, the telephony plan; the provider
+// settings saved first, else 409 CONFLICT) → 200 PutSipScheduleResponse: the working-hours
+// schedule of the entry point (ADR-0138), replaced as a whole. 422 VALIDATION: field
+// "timeZone" (not an IANA zone), "hours" (out of range, overlapping, more than 6 a day, none
+// while enabled), "offHours" (unknown target, REPEAT), "noticeSourceFileId" (as a menu's
+// prompt: the caller's own upload, MP3 / Ogg / WAV up to 3 minutes).
+message PutSipScheduleRequest {
+  SipSchedule schedule = 1; // notice_file_id / notice_duration_ms are ignored
+  // The off-hours notice: unset = keep it, "" = remove it, an id = the caller's upload,
+  // converted like a menu's prompt.
+  optional string notice_source_file_id = 2;
+}
+
+message PutSipScheduleResponse {
+  SipSettings settings = 1;
 }
 
 message PutSipPolicyRequest {
