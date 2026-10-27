@@ -80,6 +80,18 @@ test('mail-folders', async ({ open, win, shot }) => {
   await expect(win.getByTestId('mail-row').first()).toBeVisible();
   await checkpoint(shot, 'mail-smart-list');
 
+  // #94: search by an address / name, Outlook-like: To / Cc count, ё = е, every folder of the account
+  // is searched and each row says which one it lives in.
+  await sidebar.getByTestId('mail-sidebar-account').first().getByTestId('mail-sidebar-row').first().click();
+  await win.getByTestId('mail-search').fill('d.volkov@');
+  const hits = win.getByTestId('mail-row');
+  await expect(win.getByTestId('mail-row-folder').first()).toBeVisible();
+  expect(await hits.count()).toBeGreaterThan(1);
+  await checkpoint(shot, 'mail-search-address');
+  await win.getByTestId('mail-search').fill('Волков');
+  await expect(hits.first()).toBeVisible();
+  await win.getByTestId('mail-search').fill('');
+
   // Settings → «Почта»: the folder and rule rows stack (title, controls, hint under them).
   await win.getByRole('button', { name: 'Настройки', exact: true }).click();
   const settings = win.getByRole('dialog');
