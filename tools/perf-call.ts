@@ -25,6 +25,10 @@
  * `--boards`: the kanban (ADR-0042) open during the call; Борис renames CAL-2 every 3 s (TASK_UPDATE to
  * the board): one TaskCard per event should render.
  *
+ * `--telephony`: «Телефония → Недавние» (ADR-0137) open, without a voice call; every 3 s a journal event
+ * (SIP_JOURNAL_ENTRY): a new call rings me, it is answered, it ends — in turn. One RecentsRow per
+ * event should render (a new row: the list too); without live calls the section runs no timer.
+ *
  * `--dm-call`: a one-to-one call instead (ADR-0034): Борис calls, I accept in his DM (open, with the
  * «Звонок · 00:42» header timer and the island); the same live events, typing and the voice state
  * in that DM.
@@ -114,6 +118,8 @@ const FINDTIME = argv.includes('--findtime');
 const CALENDAR = argv.includes('--calendar') || FINDTIME;
 /** `--boards`: the kanban (ADR-0042) open during the call; another user renames a task every 3 s (TASK_UPDATE). */
 const BOARDS = argv.includes('--boards');
+/** `--telephony`: «Недавние» open during the call; a journal event every 3 s (SIP_JOURNAL_ENTRY). */
+const TELEPHONY = argv.includes('--telephony');
 /** `--viewer` (K): a second participant watches my camera at full size, so the encoder runs (dynacast). */
 const VIEWER = argv.includes('--viewer') || BENCH === 'F';
 /** F: what the stream shows — a still code page or one scrolling 30×/s. */
@@ -503,7 +509,7 @@ async function main(): Promise<void> {
       await page.getByTestId('call-accept').click();
       await page.getByTestId('dm-call-active').waitFor({ timeout: 15_000 });
       await page.getByText('Голос подключён').first().waitFor({ timeout: 30_000 });
-    } else {
+    } else if (!TELEPHONY) {
       await aside.getByRole('button', { name: /Созвон/ }).first().click();
       await page.getByText('Голос подключён').first().waitFor({ timeout: 30_000 });
       await aside.getByRole('button', { name: /общий/ }).first().click();
@@ -538,7 +544,16 @@ async function main(): Promise<void> {
       await page.getByTestId('kanban').waitFor({ timeout: 15_000 });
       await page.getByTestId('task-card').first().waitFor({ timeout: 15_000 });
     }
-    await page.getByRole('button', { name: /^Качество связи/ }).first().waitFor({ timeout: 15_000 });
+    if (TELEPHONY) {
+      mock.seedSipExchange();
+      mock.seedSipJournal({ base: Date.now() });
+      // The fixture's ringing call ends first: the section then has no live call (no timer).
+      mock.advanceSipJournal();
+      await page.getByTestId('section-telephony').click();
+      await page.getByTestId('tel-row').first().waitFor({ timeout: 15_000 });
+    }
+    // «--telephony» measures the section alone (no voice call: ADR-0137 §8 «открытый раздел без звонков»).
+    if (!TELEPHONY) await page.getByRole('button', { name: /^Качество связи/ }).first().waitFor({ timeout: 15_000 });
     // Musician mode is per call (not persisted, ADR-0052): turned on from the voice panel's «…».
     if (MUSICIAN) {
       await page.getByRole('button', { name: 'Ещё', exact: true }).last().click();
@@ -636,6 +651,18 @@ async function main(): Promise<void> {
         const cal2 = mock.boards.taskByKey('CAL-2')?.task.id ?? '';
         let n = 0;
         timers.push(setInterval(() => mock.updateTaskAs(IDS.users.boris, cal2, { title: `Тёмная тема ${++n}` }), 3000));
+      }
+      if (TELEPHONY) {
+        let step = 0;
+        let call = '';
+        timers.push(
+          setInterval(() => {
+            const k = step++ % 3;
+            if (k === 0) call = mock.ringSipJournal('+79160000000', [IDS.users.anna]);
+            else if (k === 1) mock.advanceSipJournal(call, IDS.users.anna);
+            else mock.advanceSipJournal(call);
+          }, 3000),
+        );
       }
     }
     // A real remote speaker: Chromium's fake microphone beeps once a second, so LiveKit's active
