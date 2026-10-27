@@ -52,6 +52,7 @@ import { zhTelephony } from './telephony';
 import { zhTelephonyContacts } from './telephonyContacts';
 import { zhAi } from './ai';
 import { zhSmartTask } from './smartTask';
+import { zhTaskSearch } from './taskSearch';
 import { zhWebApps } from './webapps';
 
 /** Simplified Chinese UI strings (ADR-0022): same keys and placeholders as `ru`/`en`; glossary docs/i18n-glossary.md. */
@@ -75,6 +76,7 @@ export const zhCN: Dict = {
   ...zhTelephonyContacts,
   ...zhAi,
   ...zhSmartTask,
+  ...zhTaskSearch,
   ...zhWebApps,
   ...zhDm,
   ...zhNotes,

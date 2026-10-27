@@ -35,6 +35,7 @@ import { GROUP_LABEL, GroupChevron, ROW_HOVER } from '../shell/ColumnHeader';
 import { menuBox, menuItem, menuSeparator } from '../shell/menu';
 import { hasBit, settingsEntryTab, MANAGE_BOARD } from './model';
 import { useFeatureOn } from './useBoardView';
+import { SavedSearchRows } from './SavedSearches';
 
 /**
  * The room column in boards mode (ADR-0042 §5, ADR-0058 §1): «Мои задачи» on top, the
@@ -173,6 +174,7 @@ export function BoardsList({ workspaceId }: { workspaceId: string }): ReactNode 
       data-testid="boards-list"
     >
       <MyTasksRow workspaceId={workspaceId} />
+      <SavedSearchRows workspaceId={workspaceId} />
       <div className="flex h-9 items-center pl-2 pr-1 pt-2 mobile:h-11 mobile:px-3">
         <h2 className={cx('min-w-0 flex-1 truncate', GROUP_LABEL)}>{t('boards.boards')}</h2>
       </div>

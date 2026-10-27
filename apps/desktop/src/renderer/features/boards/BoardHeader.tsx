@@ -17,6 +17,7 @@ import { prefsOf, useBoardsUi, type BoardPrefs, type GroupBy, type SortBy, type 
 import { myUserId } from '../../stores/session';
 import { menuBox, menuItem, menuLabel, menuSeparator } from '../shell/menu';
 import { FilterButton } from './FilterBar';
+import { BoardSearchField } from './TaskSearch';
 import { exportCsv } from './exportCsv';
 import { hasBit, settingsEntryTab, CREATE_TASKS, MANAGE_BOARD } from './model';
 import { useDisabledFeatures, useFeatureOn, useMatchCtx, useViewKind } from './useBoardView';
@@ -65,6 +66,7 @@ export function BoardHeader({ boardId, workspaceId }: { boardId: string; workspa
         {mobile ? null : <span className="flex-1" />}
         {mobile ? null : (
           <>
+            <BoardSearchField boardId={boardId} />
             <FilterButton boardId={boardId} workspaceId={workspaceId} bar />
             <SortMenu boardId={boardId} />
             <DisplayMenu boardId={boardId} />
@@ -92,6 +94,7 @@ export function BoardHeader({ boardId, workspaceId }: { boardId: string; workspa
           <DisplayMenu boardId={boardId} open={displayOpen} onOpenChange={setDisplayOpen} />
           <div className="relative">
             <div className="flex h-12 min-w-0 items-center gap-1.5 overflow-x-auto pl-4 [scrollbar-width:none]" data-testid="filter-row">
+              <BoardSearchField boardId={boardId} phone />
               <FilterButton boardId={boardId} workspaceId={workspaceId} />
               <span className="h-4 w-px shrink-0 bg-line" aria-hidden />
               <BoardCompletion boardId={boardId} />

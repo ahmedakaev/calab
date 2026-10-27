@@ -52,6 +52,7 @@ import { esTelephony } from './telephony';
 import { esTelephonyContacts } from './telephonyContacts';
 import { esAi } from './ai';
 import { esSmartTask } from './smartTask';
+import { esTaskSearch } from './taskSearch';
 import { esWebApps } from './webapps';
 
 /** Spanish UI strings (ADR-0022): same keys and placeholders as `ru`/`en`; glossary docs/i18n-glossary.md. */
@@ -75,6 +76,7 @@ export const es: Dict = {
   ...esTelephonyContacts,
   ...esAi,
   ...esSmartTask,
+  ...esTaskSearch,
   ...esWebApps,
   ...esDm,
   ...esNotes,
