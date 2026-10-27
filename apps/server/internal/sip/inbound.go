@@ -17,6 +17,7 @@ import (
 	"github.com/redis/rueidis"
 
 	v1 "github.com/calaba/calaba/server/gen/calaba/v1"
+	"github.com/calaba/calaba/server/internal/auth"
 	"github.com/calaba/calaba/server/internal/blob"
 	"github.com/calaba/calaba/server/internal/calls"
 	"github.com/calaba/calaba/server/internal/db"
@@ -467,7 +468,7 @@ type inRec struct {
 
 func inKey(id uuid.UUID) string     { return redisx.Key("sipin:" + id.String()) }
 func inDueKey() string              { return redisx.Key("sipin:due") }
-func inUserKey(u uuid.UUID) string  { return redisx.Key("sipin:user:" + u.String()) }
+func inUserKey(u uuid.UUID) string  { return calls.PhoneBusyKey(u) }
 func inLockKey(id uuid.UUID) string { return redisx.Key("sipin:lock:" + id.String()) }
 
 // presenceKey is the gateway's per-user presence hash (gateway/presence.go presKey): one field
@@ -731,14 +732,8 @@ func nonNil(u []uuid.UUID) []uuid.UUID {
 // announce: SIP_INBOUND_RING to who started ringing, SIP_CALL_UPDATE to everybody else the call
 // concerns (stopped ringing, still ringing, answered) on their user channels.
 func (s *Service) announce(ctx context.Context, row sqlc.SipCall, r *inRec, fx *Effects) {
-	pb := pbconv.SipCall(row)
-	for _, u := range fx.Rings {
-		s.events.User(ctx, u, &v1.DispatchEvent{Event: &v1.DispatchEvent_SipInboundRing{SipInboundRing: &v1.SipInboundRing{Call: pb}}})
-	}
-	seen := map[uuid.UUID]bool{}
-	for _, u := range fx.Rings {
-		seen[u] = true
-	}
+	// Caller ID (ADR-0137 §2): the contact or the employee the number is, as of now.
+	pb := FillCaller(pbconv.SipCall(row), s.callerOf(ctx, row.WorkspaceID, row.PeerE164))
 	to := append(append([]uuid.UUID{}, fx.Stopped...), r.Ringing...)
 	if r.Answered != nil {
 		to = append(to, *r.Answered)
@@ -748,12 +743,26 @@ func (s *Service) announce(ctx context.Context, row sqlc.SipCall, r *inRec, fx *
 	if fx.Hangup != "" && r.Handover != nil {
 		to = append(to, *r.Handover)
 	}
+	bots := s.botsAmong(ctx, pb, append(append([]uuid.UUID{}, fx.Rings...), to...))
+	callFor := func(u uuid.UUID) *v1.SipCall {
+		if bots[u] {
+			return forBot(pb)
+		}
+		return pb
+	}
+	for _, u := range fx.Rings {
+		s.events.User(ctx, u, &v1.DispatchEvent{Event: &v1.DispatchEvent_SipInboundRing{SipInboundRing: &v1.SipInboundRing{Call: callFor(u)}}})
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, u := range fx.Rings {
+		seen[u] = true
+	}
 	for _, u := range to {
 		if seen[u] {
 			continue
 		}
 		seen[u] = true
-		s.events.User(ctx, u, &v1.DispatchEvent{Event: &v1.DispatchEvent_SipCallUpdate{SipCallUpdate: &v1.SipCallUpdate{Call: pb}}})
+		s.events.User(ctx, u, &v1.DispatchEvent{Event: &v1.DispatchEvent_SipCallUpdate{SipCallUpdate: &v1.SipCallUpdate{Call: callFor(u)}}})
 	}
 }
 
@@ -1265,7 +1274,11 @@ func (s *Service) acceptInbound(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	httpx.Write(w, http.StatusOK, &v1.SipInboundAcceptResponse{Call: pbconv.SipCall(row), Join: join})
+	pb := FillCaller(pbconv.SipCall(row), s.callerOf(ctx, row.WorkspaceID, row.PeerE164))
+	if auth.MustFromContext(ctx).IsBot {
+		pb = forBot(pb)
+	}
+	httpx.Write(w, http.StatusOK, &v1.SipInboundAcceptResponse{Call: pb, Join: join})
 	return nil
 }
 

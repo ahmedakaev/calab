@@ -4441,7 +4441,7 @@ func (x *SipCallParty) GetTransferred() bool {
 	return false
 }
 
-// A contact of the workspace's phone book (T2); unset until then.
+// A contact of the workspace's phone book (ADR-0137 §2).
 type SipContactRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -4508,8 +4508,8 @@ type SipJournalEntry struct {
 	Call         *SipCall               `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
 	Origin       SipCallOrigin          `protobuf:"varint,2,opt,name=origin,proto3,enum=calaba.v1.SipCallOrigin" json:"origin,omitempty"`
 	PeerE164     string                 `protobuf:"bytes,3,opt,name=peer_e164,json=peerE164,proto3" json:"peer_e164,omitempty"`               // the outside party's number, E.164; empty: not a number (hidden)
-	Contact      *SipContactRef         `protobuf:"bytes,4,opt,name=contact,proto3" json:"contact,omitempty"`                                 // the contact of peer_e164 (T2), names as of now
-	MemberUserId string                 `protobuf:"bytes,5,opt,name=member_user_id,json=memberUserId,proto3" json:"member_user_id,omitempty"` // peer_e164 is an employee's phone (T2)
+	Contact      *SipContactRef         `protobuf:"bytes,4,opt,name=contact,proto3" json:"contact,omitempty"`                                 // the contact of peer_e164, names as of now
+	MemberUserId string                 `protobuf:"bytes,5,opt,name=member_user_id,json=memberUserId,proto3" json:"member_user_id,omitempty"` // peer_e164 is an employee's profile phone (never to bots)
 	// Waiting: from the start to the answer (menu and ringing), for a call nobody answered to its
 	// end; talking: from the answer to the end (0 while live or never answered).
 	WaitMs uint32 `protobuf:"varint,6,opt,name=wait_ms,json=waitMs,proto3" json:"wait_ms,omitempty"`
@@ -4799,7 +4799,7 @@ func (x *GetSipJournalEntryResponse) GetRecording() *SipJournalRecording {
 type PutSipPolicyRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// How long calls are kept: 1, 3, 6, 12, 24 or 36 months (0 = 12). Older calls are deleted
-	// within an hour (contacts, T2: those without calls and edits in the period).
+	// within an hour (contacts: those without calls and edits in the period).
 	RetentionMonths uint32 `protobuf:"varint,1,opt,name=retention_months,json=retentionMonths,proto3" json:"retention_months,omitempty"`
 	OutPerHour      uint32 `protobuf:"varint,2,opt,name=out_per_hour,json=outPerHour,proto3" json:"out_per_hour,omitempty"`               // outbound calls per hour of the workspace, 1..1000 (0 = 120)
 	OutPerUserHour  uint32 `protobuf:"varint,3,opt,name=out_per_user_hour,json=outPerUserHour,proto3" json:"out_per_user_hour,omitempty"` // outbound calls per hour of one member, 1..1000 (0 = 30)

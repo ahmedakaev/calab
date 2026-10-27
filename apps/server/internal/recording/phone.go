@@ -174,9 +174,11 @@ func (s *Service) startPhone(ctx context.Context, id uuid.UUID) {
 		return
 	}
 	in := call.Direction == "in"
+	// Inbound and personal calls (ADR-0137 §3) have rooms of their own (lk_room): only the two
+	// sides are recorded; a room's call records the voice room.
 	room := call.LkRoom
-	if !in {
-		if call.RoomID == nil {
+	if room == "" {
+		if in || call.RoomID == nil {
 			return // the connection test
 		}
 		room = voice.RoomName(call.WorkspaceID, *call.RoomID)

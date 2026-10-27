@@ -2106,7 +2106,7 @@ export const SipCallPartySchema: GenMessage<SipCallParty> = /*@__PURE__*/
   messageDesc(file_calaba_v1_sip, 43);
 
 /**
- * A contact of the workspace's phone book (T2); unset until then.
+ * A contact of the workspace's phone book (ADR-0137 §2).
  *
  * @generated from message calaba.v1.SipContactRef
  */
@@ -2158,14 +2158,14 @@ export type SipJournalEntry = Message<"calaba.v1.SipJournalEntry"> & {
   peerE164: string;
 
   /**
-   * the contact of peer_e164 (T2), names as of now
+   * the contact of peer_e164, names as of now
    *
    * @generated from field: calaba.v1.SipContactRef contact = 4;
    */
   contact?: SipContactRef | undefined;
 
   /**
-   * peer_e164 is an employee's phone (T2)
+   * peer_e164 is an employee's profile phone (never to bots)
    *
    * @generated from field: string member_user_id = 5;
    */
@@ -2300,7 +2300,7 @@ export const GetSipJournalEntryResponseSchema: GenMessage<GetSipJournalEntryResp
 export type PutSipPolicyRequest = Message<"calaba.v1.PutSipPolicyRequest"> & {
   /**
    * How long calls are kept: 1, 3, 6, 12, 24 or 36 months (0 = 12). Older calls are deleted
-   * within an hour (contacts, T2: those without calls and edits in the period).
+   * within an hour (contacts: those without calls and edits in the period).
    *
    * @generated from field: uint32 retention_months = 1;
    */

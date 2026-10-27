@@ -714,7 +714,7 @@ message SipCallsChanged {
 // VIEW_JOURNALS → 403; user (an employee's calls) only with scope=all. filter=missed: missed
 // calls (SipJournalEntry.missed; with scope=mine or user: missed calls that rang that person).
 // q: its digits match a part of the number; a text without digits matches contacts by name or
-// company (T2; until then nothing). 422 VALIDATION for a bad scope / filter / user / time /
+// company (their numbers). 422 VALIDATION for a bad scope / filter / user / time /
 // cursor / limit. A page may hold fewer entries than limit while next_cursor is set (calls of
 // rooms the reader cannot view are skipped).
 //
@@ -726,7 +726,7 @@ message SipCallsChanged {
 //
 // PUT /api/workspaces/{id}/sip/policy (MANAGE_INTEGRATIONS, the telephony plan; the provider
 // settings saved first, else 409 CONFLICT) → 200 PutSipPolicyResponse: how long the journal (and
-// the contacts, T2) are kept and the outbound limits. 422 VALIDATION retentionMonths /
+// the contacts) are kept and the outbound limits. 422 VALIDATION retentionMonths /
 // outPerHour / outPerUserHour.
 
 // Where a call comes from.
@@ -807,7 +807,7 @@ message SipCallParty {
   bool transferred = 5; // handed it over
 }
 
-// A contact of the workspace's phone book (T2); unset until then.
+// A contact of the workspace's phone book (ADR-0137 §2).
 message SipContactRef {
   string id = 1;
   string name = 2;
@@ -819,8 +819,8 @@ message SipJournalEntry {
   SipCall call = 1;
   SipCallOrigin origin = 2;
   string peer_e164 = 3;      // the outside party's number, E.164; empty: not a number (hidden)
-  SipContactRef contact = 4; // the contact of peer_e164 (T2), names as of now
-  string member_user_id = 5; // peer_e164 is an employee's phone (T2)
+  SipContactRef contact = 4; // the contact of peer_e164, names as of now
+  string member_user_id = 5; // peer_e164 is an employee's profile phone (never to bots)
   // Waiting: from the start to the answer (menu and ringing), for a call nobody answered to its
   // end; talking: from the answer to the end (0 while live or never answered).
   uint32 wait_ms = 6;
@@ -852,7 +852,7 @@ message GetSipJournalEntryResponse {
 
 message PutSipPolicyRequest {
   // How long calls are kept: 1, 3, 6, 12, 24 or 36 months (0 = 12). Older calls are deleted
-  // within an hour (contacts, T2: those without calls and edits in the period).
+  // within an hour (contacts: those without calls and edits in the period).
   uint32 retention_months = 1;
   uint32 out_per_hour = 2;      // outbound calls per hour of the workspace, 1..1000 (0 = 120)
   uint32 out_per_user_hour = 3; // outbound calls per hour of one member, 1..1000 (0 = 30)
