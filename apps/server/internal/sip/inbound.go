@@ -657,7 +657,6 @@ func (s *Service) apply(ctx context.Context, r *inRec, fx *Effects) error {
 	}
 	if fx.Answered && r.Answered != nil {
 		s.onCall(ctx, *r.Answered, r.ID, true)
-		s.recConnected(ctx, r.ID) // ADR-0131: recorded from the answer, not during the menu
 	}
 	s.applyTransfer(ctx, r, fx)
 	if fx.Advance != nil {
@@ -667,37 +666,57 @@ func (s *Service) apply(ctx context.Context, r *inRec, fx *Effects) error {
 			slog.WarnContext(ctx, "sip: round-robin pointer", "group", fx.Advance.Group, "err", err)
 		}
 	}
+	// The journal (ADR-0137 §1): the transition's events and parties go with the row, in one
+	// transaction, before the state is saved — a retried transition repeats the same seq.
+	evs := fx.Events
+	for i := range evs {
+		if evs[i].Kind == EvEnded && r.EndedBy != nil {
+			by := *r.EndedBy
+			evs[i].User = &by
+		}
+	}
 	var row sqlc.SipCall
 	var err error
 	switch {
 	case fx.Hangup != "":
-		row, err = db.GuardValue(ctx, s.db, func(q *sqlc.Queries) (sqlc.SipCall, error) {
+		row, err = s.journalTx(ctx, r.ID, evs, func(q *sqlc.Queries) (sqlc.SipCall, error) {
 			return q.FinishSipCall(ctx, sqlc.FinishSipCallParams{ID: r.ID, Status: pbconv.SipEnded, Reason: fx.Hangup, EndedBy: r.EndedBy})
 		})
 		s.recEnded(ctx, r.ID) // ADR-0131: after the row is final (a starting recording sees the end)
 		slog.InfoContext(ctx, "sip: inbound call ended", "call", r.ID, "reason", fx.Hangup, "route", strings.Join(r.Route, " → "))
 	case fx.Changed && !fx.Answered && (fx.Xfer || r.Xfer != nil): // a transfer rings / ended (ADR-0132)
-		row, err = db.GuardValue(ctx, s.db, func(q *sqlc.Queries) (sqlc.SipCall, error) {
+		row, err = s.journalTx(ctx, r.ID, evs, func(q *sqlc.Queries) (sqlc.SipCall, error) {
 			return q.UpdateSipInboundTransfer(ctx, sqlc.UpdateSipInboundTransferParams{ID: r.ID, RingingUserIds: nonNil(r.Ringing),
 				Route: clip(strings.Join(r.Route, " → "), 500)})
 		})
 	case fx.Changed && r.Phase != PhaseActive:
-		row, err = db.GuardValue(ctx, s.db, func(q *sqlc.Queries) (sqlc.SipCall, error) {
+		row, err = s.journalTx(ctx, r.ID, evs, func(q *sqlc.Queries) (sqlc.SipCall, error) {
 			return q.UpdateSipInboundRinging(ctx, sqlc.UpdateSipInboundRingingParams{ID: r.ID, RingingUserIds: nonNil(r.Ringing),
 				Route: clip(strings.Join(r.Route, " → "), 500), Via: clip(r.Via, 64)})
 		})
 	case !fx.Answered && len(fx.Rings) == 0 && len(fx.Stopped) == 0:
 		// Nothing anybody sees changed (a group's look for free members found nobody, the
 		// prompt played): no journal read, no SIP_CALL_UPDATE.
+		if len(evs) > 0 {
+			if _, err := s.journalTx(ctx, r.ID, evs, nil); err != nil {
+				slog.WarnContext(ctx, "sip: inbound journal events", "call", r.ID, "err", err)
+			}
+		}
 		return s.saveRec(ctx, r)
 	default:
-		row, err = s.db.Q.GetSipCall(ctx, r.ID)
+		row, err = s.journalTx(ctx, r.ID, evs, func(q *sqlc.Queries) (sqlc.SipCall, error) { return q.GetSipCall(ctx, r.ID) })
+	}
+	if fx.Answered && r.Answered != nil {
+		// ADR-0131: recorded from the answer, not during the menu — after this transition's
+		// writes, so the recorder's own transaction never overlaps one of the request's.
+		s.recConnected(ctx, r.ID)
 	}
 	if err != nil && !db.IsNotFound(err) {
 		slog.WarnContext(ctx, "sip: inbound journal row", "call", r.ID, "err", err)
 	}
 	if err == nil {
 		s.announce(ctx, row, r, fx)
+		s.journalChanged(ctx, row, evs)
 	}
 	return s.saveRec(ctx, r)
 }
@@ -842,16 +861,16 @@ func (s *Service) inboundGone(ctx context.Context, room, reason string) {
 // endInbound hangs a live inbound call up through its state, or — the state is lost — ends the
 // journal row and the room directly.
 func (s *Service) endInbound(ctx context.Context, row sqlc.SipCall, reason string, by *uuid.UUID) {
-	err := s.withCall(ctx, row.ID, func(r *inRec, _ Env, fx *Effects) error {
+	err := s.withCall(ctx, row.ID, func(r *inRec, e Env, fx *Effects) error {
 		r.EndedBy = by
-		r.Hangup(reason, fx)
+		r.Hangup(e, reason, fx)
 		return nil
 	})
 	if errors.Is(err, errNoCall) {
 		ctx = context.WithoutCancel(ctx)
-		if _, err := db.GuardValue(ctx, s.db, func(q *sqlc.Queries) (sqlc.SipCall, error) {
+		if _, err := s.journalOutside(ctx, row.ID, func(q *sqlc.Queries) (sqlc.SipCall, error) {
 			return q.FinishSipCall(ctx, sqlc.FinishSipCallParams{ID: row.ID, Status: pbconv.SipEnded, Reason: reason, EndedBy: by})
-		}); err != nil && !db.IsNotFound(err) {
+		}, Event{Kind: EvEnded, Reason: reason, User: by}); err != nil && !db.IsNotFound(err) {
 			slog.WarnContext(ctx, "sip: finish inbound call", "call", row.ID, "err", err)
 		}
 		s.closeRoom(ctx, row.LkRoom)
@@ -881,6 +900,10 @@ func (s *Service) inboundJoined(ctx context.Context, wid uuid.UUID, room string,
 		number = n
 	}
 	number = clip(number, 32)
+	peer := ""
+	if e164.MatchString(number) {
+		peer = number
+	}
 	id, err := uuid.NewV7()
 	if err != nil {
 		return err
@@ -888,13 +911,23 @@ func (s *Service) inboundJoined(ctx context.Context, wid uuid.UUID, room string,
 	insert := func(status, reason string) (sqlc.SipCall, error) {
 		return db.GuardValue(ctx, s.db, func(q *sqlc.Queries) (sqlc.SipCall, error) {
 			return q.InsertSipInboundCall(ctx, sqlc.InsertSipInboundCallParams{ID: id, WorkspaceID: wid, Number: number,
-				ParticipantIdentity: p.Identity, SipCallID: p.Attributes[rtc.AttrSIPCallID], LkRoom: room, Status: status, Reason: reason})
+				ParticipantIdentity: p.Identity, SipCallID: p.Attributes[rtc.AttrSIPCallID], LkRoom: room, Status: status, Reason: reason,
+				PeerE164: peer})
 		})
 	}
+	trunk := p.Attributes[rtc.AttrSIPTrunkNumber]
+	if n, ok := NormalizeNumber("+" + strings.TrimPrefix(trunk, "+")); ok {
+		trunk = n
+	}
+	started := Event{Kind: EvStarted, Digits: trunk}
 	refuse := func(reason string) error {
 		slog.InfoContext(ctx, "sip: inbound call refused", "workspace", wid, "room", room, "reason", reason)
 		if _, err := insert(pbconv.SipFailed, reason); err != nil && db.UniqueViolation(err) == "" {
 			slog.WarnContext(ctx, "sip: journal a refused inbound call", "room", room, "err", err)
+		} else if err == nil {
+			if _, err := s.journalOutside(ctx, id, nil, started, Event{Kind: EvEnded, Reason: reason}); err != nil {
+				slog.WarnContext(ctx, "sip: journal a refused inbound call", "room", room, "err", err)
+			}
 		}
 		s.closeRoom(ctx, room)
 		return nil
@@ -913,6 +946,7 @@ func (s *Service) inboundJoined(ctx context.Context, wid uuid.UUID, room string,
 		}
 		return err
 	}
+	started.Reason = a.InboundMode
 	if !s.agent.Available(ctx) {
 		return refuse(reasonAgent)
 	}
@@ -957,6 +991,7 @@ func (s *Service) inboundJoined(ctx context.Context, wid uuid.UUID, room string,
 	entry := routeTarget(a.InboundKind, a.InboundMenuID, a.InboundExtensionID, a.InboundGroupID)
 	var pause int64 // digits pressed before the entry point began a number (ADR-0129)
 	if err := s.withCall(ctx, id, func(r *inRec, e Env, fx *Effects) error {
+		r.log(e, started, fx)
 		r.Enter(e, entry, fx)
 		if r.Phase == PhaseMenu && r.Digits != "" {
 			pause = r.Deadline
@@ -1002,9 +1037,9 @@ func (s *Service) AgentEvent(ctx context.Context, ev ivrwire.Event) {
 		// The worker cannot play to the caller any more (a prompt it could not fetch, a lost
 		// room): before the answer the caller would hear silence — hang up.
 		slog.WarnContext(ctx, "sip: IVR worker", "call", id, "op", ev.Op, "error", ev.Error)
-		fn = func(r *inRec, _ Env, fx *Effects) error {
+		fn = func(r *inRec, e Env, fx *Effects) error {
 			if r.Phase != PhaseActive && !r.Transferring() { // answered: the worker is gone anyway
-				r.Hangup(reasonAgent, fx)
+				r.Hangup(e, reasonAgent, fx)
 			}
 			return nil
 		}
@@ -1081,8 +1116,8 @@ func (s *Service) expireCall(ctx context.Context, id uuid.UUID) {
 			// The member who answered did not come back within the grace (or, the target of a
 			// transfer, did not connect: the call goes back to who handed it over, ADR-0132).
 			if _, err := s.lk.GetParticipant(ctx, r.Room, rtc.AnswerIdentity(*r.Answered)); rtc.IsNotFound(err) {
-				if !s.handBack(ctx, r, fx) {
-					r.Hangup(reasonLost, fx)
+				if !s.handBack(ctx, r, e, fx) {
+					r.Hangup(e, reasonLost, fx)
 				}
 			} else if err == nil {
 				r.AnswerLeft, r.Deadline = 0, 0

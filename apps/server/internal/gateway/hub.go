@@ -657,6 +657,24 @@ func (h *Hub) routeLocked(st *wsState, wid, id uuid.UUID, ev *v1.DispatchEvent) 
 				s.dispatchEnc(id, shared)
 			}
 		}
+	case *v1.DispatchEvent_SipJournalEntry:
+		// The call journal (ADR-0137 §1): as REST GET …/sip/journal — VIEW_JOURNALS with the
+		// call's room visible (if it has one), or a party of the call; never guests, bots read REST.
+		entry := e.SipJournalEntry.GetEntry()
+		parties := map[uuid.UUID]bool{}
+		for _, p := range entry.GetParties() {
+			parties[parseID(p.GetUserId())] = true
+		}
+		rid := parseID(entry.GetCall().GetRoomId())
+		for _, s := range sessions {
+			if s.bot || st.role(s.user) == perm.RoleGuest {
+				continue
+			}
+			journal := st.members[s.user].Workspace().Has(perm.ViewJournals) && (rid == uuid.Nil || st.bits(rid, s.user).Has(perm.ViewRoom))
+			if journal || parties[s.user] {
+				s.dispatchEnc(id, shared)
+			}
+		}
 	case *v1.DispatchEvent_WorkspaceBanAdd, *v1.DispatchEvent_WorkspaceBanRemove:
 		// Bans are shown to those who manage members (item 32; MANAGE_MEMBERS, ADR-0048).
 		for _, s := range sessions {

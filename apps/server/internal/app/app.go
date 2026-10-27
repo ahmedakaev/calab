@@ -222,11 +222,12 @@ func (a *App) Run(ctx context.Context) {
 	go a.Boards.RunDueNotices(ctx, boards.DueNoticeInterval, a.dueTZ)  // due soon / overdue (ADR-0089)
 	go a.Rooms.RunTempRooms(ctx, a.redis)
 	go a.SIP.Run(ctx)
-	go a.SIP.RunInbound(ctx) // returns at once without LiveKit / IVR_AGENT_TOKEN
-	go a.IVR.Run(ctx)        // returns at once without IVR_AGENT_TOKEN
-	go a.SIPReg.Run(ctx)     // returns at once without SIPREG_AGENT_TOKEN
-	go a.billing.Run(ctx)    // returns at once while BILLING_ENABLED=false
-	go a.metrika.Run(ctx)    // returns at once without YM_MP_TOKEN
+	go a.SIP.RunInbound(ctx)   // returns at once without LiveKit / IVR_AGENT_TOKEN
+	go a.SIP.RunRetention(ctx) // ADR-0137: the call journal's retention, hourly
+	go a.IVR.Run(ctx)          // returns at once without IVR_AGENT_TOKEN
+	go a.SIPReg.Run(ctx)       // returns at once without SIPREG_AGENT_TOKEN
+	go a.billing.Run(ctx)      // returns at once while BILLING_ENABLED=false
+	go a.metrika.Run(ctx)      // returns at once without YM_MP_TOKEN
 	if a.OAuth != nil {
 		go a.OAuth.Run(ctx, a.redis, oauthprovider.SweepInterval) // provider retention
 	}
@@ -598,6 +599,7 @@ func New(d Deps) *App {
 	recLoc, _ := time.LoadLocation(d.Config.SIPRecordingTZ) // validated by config
 	recSvc.SetPhone(recording.PhoneConfig{Location: recLoc, MaxConcurrent: d.Config.SIPRecordingMaxConcurrent, Disk: diskSvc, MaxCall: sip.MaxCallTime})
 	sipSvc.SetRecorder(recSvc)
+	recSvc.SetJournal(sipSvc) // ADR-0137: the recording's steps in the call journal
 	// Inbound calls (ADR-0117 step 2): the IVR worker's endpoint, its prompts and events.
 	ivrHub := ivr.New(d.Redis, d.Config.IVRAgentToken)
 	ivrHub.Routes(mux)

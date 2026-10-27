@@ -445,15 +445,29 @@ func TestSIP(t *testing.T) {
 	}
 	joinVoice(t, bob, wid, rid)
 
-	// The hourly limit per workspace (a limiter of 1 for the test).
-	saved := testApp.SIP.CallLimit
+	// The hourly limits are the workspace's policy (ADR-0137; MANAGE_INTEGRATIONS): 1 per hour
+	// for the workspace here, on buckets of their own for the test.
+	savedW, savedU := testApp.SIP.CallLimit, testApp.SIP.UserCallLimit
 	testApp.SIP.CallLimit = redisx.NewRateLimiter(testRedis, "rl:sip-call-it:", 1, 0.001)
+	testApp.SIP.UserCallLimit = redisx.NewRateLimiter(testRedis, "rl:sip-call-u-it:", 1, 0.001)
+	bob.must(403, "PUT", base+"/policy", &v1.PutSipPolicyRequest{OutPerHour: 1}, nil)
+	o.wantErr(422, v1.ErrorCode_ERROR_CODE_VALIDATION, "PUT", base+"/policy", &v1.PutSipPolicyRequest{RetentionMonths: 5})
+	o.wantErr(422, v1.ErrorCode_ERROR_CODE_VALIDATION, "PUT", base+"/policy", &v1.PutSipPolicyRequest{OutPerHour: 1001})
+	var pol v1.PutSipPolicyResponse
+	o.must(200, "PUT", base+"/policy", &v1.PutSipPolicyRequest{RetentionMonths: 3, OutPerHour: 1}, &pol)
+	if s := pol.GetSettings(); s.GetRetentionMonths() != 3 || s.GetOutPerHour() != 1 || s.GetOutPerUserHour() != 30 {
+		t.Fatalf("policy: %v", s)
+	}
 	bob.must(201, "POST", calls, num, &pc)
 	c6 := pc.GetCall()
 	sipFake.fail(c6.GetParticipantIdentity(), 480, "Temporarily Unavailable")
 	sipCallStatus(t, o, wid, c6.GetId(), v1.SipCallStatus_SIP_CALL_STATUS_FAILED)
 	bob.wantErr(429, v1.ErrorCode_ERROR_CODE_SIP_RATE_LIMITED, "POST", calls, num)
-	testApp.SIP.CallLimit = saved
+	testApp.SIP.CallLimit, testApp.SIP.UserCallLimit = savedW, savedU
+	o.must(200, "PUT", base+"/policy", &v1.PutSipPolicyRequest{}, &pol)
+	if s := pol.GetSettings(); s.GetRetentionMonths() != 12 || s.GetOutPerHour() != 120 || s.GetOutPerUserHour() != 30 {
+		t.Fatalf("policy defaults: %v", s)
+	}
 
 	// Guests never call, whatever the room says.
 	off := false

@@ -30,8 +30,8 @@ ON CONFLICT (workspace_id) DO UPDATE SET last_error = excluded.last_error;
 UPDATE workspaces SET sip_enabled = $2 WHERE id = $1 RETURNING *;
 
 -- name: InsertSipCall :one
-INSERT INTO sip_calls (id, workspace_id, room_id, number, direction, started_by, participant_identity)
-VALUES ($1, $2, $3, $4, 'out', $5, $6)
+INSERT INTO sip_calls (id, workspace_id, room_id, number, direction, started_by, participant_identity, origin, peer_e164)
+VALUES ($1, $2, $3, $4, 'out', $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetSipCall :one
@@ -118,10 +118,11 @@ UPDATE sip_accounts SET inbound_trunk_id = $2, inbound_rule_id = $3 WHERE worksp
 
 -- name: InsertSipInboundCall :one
 -- An inbound line got into its LiveKit room: RINGING from the start (FAILED rows for refusals).
-INSERT INTO sip_calls (id, workspace_id, number, direction, participant_identity, sip_call_id, lk_room, status, reason, ended_at)
+INSERT INTO sip_calls (id, workspace_id, number, direction, participant_identity, sip_call_id, lk_room, status, reason, ended_at,
+                       origin, peer_e164)
 VALUES (sqlc.arg('id'), sqlc.arg('workspace_id'), sqlc.arg('number'), 'in', sqlc.arg('participant_identity'),
         sqlc.arg('sip_call_id'), sqlc.arg('lk_room'), sqlc.arg('status'), sqlc.arg('reason'),
-        CASE WHEN sqlc.arg('status')::text IN ('ended', 'failed') THEN now() END)
+        CASE WHEN sqlc.arg('status')::text IN ('ended', 'failed') THEN now() END, 'inbound', sqlc.arg('peer_e164'))
 RETURNING *;
 
 -- name: GetSipCallByLKRoom :one

@@ -324,6 +324,11 @@ message DispatchEvent {
     CanvasCommentDelete canvas_comment_delete = 111;
     // An @mention in a canvas comment: the mentioned member's user channel only.
     CanvasCommentMention canvas_comment_mention = 112;
+    // The call journal (ADR-0137 §1): workspace channel, to VIEW_JOURNALS members who can view
+    // the call's room and to the call's parties (never guests or bots).
+    SipJournalChange sip_journal_entry = 113;
+    // The member's missed calls badge changed: their user channel only.
+    SipMissedChanged sip_missed_changed = 114;
   }
 }
 
@@ -455,6 +460,9 @@ message WorkspaceSnapshot {
   // already filtered by VIEW_ROOM, which is the right to read their history. Clients keep it
   // up to date with MESSAGE_CREATE / UPDATE / DELETE.
   map<string, DmLastMessage> room_last_messages = 21;
+  // The recipient's missed phone calls since they last looked at «Recent» (ADR-0137 §1; ≤ 999;
+  // 0 for guests, bots and workspaces without telephony). Changes come as SIP_MISSED_CHANGED.
+  uint32 sip_missed = 22;
 }
 
 message Ready {

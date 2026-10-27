@@ -1580,6 +1580,9 @@ type SipAccount struct {
 	RegStatusAt         *time.Time
 	RecordInbound       bool
 	RecordOutbound      bool
+	RetentionMonths     int16
+	OutPerHour          int32
+	OutPerUserHour      int32
 }
 
 type SipCall struct {
@@ -1603,6 +1606,34 @@ type SipCall struct {
 	RingingUserIds      []uuid.UUID
 	Via                 string
 	ProviderCallID      string
+	Origin              string
+	PeerE164            string
+	Missed              bool
+}
+
+type SipCallEvent struct {
+	CallID     uuid.UUID
+	Seq        int32
+	At         time.Time
+	Kind       string
+	UserID     *uuid.UUID
+	PeerUserID *uuid.UUID
+	TargetKind string
+	TargetID   *uuid.UUID
+	TargetName string
+	Digits     string
+	Reason     string
+}
+
+type SipCallParty struct {
+	CallID      uuid.UUID
+	UserID      uuid.UUID
+	WorkspaceID uuid.UUID
+	StartedAt   time.Time
+	Placed      bool
+	Rang        bool
+	Answered    bool
+	Transferred bool
 }
 
 type SipCallRecording struct {
@@ -2298,6 +2329,7 @@ type WorkspaceMember struct {
 	AchievementCount int32
 	LastActiveAt     *time.Time
 	SipExtension     string
+	SipSeenAt        time.Time
 }
 
 type WorkspaceNotificationSetting struct {

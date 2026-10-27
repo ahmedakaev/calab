@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file calaba/v1/sip.proto.
  */
 export const file_calaba_v1_sip: GenFile = /*@__PURE__*/
-  fileDesc("ChNjYWxhYmEvdjEvc2lwLnByb3RvEgljYWxhYmEudjEi2AUKC1NpcFNldHRpbmdzEg8KB2VuYWJsZWQYASABKAgSEAoIcHJvdmlkZXIYAiABKAkSDAoEaG9zdBgDIAEoCRIqCgl0cmFuc3BvcnQYBCABKA4yFy5jYWxhYmEudjEuU2lwVHJhbnNwb3J0EhAKCHVzZXJuYW1lGAUgASgJEhQKDGhhc19wYXNzd29yZBgGIAEoCBIRCgljYWxsZXJfaWQYByABKAkSFwoPb3V0Ym91bmRfcHJlZml4GAggASgJEhgKEGFsbG93ZWRfcHJlZml4ZXMYCSADKAkSEgoKbGFzdF9lcnJvchgKIAEoCRIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgp1cGRhdGVkX2J5GAwgASgJEhMKC3RydW5rX3NhdmVkGA0gASgIEhUKDWF1dGhfdXNlcm5hbWUYDiABKAkSDAoEcG9ydBgPIAEoDRIZChFpbmJvdW5kX2F2YWlsYWJsZRgQIAEoCBIXCg9pbmJvdW5kX2VuYWJsZWQYESABKAgSMQoOaW5ib3VuZF90YXJnZXQYEiABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSHQoVaW5ib3VuZF9hbGxvd2VkX2NpZHJzGBMgAygJEhUKDWluYm91bmRfc2F2ZWQYFCABKAgSLwoMaW5ib3VuZF9tb2RlGBUgASgOMhkuY2FsYWJhLnYxLlNpcEluYm91bmRNb2RlEjAKDHJlZ2lzdHJhdGlvbhgWIAEoCzIaLmNhbGFiYS52MS5TaXBSZWdpc3RyYXRpb24SHgoWcmVnaXN0cmF0aW9uX2F2YWlsYWJsZRgXIAEoCBIWCg5yZWNvcmRfaW5ib3VuZBgYIAEoCBIXCg9yZWNvcmRfb3V0Ym91bmQYGSABKAgSGwoTcmVjb3JkaW5nX2F2YWlsYWJsZRgaIAEoCCLJAgoPU2lwUmVnaXN0cmF0aW9uEhEKCXJlZ2lzdHJhchgBIAEoCRIOCgZkb21haW4YAiABKAkSEwoLZXhwaXJlc19zZWMYAyABKA0SFQoNa2VlcGFsaXZlX3NlYxgEIAEoDRIVCg1hdXRoX3VzZXJuYW1lGAUgASgJEhQKDGhhc19wYXNzd29yZBgGIAEoCBIwCgZzdGF0dXMYByABKA4yIC5jYWxhYmEudjEuU2lwUmVnaXN0cmF0aW9uU3RhdHVzEg0KBWVycm9yGAggASgJEjEKDXJlZ2lzdGVyZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhYKDmNvbnRhY3RfbWFza2VkGAsgASgJIqABChRTaXBSZWdpc3RyYXRpb25JbnB1dBIRCglyZWdpc3RyYXIYASABKAkSDgoGZG9tYWluGAIgASgJEhMKC2V4cGlyZXNfc2VjGAMgASgNEhUKDWtlZXBhbGl2ZV9zZWMYBCABKA0SFQoNYXV0aF91c2VybmFtZRgFIAEoCRIVCghwYXNzd29yZBgGIAEoCUgAiAEBQgsKCV9wYXNzd29yZCJCChZHZXRTaXBTZXR0aW5nc1Jlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIpUCChVQdXRTaXBTZXR0aW5nc1JlcXVlc3QSDwoHZW5hYmxlZBgBIAEoCBIQCghwcm92aWRlchgCIAEoCRIMCgRob3N0GAMgASgJEioKCXRyYW5zcG9ydBgEIAEoDjIXLmNhbGFiYS52MS5TaXBUcmFuc3BvcnQSEAoIdXNlcm5hbWUYBSABKAkSFQoIcGFzc3dvcmQYBiABKAlIAIgBARIRCgljYWxsZXJfaWQYByABKAkSFwoPb3V0Ym91bmRfcHJlZml4GAggASgJEhgKEGFsbG93ZWRfcHJlZml4ZXMYCSADKAkSFQoNYXV0aF91c2VybmFtZRgKIAEoCRIMCgRwb3J0GAsgASgNQgsKCV9wYXNzd29yZCJCChZQdXRTaXBTZXR0aW5nc1Jlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIkkKFlB1dFNpcFJlY29yZGluZ1JlcXVlc3QSFgoOcmVjb3JkX2luYm91bmQYASABKAgSFwoPcmVjb3JkX291dGJvdW5kGAIgASgIIkMKF1B1dFNpcFJlY29yZGluZ1Jlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIkIKD1Rlc3RTaXBSZXNwb25zZRIKCgJvaxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEhIKCnNpcF9zdGF0dXMYAyABKA0i7gMKB1NpcENhbGwSCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEg8KB3Jvb21faWQYAyABKAkSDgoGbnVtYmVyGAQgASgJEi4KCWRpcmVjdGlvbhgFIAEoDjIbLmNhbGFiYS52MS5TaXBDYWxsRGlyZWN0aW9uEhIKCnN0YXJ0ZWRfYnkYBiABKAkSKAoGc3RhdHVzGAcgASgOMhguY2FsYWJhLnYxLlNpcENhbGxTdGF0dXMSDgoGcmVhc29uGAggASgJEi4KCnN0YXJ0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC2Fuc3dlcmVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcGFydGljaXBhbnRfaWRlbnRpdHkYDCABKAkSEAoIZW5kZWRfYnkYDSABKAkSEwoLYW5zd2VyZWRfYnkYDiABKAkSDQoFcm91dGUYDyABKAkSGAoQcmluZ2luZ191c2VyX2lkcxgQIAMoCRILCgN2aWEYESABKAkSGAoQcHJvdmlkZXJfY2FsbF9pZBgSIAEoCSIlChNQbGFjZVNpcENhbGxSZXF1ZXN0Eg4KBm51bWJlchgBIAEoCSIzCg9TaXBDYWxsUmVzcG9uc2USIAoEY2FsbBgBIAEoCzISLmNhbGFiYS52MS5TaXBDYWxsIk4KFExpc3RTaXBDYWxsc1Jlc3BvbnNlEiEKBWNhbGxzGAEgAygLMhIuY2FsYWJhLnYxLlNpcENhbGwSEwoLbmV4dF9jdXJzb3IYAiABKAkiMQoNU2lwQ2FsbFVwZGF0ZRIgCgRjYWxsGAEgASgLMhIuY2FsYWJhLnYxLlNpcENhbGwiVAoOU2lwUm91dGVUYXJnZXQSJQoEa2luZBgBIAEoDjIXLmNhbGFiYS52MS5TaXBSb3V0ZUtpbmQSCgoCaWQYAiABKAkSDwoHbWlzc2luZxgDIAEoCCKBAgoMU2lwRXh0ZW5zaW9uEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIOCgZudW1iZXIYAyABKAkSKQoEa2luZBgEIAEoDjIbLmNhbGFiYS52MS5TaXBFeHRlbnNpb25LaW5kEg8KB3VzZXJfaWQYBSABKAkSEAoIZ3JvdXBfaWQYBiABKAkSEwoLZGVzY3JpcHRpb24YByABKAkSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQZXh0ZXJuYWxfYmxvY2tlZBgJIAEoCBISCgpncm91cF9uYW1lGAogASgJIjgKDlNpcEdyb3VwTWVtYmVyEhQKDGV4dGVuc2lvbl9pZBgBIAEoCRIQCghwb3NpdGlvbhgCIAEoDSL4AgoIU2lwR3JvdXASCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSKgoJZXh0ZW5zaW9uGAQgASgLMhcuY2FsYWJhLnYxLlNpcEV4dGVuc2lvbhItCghzdHJhdGVneRgFIAEoDjIbLmNhbGFiYS52MS5TaXBHcm91cFN0cmF0ZWd5EhAKCHJpbmdfc2VjGAYgASgNEhcKD21lbWJlcl9yaW5nX3NlYxgHIAEoDRIqCgdvbl9mYWlsGAggASgLMhkuY2FsYWJhLnYxLlNpcFJvdXRlVGFyZ2V0EioKB21lbWJlcnMYCSADKAsyGS5jYWxhYmEudjEuU2lwR3JvdXBNZW1iZXISLgoKdXBkYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQZmFsbGJhY2tfZW5hYmxlZBgLIAEoCBIUCgxmYWxsYmFja19zZWMYDCABKA0iRgoKU2lwSXZySXRlbRINCgVkaWdpdBgBIAEoCRIpCgZhY3Rpb24YAiABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQitgMKClNpcEl2ck1lbnUSCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOcHJvbXB0X2ZpbGVfaWQYBCABKAkSMQoNcHJvbXB0X3N0YXR1cxgFIAEoDjIaLmNhbGFiYS52MS5TaXBQcm9tcHRTdGF0dXMSGgoScHJvbXB0X2R1cmF0aW9uX21zGAYgASgNEhkKEWlucHV0X3RpbWVvdXRfc2VjGAcgASgNEg8KB3JlcGVhdHMYCCABKA0SLgoLb25fbm9faW5wdXQYCSABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSJAoFaXRlbXMYCiADKAsyFS5jYWxhYmEudjEuU2lwSXZySXRlbRIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgp1cGRhdGVkX2J5GAwgASgJEhcKD2RpYWxfZXh0ZW5zaW9ucxgNIAEoCBIWCg5ub3RpY2VfZmlsZV9pZBgOIAEoCRIaChJub3RpY2VfZHVyYXRpb25fbXMYDyABKA0iSAoZTGlzdFNpcEV4dGVuc2lvbnNSZXNwb25zZRIrCgpleHRlbnNpb25zGAEgAygLMhcuY2FsYWJhLnYxLlNpcEV4dGVuc2lvbiJrChlDcmVhdGVTaXBFeHRlbnNpb25SZXF1ZXN0Eg4KBm51bWJlchgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhgKEGV4dGVybmFsX2Jsb2NrZWQYBCABKAgiuwEKGVVwZGF0ZVNpcEV4dGVuc2lvblJlcXVlc3QSEwoGbnVtYmVyGAEgASgJSACIAQESFAoHdXNlcl9pZBgCIAEoCUgBiAEBEhgKC2Rlc2NyaXB0aW9uGAMgASgJSAKIAQESHQoQZXh0ZXJuYWxfYmxvY2tlZBgEIAEoCEgDiAEBQgkKB19udW1iZXJCCgoIX3VzZXJfaWRCDgoMX2Rlc2NyaXB0aW9uQhMKEV9leHRlcm5hbF9ibG9ja2VkIkIKFFNpcEV4dGVuc2lvblJlc3BvbnNlEioKCWV4dGVuc2lvbhgBIAEoCzIXLmNhbGFiYS52MS5TaXBFeHRlbnNpb24iPAoVTGlzdFNpcEdyb3Vwc1Jlc3BvbnNlEiMKBmdyb3VwcxgBIAMoCzITLmNhbGFiYS52MS5TaXBHcm91cCIoCg9TaXBHcm91cE1lbWJlcnMSFQoNZXh0ZW5zaW9uX2lkcxgBIAMoCSKYAgoVQ3JlYXRlU2lwR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGbnVtYmVyGAIgASgJEi0KCHN0cmF0ZWd5GAMgASgOMhsuY2FsYWJhLnYxLlNpcEdyb3VwU3RyYXRlZ3kSEAoIcmluZ19zZWMYBCABKA0SFwoPbWVtYmVyX3Jpbmdfc2VjGAUgASgNEioKB29uX2ZhaWwYBiABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSKwoHbWVtYmVycxgHIAEoCzIaLmNhbGFiYS52MS5TaXBHcm91cE1lbWJlcnMSGAoQZmFsbGJhY2tfZW5hYmxlZBgIIAEoCBIUCgxmYWxsYmFja19zZWMYCSABKA0iowMKFVVwZGF0ZVNpcEdyb3VwUmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESEwoGbnVtYmVyGAIgASgJSAGIAQESMgoIc3RyYXRlZ3kYAyABKA4yGy5jYWxhYmEudjEuU2lwR3JvdXBTdHJhdGVneUgCiAEBEhUKCHJpbmdfc2VjGAQgASgNSAOIAQESHAoPbWVtYmVyX3Jpbmdfc2VjGAUgASgNSASIAQESKgoHb25fZmFpbBgGIAEoCzIZLmNhbGFiYS52MS5TaXBSb3V0ZVRhcmdldBIrCgdtZW1iZXJzGAcgASgLMhouY2FsYWJhLnYxLlNpcEdyb3VwTWVtYmVycxIdChBmYWxsYmFja19lbmFibGVkGAggASgISAWIAQESGQoMZmFsbGJhY2tfc2VjGAkgASgNSAaIAQFCBwoFX25hbWVCCQoHX251bWJlckILCglfc3RyYXRlZ3lCCwoJX3Jpbmdfc2VjQhIKEF9tZW1iZXJfcmluZ19zZWNCEwoRX2ZhbGxiYWNrX2VuYWJsZWRCDwoNX2ZhbGxiYWNrX3NlYyI2ChBTaXBHcm91cFJlc3BvbnNlEiIKBWdyb3VwGAEgASgLMhMuY2FsYWJhLnYxLlNpcEdyb3VwIj8KF0xpc3RTaXBJdnJNZW51c1Jlc3BvbnNlEiQKBW1lbnVzGAEgAygLMhUuY2FsYWJhLnYxLlNpcEl2ck1lbnUiMwoLU2lwSXZySXRlbXMSJAoFaXRlbXMYASADKAsyFS5jYWxhYmEudjEuU2lwSXZySXRlbSKBAgoXQ3JlYXRlU2lwSXZyTWVudVJlcXVlc3QSDAoEbmFtZRgBIAEoCRIZChFpbnB1dF90aW1lb3V0X3NlYxgCIAEoDRIPCgdyZXBlYXRzGAMgASgNEi4KC29uX25vX2lucHV0GAQgASgLMhkuY2FsYWJhLnYxLlNpcFJvdXRlVGFyZ2V0EiUKBWl0ZW1zGAUgASgLMhYuY2FsYWJhLnYxLlNpcEl2ckl0ZW1zEh0KFXByb21wdF9zb3VyY2VfZmlsZV9pZBgGIAEoCRIXCg9kaWFsX2V4dGVuc2lvbnMYByABKAgSHQoVbm90aWNlX3NvdXJjZV9maWxlX2lkGAggASgJIpIDChdVcGRhdGVTaXBJdnJNZW51UmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESHgoRaW5wdXRfdGltZW91dF9zZWMYAiABKA1IAYgBARIUCgdyZXBlYXRzGAMgASgNSAKIAQESLgoLb25fbm9faW5wdXQYBCABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSJQoFaXRlbXMYBSABKAsyFi5jYWxhYmEudjEuU2lwSXZySXRlbXMSIgoVcHJvbXB0X3NvdXJjZV9maWxlX2lkGAYgASgJSAOIAQESHAoPZGlhbF9leHRlbnNpb25zGAcgASgISASIAQESIgoVbm90aWNlX3NvdXJjZV9maWxlX2lkGAggASgJSAWIAQFCBwoFX25hbWVCFAoSX2lucHV0X3RpbWVvdXRfc2VjQgoKCF9yZXBlYXRzQhgKFl9wcm9tcHRfc291cmNlX2ZpbGVfaWRCEgoQX2RpYWxfZXh0ZW5zaW9uc0IYChZfbm90aWNlX3NvdXJjZV9maWxlX2lkIjkKElNpcEl2ck1lbnVSZXNwb25zZRIjCgRtZW51GAEgASgLMhUuY2FsYWJhLnYxLlNpcEl2ck1lbnUiyQEKFFB1dFNpcEluYm91bmRSZXF1ZXN0Eg8KB2VuYWJsZWQYASABKAgSKQoGdGFyZ2V0GAIgASgLMhkuY2FsYWJhLnYxLlNpcFJvdXRlVGFyZ2V0EhUKDWFsbG93ZWRfY2lkcnMYAyADKAkSJwoEbW9kZRgEIAEoDjIZLmNhbGFiYS52MS5TaXBJbmJvdW5kTW9kZRI1CgxyZWdpc3RyYXRpb24YBSABKAsyHy5jYWxhYmEudjEuU2lwUmVnaXN0cmF0aW9uSW5wdXQiQQoVUHV0U2lwSW5ib3VuZFJlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIjIKDlNpcEluYm91bmRSaW5nEiAKBGNhbGwYASABKAsyEi5jYWxhYmEudjEuU2lwQ2FsbCJoChhTaXBJbmJvdW5kQWNjZXB0UmVzcG9uc2USIAoEY2FsbBgBIAEoCzISLmNhbGFiYS52MS5TaXBDYWxsEioKBGpvaW4YAiABKAsyHC5jYWxhYmEudjEuSm9pblZvaWNlUmVzcG9uc2UiTwoWVHJhbnNmZXJTaXBDYWxsUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJEhQKDGV4dGVuc2lvbl9pZBgCIAEoCRIOCgZudW1iZXIYAyABKAkiRQoaTGlzdFNpcEFjdGl2ZUNhbGxzUmVzcG9uc2USJwoFY2FsbHMYASADKAsyGC5jYWxhYmEudjEuU2lwQWN0aXZlQ2FsbCKUAQoNU2lwQWN0aXZlQ2FsbBIgCgRjYWxsGAEgASgLMhIuY2FsYWJhLnYxLlNpcENhbGwSJgoEc3RlcBgCIAEoDjIYLmNhbGFiYS52MS5TaXBBY3RpdmVTdGVwEg8KB3N0ZXBfaWQYAyABKAkSEQoJc3RlcF9uYW1lGAQgASgJEhUKDW51bWJlcl9tYXNrZWQYBSABKAgiJwoPU2lwQ2FsbHNDaGFuZ2VkEhQKDHdvcmtzcGFjZV9pZBgBIAEoCSpyCgxTaXBUcmFuc3BvcnQSHQoZU0lQX1RSQU5TUE9SVF9VTlNQRUNJRklFRBAAEhUKEVNJUF9UUkFOU1BPUlRfVURQEAESFQoRU0lQX1RSQU5TUE9SVF9UQ1AQAhIVChFTSVBfVFJBTlNQT1JUX1RMUxADKr0BCg1TaXBDYWxsU3RhdHVzEh8KG1NJUF9DQUxMX1NUQVRVU19VTlNQRUNJRklFRBAAEhsKF1NJUF9DQUxMX1NUQVRVU19ESUFMSU5HEAESGwoXU0lQX0NBTExfU1RBVFVTX1JJTkdJTkcQAhIaChZTSVBfQ0FMTF9TVEFUVVNfQUNUSVZFEAMSGQoVU0lQX0NBTExfU1RBVFVTX0VOREVEEAQSGgoWU0lQX0NBTExfU1RBVFVTX0ZBSUxFRBAFKm0KEFNpcENhbGxEaXJlY3Rpb24SIgoeU0lQX0NBTExfRElSRUNUSU9OX1VOU1BFQ0lGSUVEEAASGgoWU0lQX0NBTExfRElSRUNUSU9OX09VVBABEhkKFVNJUF9DQUxMX0RJUkVDVElPTl9JThACKm4KDlNpcEluYm91bmRNb2RlEiAKHFNJUF9JTkJPVU5EX01PREVfVU5TUEVDSUZJRUQQABIbChdTSVBfSU5CT1VORF9NT0RFX0RJUkVDVBABEh0KGVNJUF9JTkJPVU5EX01PREVfUkVHSVNURVIQAir/AQoVU2lwUmVnaXN0cmF0aW9uU3RhdHVzEicKI1NJUF9SRUdJU1RSQVRJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASHwobU0lQX1JFR0lTVFJBVElPTl9TVEFUVVNfT0ZGEAESJwojU0lQX1JFR0lTVFJBVElPTl9TVEFUVVNfVU5BVkFJTEFCTEUQAhInCiNTSVBfUkVHSVNUUkFUSU9OX1NUQVRVU19SRUdJU1RFUklORxADEiYKIlNJUF9SRUdJU1RSQVRJT05fU1RBVFVTX1JFR0lTVEVSRUQQBBIiCh5TSVBfUkVHSVNUUkFUSU9OX1NUQVRVU19GQUlMRUQQBSq1AQoMU2lwUm91dGVLaW5kEh4KGlNJUF9ST1VURV9LSU5EX1VOU1BFQ0lGSUVEEAASGQoVU0lQX1JPVVRFX0tJTkRfSEFOR1VQEAESGQoVU0lQX1JPVVRFX0tJTkRfUkVQRUFUEAISFwoTU0lQX1JPVVRFX0tJTkRfTUVOVRADEhwKGFNJUF9ST1VURV9LSU5EX0VYVEVOU0lPThAEEhgKFFNJUF9ST1VURV9LSU5EX0dST1VQEAUqjQEKEFNpcEV4dGVuc2lvbktpbmQSIgoeU0lQX0VYVEVOU0lPTl9LSU5EX1VOU1BFQ0lGSUVEEAASGwoXU0lQX0VYVEVOU0lPTl9LSU5EX1VTRVIQARIaChZTSVBfRVhURU5TSU9OX0tJTkRfQk9UEAISHAoYU0lQX0VYVEVOU0lPTl9LSU5EX0dST1VQEAMqewoQU2lwR3JvdXBTdHJhdGVneRIiCh5TSVBfR1JPVVBfU1RSQVRFR1lfVU5TUEVDSUZJRUQQABIfChtTSVBfR1JPVVBfU1RSQVRFR1lfUklOR19BTEwQARIiCh5TSVBfR1JPVVBfU1RSQVRFR1lfUk9VTkRfUk9CSU4QAiptCg9TaXBQcm9tcHRTdGF0dXMSIQodU0lQX1BST01QVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIaChZTSVBfUFJPTVBUX1NUQVRVU19OT05FEAESGwoXU0lQX1BST01QVF9TVEFUVVNfUkVBRFkQAiqjAQoNU2lwQWN0aXZlU3RlcBIfChtTSVBfQUNUSVZFX1NURVBfVU5TUEVDSUZJRUQQABIbChdTSVBfQUNUSVZFX1NURVBfRElBTElORxABEhgKFFNJUF9BQ1RJVkVfU1RFUF9NRU5VEAISGwoXU0lQX0FDVElWRV9TVEVQX1JJTkdJTkcQAxIdChlTSVBfQUNUSVZFX1NURVBfQ09OTkVDVEVEEARClgEKDWNvbS5jYWxhYmEudjFCCFNpcFByb3RvUAFaNmdpdGh1Yi5jb20vY2FsYWJhL2NhbGFiYS9zZXJ2ZXIvZ2VuL2NhbGFiYS92MTtjYWxhYmF2MaICA0NYWKoCCUNhbGFiYS5WMcoCCUNhbGFiYVxWMeICFUNhbGFiYVxWMVxHUEJNZXRhZGF0YeoCCkNhbGFiYTo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp, file_calaba_v1_rtc]);
+  fileDesc("ChNjYWxhYmEvdjEvc2lwLnByb3RvEgljYWxhYmEudjEiowYKC1NpcFNldHRpbmdzEg8KB2VuYWJsZWQYASABKAgSEAoIcHJvdmlkZXIYAiABKAkSDAoEaG9zdBgDIAEoCRIqCgl0cmFuc3BvcnQYBCABKA4yFy5jYWxhYmEudjEuU2lwVHJhbnNwb3J0EhAKCHVzZXJuYW1lGAUgASgJEhQKDGhhc19wYXNzd29yZBgGIAEoCBIRCgljYWxsZXJfaWQYByABKAkSFwoPb3V0Ym91bmRfcHJlZml4GAggASgJEhgKEGFsbG93ZWRfcHJlZml4ZXMYCSADKAkSEgoKbGFzdF9lcnJvchgKIAEoCRIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgp1cGRhdGVkX2J5GAwgASgJEhMKC3RydW5rX3NhdmVkGA0gASgIEhUKDWF1dGhfdXNlcm5hbWUYDiABKAkSDAoEcG9ydBgPIAEoDRIZChFpbmJvdW5kX2F2YWlsYWJsZRgQIAEoCBIXCg9pbmJvdW5kX2VuYWJsZWQYESABKAgSMQoOaW5ib3VuZF90YXJnZXQYEiABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSHQoVaW5ib3VuZF9hbGxvd2VkX2NpZHJzGBMgAygJEhUKDWluYm91bmRfc2F2ZWQYFCABKAgSLwoMaW5ib3VuZF9tb2RlGBUgASgOMhkuY2FsYWJhLnYxLlNpcEluYm91bmRNb2RlEjAKDHJlZ2lzdHJhdGlvbhgWIAEoCzIaLmNhbGFiYS52MS5TaXBSZWdpc3RyYXRpb24SHgoWcmVnaXN0cmF0aW9uX2F2YWlsYWJsZRgXIAEoCBIWCg5yZWNvcmRfaW5ib3VuZBgYIAEoCBIXCg9yZWNvcmRfb3V0Ym91bmQYGSABKAgSGwoTcmVjb3JkaW5nX2F2YWlsYWJsZRgaIAEoCBIYChByZXRlbnRpb25fbW9udGhzGBsgASgNEhQKDG91dF9wZXJfaG91chgcIAEoDRIZChFvdXRfcGVyX3VzZXJfaG91chgdIAEoDSLJAgoPU2lwUmVnaXN0cmF0aW9uEhEKCXJlZ2lzdHJhchgBIAEoCRIOCgZkb21haW4YAiABKAkSEwoLZXhwaXJlc19zZWMYAyABKA0SFQoNa2VlcGFsaXZlX3NlYxgEIAEoDRIVCg1hdXRoX3VzZXJuYW1lGAUgASgJEhQKDGhhc19wYXNzd29yZBgGIAEoCBIwCgZzdGF0dXMYByABKA4yIC5jYWxhYmEudjEuU2lwUmVnaXN0cmF0aW9uU3RhdHVzEg0KBWVycm9yGAggASgJEjEKDXJlZ2lzdGVyZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhYKDmNvbnRhY3RfbWFza2VkGAsgASgJIqABChRTaXBSZWdpc3RyYXRpb25JbnB1dBIRCglyZWdpc3RyYXIYASABKAkSDgoGZG9tYWluGAIgASgJEhMKC2V4cGlyZXNfc2VjGAMgASgNEhUKDWtlZXBhbGl2ZV9zZWMYBCABKA0SFQoNYXV0aF91c2VybmFtZRgFIAEoCRIVCghwYXNzd29yZBgGIAEoCUgAiAEBQgsKCV9wYXNzd29yZCJCChZHZXRTaXBTZXR0aW5nc1Jlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIpUCChVQdXRTaXBTZXR0aW5nc1JlcXVlc3QSDwoHZW5hYmxlZBgBIAEoCBIQCghwcm92aWRlchgCIAEoCRIMCgRob3N0GAMgASgJEioKCXRyYW5zcG9ydBgEIAEoDjIXLmNhbGFiYS52MS5TaXBUcmFuc3BvcnQSEAoIdXNlcm5hbWUYBSABKAkSFQoIcGFzc3dvcmQYBiABKAlIAIgBARIRCgljYWxsZXJfaWQYByABKAkSFwoPb3V0Ym91bmRfcHJlZml4GAggASgJEhgKEGFsbG93ZWRfcHJlZml4ZXMYCSADKAkSFQoNYXV0aF91c2VybmFtZRgKIAEoCRIMCgRwb3J0GAsgASgNQgsKCV9wYXNzd29yZCJCChZQdXRTaXBTZXR0aW5nc1Jlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIkkKFlB1dFNpcFJlY29yZGluZ1JlcXVlc3QSFgoOcmVjb3JkX2luYm91bmQYASABKAgSFwoPcmVjb3JkX291dGJvdW5kGAIgASgIIkMKF1B1dFNpcFJlY29yZGluZ1Jlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIkIKD1Rlc3RTaXBSZXNwb25zZRIKCgJvaxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEhIKCnNpcF9zdGF0dXMYAyABKA0i7gMKB1NpcENhbGwSCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEg8KB3Jvb21faWQYAyABKAkSDgoGbnVtYmVyGAQgASgJEi4KCWRpcmVjdGlvbhgFIAEoDjIbLmNhbGFiYS52MS5TaXBDYWxsRGlyZWN0aW9uEhIKCnN0YXJ0ZWRfYnkYBiABKAkSKAoGc3RhdHVzGAcgASgOMhguY2FsYWJhLnYxLlNpcENhbGxTdGF0dXMSDgoGcmVhc29uGAggASgJEi4KCnN0YXJ0ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC2Fuc3dlcmVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIsCghlbmRlZF9hdBgLIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcGFydGljaXBhbnRfaWRlbnRpdHkYDCABKAkSEAoIZW5kZWRfYnkYDSABKAkSEwoLYW5zd2VyZWRfYnkYDiABKAkSDQoFcm91dGUYDyABKAkSGAoQcmluZ2luZ191c2VyX2lkcxgQIAMoCRILCgN2aWEYESABKAkSGAoQcHJvdmlkZXJfY2FsbF9pZBgSIAEoCSIlChNQbGFjZVNpcENhbGxSZXF1ZXN0Eg4KBm51bWJlchgBIAEoCSIzCg9TaXBDYWxsUmVzcG9uc2USIAoEY2FsbBgBIAEoCzISLmNhbGFiYS52MS5TaXBDYWxsIk4KFExpc3RTaXBDYWxsc1Jlc3BvbnNlEiEKBWNhbGxzGAEgAygLMhIuY2FsYWJhLnYxLlNpcENhbGwSEwoLbmV4dF9jdXJzb3IYAiABKAkiMQoNU2lwQ2FsbFVwZGF0ZRIgCgRjYWxsGAEgASgLMhIuY2FsYWJhLnYxLlNpcENhbGwiVAoOU2lwUm91dGVUYXJnZXQSJQoEa2luZBgBIAEoDjIXLmNhbGFiYS52MS5TaXBSb3V0ZUtpbmQSCgoCaWQYAiABKAkSDwoHbWlzc2luZxgDIAEoCCKBAgoMU2lwRXh0ZW5zaW9uEgoKAmlkGAEgASgJEhQKDHdvcmtzcGFjZV9pZBgCIAEoCRIOCgZudW1iZXIYAyABKAkSKQoEa2luZBgEIAEoDjIbLmNhbGFiYS52MS5TaXBFeHRlbnNpb25LaW5kEg8KB3VzZXJfaWQYBSABKAkSEAoIZ3JvdXBfaWQYBiABKAkSEwoLZGVzY3JpcHRpb24YByABKAkSLgoKY3JlYXRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQZXh0ZXJuYWxfYmxvY2tlZBgJIAEoCBISCgpncm91cF9uYW1lGAogASgJIjgKDlNpcEdyb3VwTWVtYmVyEhQKDGV4dGVuc2lvbl9pZBgBIAEoCRIQCghwb3NpdGlvbhgCIAEoDSL4AgoIU2lwR3JvdXASCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSKgoJZXh0ZW5zaW9uGAQgASgLMhcuY2FsYWJhLnYxLlNpcEV4dGVuc2lvbhItCghzdHJhdGVneRgFIAEoDjIbLmNhbGFiYS52MS5TaXBHcm91cFN0cmF0ZWd5EhAKCHJpbmdfc2VjGAYgASgNEhcKD21lbWJlcl9yaW5nX3NlYxgHIAEoDRIqCgdvbl9mYWlsGAggASgLMhkuY2FsYWJhLnYxLlNpcFJvdXRlVGFyZ2V0EioKB21lbWJlcnMYCSADKAsyGS5jYWxhYmEudjEuU2lwR3JvdXBNZW1iZXISLgoKdXBkYXRlZF9hdBgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQZmFsbGJhY2tfZW5hYmxlZBgLIAEoCBIUCgxmYWxsYmFja19zZWMYDCABKA0iRgoKU2lwSXZySXRlbRINCgVkaWdpdBgBIAEoCRIpCgZhY3Rpb24YAiABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQitgMKClNpcEl2ck1lbnUSCgoCaWQYASABKAkSFAoMd29ya3NwYWNlX2lkGAIgASgJEgwKBG5hbWUYAyABKAkSFgoOcHJvbXB0X2ZpbGVfaWQYBCABKAkSMQoNcHJvbXB0X3N0YXR1cxgFIAEoDjIaLmNhbGFiYS52MS5TaXBQcm9tcHRTdGF0dXMSGgoScHJvbXB0X2R1cmF0aW9uX21zGAYgASgNEhkKEWlucHV0X3RpbWVvdXRfc2VjGAcgASgNEg8KB3JlcGVhdHMYCCABKA0SLgoLb25fbm9faW5wdXQYCSABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSJAoFaXRlbXMYCiADKAsyFS5jYWxhYmEudjEuU2lwSXZySXRlbRIuCgp1cGRhdGVkX2F0GAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgp1cGRhdGVkX2J5GAwgASgJEhcKD2RpYWxfZXh0ZW5zaW9ucxgNIAEoCBIWCg5ub3RpY2VfZmlsZV9pZBgOIAEoCRIaChJub3RpY2VfZHVyYXRpb25fbXMYDyABKA0iSAoZTGlzdFNpcEV4dGVuc2lvbnNSZXNwb25zZRIrCgpleHRlbnNpb25zGAEgAygLMhcuY2FsYWJhLnYxLlNpcEV4dGVuc2lvbiJrChlDcmVhdGVTaXBFeHRlbnNpb25SZXF1ZXN0Eg4KBm51bWJlchgBIAEoCRIPCgd1c2VyX2lkGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEhgKEGV4dGVybmFsX2Jsb2NrZWQYBCABKAgiuwEKGVVwZGF0ZVNpcEV4dGVuc2lvblJlcXVlc3QSEwoGbnVtYmVyGAEgASgJSACIAQESFAoHdXNlcl9pZBgCIAEoCUgBiAEBEhgKC2Rlc2NyaXB0aW9uGAMgASgJSAKIAQESHQoQZXh0ZXJuYWxfYmxvY2tlZBgEIAEoCEgDiAEBQgkKB19udW1iZXJCCgoIX3VzZXJfaWRCDgoMX2Rlc2NyaXB0aW9uQhMKEV9leHRlcm5hbF9ibG9ja2VkIkIKFFNpcEV4dGVuc2lvblJlc3BvbnNlEioKCWV4dGVuc2lvbhgBIAEoCzIXLmNhbGFiYS52MS5TaXBFeHRlbnNpb24iPAoVTGlzdFNpcEdyb3Vwc1Jlc3BvbnNlEiMKBmdyb3VwcxgBIAMoCzITLmNhbGFiYS52MS5TaXBHcm91cCIoCg9TaXBHcm91cE1lbWJlcnMSFQoNZXh0ZW5zaW9uX2lkcxgBIAMoCSKYAgoVQ3JlYXRlU2lwR3JvdXBSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGbnVtYmVyGAIgASgJEi0KCHN0cmF0ZWd5GAMgASgOMhsuY2FsYWJhLnYxLlNpcEdyb3VwU3RyYXRlZ3kSEAoIcmluZ19zZWMYBCABKA0SFwoPbWVtYmVyX3Jpbmdfc2VjGAUgASgNEioKB29uX2ZhaWwYBiABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSKwoHbWVtYmVycxgHIAEoCzIaLmNhbGFiYS52MS5TaXBHcm91cE1lbWJlcnMSGAoQZmFsbGJhY2tfZW5hYmxlZBgIIAEoCBIUCgxmYWxsYmFja19zZWMYCSABKA0iowMKFVVwZGF0ZVNpcEdyb3VwUmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESEwoGbnVtYmVyGAIgASgJSAGIAQESMgoIc3RyYXRlZ3kYAyABKA4yGy5jYWxhYmEudjEuU2lwR3JvdXBTdHJhdGVneUgCiAEBEhUKCHJpbmdfc2VjGAQgASgNSAOIAQESHAoPbWVtYmVyX3Jpbmdfc2VjGAUgASgNSASIAQESKgoHb25fZmFpbBgGIAEoCzIZLmNhbGFiYS52MS5TaXBSb3V0ZVRhcmdldBIrCgdtZW1iZXJzGAcgASgLMhouY2FsYWJhLnYxLlNpcEdyb3VwTWVtYmVycxIdChBmYWxsYmFja19lbmFibGVkGAggASgISAWIAQESGQoMZmFsbGJhY2tfc2VjGAkgASgNSAaIAQFCBwoFX25hbWVCCQoHX251bWJlckILCglfc3RyYXRlZ3lCCwoJX3Jpbmdfc2VjQhIKEF9tZW1iZXJfcmluZ19zZWNCEwoRX2ZhbGxiYWNrX2VuYWJsZWRCDwoNX2ZhbGxiYWNrX3NlYyI2ChBTaXBHcm91cFJlc3BvbnNlEiIKBWdyb3VwGAEgASgLMhMuY2FsYWJhLnYxLlNpcEdyb3VwIj8KF0xpc3RTaXBJdnJNZW51c1Jlc3BvbnNlEiQKBW1lbnVzGAEgAygLMhUuY2FsYWJhLnYxLlNpcEl2ck1lbnUiMwoLU2lwSXZySXRlbXMSJAoFaXRlbXMYASADKAsyFS5jYWxhYmEudjEuU2lwSXZySXRlbSKBAgoXQ3JlYXRlU2lwSXZyTWVudVJlcXVlc3QSDAoEbmFtZRgBIAEoCRIZChFpbnB1dF90aW1lb3V0X3NlYxgCIAEoDRIPCgdyZXBlYXRzGAMgASgNEi4KC29uX25vX2lucHV0GAQgASgLMhkuY2FsYWJhLnYxLlNpcFJvdXRlVGFyZ2V0EiUKBWl0ZW1zGAUgASgLMhYuY2FsYWJhLnYxLlNpcEl2ckl0ZW1zEh0KFXByb21wdF9zb3VyY2VfZmlsZV9pZBgGIAEoCRIXCg9kaWFsX2V4dGVuc2lvbnMYByABKAgSHQoVbm90aWNlX3NvdXJjZV9maWxlX2lkGAggASgJIpIDChdVcGRhdGVTaXBJdnJNZW51UmVxdWVzdBIRCgRuYW1lGAEgASgJSACIAQESHgoRaW5wdXRfdGltZW91dF9zZWMYAiABKA1IAYgBARIUCgdyZXBlYXRzGAMgASgNSAKIAQESLgoLb25fbm9faW5wdXQYBCABKAsyGS5jYWxhYmEudjEuU2lwUm91dGVUYXJnZXQSJQoFaXRlbXMYBSABKAsyFi5jYWxhYmEudjEuU2lwSXZySXRlbXMSIgoVcHJvbXB0X3NvdXJjZV9maWxlX2lkGAYgASgJSAOIAQESHAoPZGlhbF9leHRlbnNpb25zGAcgASgISASIAQESIgoVbm90aWNlX3NvdXJjZV9maWxlX2lkGAggASgJSAWIAQFCBwoFX25hbWVCFAoSX2lucHV0X3RpbWVvdXRfc2VjQgoKCF9yZXBlYXRzQhgKFl9wcm9tcHRfc291cmNlX2ZpbGVfaWRCEgoQX2RpYWxfZXh0ZW5zaW9uc0IYChZfbm90aWNlX3NvdXJjZV9maWxlX2lkIjkKElNpcEl2ck1lbnVSZXNwb25zZRIjCgRtZW51GAEgASgLMhUuY2FsYWJhLnYxLlNpcEl2ck1lbnUiyQEKFFB1dFNpcEluYm91bmRSZXF1ZXN0Eg8KB2VuYWJsZWQYASABKAgSKQoGdGFyZ2V0GAIgASgLMhkuY2FsYWJhLnYxLlNpcFJvdXRlVGFyZ2V0EhUKDWFsbG93ZWRfY2lkcnMYAyADKAkSJwoEbW9kZRgEIAEoDjIZLmNhbGFiYS52MS5TaXBJbmJvdW5kTW9kZRI1CgxyZWdpc3RyYXRpb24YBSABKAsyHy5jYWxhYmEudjEuU2lwUmVnaXN0cmF0aW9uSW5wdXQiQQoVUHV0U2lwSW5ib3VuZFJlc3BvbnNlEigKCHNldHRpbmdzGAEgASgLMhYuY2FsYWJhLnYxLlNpcFNldHRpbmdzIjIKDlNpcEluYm91bmRSaW5nEiAKBGNhbGwYASABKAsyEi5jYWxhYmEudjEuU2lwQ2FsbCJoChhTaXBJbmJvdW5kQWNjZXB0UmVzcG9uc2USIAoEY2FsbBgBIAEoCzISLmNhbGFiYS52MS5TaXBDYWxsEioKBGpvaW4YAiABKAsyHC5jYWxhYmEudjEuSm9pblZvaWNlUmVzcG9uc2UiTwoWVHJhbnNmZXJTaXBDYWxsUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJEhQKDGV4dGVuc2lvbl9pZBgCIAEoCRIOCgZudW1iZXIYAyABKAkiRQoaTGlzdFNpcEFjdGl2ZUNhbGxzUmVzcG9uc2USJwoFY2FsbHMYASADKAsyGC5jYWxhYmEudjEuU2lwQWN0aXZlQ2FsbCKUAQoNU2lwQWN0aXZlQ2FsbBIgCgRjYWxsGAEgASgLMhIuY2FsYWJhLnYxLlNpcENhbGwSJgoEc3RlcBgCIAEoDjIYLmNhbGFiYS52MS5TaXBBY3RpdmVTdGVwEg8KB3N0ZXBfaWQYAyABKAkSEQoJc3RlcF9uYW1lGAQgASgJEhUKDW51bWJlcl9tYXNrZWQYBSABKAgiJwoPU2lwQ2FsbHNDaGFuZ2VkEhQKDHdvcmtzcGFjZV9pZBgBIAEoCSKQAgoMU2lwQ2FsbEV2ZW50EgsKA3NlcRgBIAEoDRImCgJhdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASKQoEa2luZBgDIAEoDjIbLmNhbGFiYS52MS5TaXBDYWxsRXZlbnRLaW5kEg8KB3VzZXJfaWQYBCABKAkSFAoMcGVlcl91c2VyX2lkGAUgASgJEjEKC3RhcmdldF9raW5kGAYgASgOMhwuY2FsYWJhLnYxLlNpcENhbGxUYXJnZXRLaW5kEhEKCXRhcmdldF9pZBgHIAEoCRITCgt0YXJnZXRfbmFtZRgIIAEoCRIOCgZkaWdpdHMYCSABKAkSDgoGcmVhc29uGAogASgJImQKDFNpcENhbGxQYXJ0eRIPCgd1c2VyX2lkGAEgASgJEg4KBnBsYWNlZBgCIAEoCBIMCgRyYW5nGAMgASgIEhAKCGFuc3dlcmVkGAQgASgIEhMKC3RyYW5zZmVycmVkGAUgASgIIjoKDVNpcENvbnRhY3RSZWYSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIPCgdjb21wYW55GAMgASgJIqMCCg9TaXBKb3VybmFsRW50cnkSIAoEY2FsbBgBIAEoCzISLmNhbGFiYS52MS5TaXBDYWxsEigKBm9yaWdpbhgCIAEoDjIYLmNhbGFiYS52MS5TaXBDYWxsT3JpZ2luEhEKCXBlZXJfZTE2NBgDIAEoCRIpCgdjb250YWN0GAQgASgLMhguY2FsYWJhLnYxLlNpcENvbnRhY3RSZWYSFgoObWVtYmVyX3VzZXJfaWQYBSABKAkSDwoHd2FpdF9tcxgGIAEoDRIPCgd0YWxrX21zGAcgASgNEg4KBm1pc3NlZBgIIAEoCBIoCgdwYXJ0aWVzGAkgAygLMhcuY2FsYWJhLnYxLlNpcENhbGxQYXJ0eRISCgpoYXNfZXZlbnRzGAogASgIIloKFkxpc3RTaXBKb3VybmFsUmVzcG9uc2USKwoHZW50cmllcxgBIAMoCzIaLmNhbGFiYS52MS5TaXBKb3VybmFsRW50cnkSEwoLbmV4dF9jdXJzb3IYAiABKAkiUQoTU2lwSm91cm5hbFJlY29yZGluZxIPCgdmaWxlX2lkGAEgASgJEhQKDGRpc2tfaXRlbV9pZBgCIAEoCRITCgtkdXJhdGlvbl9tcxgDIAEoDSKjAQoaR2V0U2lwSm91cm5hbEVudHJ5UmVzcG9uc2USKQoFZW50cnkYASABKAsyGi5jYWxhYmEudjEuU2lwSm91cm5hbEVudHJ5EicKBmV2ZW50cxgCIAMoCzIXLmNhbGFiYS52MS5TaXBDYWxsRXZlbnQSMQoJcmVjb3JkaW5nGAMgASgLMh4uY2FsYWJhLnYxLlNpcEpvdXJuYWxSZWNvcmRpbmciYAoTUHV0U2lwUG9saWN5UmVxdWVzdBIYChByZXRlbnRpb25fbW9udGhzGAEgASgNEhQKDG91dF9wZXJfaG91chgCIAEoDRIZChFvdXRfcGVyX3VzZXJfaG91chgDIAEoDSJAChRQdXRTaXBQb2xpY3lSZXNwb25zZRIoCghzZXR0aW5ncxgBIAEoCzIWLmNhbGFiYS52MS5TaXBTZXR0aW5ncyI9ChBTaXBKb3VybmFsQ2hhbmdlEikKBWVudHJ5GAEgASgLMhouY2FsYWJhLnYxLlNpcEpvdXJuYWxFbnRyeSI3ChBTaXBNaXNzZWRDaGFuZ2VkEhQKDHdvcmtzcGFjZV9pZBgBIAEoCRINCgVjb3VudBgCIAEoDSpyCgxTaXBUcmFuc3BvcnQSHQoZU0lQX1RSQU5TUE9SVF9VTlNQRUNJRklFRBAAEhUKEVNJUF9UUkFOU1BPUlRfVURQEAESFQoRU0lQX1RSQU5TUE9SVF9UQ1AQAhIVChFTSVBfVFJBTlNQT1JUX1RMUxADKr0BCg1TaXBDYWxsU3RhdHVzEh8KG1NJUF9DQUxMX1NUQVRVU19VTlNQRUNJRklFRBAAEhsKF1NJUF9DQUxMX1NUQVRVU19ESUFMSU5HEAESGwoXU0lQX0NBTExfU1RBVFVTX1JJTkdJTkcQAhIaChZTSVBfQ0FMTF9TVEFUVVNfQUNUSVZFEAMSGQoVU0lQX0NBTExfU1RBVFVTX0VOREVEEAQSGgoWU0lQX0NBTExfU1RBVFVTX0ZBSUxFRBAFKm0KEFNpcENhbGxEaXJlY3Rpb24SIgoeU0lQX0NBTExfRElSRUNUSU9OX1VOU1BFQ0lGSUVEEAASGgoWU0lQX0NBTExfRElSRUNUSU9OX09VVBABEhkKFVNJUF9DQUxMX0RJUkVDVElPTl9JThACKm4KDlNpcEluYm91bmRNb2RlEiAKHFNJUF9JTkJPVU5EX01PREVfVU5TUEVDSUZJRUQQABIbChdTSVBfSU5CT1VORF9NT0RFX0RJUkVDVBABEh0KGVNJUF9JTkJPVU5EX01PREVfUkVHSVNURVIQAir/AQoVU2lwUmVnaXN0cmF0aW9uU3RhdHVzEicKI1NJUF9SRUdJU1RSQVRJT05fU1RBVFVTX1VOU1BFQ0lGSUVEEAASHwobU0lQX1JFR0lTVFJBVElPTl9TVEFUVVNfT0ZGEAESJwojU0lQX1JFR0lTVFJBVElPTl9TVEFUVVNfVU5BVkFJTEFCTEUQAhInCiNTSVBfUkVHSVNUUkFUSU9OX1NUQVRVU19SRUdJU1RFUklORxADEiYKIlNJUF9SRUdJU1RSQVRJT05fU1RBVFVTX1JFR0lTVEVSRUQQBBIiCh5TSVBfUkVHSVNUUkFUSU9OX1NUQVRVU19GQUlMRUQQBSq1AQoMU2lwUm91dGVLaW5kEh4KGlNJUF9ST1VURV9LSU5EX1VOU1BFQ0lGSUVEEAASGQoVU0lQX1JPVVRFX0tJTkRfSEFOR1VQEAESGQoVU0lQX1JPVVRFX0tJTkRfUkVQRUFUEAISFwoTU0lQX1JPVVRFX0tJTkRfTUVOVRADEhwKGFNJUF9ST1VURV9LSU5EX0VYVEVOU0lPThAEEhgKFFNJUF9ST1VURV9LSU5EX0dST1VQEAUqjQEKEFNpcEV4dGVuc2lvbktpbmQSIgoeU0lQX0VYVEVOU0lPTl9LSU5EX1VOU1BFQ0lGSUVEEAASGwoXU0lQX0VYVEVOU0lPTl9LSU5EX1VTRVIQARIaChZTSVBfRVhURU5TSU9OX0tJTkRfQk9UEAISHAoYU0lQX0VYVEVOU0lPTl9LSU5EX0dST1VQEAMqewoQU2lwR3JvdXBTdHJhdGVneRIiCh5TSVBfR1JPVVBfU1RSQVRFR1lfVU5TUEVDSUZJRUQQABIfChtTSVBfR1JPVVBfU1RSQVRFR1lfUklOR19BTEwQARIiCh5TSVBfR1JPVVBfU1RSQVRFR1lfUk9VTkRfUk9CSU4QAiptCg9TaXBQcm9tcHRTdGF0dXMSIQodU0lQX1BST01QVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIaChZTSVBfUFJPTVBUX1NUQVRVU19OT05FEAESGwoXU0lQX1BST01QVF9TVEFUVVNfUkVBRFkQAiqjAQoNU2lwQWN0aXZlU3RlcBIfChtTSVBfQUNUSVZFX1NURVBfVU5TUEVDSUZJRUQQABIbChdTSVBfQUNUSVZFX1NURVBfRElBTElORxABEhgKFFNJUF9BQ1RJVkVfU1RFUF9NRU5VEAISGwoXU0lQX0FDVElWRV9TVEVQX1JJTkdJTkcQAxIdChlTSVBfQUNUSVZFX1NURVBfQ09OTkVDVEVEEAQqnwEKDVNpcENhbGxPcmlnaW4SHwobU0lQX0NBTExfT1JJR0lOX1VOU1BFQ0lGSUVEEAASGAoUU0lQX0NBTExfT1JJR0lOX1JPT00QARIcChhTSVBfQ0FMTF9PUklHSU5fUEVSU09OQUwQAhIbChdTSVBfQ0FMTF9PUklHSU5fSU5CT1VORBADEhgKFFNJUF9DQUxMX09SSUdJTl9URVNUEAQq7QQKEFNpcENhbGxFdmVudEtpbmQSIwofU0lQX0NBTExfRVZFTlRfS0lORF9VTlNQRUNJRklFRBAAEh8KG1NJUF9DQUxMX0VWRU5UX0tJTkRfU1RBUlRFRBABEhwKGFNJUF9DQUxMX0VWRU5UX0tJTkRfTUVOVRACEhsKF1NJUF9DQUxMX0VWRU5UX0tJTkRfS0VZEAMSHgoaU0lQX0NBTExfRVZFTlRfS0lORF9ESUFMRUQQBBIgChxTSVBfQ0FMTF9FVkVOVF9LSU5EX05PX0lOUFVUEAUSHgoaU0lQX0NBTExfRVZFTlRfS0lORF9OT1RJQ0UQBhIdChlTSVBfQ0FMTF9FVkVOVF9LSU5EX0dST1VQEAcSHAoYU0lQX0NBTExfRVZFTlRfS0lORF9SSU5HEAgSIAocU0lQX0NBTExfRVZFTlRfS0lORF9SSU5HX0VORBAJEiAKHFNJUF9DQUxMX0VWRU5UX0tJTkRfRkFMTEJBQ0sQChIgChxTSVBfQ0FMTF9FVkVOVF9LSU5EX0FOU1dFUkVEEAsSIAocU0lQX0NBTExfRVZFTlRfS0lORF9UUkFOU0ZFUhAMEiQKIFNJUF9DQUxMX0VWRU5UX0tJTkRfVFJBTlNGRVJfRU5EEA0SHwobU0lQX0NBTExfRVZFTlRfS0lORF9ESUFMSU5HEA4SKAokU0lQX0NBTExfRVZFTlRfS0lORF9QUk9WSURFUl9SSU5HSU5HEA8SIQodU0lQX0NBTExfRVZFTlRfS0lORF9SRUNPUkRJTkcQEBIdChlTSVBfQ0FMTF9FVkVOVF9LSU5EX0VOREVEEBEq2gEKEVNpcENhbGxUYXJnZXRLaW5kEiQKIFNJUF9DQUxMX1RBUkdFVF9LSU5EX1VOU1BFQ0lGSUVEEAASHQoZU0lQX0NBTExfVEFSR0VUX0tJTkRfTUVOVRABEh4KGlNJUF9DQUxMX1RBUkdFVF9LSU5EX0dST1VQEAISIgoeU0lQX0NBTExfVEFSR0VUX0tJTkRfRVhURU5TSU9OEAMSHQoZU0lQX0NBTExfVEFSR0VUX0tJTkRfVVNFUhAEEh0KGVNJUF9DQUxMX1RBUkdFVF9LSU5EX1JPT00QBUKWAQoNY29tLmNhbGFiYS52MUIIU2lwUHJvdG9QAVo2Z2l0aHViLmNvbS9jYWxhYmEvY2FsYWJhL3NlcnZlci9nZW4vY2FsYWJhL3YxO2NhbGFiYXYxogIDQ1hYqgIJQ2FsYWJhLlYxygIJQ2FsYWJhXFYx4gIVQ2FsYWJhXFYxXEdQQk1ldGFkYXRh6gIKQ2FsYWJhOjpWMWIGcHJvdG8z", [file_google_protobuf_timestamp, file_calaba_v1_rtc]);
 
 /**
  * The workspace's SIP provider account (one per workspace). GET never returns the password.
@@ -208,6 +208,26 @@ export type SipSettings = Message<"calaba.v1.SipSettings"> & {
    * @generated from field: bool recording_available = 26;
    */
   recordingAvailable: boolean;
+
+  /**
+   * The workspace's telephony policy (ADR-0137, PUT /api/workspaces/{id}/sip/policy): the
+   * journal is kept retention_months (1, 3, 6, 12, 24, 36; default 12), outbound calls are
+   * limited per hour to out_per_hour for the workspace (default 120) and out_per_user_hour for
+   * one member (default 30).
+   *
+   * @generated from field: uint32 retention_months = 27;
+   */
+  retentionMonths: number;
+
+  /**
+   * @generated from field: uint32 out_per_hour = 28;
+   */
+  outPerHour: number;
+
+  /**
+   * @generated from field: uint32 out_per_user_hour = 29;
+   */
+  outPerUserHour: number;
 };
 
 /**
@@ -719,8 +739,8 @@ export const SipCallSchema: GenMessage<SipCall> = /*@__PURE__*/
  * on every status change. Errors: 404 no room / DM; 403 no PLACE_CALLS, a guest; 422
  * VALIDATION (field "number": not a phone number) or «not a voice room»; 409 SIP_DISABLED;
  * 409 CONFLICT «join the call first» (the caller is not in this room's call); 409
- * SIP_CALL_ACTIVE; 422 SIP_NUMBER_NOT_ALLOWED; 429 SIP_RATE_LIMITED (20 calls per hour per
- * workspace); 403 WORKSPACE_SUSPENDED. The line rings for up to 45 s; a call lasts 2 h at most.
+ * SIP_CALL_ACTIVE; 422 SIP_NUMBER_NOT_ALLOWED; 429 SIP_RATE_LIMITED (SipSettings.out_per_hour
+ * calls per hour per workspace, out_per_user_hour per member); 403 WORKSPACE_SUSPENDED. The line rings for up to 45 s; a call lasts 2 h at most.
  *
  * @generated from message calaba.v1.PlaceSipCallRequest
  */
@@ -1938,6 +1958,410 @@ export const SipCallsChangedSchema: GenMessage<SipCallsChanged> = /*@__PURE__*/
   messageDesc(file_calaba_v1_sip, 41);
 
 /**
+ * @generated from message calaba.v1.SipCallEvent
+ */
+export type SipCallEvent = Message<"calaba.v1.SipCallEvent"> & {
+  /**
+   * @generated from field: uint32 seq = 1;
+   */
+  seq: number;
+
+  /**
+   * Unset: a call from before the journal; its steps are parsed from SipCall.route, in order
+   * but without times.
+   *
+   * @generated from field: google.protobuf.Timestamp at = 2;
+   */
+  at?: Timestamp | undefined;
+
+  /**
+   * @generated from field: calaba.v1.SipCallEventKind kind = 3;
+   */
+  kind: SipCallEventKind;
+
+  /**
+   * @generated from field: string user_id = 4;
+   */
+  userId: string;
+
+  /**
+   * @generated from field: string peer_user_id = 5;
+   */
+  peerUserId: string;
+
+  /**
+   * @generated from field: calaba.v1.SipCallTargetKind target_kind = 6;
+   */
+  targetKind: SipCallTargetKind;
+
+  /**
+   * empty: unknown (deleted, or a call from before the journal)
+   *
+   * @generated from field: string target_id = 7;
+   */
+  targetId: string;
+
+  /**
+   * the name at the time of the call; ≤ 64 characters
+   *
+   * @generated from field: string target_name = 8;
+   */
+  targetName: string;
+
+  /**
+   * @generated from field: string digits = 9;
+   */
+  digits: string;
+
+  /**
+   * @generated from field: string reason = 10;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message calaba.v1.SipCallEvent.
+ * Use `create(SipCallEventSchema)` to create a new message.
+ */
+export const SipCallEventSchema: GenMessage<SipCallEvent> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 42);
+
+/**
+ * An employee of a call and their part in it.
+ *
+ * @generated from message calaba.v1.SipCallParty
+ */
+export type SipCallParty = Message<"calaba.v1.SipCallParty"> & {
+  /**
+   * @generated from field: string user_id = 1;
+   */
+  userId: string;
+
+  /**
+   * placed the call
+   *
+   * @generated from field: bool placed = 2;
+   */
+  placed: boolean;
+
+  /**
+   * the call rang them
+   *
+   * @generated from field: bool rang = 3;
+   */
+  rang: boolean;
+
+  /**
+   * answered it (or took a transfer)
+   *
+   * @generated from field: bool answered = 4;
+   */
+  answered: boolean;
+
+  /**
+   * handed it over
+   *
+   * @generated from field: bool transferred = 5;
+   */
+  transferred: boolean;
+};
+
+/**
+ * Describes the message calaba.v1.SipCallParty.
+ * Use `create(SipCallPartySchema)` to create a new message.
+ */
+export const SipCallPartySchema: GenMessage<SipCallParty> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 43);
+
+/**
+ * A contact of the workspace's phone book (T2); unset until then.
+ *
+ * @generated from message calaba.v1.SipContactRef
+ */
+export type SipContactRef = Message<"calaba.v1.SipContactRef"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string company = 3;
+   */
+  company: string;
+};
+
+/**
+ * Describes the message calaba.v1.SipContactRef.
+ * Use `create(SipContactRefSchema)` to create a new message.
+ */
+export const SipContactRefSchema: GenMessage<SipContactRef> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 44);
+
+/**
+ * A row of the journal: the call and what the list shows of it, without its events.
+ *
+ * @generated from message calaba.v1.SipJournalEntry
+ */
+export type SipJournalEntry = Message<"calaba.v1.SipJournalEntry"> & {
+  /**
+   * @generated from field: calaba.v1.SipCall call = 1;
+   */
+  call?: SipCall | undefined;
+
+  /**
+   * @generated from field: calaba.v1.SipCallOrigin origin = 2;
+   */
+  origin: SipCallOrigin;
+
+  /**
+   * the outside party's number, E.164; empty: not a number (hidden)
+   *
+   * @generated from field: string peer_e164 = 3;
+   */
+  peerE164: string;
+
+  /**
+   * the contact of peer_e164 (T2), names as of now
+   *
+   * @generated from field: calaba.v1.SipContactRef contact = 4;
+   */
+  contact?: SipContactRef | undefined;
+
+  /**
+   * peer_e164 is an employee's phone (T2)
+   *
+   * @generated from field: string member_user_id = 5;
+   */
+  memberUserId: string;
+
+  /**
+   * Waiting: from the start to the answer (menu and ringing), for a call nobody answered to its
+   * end; talking: from the answer to the end (0 while live or never answered).
+   *
+   * @generated from field: uint32 wait_ms = 6;
+   */
+  waitMs: number;
+
+  /**
+   * @generated from field: uint32 talk_ms = 7;
+   */
+  talkMs: number;
+
+  /**
+   * An inbound call nobody answered after it rang somebody, or that ended in a menu (no input,
+   * a route to «hang up»). A call a colleague answered is not missed.
+   *
+   * @generated from field: bool missed = 8;
+   */
+  missed: boolean;
+
+  /**
+   * @generated from field: repeated calaba.v1.SipCallParty parties = 9;
+   */
+  parties: SipCallParty[];
+
+  /**
+   * false: a call from before the journal (the detail parses its route)
+   *
+   * @generated from field: bool has_events = 10;
+   */
+  hasEvents: boolean;
+};
+
+/**
+ * Describes the message calaba.v1.SipJournalEntry.
+ * Use `create(SipJournalEntrySchema)` to create a new message.
+ */
+export const SipJournalEntrySchema: GenMessage<SipJournalEntry> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 45);
+
+/**
+ * @generated from message calaba.v1.ListSipJournalResponse
+ */
+export type ListSipJournalResponse = Message<"calaba.v1.ListSipJournalResponse"> & {
+  /**
+   * @generated from field: repeated calaba.v1.SipJournalEntry entries = 1;
+   */
+  entries: SipJournalEntry[];
+
+  /**
+   * empty = no more
+   *
+   * @generated from field: string next_cursor = 2;
+   */
+  nextCursor: string;
+};
+
+/**
+ * Describes the message calaba.v1.ListSipJournalResponse.
+ * Use `create(ListSipJournalResponseSchema)` to create a new message.
+ */
+export const ListSipJournalResponseSchema: GenMessage<ListSipJournalResponse> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 46);
+
+/**
+ * The recording of a call (ADR-0131), only when the reader may view its Disk file.
+ *
+ * @generated from message calaba.v1.SipJournalRecording
+ */
+export type SipJournalRecording = Message<"calaba.v1.SipJournalRecording"> & {
+  /**
+   * @generated from field: string file_id = 1;
+   */
+  fileId: string;
+
+  /**
+   * @generated from field: string disk_item_id = 2;
+   */
+  diskItemId: string;
+
+  /**
+   * @generated from field: uint32 duration_ms = 3;
+   */
+  durationMs: number;
+};
+
+/**
+ * Describes the message calaba.v1.SipJournalRecording.
+ * Use `create(SipJournalRecordingSchema)` to create a new message.
+ */
+export const SipJournalRecordingSchema: GenMessage<SipJournalRecording> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 47);
+
+/**
+ * @generated from message calaba.v1.GetSipJournalEntryResponse
+ */
+export type GetSipJournalEntryResponse = Message<"calaba.v1.GetSipJournalEntryResponse"> & {
+  /**
+   * @generated from field: calaba.v1.SipJournalEntry entry = 1;
+   */
+  entry?: SipJournalEntry | undefined;
+
+  /**
+   * in order
+   *
+   * @generated from field: repeated calaba.v1.SipCallEvent events = 2;
+   */
+  events: SipCallEvent[];
+
+  /**
+   * @generated from field: calaba.v1.SipJournalRecording recording = 3;
+   */
+  recording?: SipJournalRecording | undefined;
+};
+
+/**
+ * Describes the message calaba.v1.GetSipJournalEntryResponse.
+ * Use `create(GetSipJournalEntryResponseSchema)` to create a new message.
+ */
+export const GetSipJournalEntryResponseSchema: GenMessage<GetSipJournalEntryResponse> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 48);
+
+/**
+ * @generated from message calaba.v1.PutSipPolicyRequest
+ */
+export type PutSipPolicyRequest = Message<"calaba.v1.PutSipPolicyRequest"> & {
+  /**
+   * How long calls are kept: 1, 3, 6, 12, 24 or 36 months (0 = 12). Older calls are deleted
+   * within an hour (contacts, T2: those without calls and edits in the period).
+   *
+   * @generated from field: uint32 retention_months = 1;
+   */
+  retentionMonths: number;
+
+  /**
+   * outbound calls per hour of the workspace, 1..1000 (0 = 120)
+   *
+   * @generated from field: uint32 out_per_hour = 2;
+   */
+  outPerHour: number;
+
+  /**
+   * outbound calls per hour of one member, 1..1000 (0 = 30)
+   *
+   * @generated from field: uint32 out_per_user_hour = 3;
+   */
+  outPerUserHour: number;
+};
+
+/**
+ * Describes the message calaba.v1.PutSipPolicyRequest.
+ * Use `create(PutSipPolicyRequestSchema)` to create a new message.
+ */
+export const PutSipPolicyRequestSchema: GenMessage<PutSipPolicyRequest> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 49);
+
+/**
+ * @generated from message calaba.v1.PutSipPolicyResponse
+ */
+export type PutSipPolicyResponse = Message<"calaba.v1.PutSipPolicyResponse"> & {
+  /**
+   * @generated from field: calaba.v1.SipSettings settings = 1;
+   */
+  settings?: SipSettings | undefined;
+};
+
+/**
+ * Describes the message calaba.v1.PutSipPolicyResponse.
+ * Use `create(PutSipPolicyResponseSchema)` to create a new message.
+ */
+export const PutSipPolicyResponseSchema: GenMessage<PutSipPolicyResponse> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 50);
+
+/**
+ * SIP_JOURNAL_ENTRY: a call appeared, was answered / transferred, or ended (ADR-0137 §1). On the
+ * workspace channel to the sessions of members with VIEW_JOURNALS who can view the call's room
+ * (if any) and of the call's parties — once per session; never guests, never bots (they read
+ * REST). Clients put the entry into a loaded first page when their filters let it in, and
+ * re-read an open detail of that call.
+ *
+ * @generated from message calaba.v1.SipJournalChange
+ */
+export type SipJournalChange = Message<"calaba.v1.SipJournalChange"> & {
+  /**
+   * @generated from field: calaba.v1.SipJournalEntry entry = 1;
+   */
+  entry?: SipJournalEntry | undefined;
+};
+
+/**
+ * Describes the message calaba.v1.SipJournalChange.
+ * Use `create(SipJournalChangeSchema)` to create a new message.
+ */
+export const SipJournalChangeSchema: GenMessage<SipJournalChange> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 51);
+
+/**
+ * SIP_MISSED_CHANGED: the member's missed badge of the workspace changed (a call that rang them
+ * was missed, or they looked at «Recent» on another device). To the member's user channel.
+ *
+ * @generated from message calaba.v1.SipMissedChanged
+ */
+export type SipMissedChanged = Message<"calaba.v1.SipMissedChanged"> & {
+  /**
+   * @generated from field: string workspace_id = 1;
+   */
+  workspaceId: string;
+
+  /**
+   * @generated from field: uint32 count = 2;
+   */
+  count: number;
+};
+
+/**
+ * Describes the message calaba.v1.SipMissedChanged.
+ * Use `create(SipMissedChangedSchema)` to create a new message.
+ */
+export const SipMissedChangedSchema: GenMessage<SipMissedChanged> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_sip, 52);
+
+/**
  * @generated from enum calaba.v1.SipTransport
  */
 export enum SipTransport {
@@ -2338,4 +2762,235 @@ export enum SipActiveStep {
  */
 export const SipActiveStepSchema: GenEnum<SipActiveStep> = /*@__PURE__*/
   enumDesc(file_calaba_v1_sip, 9);
+
+/**
+ * Where a call comes from.
+ *
+ * @generated from enum calaba.v1.SipCallOrigin
+ */
+export enum SipCallOrigin {
+  /**
+   * @generated from enum value: SIP_CALL_ORIGIN_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * a voice room's line (ADR-0046); the room may be deleted since
+   *
+   * @generated from enum value: SIP_CALL_ORIGIN_ROOM = 1;
+   */
+  ROOM = 1,
+
+  /**
+   * a call from the telephony section (ADR-0137 §3)
+   *
+   * @generated from enum value: SIP_CALL_ORIGIN_PERSONAL = 2;
+   */
+  PERSONAL = 2,
+
+  /**
+   * a call to the workspace's number (ADR-0117)
+   *
+   * @generated from enum value: SIP_CALL_ORIGIN_INBOUND = 3;
+   */
+  INBOUND = 3,
+
+  /**
+   * the connection test
+   *
+   * @generated from enum value: SIP_CALL_ORIGIN_TEST = 4;
+   */
+  TEST = 4,
+}
+
+/**
+ * Describes the enum calaba.v1.SipCallOrigin.
+ */
+export const SipCallOriginSchema: GenEnum<SipCallOrigin> = /*@__PURE__*/
+  enumDesc(file_calaba_v1_sip, 10);
+
+/**
+ * A step of a call. user_id is the employee of the step, target_* the menu / group / number /
+ * member / room it concerns, its name as it was then.
+ *
+ * @generated from enum calaba.v1.SipCallEventKind
+ */
+export enum SipCallEventKind {
+  /**
+   * @generated from enum value: SIP_CALL_EVENT_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * The call began. Inbound: digits = the company number called, reason "direct" / "register";
+   * outbound: user_id = who placed it, target = the room (room calls).
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_STARTED = 1;
+   */
+  STARTED = 1,
+
+  /**
+   * a voice menu plays: target = the menu, digits = the play count
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_MENU = 2;
+   */
+  MENU = 2,
+
+  /**
+   * the caller pressed digits; reason "invalid": the menu has no such key
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_KEY = 3;
+   */
+  KEY = 3,
+
+  /**
+   * the caller dialed an internal number digits; reason "found" / "not_found"
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_DIALED = 4;
+   */
+  DIALED = 4,
+
+  /**
+   * the menu got no key in time
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_NO_INPUT = 5;
+   */
+  NO_INPUT = 5,
+
+  /**
+   * the recording notice of target (a menu) plays (ADR-0131)
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_NOTICE = 6;
+   */
+  NOTICE = 6,
+
+  /**
+   * A group takes the call: target = the group, reason "ring_all" / "round_robin".
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_GROUP = 7;
+   */
+  GROUP = 7,
+
+  /**
+   * user_id's devices start ringing: target = the group, or the number (extension) rung.
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_RING = 8;
+   */
+  RING = 8,
+
+  /**
+   * user_id's devices stop ringing: reason "no_answer", "declined", "answered_elsewhere",
+   * "fallback", "caller_left", "cancelled", "ended".
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_RING_END = 9;
+   */
+  RING_END = 9,
+
+  /**
+   * A group's fallback (ADR-0124): target = where the call goes, reason "timeout" / "nobody" /
+   * "declined".
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_FALLBACK = 10;
+   */
+  FALLBACK = 10,
+
+  /**
+   * user_id answered (outbound: the callee, user_id empty)
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_ANSWERED = 11;
+   */
+  ANSWERED = 11,
+
+  /**
+   * user_id hands the call over (ADR-0132): to peer_user_id (a member) or target (a number, a group).
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_TRANSFER = 12;
+   */
+  TRANSFER = 12,
+
+  /**
+   * A transfer is over: reason "answered" (user_id took the call), "no_answer", "declined",
+   * "cancelled", "not_connected".
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_TRANSFER_END = 13;
+   */
+  TRANSFER_END = 13,
+
+  /**
+   * outbound: the INVITE goes to the provider
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_DIALING = 14;
+   */
+  DIALING = 14,
+
+  /**
+   * outbound: the callee's phone rings
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_PROVIDER_RINGING = 15;
+   */
+  PROVIDER_RINGING = 15,
+
+  /**
+   * The recording (ADR-0131): reason "started", "stored", "failed".
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_RECORDING = 16;
+   */
+  RECORDING = 16,
+
+  /**
+   * The end: reason = SipCall.reason; user_id = the member who hung up (empty: the caller or the system).
+   *
+   * @generated from enum value: SIP_CALL_EVENT_KIND_ENDED = 17;
+   */
+  ENDED = 17,
+}
+
+/**
+ * Describes the enum calaba.v1.SipCallEventKind.
+ */
+export const SipCallEventKindSchema: GenEnum<SipCallEventKind> = /*@__PURE__*/
+  enumDesc(file_calaba_v1_sip, 11);
+
+/**
+ * @generated from enum calaba.v1.SipCallTargetKind
+ */
+export enum SipCallTargetKind {
+  /**
+   * @generated from enum value: SIP_CALL_TARGET_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: SIP_CALL_TARGET_KIND_MENU = 1;
+   */
+  MENU = 1,
+
+  /**
+   * @generated from enum value: SIP_CALL_TARGET_KIND_GROUP = 2;
+   */
+  GROUP = 2,
+
+  /**
+   * target_name = the internal number
+   *
+   * @generated from enum value: SIP_CALL_TARGET_KIND_EXTENSION = 3;
+   */
+  EXTENSION = 3,
+
+  /**
+   * @generated from enum value: SIP_CALL_TARGET_KIND_USER = 4;
+   */
+  USER = 4,
+
+  /**
+   * @generated from enum value: SIP_CALL_TARGET_KIND_ROOM = 5;
+   */
+  ROOM = 5,
+}
+
+/**
+ * Describes the enum calaba.v1.SipCallTargetKind.
+ */
+export const SipCallTargetKindSchema: GenEnum<SipCallTargetKind> = /*@__PURE__*/
+  enumDesc(file_calaba_v1_sip, 12);
 

@@ -90,6 +90,13 @@ message SipSettings {
   // The server can record calls (LiveKit Egress is configured). The switches can be set either
   // way; without it nothing is recorded.
   bool recording_available = 26;
+  // The workspace's telephony policy (ADR-0137, PUT /api/workspaces/{id}/sip/policy): the
+  // journal is kept retention_months (1, 3, 6, 12, 24, 36; default 12), outbound calls are
+  // limited per hour to out_per_hour for the workspace (default 120) and out_per_user_hour for
+  // one member (default 30).
+  uint32 retention_months = 27;
+  uint32 out_per_hour = 28;
+  uint32 out_per_user_hour = 29;
 }
 
 // How inbound calls reach the server (ADR-0121). UNSPECIFIED in PutSipInboundRequest = keep the
@@ -256,8 +263,8 @@ message SipCall {
 // on every status change. Errors: 404 no room / DM; 403 no PLACE_CALLS, a guest; 422
 // VALIDATION (field "number": not a phone number) or «not a voice room»; 409 SIP_DISABLED;
 // 409 CONFLICT «join the call first» (the caller is not in this room's call); 409
-// SIP_CALL_ACTIVE; 422 SIP_NUMBER_NOT_ALLOWED; 429 SIP_RATE_LIMITED (20 calls per hour per
-// workspace); 403 WORKSPACE_SUSPENDED. The line rings for up to 45 s; a call lasts 2 h at most.
+// SIP_CALL_ACTIVE; 422 SIP_NUMBER_NOT_ALLOWED; 429 SIP_RATE_LIMITED (SipSettings.out_per_hour
+// calls per hour per workspace, out_per_user_hour per member); 403 WORKSPACE_SUSPENDED. The line rings for up to 45 s; a call lasts 2 h at most.
 message PlaceSipCallRequest {
   // The number to call: E.164 («+7 916 123-45-67»), or a Russian national number starting
   // with 8 or 7 (11 digits) — spaces, dashes, dots and brackets are ignored.
@@ -681,4 +688,182 @@ message SipActiveCall {
 // guests, not bots), who read GET …/sip/calls again while they look at it.
 message SipCallsChanged {
   string workspace_id = 1;
+}
+
+// ---------------------------------------------------------------- the call journal (ADR-0137 §1)
+//
+// Every call keeps its steps (SipCallEvent: the menu, the keys, who rang and how it ended for
+// each, the answer, transfers, the end) and its employees (SipCallParty). Who sees what: every
+// member but guests sees the calls they took part in (scope=mine: placed, rang them, answered,
+// transferred); VIEW_JOURNALS sees all calls of the workspace (scope=all; calls of rooms the
+// reader cannot view are left out). Bots by the same rules, REST only.
+//
+// GET /api/workspaces/{id}/sip/journal?scope=mine|all&filter=missed|in|out&user=<user id>
+// &q=<text or digits>&from=<RFC 3339>&to=<RFC 3339>&cursor=<next_cursor>&limit=<1..100, 50>
+// (not a guest) → 200 ListSipJournalResponse, newest first. scope defaults to mine; all without
+// VIEW_JOURNALS → 403; user (an employee's calls) only with scope=all. filter=missed: missed
+// calls (SipJournalEntry.missed; with scope=mine or user: missed calls that rang that person).
+// q: its digits match a part of the number; a text without digits matches contacts by name or
+// company (T2; until then nothing). 422 VALIDATION for a bad scope / filter / user / time /
+// cursor / limit. A page may hold fewer entries than limit while next_cursor is set (calls of
+// rooms the reader cannot view are skipped).
+//
+// GET /api/workspaces/{id}/sip/journal/{cid} (the same rules: VIEW_JOURNALS, or a party of the
+// call) → 200 GetSipJournalEntryResponse; 404 otherwise.
+//
+// POST /api/workspaces/{id}/sip/journal/seen (not a guest) → 204: the missed badge
+// (WorkspaceSnapshot.sip_missed) is 0; SIP_MISSED_CHANGED goes to the member's other devices.
+//
+// PUT /api/workspaces/{id}/sip/policy (MANAGE_INTEGRATIONS, the telephony plan; the provider
+// settings saved first, else 409 CONFLICT) → 200 PutSipPolicyResponse: how long the journal (and
+// the contacts, T2) are kept and the outbound limits. 422 VALIDATION retentionMonths /
+// outPerHour / outPerUserHour.
+
+// Where a call comes from.
+enum SipCallOrigin {
+  SIP_CALL_ORIGIN_UNSPECIFIED = 0;
+  SIP_CALL_ORIGIN_ROOM = 1;     // a voice room's line (ADR-0046); the room may be deleted since
+  SIP_CALL_ORIGIN_PERSONAL = 2; // a call from the telephony section (ADR-0137 §3)
+  SIP_CALL_ORIGIN_INBOUND = 3;  // a call to the workspace's number (ADR-0117)
+  SIP_CALL_ORIGIN_TEST = 4;     // the connection test
+}
+
+// A step of a call. user_id is the employee of the step, target_* the menu / group / number /
+// member / room it concerns, its name as it was then.
+enum SipCallEventKind {
+  SIP_CALL_EVENT_KIND_UNSPECIFIED = 0;
+  // The call began. Inbound: digits = the company number called, reason "direct" / "register";
+  // outbound: user_id = who placed it, target = the room (room calls).
+  SIP_CALL_EVENT_KIND_STARTED = 1;
+  SIP_CALL_EVENT_KIND_MENU = 2;     // a voice menu plays: target = the menu, digits = the play count
+  SIP_CALL_EVENT_KIND_KEY = 3;      // the caller pressed digits; reason "invalid": the menu has no such key
+  SIP_CALL_EVENT_KIND_DIALED = 4;   // the caller dialed an internal number digits; reason "found" / "not_found"
+  SIP_CALL_EVENT_KIND_NO_INPUT = 5; // the menu got no key in time
+  SIP_CALL_EVENT_KIND_NOTICE = 6;   // the recording notice of target (a menu) plays (ADR-0131)
+  // A group takes the call: target = the group, reason "ring_all" / "round_robin".
+  SIP_CALL_EVENT_KIND_GROUP = 7;
+  // user_id's devices start ringing: target = the group, or the number (extension) rung.
+  SIP_CALL_EVENT_KIND_RING = 8;
+  // user_id's devices stop ringing: reason "no_answer", "declined", "answered_elsewhere",
+  // "fallback", "caller_left", "cancelled", "ended".
+  SIP_CALL_EVENT_KIND_RING_END = 9;
+  // A group's fallback (ADR-0124): target = where the call goes, reason "timeout" / "nobody" /
+  // "declined".
+  SIP_CALL_EVENT_KIND_FALLBACK = 10;
+  SIP_CALL_EVENT_KIND_ANSWERED = 11; // user_id answered (outbound: the callee, user_id empty)
+  // user_id hands the call over (ADR-0132): to peer_user_id (a member) or target (a number, a group).
+  SIP_CALL_EVENT_KIND_TRANSFER = 12;
+  // A transfer is over: reason "answered" (user_id took the call), "no_answer", "declined",
+  // "cancelled", "not_connected".
+  SIP_CALL_EVENT_KIND_TRANSFER_END = 13;
+  SIP_CALL_EVENT_KIND_DIALING = 14;          // outbound: the INVITE goes to the provider
+  SIP_CALL_EVENT_KIND_PROVIDER_RINGING = 15; // outbound: the callee's phone rings
+  // The recording (ADR-0131): reason "started", "stored", "failed".
+  SIP_CALL_EVENT_KIND_RECORDING = 16;
+  // The end: reason = SipCall.reason; user_id = the member who hung up (empty: the caller or the system).
+  SIP_CALL_EVENT_KIND_ENDED = 17;
+}
+
+enum SipCallTargetKind {
+  SIP_CALL_TARGET_KIND_UNSPECIFIED = 0;
+  SIP_CALL_TARGET_KIND_MENU = 1;
+  SIP_CALL_TARGET_KIND_GROUP = 2;
+  SIP_CALL_TARGET_KIND_EXTENSION = 3; // target_name = the internal number
+  SIP_CALL_TARGET_KIND_USER = 4;
+  SIP_CALL_TARGET_KIND_ROOM = 5;
+}
+
+message SipCallEvent {
+  uint32 seq = 1;
+  // Unset: a call from before the journal; its steps are parsed from SipCall.route, in order
+  // but without times.
+  google.protobuf.Timestamp at = 2;
+  SipCallEventKind kind = 3;
+  string user_id = 4;
+  string peer_user_id = 5;
+  SipCallTargetKind target_kind = 6;
+  string target_id = 7;   // empty: unknown (deleted, or a call from before the journal)
+  string target_name = 8; // the name at the time of the call; ≤ 64 characters
+  string digits = 9;
+  string reason = 10;
+}
+
+// An employee of a call and their part in it.
+message SipCallParty {
+  string user_id = 1;
+  bool placed = 2;      // placed the call
+  bool rang = 3;        // the call rang them
+  bool answered = 4;    // answered it (or took a transfer)
+  bool transferred = 5; // handed it over
+}
+
+// A contact of the workspace's phone book (T2); unset until then.
+message SipContactRef {
+  string id = 1;
+  string name = 2;
+  string company = 3;
+}
+
+// A row of the journal: the call and what the list shows of it, without its events.
+message SipJournalEntry {
+  SipCall call = 1;
+  SipCallOrigin origin = 2;
+  string peer_e164 = 3;      // the outside party's number, E.164; empty: not a number (hidden)
+  SipContactRef contact = 4; // the contact of peer_e164 (T2), names as of now
+  string member_user_id = 5; // peer_e164 is an employee's phone (T2)
+  // Waiting: from the start to the answer (menu and ringing), for a call nobody answered to its
+  // end; talking: from the answer to the end (0 while live or never answered).
+  uint32 wait_ms = 6;
+  uint32 talk_ms = 7;
+  // An inbound call nobody answered after it rang somebody, or that ended in a menu (no input,
+  // a route to «hang up»). A call a colleague answered is not missed.
+  bool missed = 8;
+  repeated SipCallParty parties = 9;
+  bool has_events = 10; // false: a call from before the journal (the detail parses its route)
+}
+
+message ListSipJournalResponse {
+  repeated SipJournalEntry entries = 1;
+  string next_cursor = 2; // empty = no more
+}
+
+// The recording of a call (ADR-0131), only when the reader may view its Disk file.
+message SipJournalRecording {
+  string file_id = 1;
+  string disk_item_id = 2;
+  uint32 duration_ms = 3;
+}
+
+message GetSipJournalEntryResponse {
+  SipJournalEntry entry = 1;
+  repeated SipCallEvent events = 2; // in order
+  SipJournalRecording recording = 3;
+}
+
+message PutSipPolicyRequest {
+  // How long calls are kept: 1, 3, 6, 12, 24 or 36 months (0 = 12). Older calls are deleted
+  // within an hour (contacts, T2: those without calls and edits in the period).
+  uint32 retention_months = 1;
+  uint32 out_per_hour = 2;      // outbound calls per hour of the workspace, 1..1000 (0 = 120)
+  uint32 out_per_user_hour = 3; // outbound calls per hour of one member, 1..1000 (0 = 30)
+}
+
+message PutSipPolicyResponse {
+  SipSettings settings = 1;
+}
+
+// SIP_JOURNAL_ENTRY: a call appeared, was answered / transferred, or ended (ADR-0137 §1). On the
+// workspace channel to the sessions of members with VIEW_JOURNALS who can view the call's room
+// (if any) and of the call's parties — once per session; never guests, never bots (they read
+// REST). Clients put the entry into a loaded first page when their filters let it in, and
+// re-read an open detail of that call.
+message SipJournalChange {
+  SipJournalEntry entry = 1;
+}
+
+// SIP_MISSED_CHANGED: the member's missed badge of the workspace changed (a call that rang them
+// was missed, or they looked at «Recent» on another device). To the member's user channel.
+message SipMissedChanged {
+  string workspace_id = 1;
+  uint32 count = 2;
 }

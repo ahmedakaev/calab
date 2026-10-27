@@ -307,6 +307,13 @@ func Snapshot(ctx context.Context, q *sqlc.Queries, pl *plans.Service, ws sqlc.W
 			}
 		}
 	}
+	// The missed calls badge (ADR-0137 §1): people only, never guests.
+	var sipMissed int32
+	if ws.SipEnabled && me.Role != perm.RoleGuest && !viewerBot {
+		if sipMissed, err = q.CountSipMissed(ctx, sqlc.CountSipMissedParams{WorkspaceID: ws.ID, UserID: userID}); err != nil {
+			return nil, err
+		}
+	}
 	// Task boards (ADR-0042 §4): the visible ones with the recipient's bits, and their unread tasks.
 	bs, unread, err := boards.Snapshot(ctx, q, ws.ID, me)
 	if err != nil {
@@ -326,7 +333,7 @@ func Snapshot(ctx context.Context, q *sqlc.Queries, pl *plans.Service, ws sqlc.W
 	return &v1.WorkspaceSnapshot{Workspace: pbconv.ForViewer(pw, role), Role: role.Proto(), Rooms: rs, Members: members,
 		Permissions: bits, Categories: pbconv.Categories(cats), Recordings: recordings, Roles: pbconv.Roles(roles),
 		Badges: pbconv.Badges(badges), Backgrounds: pbconv.Backgrounds(backgrounds), Sounds: pbconv.Sounds(sounds),
-		Boards: bs, UnreadTaskIds: unread, SipCalls: sipCalls, Apps: pbconv.WorkspaceApps(apps), BoardCategories: boardCats,
+		Boards: bs, UnreadTaskIds: unread, SipCalls: sipCalls, SipMissed: uint32(max(sipMissed, 0)), Apps: pbconv.WorkspaceApps(apps), BoardCategories: boardCats, //nolint:gosec // ≤ 999
 		RoomLastMessages: lastMessages}, nil
 }
 

@@ -754,7 +754,7 @@ func (q *Queries) LockSipPBX(ctx context.Context, workspaceID uuid.UUID) error {
 const setMemberSipExtension = `-- name: SetMemberSipExtension :one
 UPDATE workspace_members SET sip_extension = $3
 WHERE workspace_id = $1 AND user_id = $2
-RETURNING workspace_id, user_id, role, nickname, joined_at, badge_id, achievement_count, last_active_at, sip_extension
+RETURNING workspace_id, user_id, role, nickname, joined_at, badge_id, achievement_count, last_active_at, sip_extension, sip_seen_at
 `
 
 type SetMemberSipExtensionParams struct {
@@ -777,6 +777,7 @@ func (q *Queries) SetMemberSipExtension(ctx context.Context, arg SetMemberSipExt
 		&i.AchievementCount,
 		&i.LastActiveAt,
 		&i.SipExtension,
+		&i.SipSeenAt,
 	)
 	return i, err
 }
