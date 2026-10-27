@@ -53,7 +53,7 @@ import { SpeakingDebouncer, speakingUserIds } from '../lib/speaking';
 import { AUTO_MUTE_TOAST, AutoMuteTimer, autoMuteArmed, type AutoMuteSec } from '../lib/autoMute';
 import { REMOTE_LEVEL, RemoteLevelSpeaking, readLevel, type LevelSample } from '../lib/remoteSpeaking';
 import { audioDevices, deviceName, deviceSwitches, type AudioDevice } from '../lib/deviceSwitch';
-import { answerCallSelf, canSpeakFrom, isDeviceGone, meterUpdate, micModeFor, pttAllowed, pttCue, qualityOf, remoteAudio, toggleDeafen, toggleMute, transmitDecision, withUserMuted, withUserVolume } from '../lib/voiceLogic';
+import { answerCallSelf, canSpeakFrom, isDeviceGone, meterUpdate, micModeFor, mySeat, pttAllowed, pttCue, qualityOf, remoteAudio, toggleDeafen, toggleMute, transmitDecision, withUserMuted, withUserVolume } from '../lib/voiceLogic';
 import { RemoteAudioOut } from '../lib/media/remoteAudioOut';
 import { useMessages } from '../stores/messages';
 import { useRooms } from '../stores/rooms';
@@ -2961,7 +2961,19 @@ class VoiceEngine {
     return true;
   }
 
+  /**
+   * Another device of mine holds the voice seat (#96): the mic / headphones buttons show that
+   * device's state, so a click here cannot quietly change a pre-join intent nobody sees — it says
+   * where to switch instead.
+   */
+  private seatElsewhere(): boolean {
+    if (useVoice.getState().roomId !== null || !mySeat(useWorkspaces.getState().byId, this.myId())) return false;
+    toast.info(t('voiceUi.seatElsewhere'));
+    return true;
+  }
+
   toggleMute(): void {
+    if (this.seatElsewhere()) return;
     const v = useVoice.getState();
     // A moderator mute (VoiceState.server_muted) can't be lifted by the user: the server removed
     // the microphone from our grant and PATCH /api/voice/self {muted:false} would be 403.
@@ -2977,6 +2989,7 @@ class VoiceEngine {
   }
 
   toggleDeafen(): void {
+    if (this.seatElsewhere()) return;
     setVoice(toggleDeafen(useVoice.getState()));
     playSound(useVoice.getState().deafened ? 'deafen' : 'undeafen');
     this.afterSelfChange();
