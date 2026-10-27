@@ -1,53 +1,38 @@
 import { create, type MessageInitShape } from '@bufbuild/protobuf';
-import { timestampDate, timestampMs } from '@bufbuild/protobuf/wkt';
+import { timestampMs } from '@bufbuild/protobuf/wkt';
 import {
   GetSipSettingsResponseSchema,
-  SipCallDirection,
-  SipCallStatus,
   SipInboundMode,
   SipTransport,
+  type GetSipSettingsResponse,
   type PutSipSettingsRequestSchema,
-  type SipCall,
   type SipSettings,
   type TestSipResponse,
 } from '@calaba/protocol';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TriangleAlert, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { PhoneCall, TriangleAlert, X } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
-import { Choice } from '../../components/Choice';
-import { PlanLock } from '../../components/PlanLock';
-import { Button, Card, Input, PasswordInput, Row, Select, Spinner, Switch, cx } from '../../components/ui';
-import { t, type MessageKey } from '../../i18n';
-import { ApiError } from '../../lib/api/client';
-import { describeError } from '../../lib/api/errors';
-import { api } from '../../lib/api/endpoints';
-import { fmt } from '../../lib/format';
-import { planHas } from '../../lib/plan';
-import { callDurationMs, formatPhone, isLiveStatus, normalizePrefix, reasonCode, reasonKey, statusKey } from '../../lib/sip';
-import { TELEPHONY_TABS, TELEPHONY_TAB_LABEL, journalKey, rememberTelephonyTab, rememberedTelephonyTab, type TelephonyTabId } from '../../lib/sipPbx';
-import { useRooms } from '../../stores/rooms';
-import { toast } from '../../stores/toasts';
-import { memberName, useWorkspaces } from '../../stores/workspaces';
-import { formatDuration } from '../shell/voiceFormat';
-import { ActiveCalls } from './TelephonyCalls';
-import { Exchange } from './TelephonyExchange';
-import { RecordingCard } from './TelephonyRecording';
+import { Button, Card, Input, PasswordInput, Row, Select, Switch, cx } from '../../../components/ui';
+import { t, type MessageKey } from '../../../i18n';
+import { ApiError } from '../../../lib/api/client';
+import { describeError } from '../../../lib/api/errors';
+import { api } from '../../../lib/api/endpoints';
+import { normalizePrefix } from '../../../lib/sip';
+import { toast } from '../../../stores/toasts';
+import { FormShell, usePhoneSettings } from './ui';
 
 /*
- * Workspace settings → «Телефония» (ADR-0046, docs/08 «Телефония»; MANAGE_WORKSPACE), five tabs
- * (CBF-77, the last one remembered per viewer): «Активные звонки» (TelephonyCalls, ADR-0128) with
- * the call journal under it (100 per page, «Показать ещё» by cursor); «Номера», «Группы», «IVR» —
- * the exchange (ADR-0117, TelephonyExchange); «Настройки» — the SIP provider account as one form
- * saved with PUT (the password is write-only: empty keeps the stored one), «Проверить
- * подключение» (a real short call to the Caller ID), «Входящие» (mode, registration and its
- * state) and «Запись звонков» (ADR-0131, TelephonyRecording). The last provider error is above the tabs. Business plan only (owner, 02.10): below it
- * every tab but the calls is locked (PlanLock) — a saved trunk stays readable.
+ * «Телефония → Настройки → Подключение» (ADR-0046, ADR-0137 §5; MANAGE_INTEGRATIONS): the SIP
+ * provider account as one form saved with PUT (the password is write-only: empty keeps the stored
+ * one), «Проверить подключение» (a real short call to the Caller ID); the last provider error above
+ * them. Never saved — the empty state «Подключите SIP-провайдера» with its one action. Moved from
+ * the workspace settings window (T5) without changing the form, its checks or the API.
  */
 
 /** SipSettings.port when never set (sip.proto: PUT 0 = 5060). */
 export const DEFAULT_SIP_PORT = 5060;
 
-const settingsKey = (workspaceId: string): readonly unknown[] => ['sip', workspaceId];
+export const sipSettingsKey = (workspaceId: string): readonly unknown[] => ['sip', workspaceId];
 
 const TRANSPORTS: ReadonlyArray<{ value: SipTransport; label: string }> = [
   { value: SipTransport.UDP, label: 'UDP' },
@@ -69,85 +54,46 @@ const FIELD_ERROR: Record<string, MessageKey> = {
   transport: 'sip.err.field.transport',
 };
 
-export function TelephonyTab({ workspaceId }: { workspaceId: string }): ReactNode {
-  // REGISTER mode (ADR-0121): the registration's state is re-read every 15 s while the window is
-  // visible (react-query pauses intervals in the background); no gateway event for it.
-  const q = useQuery({
-    queryKey: settingsKey(workspaceId),
+/**
+ * The account (GET …/sip). `poll` — the «Входящие» page over a registration (ADR-0121): its state
+ * is re-read every 15 s while the window is visible (react-query pauses intervals in the
+ * background); no gateway event for it. Every other page reads it once.
+ */
+export function useSipSettings(workspaceId: string, poll = false): UseQueryResult<GetSipSettingsResponse> {
+  return useQuery({
+    queryKey: sipSettingsKey(workspaceId),
     queryFn: () => api.sip.settings(workspaceId),
-    refetchInterval: (query) => (query.state.data?.settings?.inboundMode === SipInboundMode.REGISTER && query.state.data.settings.inboundEnabled ? 15_000 : false),
+    refetchInterval: (query) => (poll && query.state.data?.settings?.inboundMode === SipInboundMode.REGISTER && query.state.data.settings.inboundEnabled ? 15_000 : false),
   });
-  const settings = q.data?.settings;
-  const allowed = useWorkspaces((s) => planHas(s.byId[workspaceId]?.ws.plan, 'telephony'));
-  // The last tab the viewer looked at (localStorage); first time — «Активные звонки».
-  const [tab, setTab] = useState<TelephonyTabId>(() => rememberedTelephonyTab('calls'));
-  const choose = (v: TelephonyTabId): void => {
-    setTab(v);
-    rememberTelephonyTab(v);
-  };
-  // Below Business the setup is locked (PlanLock) — a saved trunk stays readable; the live calls
-  // and the journal stay open.
-  const locked = (node: ReactNode): ReactNode =>
-    allowed ? (
-      node
-    ) : (
-      <PlanLock plan="business" testId="sip-plan-lock">
-        <div className="flex flex-col gap-6">{node}</div>
-      </PlanLock>
-    );
-  const body = !settings ? null : tab === 'calls' ? (
-    <>
-      <ActiveCalls workspaceId={workspaceId} />
-      <Journal workspaceId={workspaceId} />
-    </>
-  ) : tab === 'settings' ? (
-    locked(
-      <>
-        {/* Re-mounted when the server's copy changes: the form starts from what is saved. */}
-        <SettingsForm key={settings.updatedAt ? String(timestampMs(settings.updatedAt)) : 'new'} workspaceId={workspaceId} settings={settings} />
-        <TestCard workspaceId={workspaceId} settings={settings} />
-        <Exchange workspaceId={workspaceId} settings={settings} part="inbound" />
-        <RecordingCard workspaceId={workspaceId} settings={settings} settingsKey={settingsKey(workspaceId)} />
-      </>,
-    )
-  ) : (
-    locked(<Exchange workspaceId={workspaceId} settings={settings} part={tab} />)
-  );
+}
+
+/** The connection page: the empty state until the account is first saved, else the form and the test. */
+export function ConnectionPage({ workspaceId, settings }: { workspaceId: string; settings: SipSettings }): ReactNode {
+  const [setup, setSetup] = useState(false);
+  // The phone shows the empty state on the section's root; its action opens this form directly.
+  const phone = usePhoneSettings();
+  if (!phone && !settings.updatedAt && !setup) return <NotConnected onStart={() => setSetup(true)} />;
   return (
-    <>
-      <p className="px-1 text-body text-muted">{t('sip.intro')}</p>
-      {q.isPending ? (
-        <div className="grid place-items-center py-6">
-          <Spinner />
-        </div>
-      ) : q.isError || !settings ? (
-        <Card>
-          <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-            <span className="text-body text-danger-text" role="alert">
-              {t('sip.loadFailed')}
-            </span>
-            <Button variant="secondary" size="sm" onClick={() => void q.refetch()}>
-              {t('common.retry')}
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <>
-          {settings.lastError ? <LastError text={settings.lastError} /> : null}
-          {/* docs/08 «Choice»: segments on the desktop, a picker button on a phone (five tabs). */}
-          <div className="-mx-1 overflow-x-auto px-1" data-testid="sip-tabs">
-            <Choice<TelephonyTabId>
-              label={t('pbx.tabs')}
-              value={tab}
-              onChange={choose}
-              options={TELEPHONY_TABS.map((v) => ({ value: v, label: t(TELEPHONY_TAB_LABEL[v]) }))}
-              testId="sip-tab"
-            />
-          </div>
-          {body}
-        </>
-      )}
-    </>
+    // Re-mounted when the server's copy changes: the form starts from what is saved.
+    <SettingsForm key={settings.updatedAt ? String(timestampMs(settings.updatedAt)) : 'new'} workspaceId={workspaceId} settings={settings} lead={settings.lastError ? <LastError text={settings.lastError} /> : null}>
+      <TestCard workspaceId={workspaceId} settings={settings} />
+    </SettingsForm>
+  );
+}
+
+/** Nothing connected yet (ADR-0137 §5): what the section needs, one action. */
+export function NotConnected({ onStart }: { onStart: () => void }): ReactNode {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center mobile:py-12" data-testid="tel-not-connected">
+      <span className="grid size-14 place-items-center rounded-full bg-[var(--color-fill)] text-muted" aria-hidden>
+        <PhoneCall className="size-7" strokeWidth={1.75} />
+      </span>
+      <h2 className="text-headline font-semibold">{t('tset.notConnected')}</h2>
+      <p className="max-w-sm text-body text-muted">{t('tset.notConnectedText')}</p>
+      <Button size="lg" onClick={onStart} data-testid="tel-connect">
+        {t('tset.connect')}
+      </Button>
+    </div>
   );
 }
 
@@ -230,7 +176,7 @@ function requestOf(d: Draft): MessageInitShape<typeof PutSipSettingsRequestSchem
   };
 }
 
-function SettingsForm({ workspaceId, settings }: { workspaceId: string; settings: SipSettings }): ReactNode {
+function SettingsForm({ workspaceId, settings, lead, children }: { workspaceId: string; settings: SipSettings; lead: ReactNode; children: ReactNode }): ReactNode {
   const qc = useQueryClient();
   const [d, setD] = useState<Draft>(() => draftOf(settings));
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
@@ -246,7 +192,7 @@ function SettingsForm({ workspaceId, settings }: { workspaceId: string; settings
     onSuccess: (r) => {
       setFieldErr({});
       setFormErr(null);
-      if (r.settings) qc.setQueryData(settingsKey(workspaceId), create(GetSipSettingsResponseSchema, { settings: r.settings }));
+      if (r.settings) qc.setQueryData(sipSettingsKey(workspaceId), create(GetSipSettingsResponseSchema, { settings: r.settings }));
       toast.success(t('sip.saved'));
     },
     onError: (e) => {
@@ -258,7 +204,7 @@ function SettingsForm({ workspaceId, settings }: { workspaceId: string; settings
       if (e instanceof ApiError && e.code === 'ERROR_CODE_SIP_PROVIDER_ERROR') {
         setFormErr(t('sip.err.providerSave', { message: e.message }));
         // Nothing but last_error changed on the server: show it.
-        void qc.invalidateQueries({ queryKey: settingsKey(workspaceId) });
+        void qc.invalidateQueries({ queryKey: sipSettingsKey(workspaceId) });
         return;
       }
       setFormErr(describeError(e).text);
@@ -273,14 +219,17 @@ function SettingsForm({ workspaceId, settings }: { workspaceId: string; settings
     ) : null;
   const box = 'flex w-64 flex-col gap-1 mobile:w-full';
   return (
-    <form
-      className="flex flex-col gap-4"
-      data-testid="sip-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!save.isPending) save.mutate();
-      }}
+    <FormShell
+      testId="sip-form"
+      className="gap-6"
+      onSubmit={() => save.mutate()}
+      error={formErr}
+      errorTestId="sip-form-error"
+      saveLabel={t('sip.save')}
+      saveBusy={save.isPending}
+      saveTestId="sip-save"
     >
+      {lead}
       <Card title={t('sip.card.provider')}>
         <div className="px-3 py-1">
           <Switch checked={d.enabled} onChange={(v) => set('enabled', v)} label={t('sip.enabled')} hint={t('sip.enabledHint')} />
@@ -395,17 +344,8 @@ function SettingsForm({ workspaceId, settings }: { workspaceId: string; settings
         </Row>
         <AllowedPrefixes value={d.allowed} onChange={(v) => set('allowed', v)} error={fieldErr['allowed'] ?? null} />
       </Card>
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        {formErr ? (
-          <span className="mr-auto min-w-0 text-caption text-danger-text" role="alert" data-testid="sip-form-error">
-            {formErr}
-          </span>
-        ) : null}
-        <Button type="submit" busy={save.isPending} data-testid="sip-save">
-          {t('sip.save')}
-        </Button>
-      </div>
-    </form>
+      {children}
+    </FormShell>
   );
 }
 
@@ -503,9 +443,8 @@ function TestCard({ workspaceId, settings }: { workspaceId: string; settings: Si
       setResult({ ok: false, text });
     },
     onSettled: () => {
-      // last_error is set / cleared by the test; the journal has a new row.
-      void qc.invalidateQueries({ queryKey: settingsKey(workspaceId) });
-      void qc.invalidateQueries({ queryKey: journalKey(workspaceId) });
+      // last_error is set / cleared by the test (its journal row comes with SIP_JOURNAL_ENTRY).
+      void qc.invalidateQueries({ queryKey: sipSettingsKey(workspaceId) });
     },
   });
   return (
@@ -522,120 +461,4 @@ function TestCard({ workspaceId, settings }: { workspaceId: string; settings: Si
       </div>
     </Card>
   );
-}
-
-/** The call journal: newest first, 100 a page, «Показать ещё» by `next_cursor`. */
-function Journal({ workspaceId }: { workspaceId: string }): ReactNode {
-  const q = useInfiniteQuery({
-    queryKey: journalKey(workspaceId),
-    queryFn: ({ pageParam, signal }) => api.sip.journal(workspaceId, pageParam || undefined, signal),
-    initialPageParam: '',
-    getNextPageParam: (last) => last.nextCursor || undefined,
-  });
-  const calls = q.data?.pages.flatMap((p) => p.calls) ?? [];
-  return (
-    <section className="flex flex-col gap-1.5" data-settings-row>
-      <h3 className="px-1 text-caption font-semibold text-muted" data-settings-label>
-        {t('sip.journal')}
-      </h3>
-      {q.isPending ? (
-        <div className="grid place-items-center py-4">
-          <Spinner />
-        </div>
-      ) : q.isError ? (
-        <p className="px-1 text-body text-danger-text" role="alert">
-          {t('sip.journal.loadFailed')}
-        </p>
-      ) : calls.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] bg-[var(--color-card)] px-3 py-4 text-center text-body text-muted" data-testid="sip-journal-empty">
-          {t('sip.journal.empty')}
-        </p>
-      ) : (
-        // A phone scrolls the table sideways: the region takes keyboard focus (axe scrollable-region-focusable).
-        <div className="overflow-x-auto rounded-[var(--radius-card)] bg-[var(--color-card)]" tabIndex={0} role="region" aria-label={t('sip.journal')}>
-          <table className="w-full min-w-[560px] text-body" data-testid="sip-journal">
-            <caption className="sr-only">{t('sip.journal')}</caption>
-            <thead>
-              <tr className="border-b border-[var(--color-card-line)] text-left text-caption text-muted">
-                <th scope="col" className="px-2 py-2 font-medium">
-                  {t('sip.journal.when')}
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  {t('sip.journal.room')}
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  {t('sip.journal.number')}
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  {t('sip.journal.who')}
-                </th>
-                <th scope="col" className="min-w-36 px-2 py-2 font-medium">
-                  {t('sip.journal.status')}
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">
-                  {t('sip.journal.duration')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {calls.map((c) => (
-                <JournalRow key={c.id} workspaceId={workspaceId} call={c} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {q.hasNextPage ? (
-        <Button variant="secondary" size="sm" className="self-center" busy={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()} data-testid="sip-journal-more">
-          {t('sip.journal.more')}
-        </Button>
-      ) : null}
-    </section>
-  );
-}
-
-function JournalRow({ workspaceId, call }: { workspaceId: string; call: SipCall }): ReactNode {
-  const roomName = useRooms((s) => (call.roomId ? (s.byId[call.roomId]?.name ?? '') : ''));
-  // Names re-read when the members change (a rare event; the table is not a live list).
-  const who = useWorkspaces(() => (call.startedBy ? memberName(workspaceId, call.startedBy) : '—'));
-  const started = call.startedAt ? timestampDate(call.startedAt) : null;
-  const duration = callDurationMs({
-    answeredAt: call.answeredAt ? timestampMs(call.answeredAt) : 0,
-    endedAt: call.endedAt ? timestampMs(call.endedAt) : 0,
-  });
-  const status = journalStatus(call);
-  return (
-    <tr className="border-b border-[var(--color-card-line)] last:border-b-0" data-testid="sip-journal-row">
-      <td className="px-2 py-2 min-w-[5.5rem] max-sm:whitespace-nowrap tabular-nums text-muted">{started ? fmt.dateTime(started, 'short') : '—'}</td>
-      <td className="px-2 py-2">
-        <span className="block max-w-20 truncate" title={roomName || undefined}>
-          {call.roomId ? (
-            roomName || '—'
-          ) : (
-            <span className="text-muted">{t(call.direction === SipCallDirection.IN ? 'pbx.calls.in' : 'sip.journal.test')}</span>
-          )}
-        </span>
-      </td>
-      <td className="whitespace-nowrap px-2 py-2 tabular-nums">{formatPhone(call.number)}</td>
-      <td className="px-2 py-2">
-        <span className="block max-w-20 truncate" title={who}>
-          {who}
-        </span>
-      </td>
-      <td className="min-w-36 px-2 py-2">
-        <span className="line-clamp-2 max-w-72 first-letter:uppercase" title={status}>
-          {status}
-        </span>
-      </td>
-      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums text-muted">{duration ? formatDuration(duration) : '—'}</td>
-    </tr>
-  );
-}
-
-/** The journal's «Итог»: live — its status; ended after an answer — «Разговор · reason»; else why. */
-function journalStatus(c: SipCall): string {
-  if (isLiveStatus(c.status)) return c.status === SipCallStatus.ACTIVE ? t('sip.journal.live') : t(statusKey(c.status));
-  const code = reasonCode(c.reason);
-  const reason = `${t(reasonKey(c.status, c.reason))}${code ? ` ${code}` : ''}`;
-  return c.status === SipCallStatus.ENDED && c.answeredAt ? `${t('sip.journal.answered')} · ${reason}` : reason;
 }

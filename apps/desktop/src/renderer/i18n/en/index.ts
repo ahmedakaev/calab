@@ -49,6 +49,7 @@ import { enContacts } from './contacts';
 import { enSip } from './sip';
 import { enPbx } from './pbx';
 import { enTelephony } from './telephony';
+import { enTelephonySettings } from './telephonySettings';
 import { enTelephonyContacts } from './telephonyContacts';
 import { enAi } from './ai';
 import { enSmartTask } from './smartTask';
@@ -72,6 +73,7 @@ export const en: Dict = {
   ...enSip,
   ...enPbx,
   ...enTelephony,
+  ...enTelephonySettings,
   ...enTelephonyContacts,
   ...enAi,
   ...enSmartTask,

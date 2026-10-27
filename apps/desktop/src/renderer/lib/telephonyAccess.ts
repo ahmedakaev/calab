@@ -5,10 +5,10 @@
  *  - not a guest, and
  *  - telephony is connected in the workspace (`Workspace.sip_enabled`) and I have something to do
  *    there: PLACE_CALLS of the workspace, an internal number of mine, VIEW_JOURNALS or
- *    MANAGE_INTEGRATIONS.
- *
- * The administrator's branch «no connection yet / the plan lapsed» (the section opens on
- * «Подключение») arrives with the settings pages (T5); until then the settings window keeps them.
+ *    MANAGE_INTEGRATIONS;
+ *  - or MANAGE_INTEGRATIONS on a plan with telephony: the station's settings live only here, so the
+ *    administrator finds the section before anything is connected (it opens on «Подключение»).
+ *    A lapsed plan with the account still on stays under the first rule (the pages under PlanLock).
  */
 export interface TelephonyAccessInput {
   guest: boolean;
@@ -20,10 +20,13 @@ export interface TelephonyAccessInput {
   extension: string;
   viewJournals: boolean;
   manageIntegrations: boolean;
+  /** planHas(plan, 'telephony'): the workspace's plan includes telephony (Business, on-prem). */
+  planTelephony: boolean;
 }
 
 export function telephonyVisible(a: TelephonyAccessInput): boolean {
-  if (a.guest || !a.sipEnabled) return false;
+  if (a.guest) return false;
+  if (!a.sipEnabled) return a.manageIntegrations && a.planTelephony;
   return a.placeCalls || a.extension !== '' || a.viewJournals || a.manageIntegrations;
 }
 

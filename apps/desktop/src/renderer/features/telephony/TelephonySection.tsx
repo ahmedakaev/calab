@@ -8,10 +8,11 @@ import { useTelephonyUi, type TelPage } from '../../stores/telephonyUi';
 import { MEMBERS_COLUMN_MIN, useUi } from '../../stores/ui';
 import { ColumnHeader, ColumnTitle, ROW_HOVER, ROW_SELECTED } from '../shell/ColumnHeader';
 import { showMode } from '../shell/sectionNav';
-import { useTelephonyVisible } from './access';
+import { useMayManageTelephony, useTelephonyConnected, useTelephonyVisible } from './access';
 import { CallDetailPanel } from './CallDetail';
 import { TEL_PAGES, type TelPageDef } from './pages';
 import { Recents } from './Recents';
+import { TelSettingsNav, TelSettingsPage } from './settings/SettingsSection';
 import { CreateButton } from '../../components/CreateButton';
 import { ContactFormModal } from './contacts/ContactForm';
 import { editContact } from './contacts/data';
@@ -20,8 +21,9 @@ import { ImportDialog } from './contacts/ImportDialog';
 /**
  * «Телефония» on the desktop (ADR-0137 §5–§6): the column with the section's pages (pages.ts) —
  * «Недавние» with my missed count, «Контакты», «Набор» — the page in the centre and its detail
- * (the call's, the contact's card) on the right (a
- * column from 1200 px, a floating panel over the list below). Mounted only while the section is
+ * (the call's, the contact's card) on the right (a column from 1200 px, a floating panel over the
+ * list below); for MANAGE_INTEGRATIONS the «Настройки» group of the station's pages (settings/,
+ * T5) — before telephony is connected the section is only that, opened on «Подключение». Mounted only while the section is
  * open: a hidden section holds no list, no subscriptions and no timers. When the section stops
  * being mine (telephony off, a right taken away) it gives way to «Команда».
  */
@@ -30,16 +32,20 @@ export function TelephonySection({ workspaceId }: { workspaceId: string }): Reac
   useEffect(() => {
     if (!visible) showMode('voice');
   }, [visible]);
-  // A page this build does not have yet (T4 / T5) shows «Недавние».
-  const page = useTelephonyUi((s) => (TEL_PAGES.some((p) => p.id === s.page) ? s.page : 'recents'));
+  const connected = useTelephonyConnected(workspaceId);
+  const manage = useMayManageTelephony(workspaceId);
+  // A page this build does not have yet shows «Недавние»; the settings — MANAGE_INTEGRATIONS only;
+  // nothing connected yet — only the settings.
+  const chosen = useTelephonyUi((s) => (TEL_PAGES.some((p) => p.id === s.page) ? s.page : 'recents'));
+  const page: TelPage = !connected ? 'settings' : chosen === 'settings' && !manage ? 'recents' : chosen;
   const wide = useMediaQuery(`(min-width: ${MEMBERS_COLUMN_MIN}px)`);
   if (!visible) return null;
   return (
     <>
-      <TelNav workspaceId={workspaceId} page={page} />
+      <TelNav workspaceId={workspaceId} page={page} connected={connected} manage={manage} />
       <ResizeHandle width={() => useUi.getState().sidebarWidth} min={200} max={320} label={t('shell.resize')} onChange={(w) => useUi.getState().setSidebarWidth(w)} />
       <div className="mat-content relative flex min-w-0 flex-1" data-testid="telephony">
-        <PageCenter page={page} workspaceId={workspaceId} floating={!wide} />
+        {page === 'settings' ? <TelSettingsPage workspaceId={workspaceId} /> : <PageCenter page={page} workspaceId={workspaceId} floating={!wide} />}
       </div>
       {/* T4: the contact form and the CSV import (Modals over the section). */}
       <ContactFormModal ws={workspaceId} />
@@ -60,19 +66,23 @@ function PageCenter({ page, workspaceId, floating }: { page: TelPage; workspaceI
   );
 }
 
-function TelNav({ workspaceId, page }: { workspaceId: string; page: TelPage }): ReactNode {
+function TelNav({ workspaceId, page, connected, manage }: { workspaceId: string; page: TelPage; connected: boolean; manage: boolean }): ReactNode {
   useLocale();
   return (
     <aside className="island-fade mat-sidebar mat-sidebar-window flex w-[var(--sidebar-width)] shrink-0 flex-col" aria-label={t('tel.section')} data-testid="tel-nav">
       <ColumnHeader title={<ColumnTitle>{t('tel.section')}</ColumnTitle>}>
         {/* «+» of the section: a new contact (ADR-0137 §6). */}
-        <CreateButton label={t('telc.newTitle')} onClick={() => editContact('')} data-testid="tel-create" />
+        {connected ? <CreateButton label={t('telc.newTitle')} onClick={() => editContact('')} data-testid="tel-create" /> : null}
       </ColumnHeader>
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pt-1" style={{ paddingBottom: 'calc(var(--island-height, 0px) + 20px)' }} aria-label={t('tel.nav')}>
         <ul className="flex flex-col gap-px">
-          {TEL_PAGES.map((p) => (
-            <NavRow key={p.id} def={p} workspaceId={workspaceId} active={p.id === page} />
-          ))}
+          {TEL_PAGES.map((p) =>
+            p.manage ? (
+              manage ? <TelSettingsNav key={p.id} workspaceId={workspaceId} active={p.id === page} /> : null
+            ) : connected ? (
+              <NavRow key={p.id} def={p} workspaceId={workspaceId} active={p.id === page} />
+            ) : null,
+          )}
         </ul>
       </nav>
     </aside>

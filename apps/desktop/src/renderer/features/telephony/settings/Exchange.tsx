@@ -15,17 +15,19 @@ import {
   type SipSettings,
   type WorkspaceMember,
 } from '@calaba/protocol';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Pause, Pencil, Play, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { DndContext, MouseSensor, TouchSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { ArrowDown, ArrowUp, ChevronRight, GripVertical, Pause, Pencil, Play, Trash2, TriangleAlert, Upload, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Avatar } from '../../components/Avatar';
-import { confirmAction } from '../../components/Confirm';
-import { Button, Card, IconButton, Input, PasswordInput, Row, Segmented, Select, Spinner, Switch, cx } from '../../components/ui';
-import { plural, t } from '../../i18n';
-import { describeError } from '../../lib/api/errors';
-import { fmt } from '../../lib/format';
-import { api } from '../../lib/api/endpoints';
-import { formatPhone } from '../../lib/sip';
+import { Avatar } from '../../../components/Avatar';
+import { confirmAction } from '../../../components/Confirm';
+import { Button, Card, IconButton, Input, PasswordInput, Row, Segmented, Select, Spinner, Switch, cx } from '../../../components/ui';
+import { haptics } from '../../../lib/haptics';
+import { plural, t } from '../../../i18n';
+import { describeError } from '../../../lib/api/errors';
+import { fmt } from '../../../lib/format';
+import { api } from '../../../lib/api/endpoints';
+import { formatPhone } from '../../../lib/sip';
 import {
   PROMPT_ACCEPT,
   cleanNumber,
@@ -37,22 +39,27 @@ import {
   promptFileError,
   targetInit,
   targetValue,
-} from '../../lib/sipPbx';
-import { reportPlanError } from '../../services/plan';
-import { toast } from '../../stores/toasts';
-import { useMemberName, useWorkspaces } from '../../stores/workspaces';
-import { memberItems } from '../people/memberPickItems';
-import { MemberPicker } from '../people/MemberPicker';
-import { formatDuration } from '../shell/voiceFormat';
+} from '../../../lib/sipPbx';
+import { reportPlanError } from '../../../services/plan';
+import { toast } from '../../../stores/toasts';
+import { useMemberName, useWorkspaces } from '../../../stores/workspaces';
+import { memberItems } from '../../people/memberPickItems';
+import { MemberPicker } from '../../people/MemberPicker';
+import { formatDuration } from '../../shell/voiceFormat';
+import { pushTelSettings } from './pages';
 import { clearPromptError, promptError, promptSlot, uploadPrompt, usePromptUpload, type PromptKind } from './promptUpload';
+import { MissingNote, TargetCard, TargetField, useTargetLabel } from './Targets';
+import { DrillList, ErrLine, FormShell, usePhoneSettings } from './ui';
 
 /*
- * Workspace settings → «Телефония» → the exchange (ADR-0117 step 1, docs/08 «Телефония»;
- * MANAGE_INTEGRATIONS), one section per tab (TelephonyTab, CBF-77): «Номера» (number · member or
+ * «Телефония → Настройки» — the exchange (ADR-0117 step 1, ADR-0137 §5–§7; MANAGE_INTEGRATIONS),
+ * one settings page each: «Внутренние номера» (number · member or
  * bot · description), «Группы» (number, all at once / one by one, members in order, the optional
  * fallback — ADR-0124), «IVR» (voice menus: the recorded prompt — chosen already in the new-menu
  * form, uploaded right after «Сохранить» — what each key 1–9 * 0 # does, «нет нажатия»). Each card
- * is a list; a row opens its inline form. «Входящие» (in «Настройки», shown when the server can
+ * is a list; a row opens its inline form on the desktop, its own screen on a phone (drill-down
+ * lists, «Сохранить» sticky at the bottom, the group's order by drag handles, the menu's keys as a
+ * 3×4 tile grid with the target card). «Входящие» (shown when the server can
  * take inbound calls): the switch, how calls arrive (to our address with the provider's
  * addresses, or over a registration at the provider — ADR-0121, its state line), where calls go,
  * saved with PUT …/sip/inbound. Rows are memo'd with primitive props; the lists change only by the
@@ -62,7 +69,7 @@ import { clearPromptError, promptError, promptSlot, uploadPrompt, usePromptUploa
 /** The keys of a menu in phone keypad order. */
 export const KEYPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'] as const;
 
-function useExchange(workspaceId: string): {
+export function useExchange(workspaceId: string): {
   exts: SipExtension[] | undefined;
   groups: SipGroup[] | undefined;
   menus: SipIvrMenu[] | undefined;
@@ -122,19 +129,17 @@ function useFormErrors(workspaceId: string): {
   };
 }
 
-function ErrLine({ text, testId }: { text: string | null | undefined; testId?: string }): ReactNode {
-  return text ? (
-    <span className="text-caption text-danger-text" role="alert" data-testid={testId}>
-      {text}
-    </span>
-  ) : null;
-}
-
-/** One tab's part of the exchange: «Номера», «Группы», «IVR» or «Входящие» of «Настройки». */
+/** A settings page of the exchange: «Внутренние номера», «Группы», «Автоответ» or «Входящие». */
 export type ExchangePart = 'numbers' | 'groups' | 'ivr' | 'inbound';
 
-export function Exchange({ workspaceId, settings, part }: { workspaceId: string; settings: SipSettings; part: ExchangePart }): ReactNode {
-  const inboundAvailable = settings.inboundAvailable;
+export interface ExchangeLists {
+  exts: SipExtension[];
+  groups: SipGroup[];
+  menus: SipIvrMenu[];
+}
+
+/** The three lists of the exchange loaded (a spinner, a retry line until then). */
+export function WithExchange({ workspaceId, children }: { workspaceId: string; children: (x: ExchangeLists) => ReactNode }): ReactNode {
   const x = useExchange(workspaceId);
   if (x.failed) {
     return (
@@ -157,6 +162,11 @@ export function Exchange({ workspaceId, settings, part }: { workspaceId: string;
       </div>
     );
   }
+  return children({ exts: x.exts, groups: x.groups, menus: x.menus });
+}
+
+export function Exchange({ workspaceId, settings, part }: { workspaceId: string; settings: SipSettings; part: ExchangePart }): ReactNode {
+  const inboundAvailable = settings.inboundAvailable;
   // The server takes no inbound calls yet: said where inbound is set up and where menus are built.
   const off =
     inboundAvailable || (part !== 'inbound' && part !== 'ivr') ? null : (
@@ -165,22 +175,28 @@ export function Exchange({ workspaceId, settings, part }: { workspaceId: string;
       </p>
     );
   return (
-    <div className="flex flex-col gap-6" data-testid="sip-exchange">
-      {off}
-      {part === 'inbound' && inboundAvailable ? (
-        <InboundCard
-          key={`${settings.inboundEnabled}:${settings.inboundSaved}:${settings.inboundTarget?.id ?? ''}:${settings.inboundAllowedCidrs.join(',')}:${settings.inboundMode}:${regKey(settings)}`}
-          workspaceId={workspaceId}
-          settings={settings}
-          exts={x.exts}
-          groups={x.groups}
-          menus={x.menus}
-        />
-      ) : null}
-      {part === 'numbers' ? <ExtensionsCard workspaceId={workspaceId} exts={x.exts} /> : null}
-      {part === 'groups' ? <GroupsCard workspaceId={workspaceId} exts={x.exts} groups={x.groups} menus={x.menus} /> : null}
-      {part === 'ivr' ? <MenusCard workspaceId={workspaceId} exts={x.exts} groups={x.groups} menus={x.menus} /> : null}
-    </div>
+    <WithExchange workspaceId={workspaceId}>
+      {(x) =>
+        part === 'inbound' && inboundAvailable ? (
+          // The inbound form alone (a phone screen's sticky «Сохранить» needs it at the top level).
+          <InboundCard
+            key={`${settings.inboundEnabled}:${settings.inboundSaved}:${settings.inboundTarget?.id ?? ''}:${settings.inboundAllowedCidrs.join(',')}:${settings.inboundMode}:${regKey(settings)}`}
+            workspaceId={workspaceId}
+            settings={settings}
+            exts={x.exts}
+            groups={x.groups}
+            menus={x.menus}
+          />
+        ) : (
+          <div className="flex flex-col gap-6" data-testid="sip-exchange">
+            {off}
+            {part === 'numbers' ? <ExtensionsCard workspaceId={workspaceId} exts={x.exts} /> : null}
+            {part === 'groups' ? <GroupsCard workspaceId={workspaceId} exts={x.exts} groups={x.groups} menus={x.menus} /> : null}
+            {part === 'ivr' ? <MenusCard workspaceId={workspaceId} exts={x.exts} groups={x.groups} menus={x.menus} /> : null}
+          </div>
+        )
+      }
+    </WithExchange>
   );
 }
 
@@ -195,6 +211,31 @@ function regKey(s: SipSettings): string {
 function ExtensionsCard({ workspaceId, exts }: { workspaceId: string; exts: SipExtension[] }): ReactNode {
   const [editing, setEditing] = useState<string | null>(null); // extension id, 'new', or null
   const people = exts.filter((e) => e.kind !== SipExtensionKind.GROUP);
+  if (usePhoneSettings()) {
+    return (
+      <PhoneList
+        title={t('pbx.ext.title')}
+        footer={t('pbx.ext.footer')}
+        empty={people.length === 0 ? t('pbx.ext.empty') : null}
+        emptyTestId="sip-ext-empty"
+        testId="sip-ext-list"
+        add={t('pbx.ext.add')}
+        addTestId="sip-ext-add"
+        onAdd={() => pushTelSettings('ext:new')}
+      >
+        {people.map((e) => (
+          <PhoneItem
+            key={e.id}
+            lead={<NumberPill number={e.number} />}
+            title={e.userId ? <MemberLabel workspaceId={workspaceId} userId={e.userId} bot={e.kind === SipExtensionKind.BOT} /> : <span className="text-muted">{t('pbx.ext.unassigned')}</span>}
+            sub={[e.description, e.externalBlocked ? t('pbx.ext.rowNoExternal') : ''].filter(Boolean).join(' · ')}
+            onOpen={() => pushTelSettings(`ext:${e.id}`)}
+            testId="sip-ext-row"
+          />
+        ))}
+      </PhoneList>
+    );
+  }
   return (
     <Card title={t('pbx.ext.title')} footer={t('pbx.ext.footer')}>
       {people.length === 0 && editing !== 'new' ? (
@@ -226,7 +267,7 @@ function ExtensionsCard({ workspaceId, exts }: { workspaceId: string; exts: SipE
   );
 }
 
-function MemberLabel({ workspaceId, userId, bot }: { workspaceId: string; userId: string; bot?: boolean }): ReactNode {
+export function MemberLabel({ workspaceId, userId, bot }: { workspaceId: string; userId: string; bot?: boolean }): ReactNode {
   const name = useMemberName(workspaceId, userId);
   const fileId = useWorkspaces((s) => s.byId[workspaceId]?.members[userId]?.user?.avatarFileId ?? s.users[userId]?.avatarFileId ?? '');
   return (
@@ -243,6 +284,68 @@ function MemberLabel({ workspaceId, userId, bot }: { workspaceId: string; userId
 const NumberPill = ({ number }: { number: string }): ReactNode => (
   <span className="inline-flex h-6 min-w-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-fill)] px-2 text-body font-semibold tabular-nums">{number}</span>
 );
+
+/**
+ * A phone list of the exchange (ADR-0137 §7): rows 56 px (the number pill, the name, a line under
+ * it) opening their form screen, «Добавить» under the list on the full width, the card's footer
+ * text under it.
+ */
+function PhoneList({
+  title,
+  footer,
+  empty,
+  emptyTestId,
+  testId,
+  add,
+  addTestId,
+  onAdd,
+  children,
+}: {
+  title: string;
+  footer: string;
+  empty: string | null;
+  emptyTestId: string;
+  testId: string;
+  add: string;
+  addTestId: string;
+  onAdd: () => void;
+  children: ReactNode;
+}): ReactNode {
+  return (
+    <section className="flex flex-col gap-2">
+      {empty ? (
+        <p className="rounded-[var(--radius-panel)] bg-[var(--color-fill)] px-4 py-4 text-body text-muted" data-testid={emptyTestId}>
+          {empty}
+        </p>
+      ) : (
+        <DrillList testId={testId} label={title}>
+          {children}
+        </DrillList>
+      )}
+      <Button variant="secondary" className="w-full" onClick={onAdd} data-testid={addTestId}>
+        {add}
+      </Button>
+      <p className="px-1 text-caption text-faint">{footer}</p>
+    </section>
+  );
+}
+
+/** A 56 px row of a phone list: tap — its form screen. */
+const PhoneItem = memo(function PhoneItem({ lead, title, sub, warn = false, onOpen, testId }: { lead: ReactNode; title: ReactNode; sub: string; warn?: boolean; onOpen: () => void; testId: string }): ReactNode {
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <button type="button" onClick={onOpen} className="flex min-h-14 w-full min-w-0 items-center gap-3 px-4 py-2 text-left text-list active:bg-[var(--color-fill-hover)]" data-testid={testId}>
+        {lead}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="min-w-0 truncate">{title}</span>
+          {sub ? <span className="min-w-0 truncate text-body text-muted">{sub}</span> : null}
+        </span>
+        {warn ? <TriangleAlert className="size-4 shrink-0 text-[var(--color-yellow)]" aria-label={t('pbx.target.missingHint')} /> : null}
+        <ChevronRight className="size-4 shrink-0 text-faint" aria-hidden />
+      </button>
+    </li>
+  );
+});
 
 const ExtensionRow = memo(function ExtensionRow({
   workspaceId,
@@ -321,8 +424,9 @@ function useAssignable(workspaceId: string, exts: SipExtension[], keep: string):
   }, [members, exts, keep]);
 }
 
-function ExtensionForm({ workspaceId, ext, exts, onDone }: { workspaceId: string; ext?: SipExtension; exts: SipExtension[]; onDone: () => void }): ReactNode {
+export function ExtensionForm({ workspaceId, ext, exts, onDone }: { workspaceId: string; ext?: SipExtension; exts: SipExtension[]; onDone: () => void }): ReactNode {
   const refresh = useRefresh(workspaceId);
+  const phone = usePhoneSettings();
   const [number, setNumber] = useState(ext?.number ?? '');
   const [userId, setUserId] = useState(ext?.userId ?? '');
   const [description, setDescription] = useState(ext?.description ?? '');
@@ -344,25 +448,57 @@ function ExtensionForm({ workspaceId, ext, exts, onDone }: { workspaceId: string
     },
     onError: errs.report,
   });
+  const remove = useMutation({
+    mutationFn: () => api.sip.removeExtension(workspaceId, ext?.id ?? ''),
+    onSuccess: () => {
+      refresh();
+      onDone();
+    },
+    onError: errs.report,
+  });
   const ready = numberValid(number) && (!!userId || !!ext);
+  const unassign =
+    ext && ext.userId ? (
+      <Button variant={phone ? 'secondary' : 'ghost'} size="sm" onClick={() => setUserId('')}>
+        {t('pbx.ext.unassign')}
+      </Button>
+    ) : null;
   return (
-    <form
-      className="flex flex-col gap-2 px-3 py-3"
-      data-testid="sip-ext-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (ready && !save.isPending) save.mutate();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          onDone();
-        }
-      }}
+    <FormShell
+      testId="sip-ext-form"
+      className="gap-2 px-3 py-3"
+      onSubmit={() => save.mutate()}
+      onCancel={onDone}
+      error={errs.form}
+      saveBusy={save.isPending}
+      saveDisabled={!ready}
+      saveTestId="sip-ext-save"
+      danger={
+        phone ? (
+          <>
+            {unassign}
+            {ext ? (
+              <Button
+                variant="destructive"
+                busy={remove.isPending}
+                onClick={() =>
+                  void confirmAction(t('pbx.ext.deleteTitle', { number: ext.number }), t('pbx.ext.deleteText'), t('pbx.delete')).then((ok) => {
+                    if (ok) remove.mutate();
+                  })
+                }
+                data-testid="sip-ext-delete"
+              >
+                {t('pbx.ext.delete')}
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          unassign
+        )
+      }
     >
-      <div className="flex flex-wrap items-start gap-2">
-        <span className="flex w-24 flex-col gap-1">
+      <div className="flex flex-wrap items-start gap-2 mobile:flex-col mobile:items-stretch mobile:gap-4">
+        <span className="flex w-24 flex-col gap-1 mobile:w-full">
           <label htmlFor={`${id}-n`} className="text-caption text-muted">
             {t('pbx.ext.number')}
           </label>
@@ -372,7 +508,8 @@ function ExtensionForm({ workspaceId, ext, exts, onDone }: { workspaceId: string
             value={number}
             inputMode="numeric"
             placeholder="101"
-            autoFocus
+            // No programmatic focus on a phone: iOS raises the keyboard over the screen it just pushed.
+            autoFocus={!phone}
             className="tabular-nums"
             aria-invalid={errs.field['number'] ? true : undefined}
             onChange={(e) => {
@@ -413,101 +550,8 @@ function ExtensionForm({ workspaceId, ext, exts, onDone }: { workspaceId: string
       <div data-testid="sip-ext-no-external-switch">
         <Switch checked={noExternal} onChange={setNoExternal} label={t('pbx.ext.noExternal')} hint={t('pbx.ext.noExternalHint')} />
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <ErrLine text={errs.form} />
-        {ext && ext.userId ? (
-          <Button variant="ghost" size="sm" className="mr-auto" onClick={() => setUserId('')}>
-            {t('pbx.ext.unassign')}
-          </Button>
-        ) : null}
-        <Button variant="secondary" size="sm" onClick={onDone}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" size="sm" busy={save.isPending} disabled={!ready} data-testid="sip-ext-save">
-          {t('pbx.save')}
-        </Button>
-      </div>
-    </form>
+    </FormShell>
   );
-}
-
-// ---------------------------------------------------------------- targets
-
-/** «Куда»: hang up, repeat (keys only), a menu, a person / bot number, a group. */
-function TargetSelect({
-  value,
-  onChange,
-  exts,
-  groups,
-  menus,
-  allowRepeat = false,
-  allowNone = false,
-  selfMenu,
-  label,
-  testId,
-  className,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  exts: SipExtension[];
-  groups: SipGroup[];
-  menus: SipIvrMenu[];
-  allowRepeat?: boolean;
-  allowNone?: boolean;
-  selfMenu?: string;
-  label: string;
-  testId?: string;
-  className?: string;
-}): ReactNode {
-  const names = useWorkspaces((s) => s.byId[exts[0]?.workspaceId ?? '']?.members);
-  const people = exts.filter((e) => e.kind !== SipExtensionKind.GROUP);
-  const memberName = (uid: string): string => (uid ? names?.[uid]?.nickname || names?.[uid]?.user?.displayName || '' : t('pbx.ext.unassigned'));
-  return (
-    <Select aria-label={label} title={label} value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} className={className}>
-      {allowNone ? <option value="">{t('pbx.target.none')}</option> : null}
-      <option value="hangup">{t('pbx.target.hangup')}</option>
-      {allowRepeat ? <option value="repeat">{t('pbx.target.repeat')}</option> : null}
-      {value === 'missing' ? <option value="missing">{t('pbx.target.missing')}</option> : null}
-      {menus.some((m) => m.id !== selfMenu) ? (
-        <optgroup label={t('pbx.target.menus')}>
-          {menus
-            .filter((m) => m.id !== selfMenu)
-            .map((m) => (
-              <option key={m.id} value={`menu:${m.id}`}>
-                {m.name}
-              </option>
-            ))}
-        </optgroup>
-      ) : null}
-      {people.length ? (
-        <optgroup label={t('pbx.target.people')}>
-          {people.map((e) => (
-            <option key={e.id} value={`extension:${e.id}`}>
-              {`${e.number} · ${memberName(e.userId)}`}
-            </option>
-          ))}
-        </optgroup>
-      ) : null}
-      {groups.length ? (
-        <optgroup label={t('pbx.target.groups')}>
-          {groups.map((g) => (
-            <option key={g.id} value={`group:${g.id}`}>
-              {`${g.extension?.number ?? ''} · ${g.name}`}
-            </option>
-          ))}
-        </optgroup>
-      ) : null}
-    </Select>
-  );
-}
-
-function MissingNote({ target }: { target: SipRouteTarget | undefined }): ReactNode {
-  return target?.missing ? (
-    <span className="flex items-center gap-1 text-caption text-muted" data-testid="sip-target-missing">
-      <TriangleAlert className="size-3.5 shrink-0" aria-hidden />
-      {t('pbx.target.missingHint')}
-    </span>
-  ) : null;
 }
 
 // ---------------------------------------------------------------- inbound calls
@@ -575,6 +619,7 @@ function InboundCard({
   const live = settings.inboundEnabled && settings.inboundSaved;
   const field = (id: string): string => `${f}-${id}`;
   return (
+    <FormShell testId="sip-inbound-form" onSubmit={() => save.mutate()} error={errs.form} errorTestId="sip-inbound-error" saveBusy={save.isPending} saveTestId="sip-inbound-save">
     <Card title={t('pbx.in.title')} footer={register ? t('pbx.in.footerRegister') : t('pbx.in.footer')}>
       <div className="px-3 py-1.5" data-testid="sip-inbound">
         <Switch
@@ -614,8 +659,8 @@ function InboundCard({
         </Row>
       ) : null}
       <Row label={t('pbx.in.target')}>
-        <span className="flex min-w-0 flex-col items-end gap-1">
-          <TargetSelect
+        <span className="flex min-w-0 flex-col items-end gap-1 mobile:w-full mobile:items-stretch">
+          <TargetField
             value={target}
             onChange={(v) => {
               setTarget(v);
@@ -756,13 +801,8 @@ function InboundCard({
           <ErrLine text={errs.field.allowedCidrs} />
         </span>
       </Row>
-      <div className="flex flex-wrap items-center gap-3 px-3 py-2">
-        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending} data-testid="sip-inbound-save">
-          {t('pbx.save')}
-        </Button>
-        <ErrLine text={errs.form} testId="sip-inbound-error" />
-      </div>
     </Card>
+    </FormShell>
   );
 }
 
@@ -812,6 +852,32 @@ function RegistrationStatus({ reg }: { reg: SipRegistration | undefined }): Reac
 
 function GroupsCard({ workspaceId, exts, groups, menus }: { workspaceId: string; exts: SipExtension[]; groups: SipGroup[]; menus: SipIvrMenu[] }): ReactNode {
   const [editing, setEditing] = useState<string | null>(null);
+  if (usePhoneSettings()) {
+    return (
+      <PhoneList
+        title={t('pbx.group.title')}
+        footer={t('pbx.group.footer')}
+        empty={groups.length === 0 ? t('pbx.group.empty') : null}
+        emptyTestId="sip-group-empty"
+        testId="sip-group-list"
+        add={t('pbx.group.add')}
+        addTestId="sip-group-add"
+        onAdd={() => pushTelSettings('group:new')}
+      >
+        {groups.map((g) => (
+          <PhoneItem
+            key={g.id}
+            lead={<NumberPill number={g.extension?.number ?? ''} />}
+            title={g.name}
+            sub={groupSummary(g.strategy === SipGroupStrategy.ROUND_ROBIN, g.members.length, g.fallbackEnabled ? g.fallbackSec : 0)}
+            warn={g.fallbackEnabled && !!g.onFail?.missing}
+            onOpen={() => pushTelSettings(`group:${g.id}`)}
+            testId="sip-group-row"
+          />
+        ))}
+      </PhoneList>
+    );
+  }
   return (
     <Card title={t('pbx.group.title')} footer={t('pbx.group.footer')}>
       {groups.length === 0 && editing !== 'new' ? (
@@ -879,10 +945,7 @@ const GroupRow = memo(function GroupRow({
       <span className="min-w-24 flex-1 truncate text-body font-medium" title={name}>
         {name}
       </span>
-      <span className="shrink-0 text-body text-muted">
-        {t(roundRobin ? 'pbx.group.roundRobin' : 'pbx.group.ringAll')} · {plural('pbx.group.members', members)}
-        {fallbackSec ? ` · ${t('pbx.group.rowFallback', { sec: fallbackSec })}` : ''}
-      </span>
+      <span className="shrink-0 text-body text-muted">{groupSummary(roundRobin, members, fallbackSec)}</span>
       {warn ? <TriangleAlert className="size-4 shrink-0 text-[var(--color-yellow)]" aria-label={t('pbx.target.missingHint')} /> : null}
       <IconButton size="sm" label={t('pbx.edit')} onClick={() => onEdit(id)}>
         <Pencil className="size-3.5" aria-hidden />
@@ -891,7 +954,12 @@ const GroupRow = memo(function GroupRow({
   );
 });
 
-function GroupForm({
+/** «По очереди · 3 участника · переадресация через 45 с». */
+function groupSummary(roundRobin: boolean, members: number, fallbackSec: number): string {
+  return `${t(roundRobin ? 'pbx.group.roundRobin' : 'pbx.group.ringAll')} · ${plural('pbx.group.members', members)}${fallbackSec ? ` · ${t('pbx.group.rowFallback', { sec: fallbackSec })}` : ''}`;
+}
+
+export function GroupForm({
   workspaceId,
   group,
   exts,
@@ -909,6 +977,7 @@ function GroupForm({
   const refresh = useRefresh(workspaceId);
   const errs = useFormErrors(workspaceId);
   const id = useId();
+  const phone = usePhoneSettings();
   const [name, setName] = useState(group?.name ?? '');
   const [number, setNumber] = useState(group?.extension?.number ?? '');
   const [roundRobin, setRoundRobin] = useState(group?.strategy === SipGroupStrategy.ROUND_ROBIN);
@@ -919,14 +988,6 @@ function GroupForm({
   const [onFail, setOnFail] = useState(targetValue(group?.onFail));
   const byId = useMemo(() => new Map(exts.map((e) => [e.id, e])), [exts]);
   const free = exts.filter((e) => e.kind !== SipExtensionKind.GROUP && !members.includes(e.id));
-  const move = (i: number, d: -1 | 1): void =>
-    setMembers((cur) => {
-      const next = [...cur];
-      const j = i + d;
-      if (j < 0 || j >= next.length) return cur;
-      [next[i], next[j]] = [next[j] as string, next[i] as string];
-      return next;
-    });
   const body = {
     name: name.trim(),
     number,
@@ -956,26 +1017,44 @@ function GroupForm({
   });
   const ready = !!name.trim() && numberValid(number);
   return (
-    <form
-      className="flex flex-col gap-3 px-3 py-3"
-      data-testid="sip-group-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (ready && !save.isPending) save.mutate();
-      }}
+    <FormShell
+      testId="sip-group-form"
+      className="px-3 py-3"
+      onSubmit={() => save.mutate()}
+      onCancel={onDone}
+      error={errs.form}
+      saveBusy={save.isPending}
+      saveDisabled={!ready}
+      saveTestId="sip-group-save"
+      danger={
+        group ? (
+          <Button
+            variant="destructive"
+            size="sm"
+            busy={remove.isPending}
+            onClick={() =>
+              void confirmAction(t('pbx.group.deleteTitle', { name: group.name }), t('pbx.group.deleteText'), t('pbx.delete')).then((ok) => {
+                if (ok) remove.mutate();
+              })
+            }
+          >
+            {t('pbx.group.delete')}
+          </Button>
+        ) : null
+      }
     >
-      <div className="flex flex-wrap items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2 mobile:gap-4">
         <span className="flex min-w-40 flex-1 flex-col gap-1">
           <label htmlFor={`${id}-name`} className="text-caption text-muted">
             {t('pbx.group.name')}
           </label>
-          <Input id={`${id}-name`} data-testid="sip-group-name" value={name} maxLength={64} autoFocus placeholder={t('pbx.group.namePlaceholder')} onChange={(e) => {
+          <Input id={`${id}-name`} data-testid="sip-group-name" value={name} maxLength={64} autoFocus={!phone} placeholder={t('pbx.group.namePlaceholder')} onChange={(e) => {
             setName(e.target.value);
             errs.clear('name');
           }} />
           <ErrLine text={errs.field['name']} />
         </span>
-        <span className="flex w-24 flex-col gap-1">
+        <span className="flex w-24 flex-col gap-1 mobile:w-full">
           <label htmlFor={`${id}-n`} className="text-caption text-muted">
             {t('pbx.ext.number')}
           </label>
@@ -995,6 +1074,7 @@ function GroupForm({
             { value: 'all', label: t('pbx.group.ringAll') },
             { value: 'rr', label: t('pbx.group.roundRobin') },
           ]}
+          fill={phone}
           testId="sip-group-strategy"
         />
         {roundRobin ? (
@@ -1017,33 +1097,13 @@ function GroupForm({
       <p className="text-caption text-faint">{t(roundRobin ? 'pbx.group.roundRobinHint' : 'pbx.group.ringAllHint')}</p>
       <ErrLine text={errs.field['ringSec'] ?? errs.field['memberRingSec']} />
       <div className="flex flex-col gap-1">
-        <span className="text-caption text-muted">{t('pbx.group.order')}</span>
         {members.length ? (
-          <ol className="flex flex-col rounded-[var(--radius-card)] border border-line" data-testid="sip-group-members">
-            {members.map((m, i) => {
-              const e = byId.get(m);
-              return (
-                <li key={m} className="flex min-h-9 items-center gap-2 border-b border-line px-2 py-1 last:border-b-0">
-                  <span className="w-5 shrink-0 text-right text-caption tabular-nums text-faint">{i + 1}</span>
-                  <NumberPill number={e?.number ?? '—'} />
-                  <span className="min-w-0 flex-1 text-body">
-                    {e?.userId ? <MemberLabel workspaceId={workspaceId} userId={e.userId} bot={e.kind === SipExtensionKind.BOT} /> : <span className="text-muted">{t('pbx.ext.unassigned')}</span>}
-                  </span>
-                  <IconButton size="sm" label={t('pbx.up')} disabled={i === 0} onClick={() => move(i, -1)}>
-                    <ArrowUp className="size-3.5" aria-hidden />
-                  </IconButton>
-                  <IconButton size="sm" label={t('pbx.down')} disabled={i === members.length - 1} onClick={() => move(i, 1)}>
-                    <ArrowDown className="size-3.5" aria-hidden />
-                  </IconButton>
-                  <IconButton size="sm" label={t('pbx.group.removeMember')} onClick={() => setMembers((cur) => cur.filter((x) => x !== m))}>
-                    <X className="size-3.5" aria-hidden />
-                  </IconButton>
-                </li>
-              );
-            })}
-          </ol>
+          <MemberOrder workspaceId={workspaceId} members={members} byId={byId} onChange={setMembers} />
         ) : (
-          <p className="text-body text-muted">{t(free.length ? 'pbx.group.noMembers' : 'pbx.group.needNumbers')}</p>
+          <>
+            <span className="text-caption text-muted">{t('pbx.group.order')}</span>
+            <p className="text-body text-muted">{t(free.length ? 'pbx.group.noMembers' : 'pbx.group.needNumbers')}</p>
+          </>
         )}
         {free.length && members.length < 20 ? (
           <Select
@@ -1094,8 +1154,8 @@ function GroupForm({
               />
               <span className="text-muted">{t('pbx.sec')}</span>
             </label>
-            <span className="text-muted">{t('pbx.group.fallbackTo')}</span>
-            <TargetSelect
+            <span className="text-muted mobile:w-full">{t('pbx.group.fallbackTo')}</span>
+            <TargetField
               value={onFail}
               onChange={(v) => {
                 setOnFail(v);
@@ -1113,31 +1173,144 @@ function GroupForm({
         ) : null}
         <ErrLine text={errs.field['fallbackSec'] ?? errs.field['onFail']} />
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <ErrLine text={errs.form} />
-        {group ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="mr-auto"
-            busy={remove.isPending}
-            onClick={() =>
-              void confirmAction(t('pbx.group.deleteTitle', { name: group.name }), t('pbx.group.deleteText'), t('pbx.delete')).then((ok) => {
-                if (ok) remove.mutate();
-              })
-            }
+    </FormShell>
+  );
+}
+
+/**
+ * The members of a group in their order (the order «по очереди» rings them). Desktop: ↑ ↓ × per row.
+ * Phone (ADR-0137 §7): rows 52 px with ×; «Изменить порядок» swaps the × for drag handles (dnd-kit:
+ * touch — hold 300 ms, as the «Ещё» card; a drop on a row moves the dragged one there, `select`
+ * haptic), «Готово» returns.
+ */
+function MemberOrder({ workspaceId, members, byId, onChange }: { workspaceId: string; members: string[]; byId: Map<string, SipExtension>; onChange: (next: string[] | ((cur: string[]) => string[])) => void }): ReactNode {
+  const phone = usePhoneSettings();
+  const [reorder, setReorder] = useState(false);
+  const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 4 } }), useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }));
+  const move = (i: number, d: -1 | 1): void =>
+    onChange((cur) => {
+      const next = [...cur];
+      const j = i + d;
+      if (j < 0 || j >= next.length) return cur;
+      [next[i], next[j]] = [next[j] as string, next[i] as string];
+      return next;
+    });
+  const onEnd = useCallback(
+    (e: DragEndEvent): void => {
+      const from = String(e.active.id);
+      const to = e.over ? String(e.over.id) : '';
+      if (!to || from === to) return;
+      onChange((cur) => {
+        const a = cur.indexOf(from);
+        const b = cur.indexOf(to);
+        if (a < 0 || b < 0) return cur;
+        const next = [...cur];
+        next.splice(a, 1);
+        next.splice(b, 0, from);
+        return next;
+      });
+      haptics.select();
+    },
+    [onChange],
+  );
+  const remove = (m: string): void => onChange((cur) => cur.filter((x) => x !== m));
+  const label = (m: string): ReactNode => {
+    const e = byId.get(m);
+    return e?.userId ? <MemberLabel workspaceId={workspaceId} userId={e.userId} bot={e.kind === SipExtensionKind.BOT} /> : <span className="text-muted">{t('pbx.ext.unassigned')}</span>;
+  };
+  if (!phone) {
+    return (
+      <>
+        <span className="text-caption text-muted">{t('pbx.group.order')}</span>
+        <ol className="flex flex-col rounded-[var(--radius-card)] border border-line" data-testid="sip-group-members">
+          {members.map((m, i) => (
+            <li key={m} className="flex min-h-9 items-center gap-2 border-b border-line px-2 py-1 last:border-b-0">
+              <span className="w-5 shrink-0 text-right text-caption tabular-nums text-faint">{i + 1}</span>
+              <NumberPill number={byId.get(m)?.number ?? '—'} />
+              <span className="min-w-0 flex-1 text-body">{label(m)}</span>
+              <IconButton size="sm" label={t('pbx.up')} disabled={i === 0} onClick={() => move(i, -1)}>
+                <ArrowUp className="size-3.5" aria-hidden />
+              </IconButton>
+              <IconButton size="sm" label={t('pbx.down')} disabled={i === members.length - 1} onClick={() => move(i, 1)}>
+                <ArrowDown className="size-3.5" aria-hidden />
+              </IconButton>
+              <IconButton size="sm" label={t('pbx.group.removeMember')} onClick={() => remove(m)}>
+                <X className="size-3.5" aria-hidden />
+              </IconButton>
+            </li>
+          ))}
+        </ol>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-caption text-muted">{t('pbx.group.order')}</span>
+        {members.length > 1 ? (
+          <button
+            type="button"
+            className="-my-2 min-h-11 px-1 text-list font-medium text-accent-text"
+            onClick={() => {
+              haptics.select();
+              setReorder((v) => !v);
+            }}
+            aria-pressed={reorder}
+            data-testid="sip-group-reorder"
           >
-            {t('pbx.group.delete')}
-          </Button>
+            {t(reorder ? 'tset.group.reorderDone' : 'tset.group.reorder')}
+          </button>
         ) : null}
-        <Button variant="secondary" size="sm" onClick={onDone}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" size="sm" busy={save.isPending} disabled={!ready} data-testid="sip-group-save">
-          {t('pbx.save')}
-        </Button>
       </div>
-    </form>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onEnd}>
+        <ol className="overflow-hidden rounded-[var(--radius-panel)] bg-[var(--color-fill)]" data-testid="sip-group-members">
+          {members.map((m, i) => (
+            <OrderRow key={m} id={m} index={i} number={byId.get(m)?.number ?? '—'} label={label(m)} reorder={reorder} onRemove={remove} />
+          ))}
+        </ol>
+      </DndContext>
+      {reorder ? <p className="px-1 text-caption text-faint">{t('tset.group.reorderHint')}</p> : null}
+    </>
+  );
+}
+
+/** A 52 px member row of the phone's group form: × to remove, or the drag handle while reordering. */
+function OrderRow({ id, index, number, label, reorder, onRemove }: { id: string; index: number; number: string; label: ReactNode; reorder: boolean; onRemove: (id: string) => void }): ReactNode {
+  const { setNodeRef: setDragRef, setActivatorNodeRef, listeners, transform, isDragging } = useDraggable({ id, disabled: !reorder });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id });
+  const setRef = useCallback(
+    (el: HTMLElement | null) => {
+      setDragRef(el);
+      setDropRef(el);
+    },
+    [setDragRef, setDropRef],
+  );
+  return (
+    <li
+      ref={setRef}
+      className={cx('relative flex h-[52px] items-center gap-3 border-b border-line pl-4 pr-1 last:border-b-0', isDragging && 'z-10 bg-hover shadow-md', isOver && !isDragging && 'bg-hover/60')}
+      style={transform ? { transform: `translate3d(0, ${Math.round(transform.y)}px, 0)` } : undefined}
+      data-testid="sip-group-member"
+    >
+      <span className="w-4 shrink-0 text-right text-body tabular-nums text-faint">{index + 1}</span>
+      <NumberPill number={number} />
+      <span className="min-w-0 flex-1 truncate text-list">{label}</span>
+      {reorder ? (
+        <span
+          ref={setActivatorNodeRef}
+          {...listeners}
+          aria-hidden
+          className="grid size-11 shrink-0 touch-none place-items-center text-muted"
+          data-testid="sip-group-drag"
+        >
+          <GripVertical className="size-5" strokeWidth={1.75} aria-hidden />
+        </span>
+      ) : (
+        <IconButton label={t('pbx.group.removeMember')} onClick={() => onRemove(id)} className="size-11">
+          <X className="size-4" aria-hidden />
+        </IconButton>
+      )}
+    </li>
   );
 }
 
@@ -1148,6 +1321,19 @@ function ExtOption({ workspaceId, ext }: { workspaceId: string; ext: SipExtensio
 
 // ---------------------------------------------------------------- voice menus
 
+/**
+ * A new menu saved: it joins the list at once, and the greeting and the notice chosen in the new
+ * form upload — one at a time (promptUpload.ts), the greeting first; the progress shows in the form
+ * that now edits the menu.
+ */
+export function menuCreated(qc: QueryClient, workspaceId: string, m: SipIvrMenu, file: File | null, notice: File | null): void {
+  qc.setQueryData<ListSipIvrMenusResponse>(menuKey(workspaceId), (cur) => (cur && !cur.menus.some((x) => x.id === m.id) ? { ...cur, menus: [...cur.menus, m] } : cur));
+  void (async () => {
+    if (file) await uploadPrompt(workspaceId, m.id, file);
+    if (notice) await uploadPrompt(workspaceId, m.id, notice, 'notice');
+  })();
+}
+
 function MenusCard({ workspaceId, exts, groups, menus }: { workspaceId: string; exts: SipExtension[]; groups: SipGroup[]; menus: SipIvrMenu[] }): ReactNode {
   const [editing, setEditing] = useState<string | null>(null);
   const qc = useQueryClient();
@@ -1155,13 +1341,8 @@ function MenusCard({ workspaceId, exts, groups, menus }: { workspaceId: string; 
   // form is uploaded right then (it needs the menu's id), its progress shows in that form.
   const created = useCallback(
     (m: SipIvrMenu, file: File | null, notice: File | null) => {
-      qc.setQueryData<ListSipIvrMenusResponse>(menuKey(workspaceId), (cur) => (cur && !cur.menus.some((x) => x.id === m.id) ? { ...cur, menus: [...cur.menus, m] } : cur));
       setEditing(m.id);
-      // One upload at a time (promptUpload.ts): the greeting first, then the recording notice.
-      void (async () => {
-        if (file) await uploadPrompt(workspaceId, m.id, file);
-        if (notice) await uploadPrompt(workspaceId, m.id, notice, 'notice');
-      })();
+      menuCreated(qc, workspaceId, m, file, notice);
     },
     [qc, workspaceId],
   );
@@ -1179,6 +1360,32 @@ function MenusCard({ workspaceId, exts, groups, menus }: { workspaceId: string; 
     if (s.errMenu && s.errMenu.split(':')[0] !== editing) clearPromptError(s.errMenu);
   }, [editing]);
   useEffect(() => () => clearPromptError(usePromptUpload.getState().errMenu), []);
+  if (usePhoneSettings()) {
+    return (
+      <PhoneList
+        title={t('pbx.menu.title')}
+        footer={t('pbx.menu.footer')}
+        empty={menus.length === 0 ? t('pbx.menu.empty') : null}
+        emptyTestId="sip-menu-empty"
+        testId="sip-menu-list"
+        add={t('pbx.menu.add')}
+        addTestId="sip-menu-add"
+        onAdd={() => pushTelSettings('menu:new')}
+      >
+        {menus.map((m) => (
+          <PhoneItem
+            key={m.id}
+            lead={null}
+            title={m.name}
+            sub={`${m.promptStatus === SipPromptStatus.READY && m.promptDurationMs ? t('pbx.menu.promptLen', { time: formatDuration(m.promptDurationMs) }) : t('pbx.menu.noPrompt')} · ${plural('pbx.menu.keys', m.items.length)}`}
+            warn={m.items.some((it) => it.action?.missing) || !!m.onNoInput?.missing}
+            onOpen={() => pushTelSettings(`menu:${m.id}`)}
+            testId="sip-menu-row"
+          />
+        ))}
+      </PhoneList>
+    );
+  }
   return (
     <Card title={t('pbx.menu.title')} footer={t('pbx.menu.footer')}>
       {menus.length === 0 && editing !== 'new' ? (
@@ -1259,7 +1466,7 @@ const MenuRow = memo(function MenuRow({
 });
 
 /** Listen to the prompt: a plain <audio> element, never WebAudio (docs/02). */
-function PromptPlayer({ fileId, testId = 'sip-menu-listen' }: { fileId: string; testId?: string }): ReactNode {
+export function PromptPlayer({ fileId, testId = 'sip-menu-listen' }: { fileId: string; testId?: string }): ReactNode {
   const [playing, setPlaying] = useState(false);
   const el = useRef<HTMLAudioElement | null>(null);
   useEffect(
@@ -1275,7 +1482,7 @@ function PromptPlayer({ fileId, testId = 'sip-menu-listen' }: { fileId: string; 
       setPlaying(false);
       return;
     }
-    const { platform } = await import('../../platform');
+    const { platform } = await import('../../../platform');
     // A fresh element each time: it starts from the beginning (the file is cached by the browser).
     const a = new Audio(await platform.mediaUrl(`/api/files/${fileId}`));
     a.addEventListener('ended', () => setPlaying(false));
@@ -1292,7 +1499,7 @@ function PromptPlayer({ fileId, testId = 'sip-menu-listen' }: { fileId: string; 
 }
 
 /** The file picker of a greeting: a hidden input behind a button (MP3 / WAV / OGG). */
-function PromptPicker({
+export function PromptPicker({
   label,
   onFile,
   busy = false,
@@ -1377,6 +1584,7 @@ function PromptLine({
 /** A saved menu's greeting: listen, upload / replace (promptUpload.ts — progress, conversion), remove. */
 function PromptRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMenu }): ReactNode {
   const refresh = useRefresh(workspaceId);
+  const phone = usePhoneSettings();
   const busy = usePromptUpload((s) => s.menuId === menu.id);
   const pct = usePromptUpload((s) => (s.menuId === menu.id ? s.pct : null));
   const err = usePromptUpload((s) => (s.errMenu === menu.id ? s.err : ''));
@@ -1404,7 +1612,7 @@ function PromptRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMen
             inputTestId="sip-menu-prompt-file"
           />
           {ready ? (
-            <Button variant="ghost" size="sm" busy={clear.isPending} onClick={() => clear.mutate()}>
+            <Button variant={phone ? 'secondary' : 'ghost'} size="sm" busy={clear.isPending} onClick={() => clear.mutate()}>
               {t('pbx.menu.removePrompt')}
             </Button>
           ) : null}
@@ -1448,6 +1656,7 @@ function DraftPromptRow({ file, onFile }: { file: File | null; onFile: (f: File 
 /** A saved menu's recording notice (ADR-0131): listen, upload / replace, remove — like the greeting. */
 function NoticeRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMenu }): ReactNode {
   const refresh = useRefresh(workspaceId);
+  const phone = usePhoneSettings();
   const slot = promptSlot(menu.id, 'notice');
   const busy = usePromptUpload((s) => s.menuId === slot);
   const pct = usePromptUpload((s) => (s.menuId === slot ? s.pct : null));
@@ -1477,7 +1686,7 @@ function NoticeRow({ workspaceId, menu }: { workspaceId: string; menu: SipIvrMen
             inputTestId="sip-menu-notice-file"
           />
           {ready ? (
-            <Button variant="ghost" size="sm" busy={clear.isPending} onClick={() => clear.mutate()} data-testid="sip-menu-notice-remove">
+            <Button variant={phone ? 'secondary' : 'ghost'} size="sm" busy={clear.isPending} onClick={() => clear.mutate()} data-testid="sip-menu-notice-remove">
               {t('pbx.menu.noticeRemove')}
             </Button>
           ) : null}
@@ -1519,7 +1728,7 @@ function DraftNoticeRow({ file, onFile }: { file: File | null; onFile: (f: File 
   );
 }
 
-function MenuForm({
+export function MenuForm({
   workspaceId,
   menu,
   exts,
@@ -1540,6 +1749,7 @@ function MenuForm({
   const refresh = useRefresh(workspaceId);
   const errs = useFormErrors(workspaceId);
   const id = useId();
+  const phone = usePhoneSettings();
   const [name, setName] = useState(menu?.name ?? '');
   const [draft, setDraft] = useState<File | null>(null);
   const [draftNotice, setDraftNotice] = useState<File | null>(null);
@@ -1578,20 +1788,43 @@ function MenuForm({
     onError: errs.report,
   });
   const ready = !!name.trim();
+  const setKey = (d: string, v: string): void => {
+    setKeys((cur) => ({ ...cur, [d]: v }));
+    errs.clear('items');
+  };
+  const targets = { exts, groups, menus, ...(menu ? { selfMenu: menu.id } : {}) };
   return (
-    <form
-      className="flex flex-col gap-3 px-3 py-3"
-      data-testid="sip-menu-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (ready && !save.isPending) save.mutate();
-      }}
+    <FormShell
+      testId="sip-menu-form"
+      className="px-3 py-3"
+      onSubmit={() => save.mutate()}
+      onCancel={onDone}
+      error={errs.form}
+      saveBusy={save.isPending}
+      saveDisabled={!ready}
+      saveTestId="sip-menu-save"
+      danger={
+        menu ? (
+          <Button
+            variant="destructive"
+            size="sm"
+            busy={remove.isPending}
+            onClick={() =>
+              void confirmAction(t('pbx.menu.deleteTitle', { name: menu.name }), t('pbx.menu.deleteText'), t('pbx.delete')).then((ok) => {
+                if (ok) remove.mutate();
+              })
+            }
+          >
+            {t('pbx.menu.delete')}
+          </Button>
+        ) : null
+      }
     >
       <span className="flex flex-col gap-1">
         <label htmlFor={`${id}-name`} className="text-caption text-muted">
           {t('pbx.menu.name')}
         </label>
-        <Input id={`${id}-name`} data-testid="sip-menu-name" value={name} maxLength={64} autoFocus placeholder={t('pbx.menu.namePlaceholder')} className="max-w-80" onChange={(e) => {
+        <Input id={`${id}-name`} data-testid="sip-menu-name" value={name} maxLength={64} autoFocus={!phone} placeholder={t('pbx.menu.namePlaceholder')} className="max-w-80 mobile:max-w-none" onChange={(e) => {
           setName(e.target.value);
           errs.clear('name');
         }} />
@@ -1601,31 +1834,29 @@ function MenuForm({
       {menu ? <NoticeRow workspaceId={workspaceId} menu={menu} /> : <DraftNoticeRow file={draftNotice} onFile={setDraftNotice} />}
       <div className="flex flex-col gap-1">
         <span className="text-caption text-muted">{t('pbx.menu.keysTitle')}</span>
-        <div className="grid grid-cols-3 gap-2 mobile:grid-cols-1" data-testid="sip-menu-keys">
-          {KEYPAD.map((d) => (
-            <div key={d} className="flex min-w-0 items-center gap-2">
-              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--color-fill)] text-body font-semibold" aria-hidden>
-                {d}
-              </span>
-              <TargetSelect
-                value={keys[d] ?? ''}
-                onChange={(v) => {
-                  setKeys((cur) => ({ ...cur, [d]: v }));
-                  errs.clear('items');
-                }}
-                exts={exts}
-                groups={groups}
-                menus={menus}
-                {...(menu ? { selfMenu: menu.id } : {})}
-                allowRepeat
-                allowNone
-                label={t('pbx.menu.key', { key: d })}
-                className={cx('min-w-0 flex-1', keys[d] === 'missing' && missing.get(d)?.missing && 'border-[var(--color-yellow)]')}
-                testId={`sip-menu-key-${d}`}
-              />
-            </div>
-          ))}
-        </div>
+        {phone ? (
+          <KeyTiles keys={keys} missing={missing} onChange={setKey} targets={targets} />
+        ) : (
+          <div className="grid grid-cols-3 gap-2" data-testid="sip-menu-keys">
+            {KEYPAD.map((d) => (
+              <div key={d} className="flex min-w-0 items-center gap-2">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-[var(--color-fill)] text-body font-semibold" aria-hidden>
+                  {d}
+                </span>
+                <TargetField
+                  value={keys[d] ?? ''}
+                  onChange={(v) => setKey(d, v)}
+                  {...targets}
+                  allowRepeat
+                  allowNone
+                  label={t('pbx.menu.key', { key: d })}
+                  className={cx('min-w-0 flex-1', keys[d] === 'missing' && missing.get(d)?.missing && 'border-[var(--color-yellow)]')}
+                  testId={`sip-menu-key-${d}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
         <ErrLine text={errs.field['items'] ?? errs.field['digit']} />
         {Object.values(keys).includes('missing') ? <MissingNote target={{ missing: true } as SipRouteTarget} /> : null}
       </div>
@@ -1645,36 +1876,64 @@ function MenuForm({
         </label>
       </div>
       <ErrLine text={errs.field['inputTimeoutSec'] ?? errs.field['repeats']} />
-      <label className="flex flex-wrap items-center gap-2 text-body">
-        <span className="text-muted">{t('pbx.menu.noInput')}</span>
-        <TargetSelect value={noInput} onChange={setNoInput} exts={exts} groups={groups} menus={menus} {...(menu ? { selfMenu: menu.id } : {})} label={t('pbx.menu.noInput')} className="w-64 mobile:w-full" testId="sip-menu-noinput" />
+      <div className="flex flex-wrap items-center gap-2 text-body">
+        <span className="text-muted mobile:w-full">{t('pbx.menu.noInput')}</span>
+        <TargetField value={noInput} onChange={setNoInput} {...targets} label={t('pbx.menu.noInput')} className="w-64" testId="sip-menu-noinput" />
         <MissingNote target={noInput === 'missing' ? menu?.onNoInput : undefined} />
-      </label>
-      <ErrLine text={errs.field['onNoInput']} />
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <ErrLine text={errs.form} />
-        {menu ? (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="mr-auto"
-            busy={remove.isPending}
-            onClick={() =>
-              void confirmAction(t('pbx.menu.deleteTitle', { name: menu.name }), t('pbx.menu.deleteText'), t('pbx.delete')).then((ok) => {
-                if (ok) remove.mutate();
-              })
-            }
-          >
-            {t('pbx.menu.delete')}
-          </Button>
-        ) : null}
-        <Button variant="secondary" size="sm" onClick={onDone}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit" size="sm" busy={save.isPending} disabled={!ready} data-testid="sip-menu-save">
-          {t('pbx.save')}
-        </Button>
       </div>
-    </form>
+      <ErrLine text={errs.field['onNoInput']} />
+    </FormShell>
+  );
+}
+
+/**
+ * The phone's keys (ADR-0137 §7): a 3×4 grid of 72 px tiles in keypad order — the digit and what it
+ * does (12 `muted`, two lines); a tap opens the target card for that key. A deleted target — a
+ * yellow edge.
+ */
+function KeyTiles({ keys, missing, onChange, targets }: { keys: Record<string, string>; missing: Map<string, SipRouteTarget | undefined>; onChange: (d: string, v: string) => void; targets: { exts: SipExtension[]; groups: SipGroup[]; menus: SipIvrMenu[]; selfMenu?: string } }): ReactNode {
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-2" data-testid="sip-menu-keys">
+        {KEYPAD.map((d) => (
+          <KeyTile key={d} digit={d} value={keys[d] ?? ''} warn={keys[d] === 'missing' && !!missing.get(d)?.missing} onOpen={setOpen} targets={targets} />
+        ))}
+      </div>
+      {open !== null ? (
+        <TargetCard
+          open
+          onClose={() => setOpen(null)}
+          value={keys[open] ?? ''}
+          onChange={(v) => onChange(open, v)}
+          label={t('pbx.menu.key', { key: open })}
+          allowRepeat
+          allowNone
+          {...targets}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function KeyTile({ digit, value, warn, onOpen, targets }: { digit: string; value: string; warn: boolean; onOpen: (d: string) => void; targets: { exts: SipExtension[]; groups: SipGroup[]; menus: SipIvrMenu[]; selfMenu?: string } }): ReactNode {
+  const label = useTargetLabel(value, { ...targets, allowRepeat: true, allowNone: true });
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(digit)}
+      className={cx(
+        'flex h-[72px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-[var(--radius-card)] bg-[var(--color-fill)] px-1.5 text-center active:bg-[var(--color-fill-hover)]',
+        warn && 'ring-2 ring-inset ring-[var(--color-yellow)]',
+      )}
+      data-testid={`sip-menu-key-${digit}`}
+      data-value={value}
+    >
+      <span className="text-title font-semibold leading-none tabular-nums">
+        <span className="sr-only">{t('pbx.menu.key', { key: '' }).trim()} </span>
+        {digit}
+      </span>
+      <span className={cx('line-clamp-2 max-w-full break-words text-caption leading-tight', value ? 'text-muted' : 'text-faint')}>{value ? label : '—'}</span>
+    </button>
   );
 }

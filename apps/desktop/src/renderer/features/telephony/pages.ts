@@ -1,4 +1,4 @@
-import { BookUser, Grid3x3, History, type LucideIcon } from 'lucide-react';
+import { BookUser, Grid3x3, History, Settings, type LucideIcon } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { t } from '../../i18n';
 import type { TelPage } from '../../stores/telephonyUi';
@@ -16,6 +16,8 @@ export interface TelPageDef {
   icon: LucideIcon;
   /** The red count of my missed calls next to it («Недавние»). */
   missedBadge?: boolean;
+  /** MANAGE_INTEGRATIONS only; the column shows it as the «Настройки» group of its pages (settings/pages.ts). */
+  manage?: boolean;
   /** The page's centre (and its right panel); none = «Недавние» with the call's detail. */
   Center?: ComponentType<{ workspaceId: string; floating: boolean }>;
 }
@@ -25,4 +27,5 @@ export const TEL_PAGES: readonly TelPageDef[] = [
   // T4 (ADR-0137 §6): the phone book and the dial pad.
   { id: 'contacts', label: () => t('telc.contacts'), icon: BookUser, Center: ContactsPage },
   { id: 'dial', label: () => t('telc.dial'), icon: Grid3x3, Center: DialPage },
+  { id: 'settings', label: () => t('tset.title'), icon: Settings, manage: true },
 ];

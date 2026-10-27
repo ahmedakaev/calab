@@ -39,6 +39,7 @@ import { PhoneDisk } from '../disk/PhoneDisk';
 import { PhoneWiki, PhoneWikiPage, PhoneWikiTrash } from '../wiki/PhoneWiki';
 import { PhoneTelephony } from '../telephony/PhoneTelephony';
 import { PhoneCallDetail } from '../telephony/CallDetail';
+import { PhoneTelSettings } from '../telephony/settings/PhoneSettings';
 import { PhoneContactCard } from '../telephony/contacts/ContactCard';
 import { PhoneContactEdit } from '../telephony/contacts/ContactForm';
 import { PhoneDial } from '../telephony/keypad/DialPage';
@@ -329,6 +330,8 @@ function PushedScreen({ screen }: { screen: PhoneScreen }): ReactNode {
       return <ActiveWorkspace>{(ws) => <PhoneCanvasScreen key={screen.itemId} workspaceId={ws} itemId={screen.itemId} />}</ActiveWorkspace>;
     case 'telCall':
       return <ActiveWorkspace>{(ws) => <PhoneCallDetail key={screen.callId} ws={ws} callId={screen.callId} />}</ActiveWorkspace>;
+    case 'telSettings':
+      return <ActiveWorkspace>{(ws) => <PhoneTelSettings key={screen.page} workspaceId={ws} page={screen.page} />}</ActiveWorkspace>;
     case 'telContact':
       return <ActiveWorkspace>{(ws) => <PhoneContactCard key={screen.contactId} ws={ws} id={screen.contactId} />}</ActiveWorkspace>;
     case 'telContactEdit':

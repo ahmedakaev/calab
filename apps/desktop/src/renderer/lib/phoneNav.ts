@@ -104,6 +104,11 @@ export type PhoneScreen =
   /** «Набор»: the dial pad (the FAB). */
   | { kind: 'telDial' }
   /**
+   * «Телефония → Настройки» (ADR-0137 §7, T5): `page` 'list' = the drill-down list, a settings page
+   * id (features/telephony/settings/pages.ts), or a form: 'ext:<id>' / 'group:<id>' / 'menu:<id>' ('new' = a new one).
+   */
+  | { kind: 'telSettings'; page: string }
+  /**
    * A settings window (app, workspace, room or board; its source is `useUi.dialog` / `useBoardsUi.settingsFor`)
    * as a screen: `section` null = the list of sections (also the search), else that section.
    * The list → section hop is one more screen, so back returns to the list.
@@ -160,6 +165,8 @@ export function sameScreen(a: PhoneScreen, b: PhoneScreen): boolean {
       return a.itemId === (b as typeof a).itemId;
     case 'telCall':
       return a.callId === (b as typeof a).callId;
+    case 'telSettings':
+      return a.page === (b as typeof a).page;
     case 'telContact':
     case 'telContactEdit':
       return a.contactId === (b as typeof a).contactId;
