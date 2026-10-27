@@ -119,15 +119,10 @@ export function DialPad({ ws, phone }: { ws: string; phone: boolean }): ReactNod
   };
   const shown = display(raw);
   // 32 px, shrinking down to 24 for long numbers: never wraps (ADR-0137 §7).
-  const big = phone ? (shown.length > 16 ? 'text-[24px]' : shown.length > 13 ? 'text-[28px]' : 'text-[32px]') : 'text-[26px]';
+  const big = phone ? (shown.length > 16 ? 'text-[24px]!' : shown.length > 13 ? 'text-[28px]!' : 'text-[32px]!') : 'text-[26px]!';
 
   const body = (
     <div className={cx('flex flex-col items-center', phone ? 'min-h-0 flex-1 justify-end px-4 pb-[calc(var(--safe-bottom,0px)+20px)]' : 'gap-0')} data-testid="tel-dial">
-      {!place ? (
-        <p className={cx('rounded-[var(--radius-card)] bg-[var(--color-card)] px-3 py-2 text-center text-caption text-muted', phone ? 'mb-auto mt-4 w-full max-w-[340px]' : 'mb-4 w-full')} data-testid="tel-dial-no-place">
-          {t('telc.dial.noPlace')}
-        </p>
-      ) : null}
       <div className={cx('flex w-full flex-col items-center', phone ? 'mb-[clamp(12px,3dvh,32px)]' : 'mb-4')}>
         <input
           ref={field}
@@ -214,7 +209,7 @@ function SuggestionLine({
         type="button"
         className={cx(line, 'text-accent-text hover:bg-hover')}
         onClick={() => onPick(formatPhone(suggestion.number))}
-        aria-label={t('telc.dial.useContact', { name: title, number: formatPhone(suggestion.number) })}
+        title={t('telc.dial.useContact', { name: title, number: formatPhone(suggestion.number) })}
         data-testid="tel-dial-suggestion"
       >
         <span className="min-w-0 truncate font-medium">{title}</span>
@@ -227,6 +222,14 @@ function SuggestionLine({
     return (
       <p className={cx(line, 'text-caption text-muted')} data-testid="tel-dial-suggestion">
         {t('telc.dial.onlyInternal')}
+      </p>
+    );
+  }
+  // Without PLACE_CALLS (ADR-0137 §6): why outside numbers do not dial, in the same line (no jump).
+  if (!place) {
+    return (
+      <p className="flex h-10 max-w-[300px] items-center justify-center text-center text-caption leading-4 text-muted" data-testid="tel-dial-no-place">
+        {t('telc.dial.noPlace')}
       </p>
     );
   }

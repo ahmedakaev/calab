@@ -7,6 +7,7 @@ import { Segmented } from '../../components/ui';
 import { t, useLocale } from '../../i18n';
 import { openTab } from '../../services/phoneNav';
 import { usePersonalCallOn } from '../../stores/sipOutbound';
+import { useTelContacts } from '../../stores/telContacts';
 import { useTelephonyUi } from '../../stores/telephonyUi';
 import { useVoice } from '../../stores/voice';
 import { useHasExtensions, usePlaceCalls, useTelephonyVisible } from './access';
@@ -108,7 +109,9 @@ function DialFab({ ws }: { ws: string }): ReactNode {
   const exts = useHasExtensions(ws);
   const inCall = useVoice((s) => s.roomId !== null);
   const personal = usePersonalCallOn();
-  if ((!place && !exts) || inCall || personal) return null;
+  // A row swiped open under it: the FAB steps aside so its actions stay reachable.
+  const swiped = useTelContacts((s) => s.swipeOpen > 0);
+  if ((!place && !exts) || inCall || personal || swiped) return null;
   return (
     <button
       type="button"

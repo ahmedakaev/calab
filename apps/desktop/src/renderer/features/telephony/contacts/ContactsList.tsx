@@ -11,7 +11,7 @@ import { workspaceInitials } from '../../../lib/initials';
 import { dialKey } from '../../../lib/phoneNumber';
 import { useRowSwipe } from '../../../lib/rowSwipe';
 import { formatPhone } from '../../../lib/sip';
-import { useTelContacts } from '../../../stores/telContacts';
+import { useSwipeOpenMark, useTelContacts } from '../../../stores/telContacts';
 import { GROUP_LABEL } from '../../shell/ColumnHeader';
 import { menuBox, menuItem } from '../../shell/menu';
 import { useMayDeleteContact, useMayManageTelephony, usePlaceCalls } from '../access';
@@ -166,6 +166,7 @@ function PhoneContactRow({ c, ws, title, sub }: { c: SipContact; ws: string; tit
   const call = place && !!main;
   const swipe = useRowSwipe(true, call ? 2 : 1);
   const shifted = swipe.offset !== 0;
+  useSwipeOpenMark(shifted);
   return (
     <div className="relative flex" {...swipe.handlers}>
       {shifted ? <SwipeActions c={c} ws={ws} call={call} width={Math.min(-swipe.offset, swipe.width)} close={swipe.close} /> : null}

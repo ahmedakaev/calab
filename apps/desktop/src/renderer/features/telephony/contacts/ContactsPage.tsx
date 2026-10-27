@@ -23,8 +23,8 @@ export function ContactsPage({ workspaceId, floating }: { workspaceId: string; f
     <>
       <section className="flex min-w-0 flex-1 flex-col" aria-label={t('telc.contacts')} data-testid="telc-page">
         <Bar className="gap-2 pr-3">
-          <ContactSearch phone={false} className="max-w-[360px] flex-1 pl-3" />
-          <span className="flex-1" />
+          <ContactSearch phone={false} className="w-[320px] min-w-0 shrink pl-3" />
+          <span className="min-w-0 flex-1" />
           <Button variant="secondary" onClick={() => editContact('')} data-testid="telc-new">
             <UserRoundPlus className="size-3.5" aria-hidden /> {t('telc.add')}
           </Button>

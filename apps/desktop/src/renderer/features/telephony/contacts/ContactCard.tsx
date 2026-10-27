@@ -238,15 +238,15 @@ function CallButton({ ws, c, phone }: { ws: string; c: SipContact; phone: boolea
 function DesktopActions({ ws, c, place }: { ws: string; c: SipContact; place: boolean }): ReactNode {
   const del = useMayDeleteContact(ws, c.createdBy);
   return (
-    <div className="mt-4 flex flex-wrap justify-center gap-2" data-testid="telc-card-actions">
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-2" data-testid="telc-card-actions">
       {place && c.phones.length ? <CallButton ws={ws} c={c} phone={false} /> : null}
       <Button variant="secondary" onClick={() => editContact(c.id)} data-testid="telc-card-edit">
         <Pencil className="size-3.5" aria-hidden /> {t('telc.edit')}
       </Button>
       {del ? (
-        <Button variant="destructive" onClick={() => void confirmDelete(ws, c)} data-testid="telc-card-delete">
-          <Trash2 className="size-3.5" aria-hidden /> {t('telc.delete')}
-        </Button>
+        <IconButton label={t('telc.deleteContact')} onClick={() => void confirmDelete(ws, c)} className="text-danger-text" data-testid="telc-card-delete">
+          <Trash2 className="size-4" aria-hidden />
+        </IconButton>
       ) : null}
     </div>
   );

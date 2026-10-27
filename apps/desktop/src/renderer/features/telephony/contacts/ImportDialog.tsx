@@ -94,6 +94,7 @@ function ImportBody({ ws }: { ws: string }): ReactNode {
       onClose={close}
       title={t('telc.import')}
       description={t('telc.importHint')}
+      initialFocus="body"
       footer={
         <>
           <Button variant="secondary" onClick={close}>
@@ -105,7 +106,7 @@ function ImportBody({ ws }: { ws: string }): ReactNode {
         </>
       }
     >
-      <input ref={input} type="file" accept=".csv,text/csv,text/comma-separated-values,application/vnd.ms-excel" className="sr-only" tabIndex={-1} onChange={(e) => void pick(e.target.files?.[0])} data-testid="telc-import-file" />
+      <input ref={input} type="file" accept=".csv,text/csv,text/comma-separated-values,application/vnd.ms-excel" className="sr-only" tabIndex={-1} aria-label={t('telc.importPick')} onChange={(e) => void pick(e.target.files?.[0])} data-testid="telc-import-file" />
       <div className="flex flex-col gap-3" data-testid="telc-import">
         <Button variant="secondary" className="self-start" onClick={() => input.current?.click()} disabled={busy}>
           <FileUp className="size-4" aria-hidden />

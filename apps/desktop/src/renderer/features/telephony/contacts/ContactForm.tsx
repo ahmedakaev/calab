@@ -1,7 +1,7 @@
 import { create } from '@bufbuild/protobuf';
 import { SipContactPhoneSchema, SipPhoneLabel, type SipContact } from '@calaba/protocol';
 import { Plus, Trash2, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Choice } from '../../../components/Choice';
 import { PhoneHeader } from '../../../components/PhoneHeader';
 import { Button, Field, IconButton, Input, Modal, Select, Spinner, TextArea, cx } from '../../../components/ui';
@@ -85,6 +85,7 @@ function FormBody({ ws, id, contact, prefill, phone, onDone }: { ws: string; id:
   const [rows, setRows] = useState<Row[]>(init.rows);
   const [err, setErr] = useState<SaveError | null>(null);
   const [busy, setBusy] = useState(false);
+  const nameRef = useRef<HTMLInputElement | null>(null);
   const del = useMayDeleteContact(ws, contact?.createdBy ?? '');
   const title = id ? t('telc.editTitle') : t('telc.newTitle');
   const empty = !name.trim() && !company.trim();
@@ -114,32 +115,15 @@ function FormBody({ ws, id, contact, prefill, phone, onDone }: { ws: string; id:
   const fields = (
     <div className={cx('flex flex-col', phone ? 'gap-4' : 'gap-3')} data-testid="telc-form-fields">
       <Field label={t('telc.f.name')} error={err?.field === 'name' ? err.text : null}>
-        <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} autoComplete="off" autoFocus={!id} data-testid="telc-f-name" className={phone ? 'text-[16px]' : undefined} />
+        <Input ref={nameRef} value={name} onChange={(e) => setName(e.target.value)} maxLength={128} autoComplete="off" data-testid="telc-f-name" className={phone ? 'text-[16px]' : undefined} />
       </Field>
       <Field label={t('telc.f.company')} error={err?.field === 'company' ? err.text : null}>
         <Input value={company} onChange={(e) => setCompany(e.target.value)} maxLength={128} autoComplete="off" data-testid="telc-f-company" className={phone ? 'text-[16px]' : undefined} />
       </Field>
       <fieldset className="flex min-w-0 flex-col gap-2" data-testid="telc-f-phones">
         <legend className="mb-1 text-caption font-medium text-muted">{t('telc.numbers')}</legend>
-        {rows.map((r, i) => (
-          <div key={r.key} className="flex min-w-0 items-center gap-2" data-testid="telc-f-phone">
-            {phone ? (
-              <Choice
-                value={String(r.label)}
-                options={PHONE_LABELS.map((l) => ({ value: String(l), label: t(labelKey(l)) }))}
-                onChange={(v) => setRow(r.key, { label: Number(v) })}
-                label={t('telc.f.label')}
-                phone="picker"
-              />
-            ) : (
-              <Select value={String(r.label)} onChange={(e) => setRow(r.key, { label: Number(e.target.value) })} aria-label={t('telc.f.label')} className="w-[128px] shrink-0">
-                {PHONE_LABELS.map((l) => (
-                  <option key={l} value={String(l)}>
-                    {t(labelKey(l))}
-                  </option>
-                ))}
-              </Select>
-            )}
+        {rows.map((r, i) => {
+          const number = (
             <Input
               type="tel"
               inputMode="tel"
@@ -151,31 +135,57 @@ function FormBody({ ws, id, contact, prefill, phone, onDone }: { ws: string; id:
               className={cx('min-w-0 flex-1 tabular-nums', phone && 'text-[16px]')}
               data-testid="telc-f-number"
             />
+          );
+          const remove = (
             <IconButton label={t('telc.f.removeNumber')} onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : [row()]))} className="shrink-0 mobile:tap-size">
               <X className="size-4" aria-hidden />
             </IconButton>
-          </div>
-        ))}
+          );
+          // Phone: the label and × over the number on all the width (375 px: «+7 916 123-45-67» never cut).
+          return phone ? (
+            <div key={r.key} className="flex min-w-0 flex-col gap-1" data-testid="telc-f-phone">
+              <div className="flex items-center justify-between gap-2">
+                <Choice
+                  value={String(r.label)}
+                  options={PHONE_LABELS.map((l) => ({ value: String(l), label: t(labelKey(l)) }))}
+                  onChange={(v) => setRow(r.key, { label: Number(v) })}
+                  label={`${t('telc.f.label')}: ${t(labelKey(r.label))}`}
+                  phone="picker"
+                />
+                {remove}
+              </div>
+              {number}
+            </div>
+          ) : (
+            <div key={r.key} className="flex min-w-0 items-center gap-2" data-testid="telc-f-phone">
+              <Select value={String(r.label)} onChange={(e) => setRow(r.key, { label: Number(e.target.value) })} aria-label={t('telc.f.label')} className="w-[128px] shrink-0">
+                {PHONE_LABELS.map((l) => (
+                  <option key={l} value={String(l)}>
+                    {t(labelKey(l))}
+                  </option>
+                ))}
+              </Select>
+              {number}
+              {remove}
+            </div>
+          );
+        })}
         {err?.field === 'phones' ? (
-          <p className="text-caption text-danger-text" role="alert" data-testid="telc-f-phones-error">
+          <div role="alert" data-testid="telc-f-phones-error">
             {err.taken?.id ? (
-              <>
-                {t('telc.err.numberTakenPrefix')}{' '}
-                <button
-                  type="button"
-                  className="font-medium underline"
-                  onClick={() => {
-                    formToContact(err.taken?.id ?? '');
-                  }}
-                  data-testid="telc-f-taken-link"
-                >
-                  «{err.taken.name}»
-                </button>
-              </>
+              // The whole sentence opens that contact: a 44 px target on the phone, the name wraps inside it.
+              <button
+                type="button"
+                className="block w-full text-left text-caption text-danger-text mobile:min-h-11"
+                onClick={() => formToContact(err.taken?.id ?? '')}
+                data-testid="telc-f-taken-link"
+              >
+                {t('telc.err.numberTakenPrefix')} <span className="font-medium underline">«{err.taken.name}»</span>
+              </button>
             ) : (
-              err.text
+              <p className="text-caption text-danger-text">{err.text}</p>
             )}
-          </p>
+          </div>
         ) : null}
         {rows.length < MAX_PHONES ? (
           <button type="button" className="flex h-9 items-center gap-1.5 self-start rounded-full px-1 text-body font-medium text-accent-text hover:underline mobile:tap-h" onClick={() => setRows((rs) => [...rs, row('', SipPhoneLabel.WORK)])} data-testid="telc-f-add-number">
@@ -226,6 +236,7 @@ function FormBody({ ws, id, contact, prefill, phone, onDone }: { ws: string; id:
       open
       onClose={onDone}
       title={title}
+      initialFocus={nameRef}
       footer={
         <>
           {id && del && contact ? (

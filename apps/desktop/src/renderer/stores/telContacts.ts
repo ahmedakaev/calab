@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { create } from 'zustand';
 
 /**
@@ -25,6 +26,8 @@ interface TelContactsState {
   /** What the dial pad shows when it opens (a «Набрать +7 …» from an empty search); taken once. */
   dialPrefill: string;
   setDialPrefill: (n: string) => void;
+  /** Phone: rows swiped open now (the FAB «Набор» steps aside so it never covers their actions). */
+  swipeOpen: number;
 }
 
 export const useTelContacts = create<TelContactsState>()((set) => ({
@@ -38,7 +41,17 @@ export const useTelContacts = create<TelContactsState>()((set) => ({
   setImport: (importOpen) => set({ importOpen }),
   dialPrefill: '',
   setDialPrefill: (dialPrefill) => set({ dialPrefill }),
+  swipeOpen: 0,
 }));
+
+/** A phone row of «Телефония» swiped open (`open`) or closed: counted while it is open. */
+export function useSwipeOpenMark(open: boolean): void {
+  useEffect(() => {
+    if (!open) return;
+    useTelContacts.setState((s) => ({ swipeOpen: s.swipeOpen + 1 }));
+    return () => useTelContacts.setState((s) => ({ swipeOpen: Math.max(0, s.swipeOpen - 1) }));
+  }, [open]);
+}
 
 /** The dial pad's opening number, once. */
 export function takeDialPrefill(): string {

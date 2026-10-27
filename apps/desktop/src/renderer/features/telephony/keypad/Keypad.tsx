@@ -80,9 +80,12 @@ function Key({ k, size, onKey, onPlus }: { k: string; size: KeypadSize; onKey: (
       }}
       data-key={k}
     >
-      <span aria-hidden>{k}</span>
+      {/* «*» of the font sits high and small: one size up, lowered to the digits' middle. */}
+      <span aria-hidden className={k === '*' ? 'translate-y-[0.18em] text-[1.3em]' : undefined}>
+        {k}
+      </span>
       {k === '0' && onPlus ? (
-        <span className={cx('absolute font-medium text-muted', size === 'phone' ? 'bottom-[14%] text-[13px]' : 'bottom-1 text-[10px]')} aria-hidden>
+        <span className={cx('font-medium leading-none text-muted', size === 'phone' ? 'mt-0.5 text-[13px]' : 'text-[10px]')} aria-hidden>
           +
         </span>
       ) : null}

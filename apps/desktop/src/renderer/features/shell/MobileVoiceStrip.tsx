@@ -120,7 +120,9 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
             {recording ? <MobileRecDot roomId={roomId} workspaceId={wsId} rec={recording} className="pointer-events-auto -my-1 relative" /> : null}
             {call ? null : <TempExpiry roomId={roomId} workspaceId={wsId} compact />}
           </span>
-          <span className="pointer-events-none max-w-full truncate text-[12px] leading-[15px] text-muted">{call ? callLabel : (room?.name ?? '')}</span>
+          <span className="pointer-events-none max-w-full truncate text-[12px] leading-[15px] text-muted" data-testid="mobile-voice-label">
+            {phone !== null ? phone || t('call.sipUnknown') : call ? callLabel : (room?.name ?? '')}
+          </span>
         </div>
         <button
           type="button"

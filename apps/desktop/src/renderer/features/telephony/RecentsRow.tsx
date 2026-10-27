@@ -14,6 +14,7 @@ import { useRowSwipe } from '../../lib/rowSwipe';
 import { activeCallsKey } from '../../lib/sipPbx';
 import { useSipJournal } from '../../stores/sipJournal';
 import { useTelephonyUi } from '../../stores/telephonyUi';
+import { useSwipeOpenMark } from '../../stores/telContacts';
 import { useWorkspaces } from '../../stores/workspaces';
 import { useShallow } from 'zustand/react/shallow';
 import { menuBox, menuItem } from '../shell/menu';
@@ -87,6 +88,7 @@ function PhoneRow({ e, ws, name, company }: { e: SipJournalEntry; ws: string; na
   const copy = numberOf(e) !== '';
   const swipe = useRowSwipe(true, copy ? 2 : 1);
   const shifted = swipe.offset !== 0;
+  useSwipeOpenMark(shifted);
   const onTap = (): void => {
     if (shifted) {
       swipe.close();

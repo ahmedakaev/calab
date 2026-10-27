@@ -47,9 +47,10 @@ export function DtmfRow({ roomId, className }: { roomId: string; className?: str
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            side="top"
-            align="start"
-            sideOffset={8}
+            // Beside the island, never over its hang-up.
+            side="right"
+            align="end"
+            sideOffset={12}
             collisionPadding={16}
             className="mat-popover anim-in z-[var(--z-popover)] rounded-[var(--radius-panel)] p-4"
             aria-label={t('telc.dtmf')}
