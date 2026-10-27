@@ -97,6 +97,12 @@ export type PhoneScreen =
   | { kind: 'canvas'; itemId: string }
   /** A call of «Телефония → Недавние» (ADR-0137 §7): its detail; the workspace is the open one. */
   | { kind: 'telCall'; callId: string }
+  /** «Телефония → Контакты» (ADR-0137 §7): a contact's card; the workspace is the open one. */
+  | { kind: 'telContact'; contactId: string }
+  /** A contact's form ('' = a new one; the prefill is in stores/telContacts). */
+  | { kind: 'telContactEdit'; contactId: string }
+  /** «Набор»: the dial pad (the FAB). */
+  | { kind: 'telDial' }
   /**
    * «Телефония → Настройки» (ADR-0137 §7, T5): `page` 'list' = the drill-down list, a settings page
    * id (features/telephony/settings/pages.ts), or a form: 'ext:<id>' / 'group:<id>' / 'menu:<id>' ('new' = a new one).
@@ -161,6 +167,11 @@ export function sameScreen(a: PhoneScreen, b: PhoneScreen): boolean {
       return a.callId === (b as typeof a).callId;
     case 'telSettings':
       return a.page === (b as typeof a).page;
+    case 'telContact':
+    case 'telContactEdit':
+      return a.contactId === (b as typeof a).contactId;
+    case 'telDial':
+      return true;
     case 'search':
     case 'findTime':
       return true;

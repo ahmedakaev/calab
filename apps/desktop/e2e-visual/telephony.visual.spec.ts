@@ -455,3 +455,80 @@ test('telephony-section', async ({ open, win, mock, shot, theme }) => {
   await expect(win.getByTestId('tel-empty')).toContainText('Звонков пока нет');
   await checkpoint(shot, 'telephony-recents-empty');
 });
+
+// ADR-0137 «Телефония» (T4) on the desktop: «Контакты» (the list by letters, the card in the
+// floating panel at 960, the form, the CSV import preview), «Набор» (the card typed from the
+// keyboard with the contact suggestion), the personal call — «Набираем…» in the island, then the
+// tone keypad — and an inbound call from a contact (its name, company and number). The light
+// theme takes the card, the dial pad and the inbound call.
+test('telephony-contacts', async ({ open, win, mock, shot, theme }) => {
+  await open();
+  mock.seedSipExchange();
+  mock.seedSipJournal();
+  mock.seedSipContacts();
+  await win.getByTestId('section-telephony').click();
+  await win.getByTestId('tel-nav-contacts').click();
+  const page = win.getByTestId('telc-page');
+  await expect(page.getByTestId('telc-letter').first()).toHaveText('А');
+  if (DARK(theme)) await checkpoint(shot, 'telephony-contacts');
+  await page.getByRole('button', { name: 'Анна Петрова', exact: true }).click();
+  const card = win.getByTestId('telc-card');
+  await expect(card.getByTestId('telc-number')).toHaveCount(3);
+  await expect(card.getByTestId('telc-call').first()).toBeVisible();
+  await checkpoint(shot, 'telephony-contact-card');
+  if (DARK(theme)) {
+    await card.getByTestId('telc-card-edit').click();
+    const form = win.getByRole('dialog');
+    await expect(form.getByTestId('telc-f-number')).toHaveCount(3);
+    await checkpoint(shot, 'telephony-contact-form');
+    await form.getByRole('button', { name: 'Отмена' }).click();
+    await expect(form).toHaveCount(0);
+    await win.keyboard.press('Escape');
+    // «…» → «Импорт CSV»: a file → the preview with its skips.
+    await page.getByTestId('telc-more').click();
+    await win.getByTestId('telc-import-open').click();
+    await win.getByTestId('telc-import-file').setInputFiles({
+      name: 'contacts.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Имя;Компания;Телефон;Заметка\nИрина Белова;ООО Лютик;8 916 000-11-22;\nДубль Анны;;+7 916 123-45-67;\n;;+7 916 000-99-88;\nПётр;;доб. 12;\n'),
+    });
+    await expect(win.getByTestId('telc-import-preview')).toContainText('Будет добавлено: 1');
+    await checkpoint(shot, 'telephony-import-preview');
+    await win.keyboard.press('Escape');
+  }
+
+  // «Набор»: typed from the keyboard; the contact of the number under it.
+  await win.getByTestId('tel-nav-dial').click();
+  const field = win.getByTestId('tel-dial-field');
+  await expect(field).toBeFocused();
+  await win.keyboard.type('89161234567');
+  await expect(field).toHaveValue('8 916 123-45-67');
+  await expect(win.getByTestId('tel-dial-suggestion')).toContainText('Анна Петрова');
+  await checkpoint(shot, 'telephony-keypad');
+  if (DARK(theme)) {
+    // Enter calls: the island says «Набираем…» until the answer, then «Клавиатура» sends tones.
+    await win.keyboard.press('Enter');
+    const panel = win.getByRole('region', { name: 'Голосовое подключение' });
+    await expect(panel).toContainText('Звонок · Анна Петрова (ООО Ромашка)');
+    await expect(panel.getByTestId('voice-phase')).toHaveText('Набираем…');
+    await checkpoint(shot, 'telephony-calling');
+    mock.advanceSipPersonal();
+    await expect(panel.getByTestId('voice-phase')).toHaveText('Голос подключён', { timeout: 30_000 });
+    await panel.getByTestId('dtmf-open').click();
+    const pad = win.getByTestId('dtmf-pad');
+    for (const k of '12#') await pad.locator(`[data-key="${k}"]`).click();
+    await expect(win.getByTestId('dtmf-typed')).toHaveText('12#');
+    await checkpoint(shot, 'telephony-dtmf');
+    await win.keyboard.press('Escape');
+    await panel.getByRole('button', { name: 'Отключиться' }).click();
+    await expect(panel).toHaveCount(0);
+  }
+
+  // An inbound call from a contact's number: the name big, the company, the number under them.
+  mock.ringSipInbound(IDS.users.anna, '+79161234567', 'Отдел продаж');
+  const ring = win.getByTestId('sip-incoming');
+  await expect(ring.getByTestId('call-sheet-title')).toHaveText('Анна Петрова');
+  await expect(ring).toContainText('ООО Ромашка');
+  await expect(ring).toContainText('+7 916 123-45-67');
+  await checkpoint(shot, 'telephony-incoming-contact');
+});

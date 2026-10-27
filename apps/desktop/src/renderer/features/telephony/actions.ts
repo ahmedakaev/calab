@@ -8,13 +8,16 @@ import { startCall } from '../../services/call';
 import { startDm } from '../../services/dms';
 import { useTelephonyUi } from '../../stores/telephonyUi';
 import { useUi } from '../../stores/ui';
+import { placePersonalCall } from '../../services/sipOutbound';
+import { placeCallsNow } from './access';
+import { editContact, openContact } from './contacts/data';
 import { canCallNow } from '../dm/canDm';
 import { numberOf } from './timeline';
 
 /*
  * What a row and the detail do (ADR-0137 §6–§7). «Позвонить» is the internal call (ADR-0034) to the
- * employee whose phone the number is; the call over the trunk to an outside number arrives with T4
- * — until then a row of an outside number opens its detail.
+ * employee whose phone the number is, else a personal call over the trunk to the number
+ * (services/sipOutbound.ts, PLACE_CALLS); a hidden number, or no right, cannot be called back.
  */
 
 /** The employee I can call back instead of the number ('' = none). */
@@ -23,12 +26,34 @@ export function internalPeer(e: SipJournalEntry | undefined, ws: string): string
   return u && canCallNow(u, ws) ? u : '';
 }
 
+/** The call can be called back: an employee, or a number with PLACE_CALLS. */
+export function canCallBack(e: SipJournalEntry | undefined, ws: string): boolean {
+  if (!e) return false;
+  return !!internalPeer(e, ws) || (!!numberOf(e) && placeCallsNow(ws));
+}
+
 export function callBack(e: SipJournalEntry, ws: string): boolean {
   const peer = internalPeer(e, ws);
-  if (!peer) return false;
-  haptics.impact();
-  void startCall(peer);
+  if (peer) {
+    haptics.impact();
+    void startCall(peer);
+    return true;
+  }
+  const number = numberOf(e);
+  if (!number || !placeCallsNow(ws)) return false;
+  const c = e.contact;
+  void placePersonalCall({ workspaceId: ws, number, ...(c?.id ? { contactId: c.id, name: c.name || c.company } : {}) });
   return true;
+}
+
+/** «Контакт»: the contact of the number, or «Добавить в контакты» with the number filled in. */
+export function openOrAddContact(e: SipJournalEntry): void {
+  const id = e.contact?.id ?? '';
+  if (id) openContact(id);
+  else {
+    const n = numberOf(e);
+    if (n) editContact('', { number: formatPhone(n) });
+  }
 }
 
 /** The detail of a call: the right panel on the desktop, a pushed screen on the phone. */

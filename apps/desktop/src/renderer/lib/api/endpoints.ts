@@ -1,4 +1,12 @@
 import {
+  GetSipContactResponseSchema,
+  ImportSipContactsResponseSchema,
+  ListSipContactsResponseSchema,
+  PlaceSipPersonalCallRequestSchema,
+  PlaceSipPersonalCallResponseSchema,
+  SipContactInputSchema,
+  SipContactResponseSchema,
+  UpdateSipContactRequestSchema,
   GetSipSettingsResponseSchema,
   CreateSipExtensionRequestSchema,
   CreateSipGroupRequestSchema,
@@ -806,6 +814,31 @@ export const api = {
     transfer: (workspaceId: string, callId: string, init: MessageInitShape<typeof TransferSipCallRequestSchema>) =>
       call('POST', `/api/workspaces/${workspaceId}/sip/calls/${callId}/transfer`, SipCallResponseSchema, body(TransferSipCallRequestSchema, init)),
     cancelTransfer: (workspaceId: string, callId: string) => call('DELETE', `/api/workspaces/${workspaceId}/sip/calls/${callId}/transfer`, SipCallResponseSchema),
+    /**
+     * The phone book (ADR-0137 §2): a page by name (`q` — a part of the name / company, or digits
+     * of a number), one contact with its last calls, create / edit (numbers as a whole list) /
+     * delete. 409 SIP_CONTACT_NUMBER_TAKEN (ApiError.extra.conflictId / conflictName), 422 field.
+     * Import (MANAGE_INTEGRATIONS): the CSV as multipart, `dryRun` = the preview; export — the CSV.
+     */
+    contacts: (workspaceId: string, p: { q?: string; cursor?: string }, signal?: AbortSignal) =>
+      call('GET', `/api/workspaces/${workspaceId}/sip/contacts${qs(p)}`, ListSipContactsResponseSchema, undefined, signal),
+    contact: (workspaceId: string, contactId: string, signal?: AbortSignal) =>
+      call('GET', `/api/workspaces/${workspaceId}/sip/contacts/${contactId}`, GetSipContactResponseSchema, undefined, signal),
+    createContact: (workspaceId: string, init: MessageInitShape<typeof SipContactInputSchema>) =>
+      call('POST', `/api/workspaces/${workspaceId}/sip/contacts`, SipContactResponseSchema, body(SipContactInputSchema, init)),
+    updateContact: (workspaceId: string, contactId: string, init: MessageInitShape<typeof UpdateSipContactRequestSchema>) =>
+      call('PATCH', `/api/workspaces/${workspaceId}/sip/contacts/${contactId}`, SipContactResponseSchema, body(UpdateSipContactRequestSchema, init)),
+    removeContact: (workspaceId: string, contactId: string) => callEmpty('DELETE', `/api/workspaces/${workspaceId}/sip/contacts/${contactId}`),
+    importContacts: (workspaceId: string, file: Blob, name: string, dryRun: boolean) => importSipContacts(workspaceId, file, name, dryRun),
+    exportContacts: (workspaceId: string) => exportSipContacts(workspaceId),
+    /**
+     * A personal call from «Телефония» (ADR-0137 §3): the call (DIALING) and the token of its own
+     * room — the number is dialed once I am in it. 409 SIP_BUSY / PLAN_LIMIT / SIP_DISABLED, 422
+     * SIP_NUMBER_NOT_ALLOWED / VALIDATION number, 429 SIP_RATE_LIMITED. DELETE hangs it up.
+     */
+    placePersonal: (workspaceId: string, init: MessageInitShape<typeof PlaceSipPersonalCallRequestSchema>) =>
+      call('POST', `/api/workspaces/${workspaceId}/sip/calls`, PlaceSipPersonalCallResponseSchema, body(PlaceSipPersonalCallRequestSchema, init)),
+    hangupPersonal: (workspaceId: string, callId: string) => call('DELETE', `/api/workspaces/${workspaceId}/sip/calls/${callId}`, SipCallResponseSchema),
   },
   /**
    * AI integration (CBF-60, ai.proto) — MANAGE_INTEGRATIONS. PUT replaces the form (api_key unset =
@@ -1026,6 +1059,22 @@ export async function replaceSticker(packId: string, stickerId: string, change: 
   const res = await platform.apiFetch(`/api/sticker-packs/${packId}/stickers/${stickerId}`, { method: 'PUT', body: form });
   if (!res.ok) throw await toApiError(res);
   return fromJson(StickerPackResponseSchema, (await res.json()) as JsonValue, { ignoreUnknownFields: true });
+}
+
+/** POST …/sip/contacts/import (multipart `file`; `dry_run=1` — the preview, nothing written). */
+async function importSipContacts(workspaceId: string, file: Blob, name: string, dryRun: boolean): Promise<MessageShape<typeof ImportSipContactsResponseSchema>> {
+  const form = new FormData();
+  form.append('file', file, name);
+  const res = await platform.apiFetch(`/api/workspaces/${workspaceId}/sip/contacts/import${dryRun ? '?dry_run=1' : ''}`, { method: 'POST', body: form });
+  if (!res.ok) throw await toApiError(res);
+  return fromJson(ImportSipContactsResponseSchema, (await res.json()) as JsonValue, { ignoreUnknownFields: true });
+}
+
+/** GET …/sip/contacts/export.csv: the whole phone book as a CSV blob. */
+async function exportSipContacts(workspaceId: string): Promise<Blob> {
+  const res = await platform.apiFetch(`/api/workspaces/${workspaceId}/sip/contacts/export.csv`, { method: 'GET' });
+  if (!res.ok) throw await toApiError(res);
+  return res.blob();
 }
 
 /** Multipart `file` to an avatar route (own profile or a bot); the parsed JSON response. */

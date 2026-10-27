@@ -63,6 +63,7 @@ import {
   type RoomPermissionOverride,
   type RoomRecording,
   type SipCall,
+  type SipContact,
   type SipSettings,
   type Badge,
   type WorkspaceBackground,
@@ -468,6 +469,8 @@ export interface MockState {
   sipJournal: Map<string, JournalRow>;
   /** `${workspace}|${user}` → when they last looked at «Недавние» (ms; absent = never: every missed call counts). */
   sipSeen: Map<string, number>;
+  /** The phone book (ADR-0137 §2, mock-contacts.ts) by contact id; empty until seedSipContacts. */
+  sipContacts: Map<string, SipContact>;
   /** Sticker packs by id (ADR-0030), live stickers inside in order; deleted stickers stay in `deletedStickers`. */
   stickerPacks: Map<string, StickerPack>;
   /** Stickers removed from a pack that messages still show, by id. */
@@ -853,6 +856,7 @@ export function buildState(scenario: Scenario): MockState {
     sipPbx: new Map(),
     sipJournal: new Map(),
     sipSeen: new Map(),
+    sipContacts: new Map(),
     stickerPacks: new Map(),
     deletedStickers: new Map(),
     userStickerPacks: new Map(),

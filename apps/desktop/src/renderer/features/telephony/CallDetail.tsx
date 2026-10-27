@@ -1,7 +1,7 @@
 import { timestampMs } from '@bufbuild/protobuf/wkt';
 import { SipCallDirection, SipCallEventKind, SipCallOrigin, type SipCallEvent, type SipJournalEntry, type SipJournalRecording } from '@calaba/protocol';
 import { useQuery } from '@tanstack/react-query';
-import { Copy, MessageCircle, Pause, Phone, Play } from 'lucide-react';
+import { Copy, MessageCircle, Pause, Phone, Play, UserRound, UserRoundPlus } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Avatar } from '../../components/Avatar';
@@ -16,7 +16,8 @@ import { useSipJournal } from '../../stores/sipJournal';
 import { useTelephonyUi } from '../../stores/telephonyUi';
 import { useRooms } from '../../stores/rooms';
 import { memberName, useWorkspaces } from '../../stores/workspaces';
-import { copyNumber, callBack, internalPeer, writeTo } from './actions';
+import { copyNumber, callBack, internalPeer, openOrAddContact, writeTo } from './actions';
+import { usePlaceCalls } from './access';
 import { PartyCircle } from './RecentsRow';
 import { dur, partyName, person, resultText } from './texts';
 import { CallRoute } from './CallRoute';
@@ -91,6 +92,7 @@ function DetailBody({ ws, callId, phone }: { ws: string; callId: string; phone: 
   useLocale();
   useTimeFormat();
   const d = useDetail(ws, callId);
+  const place = usePlaceCalls(ws);
   const e = d.entry;
   const party = useWorkspaces(useShallow(() => (e ? partyName(ws, e) : { name: '', company: '', number: '' })));
   if (!e) {
@@ -111,6 +113,7 @@ function DetailBody({ ws, callId, phone }: { ws: string; callId: string; phone: 
   }
   const peer = internalPeer(e, ws);
   const number = numberOf(e);
+  const callable = !!peer || (place && !!number);
   return (
     <>
       <div className={cx('scrollbar-none min-h-0 flex-1 overflow-y-auto overflow-x-hidden', phone ? 'px-4 pb-6 pt-5' : 'px-4 pb-4 pt-4')} tabIndex={0} role="region" aria-label={t('tel.detail')} data-testid="tel-detail-body">
@@ -137,11 +140,16 @@ function DetailBody({ ws, callId, phone }: { ws: string; callId: string; phone: 
           ) : null}
         </div>
         {/* Desktop: the actions under the hero (the phone has them in the sticky bar). */}
-        {!phone && (peer || e.memberUserId) ? (
+        {!phone && (callable || number || e.memberUserId) ? (
           <div className="mt-4 flex flex-wrap justify-center gap-2" data-testid="tel-detail-actions">
-            {peer ? (
+            {callable ? (
               <Button onClick={() => callBack(e, ws)} data-testid="tel-detail-call">
                 <Phone className="size-3.5" aria-hidden /> {t('tel.call')}
+              </Button>
+            ) : null}
+            {number ? (
+              <Button variant="secondary" onClick={() => openOrAddContact(e)} data-testid="tel-detail-contact">
+                {e.contact?.id ? <UserRound className="size-3.5" aria-hidden /> : <UserRoundPlus className="size-3.5" aria-hidden />} {e.contact?.id ? t('telc.contactShort') : t('telc.addContactShort')}
               </Button>
             ) : null}
             {e.memberUserId ? (
@@ -239,17 +247,24 @@ function Summary({ ws, e, events, phone }: { ws: string; e: SipJournalEntry; eve
 function PhoneActions({ ws, e, recording, subtitle }: { ws: string; e: SipJournalEntry; recording: SipJournalRecording | undefined; subtitle: string }): ReactNode {
   const peer = internalPeer(e, ws);
   const number = numberOf(e) !== '';
-  if (!peer && !number && !recording && !e.memberUserId) return null;
+  const place = usePlaceCalls(ws);
+  const callable = !!peer || (place && number);
+  if (!callable && !number && !recording && !e.memberUserId) return null;
   const round = 'grid size-11 place-items-center rounded-full bg-hover text-fg';
   return (
     <div className="mat-toolbar flex shrink-0 flex-col gap-2 border-t border-line px-4 pb-[calc(var(--safe-bottom,0px)+12px)] pt-3" data-testid="tel-detail-bar">
-      {peer ? (
+      {callable ? (
         <button type="button" onClick={() => callBack(e, ws)} className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-ok-fill text-list font-semibold text-white" data-testid="tel-detail-call">
           <Phone className="size-5" aria-hidden />
           {t('tel.call')}
         </button>
       ) : null}
       <div className="flex items-start justify-center gap-4">
+        {number ? (
+          <RoundAction label={t('telc.contactShort')} name={e.contact?.id ? t('telc.openContact') : t('telc.addContact')} onClick={() => openOrAddContact(e)} testId="tel-detail-contact" cls={round}>
+            {e.contact?.id ? <UserRound className="size-5" aria-hidden /> : <UserRoundPlus className="size-5" aria-hidden />}
+          </RoundAction>
+        ) : null}
         {number ? (
           <RoundAction label={t('tel.copyShort')} name={t('tel.copy')} onClick={() => copyNumber(e)} testId="tel-detail-copy" cls={round}>
             <Copy className="size-5" aria-hidden />

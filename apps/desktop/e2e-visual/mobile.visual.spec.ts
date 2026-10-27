@@ -291,7 +291,9 @@ async function checkpoint(page: Page, name: string, opts: { main?: boolean; snap
 async function expectNoFieldFocus(page: Page, where: string): Promise<void> {
   const active = await page.evaluate(() => {
     const a = document.activeElement;
-    return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || (a as HTMLElement).isContentEditable) ? `${a.tagName} ${a.getAttribute('aria-label') ?? a.getAttribute('placeholder') ?? ''}` : null;
+    // A checkbox (the haptics switch, lib/haptics) raises no keyboard: only text fields count.
+    const text = a?.tagName === 'INPUT' && !['checkbox', 'radio'].includes((a as HTMLInputElement).type);
+    return a && (text || a.tagName === 'TEXTAREA' || (a as HTMLElement).isContentEditable) ? `${a.tagName} ${a.getAttribute('aria-label') ?? a.getAttribute('placeholder') ?? ''}` : null;
   });
   expect.soft(active, `no field focused programmatically: ${where}`).toBeNull();
 }
@@ -1748,6 +1750,206 @@ async function phoneRecents(page: Page): Promise<void> {
   await checkpoint(page, 'm-tel-recents-empty');
 
 }
+
+/** «Телефония» from «Ещё» (the section is not pinned in the fixture): its root. */
+async function openTelephony(page: Page): Promise<Locator> {
+  await toRoot(page);
+  await page.getByTestId('phone-tab-more').tap();
+  await page.getByTestId('more-row-telephony').tap();
+  const root = page.getByTestId('phone-telephony');
+  await expect(root).toBeVisible();
+  return root;
+}
+
+/** A CSV the import previews: one new contact, a number another contact has, a row with no name. */
+const CONTACTS_CSV = 'Имя;Компания;Телефон;Заметка\nИрина Белова;ООО Лютик;8 916 000-11-22;\nДубль Анны;;+7 916 123-45-67;\n;;+7 916 000-99-88;\nПётр;;доб. 12;\n';
+
+/**
+ * ADR-0137 T4 on a phone: «Контакты» — the third segment (letters, Cyrillic then Latin then «#»,
+ * a company without a person, a very long name and company), the FAB over the list's end, a row's
+ * swipe and long-press menu, the card (three numbers, a note, the calls), the number choice, the
+ * form (with the keyboard up: «Сохранить» above it), a number another contact has, the empty
+ * book with «Импорт CSV», its loading, the import preview.
+ */
+test('m-telephony-contacts', async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.addInitScript(KEYBOARD_STUB);
+  await signedIn(page);
+  mock.seedSipExchange();
+  mock.seedSipJournal();
+  mock.seedSipContacts();
+  const root = await openTelephony(page);
+  const segment = (name: string): Locator => root.getByTestId('tel-segment').getByRole('radio', { name });
+  // The six static rows while the first page loads.
+  const release = mock.holdSipContacts();
+  await segment('Контакты').tap();
+  await expect(root.getByTestId('telc-skeleton')).toBeVisible();
+  await checkpoint(page, 'm-tel-contacts-loading');
+  release();
+  const list = root.getByTestId('telc-list');
+  await expect(list.getByTestId('telc-letter').first()).toHaveText('А');
+  await expect(list.getByTestId('telc-row').filter({ hasText: 'ООО Лютик' })).toBeVisible();
+  await expectNoFieldFocus(page, 'telephony contacts');
+  await checkpoint(page, 'm-tel-contacts');
+  // The FAB over the end of the list: the last row stays above it.
+  await root.locator('[data-virtuoso-scroller]').evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(list.getByTestId('telc-letter').filter({ hasText: '#' })).toBeVisible();
+  await expect(root.getByTestId('tel-fab')).toBeVisible();
+  await checkpoint(page, 'm-tel-fab');
+  await root.locator('[data-virtuoso-scroller]').evaluate((el) => el.scrollTo({ top: 0 }));
+
+  // A row: the left swipe («Позвонить» · «Изменить»), the long-press menu.
+  const orlov = list.getByTestId('telc-row').filter({ hasText: 'Дмитрий Орлов' });
+  await swipeLeft(orlov);
+  await expect(root.getByTestId('telc-swipe')).toBeVisible();
+  await checkpoint(page, 'm-tel-contact-swipe');
+  await orlov.getByTestId('telc-row-tap').tap();
+  await expect(root.getByTestId('telc-swipe')).toHaveCount(0);
+  await longPress(orlov.getByTestId('telc-row-tap'));
+  await expectMenuCard(page, 'm-tel-contact-menu');
+
+  // The card: three numbers, the note, the calls; «Позвонить» → which number.
+  await list.getByTestId('telc-row').filter({ hasText: 'Анна Петрова' }).getByTestId('telc-row-tap').tap();
+  const card = page.getByTestId('telc-card');
+  await expect(card.getByTestId('telc-number')).toHaveCount(3);
+  await expect(card.getByTestId('telc-call').first()).toBeVisible();
+  await checkpoint(page, 'm-tel-contact-card');
+  await card.getByTestId('telc-card-call').tap();
+  await expect(page.getByTestId('telc-number-choice')).toBeVisible();
+  await expectMenuCard(page, 'm-tel-contact-number-choice', true);
+
+  // The form: the fields, then the keyboard up with «Сохранить» right above it.
+  await card.getByTestId('telc-card-edit').tap();
+  const form = page.getByTestId('telc-form');
+  await expect(form.getByTestId('telc-f-number')).toHaveCount(3);
+  await expectNoFieldFocus(page, 'contact form');
+  await checkpoint(page, 'm-tel-contact-edit');
+  await form.getByTestId('telc-f-company').tap();
+  await page.evaluate(() => (window as unknown as KeyboardStub).__keyboard(336));
+  await expect(page.locator('html.kb-open')).toHaveCount(1);
+  await checkpoint(page, 'm-tel-contact-edit-keyboard', { keyboard: true });
+  await page.evaluate(() => (window as unknown as KeyboardStub).__keyboard(null));
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  // A number another contact has: the error under the numbers with a link to that contact.
+  await form.getByTestId('telc-f-number').last().fill('+7 812 333-44-55');
+  await form.getByTestId('telc-f-save').tap();
+  await expect(form.getByTestId('telc-f-phones-error')).toContainText('Константин');
+  await form.getByTestId('telc-f-phones-error').scrollIntoViewIfNeeded();
+  await checkpoint(page, 'm-tel-contact-dup-error');
+  await toRoot(page);
+
+  // An empty book: «Добавить контакт» and, for MANAGE_INTEGRATIONS, «Импорт CSV».
+  mock.seedSipContacts({ empty: true });
+  await segment('Недавние').tap();
+  await segment('Контакты').tap();
+  await expect(root.getByTestId('telc-empty')).toContainText('Контактов пока нет');
+  await checkpoint(page, 'm-tel-contacts-empty');
+  // «Импорт CSV»: a file → the preview with its skips.
+  mock.seedSipContacts();
+  await root.getByTestId('telc-empty-import').tap();
+  await page.getByTestId('telc-import-file').setInputFiles({ name: 'contacts.csv', mimeType: 'text/csv', buffer: Buffer.from(CONTACTS_CSV) });
+  await expect(page.getByTestId('telc-import-preview')).toContainText('Будет добавлено: 1');
+  await checkpoint(page, 'm-tel-import-preview');
+  await page.keyboard.press('Escape');
+});
+
+/**
+ * ADR-0137 T4 «Набор» on a phone: the FAB's screen — empty, a number typed with the contact it
+ * belongs to, a colleague's internal number, «+» from a held «0» (iPhone SE: the keypad fits
+ * without scrolling — layout invariants on every phone); the call: «Вызов…» full screen, then
+ * the band with the tone keypad; an inbound call from a contact — its name, company, number.
+ */
+test('m-telephony-dial', async ({ page }) => {
+  test.setTimeout(300_000);
+  await signedIn(page);
+  mock.seedSipExchange();
+  mock.seedSipJournal();
+  mock.seedSipContacts();
+  const root = await openTelephony(page);
+  await root.getByTestId('tel-fab').tap();
+  const dial = page.getByTestId('tel-dial-screen');
+  await expect(dial.getByTestId('tel-keypad')).toBeVisible();
+  await expectNoFieldFocus(page, 'dial pad');
+  await checkpoint(page, 'm-tel-keypad-empty');
+  const press = async (keys: string): Promise<void> => {
+    for (const k of keys) await dial.locator(`[data-key="${k}"]`).tap();
+  };
+  const clear = async (): Promise<void> => {
+    await longPress(dial.getByTestId('tel-dial-back'));
+    await expect(dial.getByTestId('tel-dial-field')).toHaveValue('');
+  };
+  await press('89161234567');
+  await expect(dial.getByTestId('tel-dial-field')).toHaveValue('8 916 123-45-67');
+  await expect(dial.getByTestId('tel-dial-suggestion')).toContainText('Анна Петрова');
+  await checkpoint(page, 'm-tel-keypad-typed');
+  await clear();
+  await press('101');
+  await expect(dial.getByTestId('tel-dial-suggestion')).toContainText('Борис Петров');
+  await expect(dial.getByTestId('tel-dial-suggestion')).toContainText('вн. 101');
+  await checkpoint(page, 'm-tel-keypad-extension');
+  await clear();
+  await longPress(dial.locator('[data-key="0"]'));
+  await press('74957001100');
+  await expect(dial.getByTestId('tel-dial-field')).toHaveValue('+7 495 700-11-00');
+  await expect(dial.getByTestId('tel-dial-suggestion')).toContainText('«Альфа-Сервис»');
+  await checkpoint(page, 'm-tel-keypad-plus');
+  await clear();
+
+  // The call: «Вызов…» over everything until the answer, then the band with «Клавиатура».
+  await press('89161234567');
+  await dial.getByTestId('tel-dial-call').tap();
+  const calling = page.getByTestId('sip-outgoing');
+  await expect(calling).toContainText('Анна Петрова');
+  await checkpoint(page, 'm-tel-calling');
+  mock.advanceSipPersonal();
+  await expect(calling).toHaveCount(0);
+  const strip = page.getByTestId('mobile-voice-strip');
+  await expect(strip).toContainText('Анна Петрова');
+  // Like the iPhone «Телефон»: the name on one line, the call's timer under it.
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText(/^\d{2}:\d{2}$/, { timeout: 30_000 });
+  // WebKit here has no microphone: its toast is not what the frame is about.
+  while (await page.getByTestId('toast').count()) await page.getByTestId('toast').first().getByRole('button', { name: 'Закрыть' }).tap();
+  expect(await strip.getByTestId('mobile-voice-label').evaluate((el) => el.getBoundingClientRect().height < 24), 'name on one line').toBe(true);
+  await checkpoint(page, 'm-tel-in-call', { mask: [strip.getByTestId('mobile-voice-status')] });
+  await strip.getByTestId('dtmf-open').tap();
+  const pad = page.getByTestId('dtmf-pad');
+  for (const k of '12#') await pad.locator(`[data-key="${k}"]`).tap();
+  await expect(page.getByTestId('dtmf-typed')).toHaveText('12#');
+  await checkpoint(page, 'm-tel-in-call-dtmf', { mask: [strip.getByTestId('mobile-voice-status')] });
+  await page.keyboard.press('Escape');
+  await strip.getByRole('button', { name: 'Отключиться' }).tap();
+  await expect(strip).toHaveCount(0);
+
+  // An inbound call from a contact's number: the name big, the company, the number under them.
+  mock.ringSipInbound(IDS.users.anna, '+78123334455', 'Отдел продаж');
+  const ring = page.getByTestId('sip-incoming');
+  await expect(ring.getByTestId('call-sheet-title')).toContainText('Константин');
+  await expect(ring).toContainText('+7 812 333-44-55');
+  await checkpoint(page, 'm-call-incoming-contact');
+});
+
+/** «Набор» without PLACE_CALLS (Вера, a member with an internal number): the note; colleagues' numbers still dial. */
+test('m-telephony-no-place-calls', async ({ page }) => {
+  await open(page, '/');
+  await page.getByLabel('Email').fill('vera@calaba.test');
+  await page.getByLabel('Пароль', { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: 'Войти', exact: true }).tap();
+  await expect(page.getByTestId('mobile-shell')).toBeVisible();
+  mock.seedSipExchange();
+  const root = await openTelephony(page);
+  await root.getByTestId('tel-fab').tap();
+  const dial = page.getByTestId('tel-dial-screen');
+  await expect(dial.getByTestId('tel-dial-no-place')).toBeVisible();
+  await checkpoint(page, 'm-tel-no-place-calls');
+  for (const k of '84951') await dial.locator(`[data-key="${k}"]`).tap();
+  await expect(dial.getByTestId('tel-dial-suggestion')).toHaveText('Только внутренние номера');
+  await expect(dial.getByTestId('tel-dial-call')).toBeDisabled();
+  // A colleague's internal number still dials.
+  await longPress(dial.getByTestId('tel-dial-back'));
+  for (const k of '101') await dial.locator(`[data-key="${k}"]`).tap();
+  await expect(dial.getByTestId('tel-dial-suggestion')).toContainText('Борис Петров');
+  await expect(dial.getByTestId('tel-dial-call')).toBeEnabled();
+});
 
 // «Телефония» pinned to the bar (in place of «Календарь»): the tab with my missed calls.
 test('m-telephony-pinned', async ({ page }) => {

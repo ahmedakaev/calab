@@ -28,6 +28,10 @@
  * `--telephony`: «Телефония → Недавние» (ADR-0137) open, without a voice call; every 3 s a journal event
  * (SIP_JOURNAL_ENTRY): a new call rings me, it is answered, it ends — in turn. One RecentsRow per
  * event should render (a new row: the list too); without live calls the section runs no timer.
+ * `--tel-page contacts|dial` (with `--telephony`): that page open instead of «Недавние» (T4; with
+ * `--no-emulate` — an idle section: no commits). `--telephony-call`: «Набор» → a personal call
+ * answered, the island's tone keypad open; the journal events go on and a key is pressed every 2 s
+ * (one DtmfPad per press, nothing else of the call band).
  *
  * `--dm-call`: a one-to-one call instead (ADR-0034): Борис calls, I accept in his DM (open, with the
  * «Звонок · 00:42» header timer and the island); the same live events, typing and the voice state
@@ -119,7 +123,10 @@ const CALENDAR = argv.includes('--calendar') || FINDTIME;
 /** `--boards`: the kanban (ADR-0042) open during the call; another user renames a task every 3 s (TASK_UPDATE). */
 const BOARDS = argv.includes('--boards');
 /** `--telephony`: «Недавние» open during the call; a journal event every 3 s (SIP_JOURNAL_ENTRY). */
-const TELEPHONY = argv.includes('--telephony');
+const TELEPHONY_CALL = argv.includes('--telephony-call');
+const TELEPHONY = argv.includes('--telephony') || TELEPHONY_CALL;
+/** `--tel-page contacts|dial` (T4, ADR-0137 §6): the section's page open during the scene. */
+const TEL_PAGE = opt('tel-page', TELEPHONY_CALL ? 'dial' : 'recents');
 /** `--viewer` (K): a second participant watches my camera at full size, so the encoder runs (dynacast). */
 const VIEWER = argv.includes('--viewer') || BENCH === 'F';
 /** F: what the stream shows — a still code page or one scrolling 30×/s. */
@@ -549,8 +556,23 @@ async function main(): Promise<void> {
       mock.seedSipJournal({ base: Date.now() });
       // The fixture's ringing call ends first: the section then has no live call (no timer).
       mock.advanceSipJournal();
+      mock.seedSipContacts();
       await page.getByTestId('section-telephony').click();
       await page.getByTestId('tel-row').first().waitFor({ timeout: 15_000 });
+      if (TEL_PAGE !== 'recents') {
+        await page.getByTestId(`tel-nav-${TEL_PAGE}`).click();
+        await page.getByTestId(TEL_PAGE === 'contacts' ? 'telc-row' : 'tel-keypad').first().waitFor({ timeout: 15_000 });
+      }
+      if (TELEPHONY_CALL) {
+        // A personal call (ADR-0137 §3) from the dial pad, answered; the island's tone keypad open.
+        await page.keyboard.type('89161234567');
+        await page.keyboard.press('Enter');
+        await page.getByTestId('voice-phase').waitFor({ timeout: 15_000 });
+        mock.advanceSipPersonal();
+        await page.getByTestId('voice-phase').filter({ hasText: 'Голос подключён' }).waitFor({ timeout: 30_000 });
+        await page.getByTestId('dtmf-open').click();
+        await page.getByTestId('dtmf-pad').waitFor({ timeout: 15_000 });
+      }
     }
     // «--telephony» measures the section alone (no voice call: ADR-0137 §8 «открытый раздел без звонков»).
     if (!TELEPHONY) await page.getByRole('button', { name: /^Качество связи/ }).first().waitFor({ timeout: 15_000 });
@@ -663,6 +685,10 @@ async function main(): Promise<void> {
             else mock.advanceSipJournal(call);
           }, 3000),
         );
+      }
+      if (TELEPHONY_CALL) {
+        let d = 0;
+        timers.push(setInterval(() => void page.getByTestId('dtmf-pad').locator(`[data-key="${'1234567890*#'[d++ % 12]}"]`).click().catch(() => undefined), 2000));
       }
     }
     // A real remote speaker: Chromium's fake microphone beeps once a second, so LiveKit's active
