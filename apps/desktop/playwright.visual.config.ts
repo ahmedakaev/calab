@@ -110,6 +110,10 @@ export default defineConfig<VisualOptions>({
       testMatch: /billing\.visual\.spec\.ts/,
       use: { ...devices['iPhone 14'], browserName: 'webkit', colorScheme: 'dark', timezoneId: 'Europe/Moscow', reducedMotion: 'reduce' },
     },
+    // Day separators in chats / task comments and the assignee circles on cards (#87, #92): web build.
+    { name: 'days-dark-960', testMatch: /days-assignees\.visual\.spec\.ts/, use: { browserName: 'chromium', viewport: { width: 960, height: 600 }, colorScheme: 'dark', timezoneId: 'Europe/Moscow' } },
+    { name: 'days-light-960', testMatch: /days-assignees\.visual\.spec\.ts/, use: { browserName: 'chromium', viewport: { width: 960, height: 600 }, colorScheme: 'light', timezoneId: 'Europe/Moscow' } },
+    { name: 'days-phone-390', testMatch: /days-assignees\.visual\.spec\.ts/, use: { ...devices['iPhone 14'], browserName: 'webkit', colorScheme: 'dark', timezoneId: 'Europe/Moscow', reducedMotion: 'reduce' } },
     // Focus walk and the web client's own screens (they start their own mock / app). Locally only
     // web.spec.ts, where everything but the dark-960 join card is skipped (see above).
     { name: 'misc', testMatch: ALL_CONFIGS ? /(focus|web)\.spec\.ts/ : /web\.spec\.ts/ },

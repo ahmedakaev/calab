@@ -11,13 +11,13 @@ import { featureOn } from '../../lib/boards/features';
 import { checklistProgress, milestoneChipOf, useBoards } from '../../stores/boards';
 import { useBoardsUi, type CardMenu } from '../../stores/boardsUi';
 import { myUserId } from '../../stores/session';
-import { memberName } from '../../stores/workspaces';
 import { menuBox, menuItem, menuSeparator } from '../shell/menu';
 import { DRAG_USER, dragKind } from '../calendar/dragState';
 import { ApprovalTag } from './Approvals';
 import { GitBadge } from './GitLinks';
+import { AssigneeStack } from './AssigneeStack';
 import { openInTab, tabClick } from './TaskTabs';
-import { AssigneeMenu, DateMenu, LabelMenu, MemberAvatar, PriorityMenu, StatusMenu, useToday } from './menus';
+import { AssigneeMenu, DateMenu, LabelMenu, PriorityMenu, StatusMenu, useToday } from './menus';
 import { doneType, hasBit, mayArchiveTask, mayEditTask, CREATE_TASKS, MANAGE_BOARD } from './model';
 import { Dot, PRIORITY_LABEL, PriorityIcon, StatusIcon, formatDue, isOverdue, PRIORITIES } from './visuals';
 import { chordLabel, BOARD_HOTKEYS, type BoardHotkeyId } from './hotkeys';
@@ -168,18 +168,8 @@ export const TaskCard = memo(function TaskCard({
           align="end"
           {...menuOpen('assignee')}
         >
-          <button type="button" onClick={stop} disabled={!canEdit} aria-label={t('boards.f.assignee')} className="flex shrink-0 items-center -space-x-1.5 rounded-full disabled:cursor-default" data-testid="card-assignees">
-            {task.assignees.length === 0 ? (
-              <UserRound className="size-4 text-faint" aria-hidden />
-            ) : (
-              task.assignees.slice(0, 3).map((a) => (
-                <span key={a.userId} className="relative rounded-full ring-2 ring-[var(--color-bg-elevated)]" title={a.note ? `${memberName(workspaceId, a.userId)} — ${a.note}` : memberName(workspaceId, a.userId)}>
-                  <MemberAvatar workspaceId={workspaceId} userId={a.userId} size={20} />
-                  {a.isLead && task.assignees.length > 1 ? <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full bg-accent ring-2 ring-[var(--color-bg-elevated)]" aria-hidden /> : null}
-                </span>
-              ))
-            )}
-            {task.assignees.length > 3 ? <span className="grid size-5 place-items-center rounded-full bg-hover text-micro text-muted ring-2 ring-[var(--color-bg-elevated)]">+{task.assignees.length - 3}</span> : null}
+          <button type="button" onClick={stop} disabled={!canEdit} aria-label={t('boards.f.assignee')} className="flex shrink-0 items-center rounded-full disabled:cursor-default" data-testid="card-assignees">
+            {task.assignees.length === 0 ? <UserRound className="size-4 text-faint" aria-hidden /> : <AssigneeStack workspaceId={workspaceId} assignees={task.assignees} />}
           </button>
         </AssigneeMenu>
       </div>

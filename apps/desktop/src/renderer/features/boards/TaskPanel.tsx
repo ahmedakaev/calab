@@ -1282,7 +1282,7 @@ function TaskComments({ task, roomId, commentsOff }: { task: Task; roomId: strin
           return c.msg.kind === MessageKind.SYSTEM ? (
             <SystemRow key={c.key} c={c} meta={meta} workspaceId={task.workspaceId} perms={roomPerms} highlighted={highlight === c.key} />
           ) : (
-            <MessageRow key={c.key} c={c} meta={{ ...meta, day: false, isNew: false }} own={c.msg.authorId === me} workspaceId={task.workspaceId} roomId={roomId} perms={roomPerms} highlighted={highlight === c.key} />
+            <MessageRow key={c.key} c={c} meta={meta} own={c.msg.authorId === me} workspaceId={task.workspaceId} roomId={roomId} perms={roomPerms} highlighted={highlight === c.key} />
           );
         })}
         {state.items.length === 0 && !state.loading ? (

@@ -14,6 +14,7 @@ import { useBoards } from '../../stores/boards';
 import { prefsOf, useBoardsUi, type BoardPrefs } from '../../stores/boardsUi';
 import { myUserId } from '../../stores/session';
 import { memberName } from '../../stores/workspaces';
+import { AssigneeStack } from './AssigneeStack';
 import { AssigneeMenu, DateMenu, LabelMenu, MemberAvatar, PriorityMenu, StatusMenu, useToday } from './menus';
 import { doneType, hasBit, mayArchiveTask, mayEditTask, sortedStatuses, CREATE_TASKS, MANAGE_BOARD } from './model';
 import { ApprovalTag } from './Approvals';
@@ -36,7 +37,8 @@ const COL_APPROVALS = cx(COL, 'w-[52px]');
 const COL_CHECKLIST = cx(COL, 'w-[48px] min-[769px]:max-[1000px]:hidden');
 const COL_UPDATED = cx(COL, 'w-[40px] text-micro min-[769px]:max-[1100px]:hidden');
 const COL_DUE = cx(COL, 'w-[76px]');
-const COL_ASSIGNEE = cx(COL, 'w-[44px] order-last mobile:order-none');
+// Fixed width and right-aligned on the phone too: the circles' right edge does not depend on how many there are (#92).
+const COL_ASSIGNEE = 'flex w-[52px] shrink-0 items-center justify-end order-last mobile:order-none';
 
 type Item = { kind: 'group'; key: string; label: ReactNode; count: number } | { kind: 'row'; id: string };
 
@@ -336,9 +338,8 @@ export const ListRow = memo(function ListRow({ id, boardId, boardLabel, workspac
           align="end"
           {...req('assignee')}
         >
-          <button type="button" onClick={stop} disabled={!canEdit} className="flex h-6 min-w-6 shrink-0 items-center rounded-[var(--radius-icon)] px-0.5 hover:bg-hover disabled:pointer-events-none disabled:hover:bg-transparent" aria-label={t('boards.f.assignee')}>
-            {task.assignees[0] ? <MemberAvatar workspaceId={workspaceId} userId={task.assignees[0].userId} size={20} /> : <UserRound className="size-4 text-faint" aria-hidden />}
-            {task.assignees.length > 1 ? <span className="pl-0.5 text-micro text-muted">+{task.assignees.length - 1}</span> : null}
+          <button type="button" onClick={stop} disabled={!canEdit} className="flex h-6 min-w-6 shrink-0 items-center justify-end rounded-[var(--radius-icon)] px-0.5 hover:bg-hover disabled:pointer-events-none disabled:hover:bg-transparent" aria-label={t('boards.f.assignee')}>
+            {task.assignees.length ? <AssigneeStack workspaceId={workspaceId} assignees={task.assignees} /> : <UserRound className="size-4 text-faint" aria-hidden />}
           </button>
         </AssigneeMenu>
         </span>
