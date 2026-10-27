@@ -562,6 +562,7 @@ test('m-chat-audio', async ({ page }) => {
 // Code blocks on a phone (docs/08 «Код в сообщениях»): the same block — language label, copy
 // always visible (no hover on touch), horizontal scroll inside the block, not the page.
 test('m-chat-code', async ({ page }) => {
+  await page.addInitScript(KEYBOARD_STUB);
   await signedInRoom(page);
   await expect(page.getByTestId('composer')).toBeVisible();
   mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: CODE_FIXTURE.long });
@@ -576,6 +577,24 @@ test('m-chat-code', async ({ page }) => {
   await expect(js.getByTestId('code-copy')).toHaveCSS('opacity', '1');
   await expect(page.locator('[data-virtuoso-scroller][data-scrolling]')).toHaveCount(0);
   await checkpoint(page, 'm-chat-code', { main: true });
+
+  // Expanded editor on a phone (#97): the whole screen, the keyboard frame shrinks it from below.
+  const field = page.getByTestId('composer').locator('textarea');
+  const draft = Array.from({ length: 30 }, (_, i) => `Строка ${i + 1}: черновик длинного сообщения для проверки редактора`).join('\n');
+  await field.fill(draft);
+  await expect(page.getByTestId('composer-expand')).toBeVisible();
+  await checkpoint(page, 'm-chat-expand-button', { main: true });
+  await page.getByTestId('composer-expand').tap();
+  const editor = page.getByRole('dialog', { name: /Сообщение в/ });
+  await expect(editor.getByTestId('editor-field')).toBeFocused();
+  await checkpoint(page, 'm-chat-expanded-editor');
+  await page.evaluate(() => (window as unknown as KeyboardStub).__keyboard(336));
+  await expect(page.locator('html.kb-open')).toHaveCount(1);
+  await checkpoint(page, 'm-chat-expanded-editor-keyboard', { keyboard: true });
+  await page.evaluate(() => (window as unknown as KeyboardStub).__keyboard(null));
+  await editor.getByTestId('editor-collapse').tap();
+  await expect(editor).toHaveCount(0);
+  await expect(field).toHaveValue(draft);
 });
 
 // Voice message on a phone (docs/08 «Голосовые сообщения»): the bubble with 44 px targets and
