@@ -1655,6 +1655,28 @@ type SipCallRecording struct {
 	DiskItemID  *uuid.UUID
 }
 
+type SipContact struct {
+	ID          uuid.UUID
+	WorkspaceID uuid.UUID
+	Name        string
+	Company     string
+	Note        string
+	CreatedBy   *uuid.UUID
+	UpdatedBy   *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	SortKey     *string
+	SortGroup   *int16
+}
+
+type SipContactPhone struct {
+	ContactID   uuid.UUID
+	WorkspaceID uuid.UUID
+	Number      string
+	Label       string
+	Position    int16
+}
+
 type SipExtension struct {
 	ID              uuid.UUID
 	WorkspaceID     uuid.UUID
