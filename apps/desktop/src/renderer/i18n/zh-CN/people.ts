@@ -34,6 +34,8 @@ export const zhPeople: DictShape<typeof enPeople> = {
   'people.tz.minutes': '{m} 分钟',
   'people.tz.ahead': '比你早 {diff}',
   'people.tz.behind': '比你晚 {diff}',
+  'people.tz.workTitle': '工作时间',
+  'people.tz.work': '工作时间 {range}',
 
   // member context menu
   'people.menu.profile': '资料',

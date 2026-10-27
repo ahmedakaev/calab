@@ -161,6 +161,7 @@ const KEY = new Set([
   'calendar-day',
   'calendar-week',
   'calendar-dialog',
+  'calendar-dialog-picker',
   // Free / busy, find a time, Settings → Календарь (ADR-0041).
   'calendar-filter',
   'calendar-findtime',
@@ -976,6 +977,9 @@ test('members-profile', async ({ open, win, mock, shot }) => {
   await expect(card.getByTestId('profile-email')).toContainText('boris@calaba.test');
   await expect(card.getByTestId('profile-phone')).toContainText('+7 912 555-02-02');
   await expect(card.getByTestId('profile-extension')).toContainText('101');
+  // docs/09 #85: his local time and working hours (a zone other than mine).
+  await expect(card.getByTestId('local-time')).toContainText('UTC+5');
+  await expect(card.getByTestId('work-hours')).toContainText('10–19');
   await badgesLoaded(win);
   await checkpoint(shot, 'members-profile');
 });
@@ -3957,12 +3961,15 @@ test('calendar-dialog', async ({ open, win, mock, shot }) => {
   await mainWindow(win, mock);
   await calendarDay(win, mock);
   await win.locator(`[data-cal-day="${DAY}"]`).click();
-  await win.keyboard.press('n'); // the header has no «Встреча» (CBF-18)
+  await win.getByTestId('section-create-event').click(); // the sidebar «+» (the header has no «Встреча», CBF-18)
   const dialog = win.getByTestId('event-dialog');
   await dialog.getByTestId('event-title-input').fill('Разбор релиза');
   await dialog.getByTestId('event-room').click(); // the room picker with a search (CBF-18)
   await win.getByRole('option', { name: 'Переговорка' }).click();
   await dialog.getByTestId('event-add-people').click();
+  // docs/09 #85: colleagues in other zones show their local time, zone and working hours.
+  await expect(win.getByTestId('event-member-picker').getByRole('option', { name: /Борис/ })).toContainText('UTC+5 · 10–19');
+  await checkpoint(shot, 'calendar-dialog-picker');
   // The picker stays open for several people.
   await win.getByTestId('event-member-picker').getByRole('option', { name: /Борис/ }).click();
   await win.getByTestId('event-member-picker').getByRole('option', { name: /Вера/ }).click();

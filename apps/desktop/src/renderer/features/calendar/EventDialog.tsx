@@ -43,6 +43,7 @@ import { roomItems, type RoomPickItem } from '../chat/forwardModel';
 import { FormerChip } from '../people/MemberBits';
 import { memberItems, type PeoplePickItem, type RolePickItem } from '../people/memberPickItems';
 import { MemberPicker } from '../people/MemberPicker';
+import { useColleagueClocks } from '../people/useColleagueClocks';
 import { REPEAT_LABEL } from './EventCard';
 import { dragKind, dragPayload, useRoomDropHover } from './dragState';
 import { AvailabilityStrip } from './AvailabilityStrip';
@@ -480,6 +481,9 @@ function AttendeesField({ workspaceId, draft, onChange, error }: { workspaceId: 
         .map((m) => m.user?.id ?? ''),
     [members, me],
   );
+  // Local time and working hours of colleagues in other zones next to their names (#85); only while the picker is open.
+  const pickable = useMemo(() => Object.values(members ?? {}).flatMap((m) => (m.user && !m.user.isBot && m.role !== WorkspaceRole.GUEST && m.user.id !== me ? [m.user.id] : [])), [members, me]);
+  const clocks = useColleagueClocks(workspaceId, pickable, picking);
   const groups = useMemo(() => {
     const taken = new Set([me, ...draft.attendees.map((a) => a.userId).filter(Boolean)]);
     const list = Object.values(members ?? {}).filter((m) => m.user && !m.user.isBot && m.role !== WorkspaceRole.GUEST);
@@ -504,9 +508,9 @@ function AttendeesField({ workspaceId, draft, onChange, error }: { workspaceId: 
         : [];
     return [
       { id: 'all', label: '', items: all },
-      { id: 'members', label: '', items: memberItems(list, { exclude: taken, ...(roles ? { roles } : {}) }) },
+      { id: 'members', label: '', items: memberItems(list, { exclude: taken, decorate: (m) => (m.user && clocks[m.user.id] ? { note: clocks[m.user.id] ?? '' } : undefined), ...(roles ? { roles } : {}) }) },
     ];
-  }, [members, roles, draft.attendees, me, everyone]);
+  }, [members, roles, draft.attendees, me, everyone, clocks]);
 
   const add = (userId: string): void => onChange(addMember(draft.attendees, userId));
   const select = (it: PeoplePickItem): void => {

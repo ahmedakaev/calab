@@ -34,6 +34,8 @@ export const esPeople: DictShape<typeof enPeople> = {
   'people.tz.minutes': '{m} min',
   'people.tz.ahead': '{diff} por delante',
   'people.tz.behind': '{diff} por detrás',
+  'people.tz.workTitle': 'Horario laboral',
+  'people.tz.work': 'laboral {range}',
 
   // member context menu
   'people.menu.profile': 'Perfil',

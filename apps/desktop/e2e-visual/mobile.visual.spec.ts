@@ -756,6 +756,7 @@ test('m-profile-member', async ({ page }) => {
   await expect(card.getByTestId('user-handle')).toHaveText('@boris_p');
   await expect(card.getByTestId('profile-extension')).toContainText('101');
   await expect(card.getByTestId('profile-email')).toContainText('boris@calaba.test');
+  await expect(card.getByTestId('work-hours')).toContainText('10–19'); // docs/09 #85
   await expect(card.getByRole('link', { name: '+7 912 555-02-02' })).toHaveAttribute('href', 'tel:+79125550202');
   await checkpoint(page, 'm-profile-member', { snapshot: false });
 });

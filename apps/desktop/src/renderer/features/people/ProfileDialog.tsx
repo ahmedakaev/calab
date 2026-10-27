@@ -178,7 +178,7 @@ export function ProfileDialog({
                   {t('call.onCall')}
                 </div>
               ) : null}
-              <LocalTime userId={userId} variant="line" />
+              <LocalTime userId={userId} workspaceId={workspaceId} variant="line" />
               {u.isBot ? null : <ClientVersion userId={userId} />}
               <BirthdayInfo userId={userId} variant="line" />
               <EditBirthday workspaceId={workspaceId} userId={userId} />

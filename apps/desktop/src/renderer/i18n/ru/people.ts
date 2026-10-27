@@ -32,6 +32,8 @@ export const ruPeople = {
   'people.tz.minutes': '{m} мин',
   'people.tz.ahead': 'на {diff} впереди',
   'people.tz.behind': 'на {diff} позади',
+  'people.tz.workTitle': 'Рабочие часы',
+  'people.tz.work': 'рабочие {range}',
 
   // member context menu
   'people.menu.profile': 'Профиль',
