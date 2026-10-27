@@ -226,6 +226,7 @@ func (s *Service) startPhone(ctx context.Context, id uuid.UUID) {
 	out, err := s.store.output(rec.File)
 	if err == nil {
 		out.FileType = rtc.FileOGG
+		out.Audio = rtc.PhoneAudio
 		var info *rtc.EgressInfo
 		if info, err = s.eg.StartAudioRecording(ctx, room, out); err == nil {
 			s.phoneStarted(ctx, rec, info.EgressID)
