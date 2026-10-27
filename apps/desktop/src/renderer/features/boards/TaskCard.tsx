@@ -1,6 +1,6 @@
 import * as ContextMenu from '../../components/radix/context-menu';
 import { BoardFeature, type Task } from '@calaba/protocol';
-import { CalendarClock, ChevronRight, Copy, CopyPlus, Diamond, GitFork, Link2, ListChecks, MessageSquare, Archive, UserPlus, SquareArrowOutUpRight, UserRound } from 'lucide-react';
+import { AppWindow, CalendarClock, ChevronRight, Copy, CopyPlus, Diamond, GitFork, Link2, ListChecks, MessageSquare, Archive, UserPlus, SquareArrowOutUpRight, UserRound } from 'lucide-react';
 import { memo, useCallback, useMemo, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { Tip, cx } from '../../components/ui';
 import { t } from '../../i18n';
@@ -16,6 +16,7 @@ import { menuBox, menuItem, menuSeparator } from '../shell/menu';
 import { DRAG_USER, dragKind } from '../calendar/dragState';
 import { ApprovalTag } from './Approvals';
 import { GitBadge } from './GitLinks';
+import { openInTab, tabClick } from './TaskTabs';
 import { AssigneeMenu, DateMenu, LabelMenu, MemberAvatar, PriorityMenu, StatusMenu, useToday } from './menus';
 import { doneType, hasBit, mayArchiveTask, mayEditTask, CREATE_TASKS, MANAGE_BOARD } from './model';
 import { Dot, PRIORITY_LABEL, PriorityIcon, StatusIcon, formatDue, isOverdue, PRIORITIES } from './visuals';
@@ -75,6 +76,7 @@ export const TaskCard = memo(function TaskCard({
   const onClick = useCallback(
     (e: MouseEvent) => {
       const ui = useBoardsUi.getState();
+      if (tabClick(id, e, workspaceId, boardId)) return;
       if (e.shiftKey || e.metaKey || e.ctrlKey) {
         // No selection without a bulk bar on a scoped board (ADR-0059).
         if (useBoards.getState().boards[boardId]?.taskScoped) return;
@@ -86,7 +88,7 @@ export const TaskCard = memo(function TaskCard({
       ui.setFocused(id);
       ui.openTask(id);
     },
-    [id, boardId],
+    [id, boardId, workspaceId],
   );
 
   if (!task) return null;
@@ -325,6 +327,9 @@ export function TaskContextMenu({ task, canEdit, canArchive, manage, children }:
           <ContextMenu.Item className={item} onSelect={() => useBoardsUi.getState().openTask(task.id)}>
             <SquareArrowOutUpRight className="size-4" aria-hidden /> {t('boards.open')}
             {kbd('open')}
+          </ContextMenu.Item>
+          <ContextMenu.Item className={cx(item, 'mobile:hidden')} onSelect={() => openInTab(task.id, task.workspaceId, task.boardId)} data-testid="task-open-in-tab">
+            <AppWindow className="size-4" aria-hidden /> {t('boards.openInTab')}
           </ContextMenu.Item>
           {canEdit ? (
             <>

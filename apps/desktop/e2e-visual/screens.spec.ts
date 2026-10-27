@@ -4125,6 +4125,40 @@ test('boards-task', async ({ open, win, mock, shot }) => {
   await expect(panel.getByTestId('task-description-img')).toBeVisible();
   await expect(panel.getByTestId('task-description')).toContainText('Проверить экспорт');
   await checkpoint(shot, 'boards-task-inline-image');
+
+  // #89 / #93: «×» closes the card; Ctrl/⌘-click on cards adds background tabs; a click on a tab
+  // opens it; a half-typed comment survives the trip to another tab and back.
+  await panel.getByTestId('task-close').click();
+  await expect(panel).toBeHidden();
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+  for (const key of ['CAL-1', 'CAL-2', 'CAL-4']) await win.getByTestId('task-card').filter({ hasText: key }).getByTestId('card-title').click({ modifiers: [mod] });
+  const tabs = win.getByTestId('task-tabs').getByTestId('task-tab');
+  await expect(tabs).toHaveCount(3);
+  await expect(panel).toBeHidden();
+  await tabs.nth(0).getByRole('button').first().click();
+  await expect(panel).toBeVisible();
+  const draft = panel.getByTestId('task-composer').getByRole('textbox');
+  await draft.fill('Черновик, который не должен пропасть');
+  await tabs.nth(1).getByRole('button').first().click();
+  await expect(win.getByTestId('task-tab').nth(1)).toHaveAttribute('data-active', 'true');
+  await expect(panel.getByTestId('task-composer').getByRole('textbox')).toHaveValue('');
+  await tabs.nth(0).getByRole('button').first().click();
+  await expect(panel.getByTestId('task-composer').getByRole('textbox')).toHaveValue('Черновик, который не должен пропасть');
+  await panel.getByTestId('task-composer').getByRole('textbox').blur();
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-task-tabs');
+
+  // #89: from the «Все задачи» search the path starts with the query; «×» returns to the same list.
+  await win.getByTestId('my-tasks').click();
+  await win.getByTestId('my-tasks-scope').getByRole('radio', { name: 'Все задачи' }).click();
+  await win.getByTestId('all-tasks-search').fill('эхо');
+  await win.getByTestId('list-row').first().click();
+  await expect(panel).toBeVisible();
+  await expect(panel.getByTestId('panel-crumb-search')).toContainText('эхо');
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-task-from-search');
+  await panel.getByTestId('task-close').click();
+  await expect(win.getByTestId('all-tasks-search')).toHaveValue('эхо');
 });
 
 /** CAL-3's panel at its lower section: the «Комментарии» tab (the default) with the composer. */

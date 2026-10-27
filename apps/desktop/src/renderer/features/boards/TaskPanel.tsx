@@ -83,6 +83,7 @@ import type { PmNode } from '@calaba/wiki-doc/markdown';
 import { MediaImg } from '../../components/MediaImg';
 import { THUMB_LARGE, thumbWidthPath } from '../../lib/thumbs';
 import { openAttachment } from '../../services/files';
+import { TaskDates } from './TaskDates';
 import { Checklists } from './Checklists';
 import { MilestoneDiamond, TaskMilestones } from './TaskMilestones';
 import { TaskHistory } from './TaskHistory';
@@ -154,6 +155,7 @@ function PanelBody({ task, onClose }: { task: Task; onClose: () => void }): Reac
       <div ref={scroller} className="scrollbar-thin min-h-0 flex-1 overflow-y-auto" data-testid="task-scroll">
         <div className="flex flex-col gap-5 px-5 pb-6 pt-4">
           <TitleEditor task={task} canEdit={canEdit} />
+          <TaskDates id={task.id} />
           <DescriptionEditor task={task} canEdit={canEdit} attachments={on(BoardFeature.ATTACHMENTS)} />
           {/* Git links (ADR-0060 §4): under the attachments; its own subscriber, nothing when none. */}
           {on(BoardFeature.GIT_LINKS) ? <GitSection taskId={task.id} /> : null}
@@ -169,7 +171,7 @@ function PanelBody({ task, onClose }: { task: Task; onClose: () => void }): Reac
           {room ? <Activity task={task} room={room} toEnd={toEnd} commentsOff={!on(BoardFeature.COMMENTS)} /> : <div className="grid h-16 place-items-center"><Spinner /></div>}
         </div>
       </div>
-      {room ? <CommentBox task={task} room={room} perms={perms} commentsOff={!on(BoardFeature.COMMENTS)} /> : null}
+      {room ? <CommentBox key={room.id} task={task} room={room} perms={perms} commentsOff={!on(BoardFeature.COMMENTS)} /> : null}
     </>
   );
 }
@@ -177,11 +179,13 @@ function PanelBody({ task, onClose }: { task: Task; onClose: () => void }): Reac
 function PanelHeader({ task, boardName, perms, scoped, onClose }: { task: Task; boardName: string; perms: bigint | undefined; scoped: boolean; onClose: () => void }): ReactNode {
   const subscribed = task.subscribed && !task.muted;
   const parent = useBoards((s) => (task.parentId ? s.tasks[task.parentId] : undefined));
+  const searchFrom = useBoardsUi((s) => s.searchFrom);
   return (
     <Bar plain className="gap-1 pl-2 pr-2" data-testid="task-panel-header">
       <PhoneBack />
-      <button type="button" onClick={onClose} className="min-w-0 truncate rounded-[var(--radius-icon)] px-2 text-caption text-muted hover:bg-hover hover:text-fg mobile:tap-h" data-testid="panel-crumb-board">
-        {boardName}
+      {/* From a «Все задачи» search (#89) the path starts there; the phone has room for one crumb. */}
+      <button type="button" onClick={onClose} className="min-w-0 truncate rounded-[var(--radius-icon)] px-2 text-caption text-muted hover:bg-hover hover:text-fg mobile:tap-h" title={searchFrom ? t('boards.crumb.back') : undefined} data-testid={searchFrom ? 'panel-crumb-search' : 'panel-crumb-board'}>
+        {searchFrom ? `${t('boards.myTasks')} › ${t('boards.crumb.search', { q: searchFrom })}` : boardName}
       </button>
       {parent ? (
         <>
@@ -204,6 +208,7 @@ function PanelHeader({ task, boardName, perms, scoped, onClose }: { task: Task; 
         <Link2 className="size-4" aria-hidden />
       </IconButton>
       <TaskMoreMenu task={task} perms={perms} scoped={scoped} />
+      <CloseButton size="md" onClick={onClose} shortcut="" data-testid="task-close" />
     </Bar>
   );
 }

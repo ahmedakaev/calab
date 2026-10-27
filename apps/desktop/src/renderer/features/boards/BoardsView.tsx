@@ -31,6 +31,7 @@ import { Kanban } from './Kanban';
 import { EmptyBoard, ListRow, ListView } from './ListView';
 import { doneType, hasBit, CREATE_TASKS } from './model';
 import { TaskPanel } from './TaskPanel';
+import { TaskTabs } from './TaskTabs';
 import { TaskView } from './TaskView';
 import { Timeline } from './Timeline';
 import { useBoardHotkeys } from './useBoardHotkeys';
@@ -71,14 +72,17 @@ export function BoardsView({ workspaceId, mobile = false }: { workspaceId: strin
     void loadBoard(boardId);
   }, [boardId]);
   return (
-    <div className="relative flex min-w-0 flex-1" data-testid="boards-view">
-      {/* `invisible` keeps the layout (and so every scroll offset) but paints nothing under the task. */}
-      <section ref={board} className={cx('mat-content flex min-w-0 flex-1 flex-col', covered && 'invisible')} aria-label={t('boards.boards')} inert={covered} aria-hidden={covered || undefined} data-toast-anchor>
-        {boardId === MY_TASKS ? <MyTasks key={workspaceId} workspaceId={workspaceId} /> : <Board boardId={boardId} workspaceId={workspaceId} />}
-      </section>
-      {taskId ? phone ? <TaskPanel taskId={taskId} /> : <TaskView taskId={taskId} boardId={boardId} workspaceId={workspaceId} boardRef={board} /> : null}
-      <BoardSettingsHost />
-      <HotkeysSheet />
+    <div className="flex min-w-0 flex-1 flex-col" data-testid="boards-view">
+      {phone ? null : <TaskTabs workspaceId={workspaceId} boardId={boardId} />}
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        {/* `invisible` keeps the layout (and so every scroll offset) but paints nothing under the task. */}
+        <section ref={board} className={cx('mat-content flex min-w-0 flex-1 flex-col', covered && 'invisible')} aria-label={t('boards.boards')} inert={covered} aria-hidden={covered || undefined} data-toast-anchor>
+          {boardId === MY_TASKS ? <MyTasks key={workspaceId} workspaceId={workspaceId} /> : <Board boardId={boardId} workspaceId={workspaceId} />}
+        </section>
+        {taskId ? phone ? <TaskPanel taskId={taskId} /> : <TaskView taskId={taskId} boardId={boardId} workspaceId={workspaceId} boardRef={board} /> : null}
+        <BoardSettingsHost />
+        <HotkeysSheet />
+      </div>
     </div>
   );
 }
@@ -318,7 +322,9 @@ const openFromList = (id: string, e: MouseEvent): void => {
     return;
   }
   ui.setFocused(id);
-  ui.openTask(id);
+  // From «Все задачи» the crumbs start with the query (#89): read off the field, the list owns it.
+  const q = document.querySelector<HTMLInputElement>('[data-testid=all-tasks-search]')?.value.trim() ?? '';
+  ui.openTask(id, q);
 };
 
 /** A GET /me/tasks scope, grouped by board, with the completion filter. */

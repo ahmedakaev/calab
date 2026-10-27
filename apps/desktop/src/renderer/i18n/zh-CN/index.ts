@@ -704,6 +704,7 @@ export const zhCN: Dict = {
   'unit.mb': '{n} MB',
   'unit.gb': '{n} GB',
   'date.todayAt': '今天{time}',
+  'date.yesterdayAt': '昨天{time}',
   'date.yesterday': '昨天',
   'perm.granted': '已允许',
   'perm.denied': '已拒绝',

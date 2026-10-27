@@ -18,6 +18,7 @@ import { AssigneeMenu, DateMenu, LabelMenu, MemberAvatar, PriorityMenu, StatusMe
 import { doneType, hasBit, mayArchiveTask, mayEditTask, sortedStatuses, CREATE_TASKS, MANAGE_BOARD } from './model';
 import { ApprovalTag } from './Approvals';
 import { featureOn, groupOn, sortOn } from '../../lib/boards/features';
+import { tabClick } from './TaskTabs';
 import { ChecklistBadge, MilestoneBadge, TaskContextMenu, useBlockedStatuses } from './TaskCard';
 import { useDisabledFeatures, useMatchCtx } from './useBoardView';
 import { useBoardScoped, useTaskPerms } from './useTaskPerms';
@@ -215,6 +216,7 @@ export function ListView({ boardId, workspaceId }: { boardId: string; workspaceI
           return;
         }
       }
+      if (tabClick(id, e, workspaceId, boardId)) return;
       if (e.metaKey || e.ctrlKey) {
         ui.toggleSelected(id);
         ui.setFocused(id);
@@ -224,7 +226,7 @@ export function ListView({ boardId, workspaceId }: { boardId: string; workspaceI
       ui.setFocused(id);
       ui.openTask(id);
     },
-    [ids],
+    [ids, workspaceId, boardId],
   );
   if (items.length === 0) return <EmptyBoard />;
   return (

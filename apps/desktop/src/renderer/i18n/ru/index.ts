@@ -697,6 +697,7 @@ export const ru = {
   'unit.mb': '{n} МБ',
   'unit.gb': '{n} ГБ',
   'date.todayAt': 'сегодня в {time}',
+  'date.yesterdayAt': 'вчера в {time}',
   'date.yesterday': 'вчера',
   'perm.granted': 'Разрешено',
   'perm.denied': 'Запрещено',

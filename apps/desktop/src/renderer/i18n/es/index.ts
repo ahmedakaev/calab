@@ -705,6 +705,7 @@ export const es: Dict = {
   'unit.mb': '{n} MB',
   'unit.gb': '{n} GB',
   'date.todayAt': 'hoy a las {time}',
+  'date.yesterdayAt': 'ayer a las {time}',
   'date.yesterday': 'ayer',
   'perm.granted': 'Permitido',
   'perm.denied': 'Denegado',
