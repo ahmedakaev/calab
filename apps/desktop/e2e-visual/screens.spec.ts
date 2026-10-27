@@ -4170,6 +4170,19 @@ test('boards-task', async ({ open, win, mock, shot }) => {
   await win.mouse.move(0, 0);
   await checkpoint(shot, 'boards-task-tabs');
 
+  // #93 follow-up: the strip lives in the title bar, so it stays in other sections; no tab is
+  // highlighted there, and a click brings the task back with the draft.
+  await win.getByTestId('section-calendar').click();
+  await expect(win.getByTestId('titlebar').getByTestId('task-tabs')).toBeVisible();
+  await expect(tabs).toHaveCount(3);
+  await expect(win.getByTestId('task-tab').and(win.locator('[data-active]'))).toHaveCount(0);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-task-tabs-calendar');
+  await tabs.nth(0).getByRole('button').first().click();
+  await expect(panel.getByTestId('task-composer').getByRole('textbox')).toHaveValue('Черновик, который не должен пропасть');
+  await expect(win.getByTestId('task-tab').nth(0)).toHaveAttribute('data-active', 'true');
+  await panel.getByTestId('task-composer').getByRole('textbox').blur();
+
   // #89: from the «Все задачи» search the path starts with the query; «×» returns to the same list.
   await win.getByTestId('my-tasks').click();
   await win.getByTestId('my-tasks-scope').getByRole('radio', { name: 'Все задачи' }).click();
