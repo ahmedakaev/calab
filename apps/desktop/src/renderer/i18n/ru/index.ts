@@ -47,6 +47,7 @@ import { ruTemp } from './temp';
 import { ruContacts } from './contacts';
 import { ruSip } from './sip';
 import { ruPbx } from './pbx';
+import { ruTelephony } from './telephony';
 import { ruAi } from './ai';
 import { ruSmartTask } from './smartTask';
 import { ruWebApps } from './webapps';
@@ -68,6 +69,7 @@ export const ru = {
   ...ruContacts,
   ...ruSip,
   ...ruPbx,
+  ...ruTelephony,
   ...ruAi,
   ...ruSmartTask,
   ...ruWebApps,

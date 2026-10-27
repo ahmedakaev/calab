@@ -152,6 +152,7 @@ function closeFlag(s: PhoneScreen, next: PhoneScreen | undefined): void {
     case 'disk':
     case 'wiki':
     case 'canvas':
+    case 'telCall':
       break;
   }
   // Back to a chat below: it is the open room again (the list's highlight, read state, links).

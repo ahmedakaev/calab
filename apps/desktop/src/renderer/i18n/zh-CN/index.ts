@@ -48,6 +48,7 @@ import { zhTemp } from './temp';
 import { zhContacts } from './contacts';
 import { zhSip } from './sip';
 import { zhPbx } from './pbx';
+import { zhTelephony } from './telephony';
 import { zhAi } from './ai';
 import { zhSmartTask } from './smartTask';
 import { zhWebApps } from './webapps';
@@ -69,6 +70,7 @@ export const zhCN: Dict = {
   ...zhContacts,
   ...zhSip,
   ...zhPbx,
+  ...zhTelephony,
   ...zhAi,
   ...zhSmartTask,
   ...zhWebApps,

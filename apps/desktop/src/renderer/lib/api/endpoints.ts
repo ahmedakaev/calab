@@ -19,6 +19,8 @@ import {
   CheckAiRequestSchema,
   CheckAiResponseSchema,
   ListSipCallsResponseSchema,
+  ListSipJournalResponseSchema,
+  GetSipJournalEntryResponseSchema,
   ListSipActiveCallsResponseSchema,
   PlaceSipCallRequestSchema,
   PutSipSettingsRequestSchema,
@@ -730,6 +732,21 @@ export const api = {
     test: (workspaceId: string) => call('POST', `/api/workspaces/${workspaceId}/sip/test`, TestSipResponseSchema),
     journal: (workspaceId: string, cursor?: string, signal?: AbortSignal) =>
       call('GET', `/api/workspaces/${workspaceId}/calls${qs({ cursor })}`, ListSipCallsResponseSchema, undefined, signal),
+    /**
+     * «Телефония → Недавние» (ADR-0137 §1): a page of the journal, newest first — my calls
+     * (scope mine) or the workspace's (scope all, VIEW_JOURNALS; `user` = one employee's); `filter`
+     * missed / in / out; `q` digits of a number (names with T2); `from`/`to` RFC 3339; 403 for all
+     * without VIEW_JOURNALS. The detail adds the call's events and its recording (if I may hear it);
+     * `seen` zeroes my missed badge (SIP_MISSED_CHANGED to my other devices).
+     */
+    journalList: (
+      workspaceId: string,
+      p: { scope: 'mine' | 'all'; filter?: 'missed' | 'in' | 'out'; user?: string; q?: string; from?: string; to?: string; cursor?: string; limit?: number },
+      signal?: AbortSignal,
+    ) => call('GET', `/api/workspaces/${workspaceId}/sip/journal${qs(p)}`, ListSipJournalResponseSchema, undefined, signal),
+    journalEntry: (workspaceId: string, callId: string, signal?: AbortSignal) =>
+      call('GET', `/api/workspaces/${workspaceId}/sip/journal/${callId}`, GetSipJournalEntryResponseSchema, undefined, signal),
+    journalSeen: (workspaceId: string) => callEmpty('POST', `/api/workspaces/${workspaceId}/sip/journal/seen`),
     /** The workspace's live calls with their step (ADR-0128; MANAGE_INTEGRATIONS); SIP_CALLS_CHANGED says when to re-read. */
     activeCalls: (workspaceId: string, signal?: AbortSignal) => call('GET', `/api/workspaces/${workspaceId}/sip/calls`, ListSipActiveCallsResponseSchema, undefined, signal),
     place: (roomId: string, number: string) => call('POST', `/api/rooms/${roomId}/calls`, SipCallResponseSchema, body(PlaceSipCallRequestSchema, { number })),

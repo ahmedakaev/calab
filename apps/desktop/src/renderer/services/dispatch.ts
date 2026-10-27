@@ -51,6 +51,7 @@ import { checkWebVersion } from './webVersion';
 import { applySnapshotRecordings, dropRecordings, onRoomRecording, resetRecordings } from './recording';
 import { applySnapshotSipCalls, dropSipCalls, onSipCallUpdate, resetSipCalls } from './sip';
 import { onSipInboundRing } from './sipInbound';
+import { applySnapshotSipMissed, dropSipMissed, onJournalEntry, onSipMissedChanged, resetSipMissed } from './sipJournal';
 import { activeCallsKey, coalescer, journalKey } from '../lib/sipPbx';
 import { t } from '../i18n';
 import { dropStaleWorkspaceBackground } from './cameraBackground';
@@ -238,6 +239,8 @@ export function applyDispatch(ev: DispatchEvent): void {
       resetRecordings(r.workspaces);
       // Telephony (ADR-0046): the rooms' live phone lines.
       resetSipCalls(r.workspaces);
+      // «Телефония» (ADR-0137): my missed calls of each workspace (the rail / tab badge).
+      resetSipMissed(r.workspaces);
       useSession.getState().set({
         me: r.me ?? null,
         planContact: r.planContact,
@@ -291,6 +294,7 @@ export function applyDispatch(ev: DispatchEvent): void {
       applySnapshotApps(snap);
       applySnapshotRecordings(snap);
       applySnapshotSipCalls(snap);
+      applySnapshotSipMissed(snap);
       applySnapshotEvents(snap);
       applySnapshotBoards(snap);
       ensureActiveWorkspace();
@@ -384,6 +388,7 @@ export function applyDispatch(ev: DispatchEvent): void {
       useWebApps.getState().dropWorkspace(id);
       dropRecordings((_room, rec) => rec.workspaceId === id);
       dropSipCalls((_room, c) => c.workspaceId === id);
+      dropSipMissed(id);
       dropWorkspaceEvents(id);
       dropWorkspaceBoards(id);
       useDisk.getState().dropWorkspace(id);
@@ -599,6 +604,13 @@ export function applyDispatch(ev: DispatchEvent): void {
       return;
     case 'sipCallsChanged':
       callsChanged(e.value.workspaceId);
+      return;
+    // «Телефония → Недавние» (ADR-0137 §1): a call appeared / was answered / ended — into the open list.
+    case 'sipJournalEntry':
+      onJournalEntry(e.value.entry);
+      return;
+    case 'sipMissedChanged':
+      onSipMissedChanged(e.value.workspaceId, e.value.count);
       return;
     case 'roomNotificationUpdate':
       if (e.value.settings) useRooms.getState().setNotify(e.value.settings);
