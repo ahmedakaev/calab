@@ -462,6 +462,12 @@ var botRouteGroups = []botRouteGroup{
 		"DELETE /api/workspaces/{id}/sip/contacts/{cid}",
 		"DELETE /api/workspaces/{id}/sip/calls/{cid}",
 	}},
+	{access: botDeny, why: "ADR-0139: saved task searches are a person's left-panel filters in the app; a bot searches with GET …/tasks/search directly", routes: []string{
+		"GET /api/workspaces/{id}/task-searches",
+		"POST /api/workspaces/{id}/task-searches",
+		"PATCH /api/workspaces/{id}/task-searches/{sid}",
+		"DELETE /api/workspaces/{id}/task-searches/{sid}",
+	}},
 	{access: botDeny, why: "ADR-0137 §3: a personal phone call puts the caller's own LiveKit client into the call's room — a bot has none; bots call a number from a voice room (POST /api/rooms/{id}/calls)", routes: []string{
 		"POST /api/workspaces/{id}/sip/calls",
 	}},

@@ -1923,6 +1923,16 @@ type TaskRelation struct {
 	CreatedAt time.Time
 }
 
+type TaskSearch struct {
+	ID          uuid.UUID
+	WorkspaceID uuid.UUID
+	UserID      uuid.UUID
+	Name        string
+	Query       []byte
+	Position    int32
+	CreatedAt   time.Time
+}
+
 type TaskSubscriber struct {
 	TaskID     uuid.UUID
 	UserID     uuid.UUID
