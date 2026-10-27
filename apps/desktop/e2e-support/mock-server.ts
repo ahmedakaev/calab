@@ -234,6 +234,16 @@ import {
   GetSipSettingsResponseSchema,
   ListSipCallsResponseSchema,
   ListSipJournalResponseSchema,
+  ListSipContactsResponseSchema,
+  GetSipContactResponseSchema,
+  SipContactInputSchema,
+  UpdateSipContactRequestSchema,
+  SipContactResponseSchema,
+  ImportSipContactsResponseSchema,
+  PlaceSipPersonalCallRequestSchema,
+  PlaceSipPersonalCallResponseSchema,
+  SipPhoneLabel,
+  type SipContact,
   GetSipJournalEntryResponseSchema,
   SipJournalEntrySchema,
   SipCallPartySchema,
@@ -568,6 +578,8 @@ import {
   type PbxMembers,
 } from './mock-pbx';
 import { advanceCall, listJournal, mayReadCall, missedCount, seedJournal, type JournalRow } from './mock-journal';
+import { checkContact, exportCsv, importCsv, listContacts, makeContact, numberOwner } from './mock-contacts';
+import { normalizeContactNumber } from '../src/renderer/lib/phoneNumber';
 import { MOCK_SIP_RATE_NUMBER, MOCK_SIP_REFUSED_HOST, MOCK_SIP_UNREACHABLE_HOST, defaultSipSettings, isLiveSipStatus, normalizeCallee, numberAllowed, sipSettingsError } from './mock-sip';
 import {
   ACTIVE_BEFORE_MS,
@@ -794,6 +806,20 @@ export interface MockServer {
   /** A new inbound call starts ringing `ringing` (SIP_JOURNAL_ENTRY): its id. */
   ringSipJournal(number: string, ringing: string[]): string;
   /**
+   * ADR-0137 §2 «Контакты»: the phone book of «Команда Calab» (mock-contacts.ts) — Cyrillic and
+   * Latin names, a company without a person, a very long name and company, a contact with three
+   * numbers and a note; the contacts of the journal's calls keep their ids (seedSipJournal first).
+   * `empty` — none. Inbound calls from a contact's number ring with its name (caller ID).
+   */
+  seedSipContacts(opts?: { empty?: boolean }): void;
+  /** The next GET …/sip/contacts pages wait until the returned release is called (the loading state). */
+  holdSipContacts(): () => void;
+  /**
+   * The personal call placed from «Телефония» (ADR-0137 §3) moves on → SIP_CALL_UPDATE to its
+   * caller: RINGING, ACTIVE (answered), ENDED / FAILED with `reason`. Default: answered.
+   */
+  advanceSipPersonal(status?: SipCallStatus, reason?: string): void;
+  /**
    * A recording card in the room chat (SYSTEM message, MESSAGE_CREATE) in the given state; the
    * status never advances by itself (unlike a stop through the API).
    */
@@ -985,6 +1011,9 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     holdSipJournal: () => impl.holdSipJournal(),
     advanceSipJournal: (id, by) => impl.advanceSipJournal(id, by),
     ringSipJournal: (number, ringing) => impl.ringSipJournal(number, ringing),
+    seedSipContacts: (o) => impl.seedSipContacts(o),
+    holdSipContacts: () => impl.holdSipContacts(),
+    advanceSipPersonal: (st, r) => impl.advanceSipPersonal(st, r),
     injectRecordingCard: (a) => impl.injectRecordingCard(a),
     updateRecordingCard: (id, patch) => impl.updateRecordingCard(id, patch),
     setBirthday: (u, b, card) => impl.setBirthday(u, b, card),
@@ -1082,7 +1111,7 @@ class HttpError extends Error {
     message: string,
     readonly field = '',
     /** ApiError reason / used / limit (plan limits, ADR-0024). */
-    readonly extra: { reason?: string; used?: bigint; limit?: bigint } = {},
+    readonly extra: { reason?: string; used?: bigint; limit?: bigint; conflictId?: string; conflictName?: string } = {},
     readonly headers: Record<string, string> = {},
   ) {
     super(message);
@@ -1900,7 +1929,7 @@ class MockImpl {
         .filter((c) => c.workspaceId === wsId)
         .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id)),
       recordings: [...this.state.recordings.values()].filter((r) => r.workspaceId === wsId && rooms.some((x) => x.id === r.roomId)),
-      sipCalls: [...this.state.sipCalls.values()].filter((c) => c.workspaceId === wsId && isLiveSipStatus(c.status) && rooms.some((x) => x.id === c.roomId)),
+      sipCalls: [...this.state.sipCalls.values()].filter((c) => c.workspaceId === wsId && isLiveSipStatus(c.status) && (rooms.some((x) => x.id === c.roomId) || (c.origin === SipCallOrigin.PERSONAL && c.startedBy === userId))),
       sipMissed: m && m.role !== WorkspaceRole.GUEST ? missedCount(this.state.sipJournal.values(), wsId, userId, this.state.sipSeen.get(`${wsId}|${userId}`) ?? 0) : 0,
       roles: this.rolesOfWs(wsId),
       badges: this.badgesOf(wsId),
@@ -6312,6 +6341,7 @@ class MockImpl {
       ringingUserIds: [toUserId],
       via,
       route: 'menu',
+      ...this.callerIdOf(IDS.workspaces.main, number),
     });
     this.state.sipCalls.set(id, c);
     this.toUser(toUserId, { event: { case: 'sipInboundRing', value: { call: clone(SipCallSchema, c) } } });
@@ -6470,6 +6500,209 @@ class MockImpl {
     return id;
   }
 
+  // ------------------------------------------------ the phone book and the personal call (ADR-0137 §2–§3, mock-contacts.ts)
+
+  /** Caller ID of a number (ADR-0137 §2): the contact that has it. */
+  private callerIdOf(ws: string, number: string): { callerName: string; callerCompany: string; contactId: string } {
+    const n = normalizeContactNumber(number, this.sipSettingsOf(ws).callerId);
+    const c = n ? numberOwner(this.state.sipContacts, ws, n) : undefined;
+    return { callerName: c?.name ?? '', callerCompany: c?.company ?? '', contactId: c?.id ?? '' };
+  }
+
+  seedSipContacts(opts: { empty?: boolean } = {}): void {
+    const ws = IDS.workspaces.main;
+    this.state.sipContacts.clear();
+    if (opts.empty) return;
+    const at = Date.parse('2026-01-10T12:00:00+03:00');
+    const M = SipPhoneLabel.MOBILE;
+    const W = SipPhoneLabel.WORK;
+    const H = SipPhoneLabel.HOME;
+    const anna = IDS.users.anna;
+    const boris = IDS.users.boris;
+    const list = [
+      makeContact({ id: 'ct-petrova', ws, name: 'Анна Петрова', company: 'ООО Ромашка', note: 'Звонить после 11:00. Решает вопросы по договору поставки, копию счёта — на почту бухгалтерии.', phones: [['+79161234567', M], ['+74950001122', W], ['+79031112233', H]], by: anna, at }),
+      makeContact({ id: 'ct-lutik', ws, company: 'ООО Лютик', phones: [['+74959990011', W]], by: boris, at }),
+      makeContact({ id: 'ct-long', ws, name: 'Константин Константинович Константинопольский-Длинноимённый', company: 'Общество с ограниченной ответственностью «Северо-Западная Логистическая Компания»', phones: [['+78123334455', W]], by: boris, at }),
+      makeContact({ id: 'ct-saveliev', ws, name: 'Игорь Савельев', phones: [['+79250001020', M]], by: anna, at }),
+      makeContact({ id: 'ct-smirnova', ws, name: 'Вера Смирнова', company: 'ИП Смирнова', phones: [['+79161110000', M]], by: boris, at }),
+      makeContact({ id: 'ct-orlov', ws, name: 'Дмитрий Орлов', phones: [['+79037778899', M]], by: anna, at }),
+      makeContact({ id: 'ct-ershov', ws, name: 'Ёлкин Пётр', company: 'Склад №3', phones: [['+79035550199', M]], by: anna, at }),
+      makeContact({ id: 'ct-alice', ws, name: 'Alice Johnson', company: 'Acme Corporation', phones: [['+12125550100', W]], by: boris, at }),
+      makeContact({ id: 'ct-bob', ws, name: 'Bob Miller', phones: [['+4930123456', M]], by: boris, at }),
+      makeContact({ id: 'ct-alpha', ws, company: '«Альфа-Сервис»', phones: [['+74957001100', W]], by: anna, at }),
+    ];
+    // The journal's calls name their contacts by id (mock-journal.ts): the same contact keeps that id.
+    const journalIds = new Map<string, string>();
+    for (const r of this.state.sipJournal.values()) if (r.entry.contact?.id && r.entry.peerE164) journalIds.set(r.entry.peerE164, r.entry.contact.id);
+    for (const c of list) {
+      const jid = c.phones.map((p) => journalIds.get(p.number)).find(Boolean);
+      if (jid) c.id = jid;
+      this.state.sipContacts.set(c.id, c);
+    }
+  }
+
+  private sipContactsHold: Promise<void> | null = null;
+
+  holdSipContacts(): () => void {
+    let release = (): void => undefined;
+    this.sipContactsHold = new Promise<void>((r) => {
+      release = () => {
+        this.sipContactsHold = null;
+        r();
+      };
+    });
+    return release;
+  }
+
+  private sipContactRoutes(): void {
+    // Who: not a guest, telephony on (or MANAGE_INTEGRATIONS); import / export: MANAGE_INTEGRATIONS.
+    const reader = (c: Ctx): { ws: string; me: string; perms: bigint } => {
+      const me = this.uid(c);
+      const { ws, m } = this.workspaceFor(c.params[0] ?? '', me);
+      if (m.role === WorkspaceRole.GUEST) throw forbidden('guests have no phone book');
+      return { ws: ws.id, me, perms: workspacePermissions(this.memberRoles(m)) };
+    };
+    const manager = (c: Ctx): { ws: string; me: string } => {
+      const r = reader(c);
+      if (!has(r.perms, PERMISSION_BITS.MANAGE_INTEGRATIONS)) throw forbidden('MANAGE_INTEGRATIONS required');
+      return r;
+    };
+    const fail = (e: { kind: 'validation'; field: string; message: string } | { kind: 'taken'; id: string; name: string }): HttpError =>
+      e.kind === 'validation' ? invalid(e.field, e.message) : new HttpError(409, ErrorCode.SIP_CONTACT_NUMBER_TAKEN, 'the number belongs to another contact', 'phones', { conflictId: e.id, conflictName: e.name });
+    const owned = (ws: string, id: string): SipContact => {
+      const c = this.state.sipContacts.get(id);
+      if (!c || c.workspaceId !== ws) throw notFound('contact not found');
+      return c;
+    };
+    this.route('GET', '/api/workspaces/:id/sip/contacts', async (c) => {
+      const { ws } = reader(c);
+      if (this.sipContactsHold) await this.sipContactsHold;
+      const sp = c.url.searchParams;
+      sendMsg(c.res, 200, ListSipContactsResponseSchema, listContacts(this.state.sipContacts, ws, sp.get('q') ?? '', Number(sp.get('cursor') || '0')));
+    });
+    this.route('GET', '/api/workspaces/:id/sip/contacts/export.csv', (c) => {
+      const { ws } = manager(c);
+      send(c.res, 200, exportCsv(this.state.sipContacts, ws), 'text/csv; charset=utf-8');
+    });
+    this.route('POST', '/api/workspaces/:id/sip/contacts/import', async (c) => {
+      const { ws, me } = manager(c);
+      const f = await parseMultipartFile(c);
+      if (f.bytes.length > 1024 * 1024) throw invalid('file', 'file: at most 1 MB');
+      const dry = c.url.searchParams.get('dry_run') === '1';
+      const r = importCsv(this.state.sipContacts, ws, f.bytes.toString('utf8'), this.sipSettingsOf(ws).callerId, me, () => nextId(this.state, 'file'), Date.now());
+      if ('field' in r) throw invalid(r.field, r.message);
+      if (!dry) for (const x of r.created) this.state.sipContacts.set(x.id, x);
+      sendMsg(c.res, 200, ImportSipContactsResponseSchema, { created: r.created.length, rows: r.rows, skipped: r.skipped, dryRun: dry });
+    });
+    this.route('GET', '/api/workspaces/:id/sip/contacts/:cid', (c) => {
+      const { ws, me, perms } = reader(c);
+      const contact = owned(ws, c.params[1] ?? '');
+      const all = has(perms, PERMISSION_BITS.VIEW_JOURNALS);
+      const numbers = new Set(contact.phones.map((p) => p.number));
+      const calls = [...this.state.sipJournal.values()]
+        .filter((r) => r.entry.call?.workspaceId === ws && numbers.has(r.entry.peerE164) && mayReadCall(r, me, all))
+        .sort((a, b) => Number((b.entry.call?.startedAt?.seconds ?? 0n) - (a.entry.call?.startedAt?.seconds ?? 0n)))
+        .slice(0, 10)
+        .map((r) => r.entry);
+      sendMsg(c.res, 200, GetSipContactResponseSchema, { contact, calls });
+    });
+    this.route('POST', '/api/workspaces/:id/sip/contacts', (c) => {
+      const { ws, me } = reader(c);
+      const b = parseBody(c, SipContactInputSchema);
+      const r = checkContact(this.state.sipContacts, ws, '', b, this.sipSettingsOf(ws).callerId);
+      if ('kind' in r) throw fail(r);
+      const contact = makeContact({ id: nextId(this.state, 'file'), ws, name: b.name.trim(), company: b.company.trim(), note: b.note.trim(), phones: r.phones.map((p) => [p.number, p.label]), by: me, at: Date.now() });
+      this.state.sipContacts.set(contact.id, contact);
+      sendMsg(c.res, 201, SipContactResponseSchema, { contact });
+    });
+    this.route('PATCH', '/api/workspaces/:id/sip/contacts/:cid', (c) => {
+      const { ws, me } = reader(c);
+      const cur = owned(ws, c.params[1] ?? '');
+      const b = parseBody(c, UpdateSipContactRequestSchema);
+      const next = { name: b.name ?? cur.name, company: b.company ?? cur.company, note: b.note ?? cur.note, phones: b.phones ? b.phones.phones : cur.phones };
+      const r = checkContact(this.state.sipContacts, ws, cur.id, next, this.sipSettingsOf(ws).callerId);
+      if ('kind' in r) throw fail(r);
+      const contact = makeContact({ id: cur.id, ws, name: next.name.trim(), company: next.company.trim(), note: next.note.trim(), phones: r.phones.map((p) => [p.number, p.label]), by: me, at: Date.now() });
+      contact.createdBy = cur.createdBy;
+      if (cur.createdAt) contact.createdAt = cur.createdAt;
+      this.state.sipContacts.set(contact.id, contact);
+      sendMsg(c.res, 200, SipContactResponseSchema, { contact });
+    });
+    this.route('DELETE', '/api/workspaces/:id/sip/contacts/:cid', (c) => {
+      const { ws, me, perms } = reader(c);
+      const cur = owned(ws, c.params[1] ?? '');
+      if (cur.createdBy !== me && !has(perms, PERMISSION_BITS.MANAGE_INTEGRATIONS)) throw forbidden('the author or MANAGE_INTEGRATIONS');
+      this.state.sipContacts.delete(cur.id);
+      noContent(c.res);
+    });
+  }
+
+  /** The caller's live personal call (the one a test moves on). */
+  private personalCall(): SipCall | undefined {
+    return [...this.state.sipCalls.values()].reverse().find((x) => x.origin === SipCallOrigin.PERSONAL && isLiveSipStatus(x.status));
+  }
+
+  advanceSipPersonal(status: SipCallStatus = SipCallStatus.ACTIVE, reason = ''): void {
+    const call = this.personalCall();
+    if (!call) throw notFound('no personal call');
+    call.status = status;
+    call.reason = reason;
+    if (status === SipCallStatus.ACTIVE) call.answeredAt = timestampFromMs(Date.now());
+    if (status === SipCallStatus.ENDED || status === SipCallStatus.FAILED) call.endedAt = timestampFromMs(Date.now());
+    this.toUser(call.startedBy, { event: { case: 'sipCallUpdate', value: { call: clone(SipCallSchema, call) } } });
+  }
+
+  private sipPersonalRoutes(): void {
+    // POST: a person with PLACE_CALLS of the workspace, telephony on, one call at a time. The
+    // call's room is the LiveKit room «<prefix>sipout_<call>» of the dev server (no line in it).
+    this.route('POST', '/api/workspaces/:id/sip/calls', async (c) => {
+      const me = this.uid(c);
+      const { ws, m } = this.workspaceFor(c.params[0] ?? '', me);
+      if (m.role === WorkspaceRole.GUEST) throw forbidden('guests do not call');
+      if (!has(workspacePermissions(this.memberRoles(m)), PERMISSION_BITS.PLACE_CALLS)) throw forbidden('PLACE_CALLS required');
+      const settings = this.sipSettingsOf(ws.id);
+      if (!settings.enabled) throw new HttpError(409, ErrorCode.SIP_DISABLED, 'telephony is off');
+      const b = parseBody(c, PlaceSipPersonalCallRequestSchema);
+      const number = normalizeContactNumber(b.number, settings.callerId);
+      if (!number) throw invalid('number', 'number: not a phone number');
+      if (number === MOCK_SIP_RATE_NUMBER) throw new HttpError(429, ErrorCode.SIP_RATE_LIMITED, 'too many calls', '', {}, { 'Retry-After': '600' });
+      if (!numberAllowed(number, settings.allowedPrefixes)) throw new HttpError(422, ErrorCode.SIP_NUMBER_NOT_ALLOWED, 'the number is not allowed');
+      if ([...this.state.sipCalls.values()].some((x) => x.startedBy === me && x.origin === SipCallOrigin.PERSONAL && isLiveSipStatus(x.status))) throw new HttpError(409, ErrorCode.SIP_BUSY, 'already on a call');
+      const id = nextId(this.state, 'file');
+      const call = create(SipCallSchema, {
+        id,
+        workspaceId: ws.id,
+        number,
+        direction: SipCallDirection.OUT,
+        origin: SipCallOrigin.PERSONAL,
+        status: SipCallStatus.DIALING,
+        startedBy: me,
+        startedAt: timestampFromMs(Date.now()),
+        participantIdentity: `sip:${id}`,
+        ...this.callerIdOf(ws.id, number),
+      });
+      this.state.sipCalls.set(id, call);
+      const { user } = this.auth(c);
+      const identity = `sipout_${user.user.id}`;
+      const token = await this.voiceToken({ id: `sipout_${id}` } as Room, identity, user.user.displayName);
+      this.toUser(me, { event: { case: 'sipCallUpdate', value: { call: clone(SipCallSchema, call) } } });
+      sendMsg(c.res, 201, PlaceSipPersonalCallResponseSchema, { call: clone(SipCallSchema, call), join: { url: this.lk.url, token, identity, canSpeak: true } });
+    });
+    this.route('DELETE', '/api/workspaces/:id/sip/calls/:cid', (c) => {
+      const me = this.uid(c);
+      const call = this.state.sipCalls.get(c.params[1] ?? '');
+      if (!call || call.workspaceId !== c.params[0] || call.origin !== SipCallOrigin.PERSONAL) throw notFound('call not found');
+      if (call.startedBy !== me) throw forbidden('not your call');
+      if (!isLiveSipStatus(call.status)) throw conflict('the call is over');
+      call.reason = call.status === SipCallStatus.ACTIVE ? 'hangup' : 'cancelled';
+      call.status = SipCallStatus.ENDED;
+      call.endedAt = timestampFromMs(Date.now());
+      call.endedBy = me;
+      this.toUser(me, { event: { case: 'sipCallUpdate', value: { call: clone(SipCallSchema, call) } } });
+      sendMsg(c.res, 200, SipCallResponseSchema, { call: clone(SipCallSchema, call) });
+    });
+  }
+
   private sipJournalRoutes(): void {
     const reader = (c: Ctx): { ws: string; me: string; all: boolean } => {
       const me = this.uid(c);
@@ -6527,6 +6760,8 @@ class MockImpl {
   private sipRoutes(): void {
     this.pbxRoutes();
     this.sipJournalRoutes();
+    this.sipContactRoutes();
+    this.sipPersonalRoutes();
     this.route('GET', '/api/workspaces/:id/sip', (c) => {
       const { wsId } = this.sipAdmin(c);
       sendMsg(c.res, 200, GetSipSettingsResponseSchema, { settings: this.sipSettingsOf(wsId) });
