@@ -282,7 +282,11 @@ func (s *Service) hangupPersonal(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 	slog.InfoContext(ctx, "sip: personal call ended", "call", cid, "by", me, "reason", out.Reason)
-	httpx.Write(w, http.StatusOK, &v1.SipCallResponse{Call: FillCaller(pbconv.SipCall(out), s.callerOf(ctx, wsID, out.PeerE164))})
+	pb := FillCaller(pbconv.SipCall(out), s.callerOf(ctx, wsID, out.PeerE164))
+	if auth.MustFromContext(ctx).IsBot { // a bot never learns whose phone a number is (ADR-0077)
+		pb = forBot(pb)
+	}
+	httpx.Write(w, http.StatusOK, &v1.SipCallResponse{Call: pb})
 	return nil
 }
 
