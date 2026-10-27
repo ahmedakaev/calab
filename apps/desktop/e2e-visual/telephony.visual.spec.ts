@@ -343,3 +343,59 @@ test('telephony-incoming', async ({ open, win, mock, shot }) => {
   await expect(parked).toHaveCount(0);
   await expect(sidebar.locator('li[data-on-phone]')).toHaveCount(1); // Борис is still on his call
 });
+
+// ADR-0137 «Телефония» (T3): the section on the rail — the tile with my missed calls, «Недавние»
+// (a call ringing now, the day groups, a missed one in red, an outbound one to a company, a long
+// name with a long company, a hidden number, an employee's phone), the detail of a call through
+// the main menu, a group «по очереди» and a transfer (the floating panel at 960, its rings
+// unfolded), a live call moving on through SIP_JOURNAL_ENTRY, the empty journal. The light theme
+// takes the detail only.
+test('telephony-section', async ({ open, win, mock, shot, theme }) => {
+  await open();
+  mock.seedSipExchange();
+  mock.seedSipJournal();
+  const tile = win.getByTestId('section-telephony');
+  await expect(tile.getByTestId('section-telephony-count')).toHaveText('2');
+  // The frame is about the rail: the room feed behind it settles its scroll on its own time.
+  if (DARK(theme)) await checkpoint(shot, 'telephony-rail', { mask: [win.locator('[data-virtuoso-scroller]')] });
+  await tile.click();
+  const recents = win.getByTestId('tel-recents');
+  await expect(recents.getByTestId('tel-group').first()).toHaveText('Сейчас');
+  await expect(recents.getByTestId('tel-row').first()).toContainText('+7 916 700-11-22');
+  // Looking at «Недавние» clears the badge (journal/seen).
+  await expect(tile.getByTestId('section-telephony-count')).toHaveCount(0);
+  const missed = recents.getByTestId('tel-row').filter({ hasText: '+7 495 765-43-21' });
+  await expect(missed.getByTestId('tel-row-outcome')).toHaveText('Пропущенный · ждал 1:15 · «Отдел продаж»');
+  await expect(recents.getByTestId('tel-row').filter({ hasText: 'ООО Лютик' }).getByTestId('tel-row-outcome')).toHaveText('Исходящий · Вы · 2:03');
+  if (DARK(theme)) await checkpoint(shot, 'telephony-recents');
+
+  // The detail: menu → key → «Отдел продаж» one by one → Анна answers → transfers to Борис.
+  await recents.getByRole('button', { name: 'Звонок: Анна Петрова' }).click();
+  const detail = win.getByTestId('tel-detail');
+  await expect(detail.getByTestId('tel-detail-name')).toHaveText('Анна Петрова');
+  // The recording (ADR-0131): the player card and «Открыть в Диске».
+  await expect(detail.getByTestId('tel-recording')).toContainText('6:20');
+  if (DARK(theme)) await checkpoint(shot, 'telephony-detail-recording');
+  await expect(detail.getByTestId('tel-step')).toHaveCount(13);
+  await detail.getByTestId('tel-step-rings').first().click();
+  await expect(detail.getByTestId('tel-step-attempts').first()).toContainText('Вера Ким');
+  await detail.getByTestId('tel-step').filter({ hasText: 'переводит' }).scrollIntoViewIfNeeded();
+  await checkpoint(shot, 'telephony-detail-transfer');
+  if (!DARK(theme)) return;
+  await win.keyboard.press('Escape');
+  await expect(detail).toHaveCount(0);
+
+  // SIP_JOURNAL_ENTRY: the ringing call is answered (still «Сейчас»), then ends — it joins «Сегодня».
+  mock.advanceSipJournal(undefined, IDS.users.boris);
+  await expect(recents.getByTestId('tel-row').first().getByTestId('tel-row-outcome')).toHaveText('Разговор: Борис Петров');
+  mock.advanceSipJournal();
+  await expect(recents.getByTestId('tel-group').first()).toHaveText('Сегодня');
+
+  // Nothing yet.
+  await open();
+  mock.seedSipExchange();
+  mock.seedSipJournal({ empty: true });
+  await win.getByTestId('section-telephony').click();
+  await expect(win.getByTestId('tel-empty')).toContainText('Звонков пока нет');
+  await checkpoint(shot, 'telephony-recents-empty');
+});

@@ -233,6 +233,13 @@ import {
   RoomRecordingSchema,
   GetSipSettingsResponseSchema,
   ListSipCallsResponseSchema,
+  ListSipJournalResponseSchema,
+  GetSipJournalEntryResponseSchema,
+  SipJournalEntrySchema,
+  SipCallPartySchema,
+  SipCallEventSchema,
+  SipCallEventKind,
+  SipCallOrigin,
   ListSipActiveCallsResponseSchema,
   SipActiveStep,
   PlaceSipCallRequestSchema,
@@ -560,6 +567,7 @@ import {
   type MockPbx,
   type PbxMembers,
 } from './mock-pbx';
+import { advanceCall, listJournal, mayReadCall, missedCount, seedJournal, type JournalRow } from './mock-journal';
 import { MOCK_SIP_RATE_NUMBER, MOCK_SIP_REFUSED_HOST, MOCK_SIP_UNREACHABLE_HOST, defaultSipSettings, isLiveSipStatus, normalizeCallee, numberAllowed, sipSettingsError } from './mock-sip';
 import {
   ACTIVE_BEFORE_MS,
@@ -771,6 +779,21 @@ export interface MockServer {
    */
   seedSipActiveCalls(): void;
   /**
+   * ADR-0137 «Недавние»: the call journal of «Команда Calab» (mock-journal.ts seedJournal, around
+   * the visual tests' NOW or `base`) with telephony on (seedSipExchange first); `empty` — none.
+   * Анна's missed badge counts from her last «seen» (none yet: 2 missed calls).
+   */
+  seedSipJournal(opts?: { empty?: boolean; base?: number }): void;
+  /** The next GET …/sip/journal pages wait until the returned release is called (the loading state). */
+  holdSipJournal(): () => void;
+  /**
+   * A journal call moves on → SIP_JOURNAL_ENTRY (and SIP_MISSED_CHANGED when it ends missed):
+   * a ringing call is answered by `by`, else it ends. Default: the live call of the fixture.
+   */
+  advanceSipJournal(callId?: string, by?: string): void;
+  /** A new inbound call starts ringing `ringing` (SIP_JOURNAL_ENTRY): its id. */
+  ringSipJournal(number: string, ringing: string[]): string;
+  /**
    * A recording card in the room chat (SYSTEM message, MESSAGE_CREATE) in the given state; the
    * status never advances by itself (unlike a stop through the API).
    */
@@ -958,6 +981,10 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     holdSipPrompt: () => impl.holdSipPrompt(),
     ringSipInbound: (to, number, via) => impl.ringSipInbound(to, number, via),
     seedSipActiveCalls: () => impl.seedSipActiveCalls(),
+    seedSipJournal: (o) => impl.seedSipJournal(o),
+    holdSipJournal: () => impl.holdSipJournal(),
+    advanceSipJournal: (id, by) => impl.advanceSipJournal(id, by),
+    ringSipJournal: (number, ringing) => impl.ringSipJournal(number, ringing),
     injectRecordingCard: (a) => impl.injectRecordingCard(a),
     updateRecordingCard: (id, patch) => impl.updateRecordingCard(id, patch),
     setBirthday: (u, b, card) => impl.setBirthday(u, b, card),
@@ -1874,6 +1901,7 @@ class MockImpl {
         .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id)),
       recordings: [...this.state.recordings.values()].filter((r) => r.workspaceId === wsId && rooms.some((x) => x.id === r.roomId)),
       sipCalls: [...this.state.sipCalls.values()].filter((c) => c.workspaceId === wsId && isLiveSipStatus(c.status) && rooms.some((x) => x.id === c.roomId)),
+      sipMissed: m && m.role !== WorkspaceRole.GUEST ? missedCount(this.state.sipJournal.values(), wsId, userId, this.state.sipSeen.get(`${wsId}|${userId}`) ?? 0) : 0,
       roles: this.rolesOfWs(wsId),
       badges: this.badgesOf(wsId),
       backgrounds: this.backgroundsOf(wsId),
@@ -6364,8 +6392,141 @@ class MockImpl {
     return { wsId: ws.id, me };
   }
 
+  // ------------------------------------------------ the call journal (ADR-0137 §1, mock-journal.ts)
+
+  seedSipJournal(opts: { empty?: boolean; base?: number } = {}): void {
+    const ws = IDS.workspaces.main;
+    this.state.sipJournal.clear();
+    if (!opts.empty) {
+      const boris = this.state.users.get(IDS.users.boris)?.user.phone ?? '';
+      const rows = seedJournal(opts.base ?? Date.parse('2026-01-15T13:30:00+03:00'), {
+        ws,
+        anna: IDS.users.anna,
+        boris: IDS.users.boris,
+        vera: IDS.users.vera,
+        room: IDS.rooms.call,
+        roomName: this.state.rooms.get(IDS.rooms.call)?.name ?? '',
+        borisPhone: normalizeCallee(boris) ?? '+79125550202',
+      });
+      for (const r of rows) if (r.entry.call) this.state.sipJournal.set(r.entry.call.id, r);
+    }
+    // A fresh journal: nobody has looked at it yet.
+    for (const m of this.membersOf(ws)) {
+      this.state.sipSeen.delete(`${ws}|${m.userId}`);
+      this.announceMissed(ws, m.userId);
+    }
+  }
+
+  private sipJournalHold: Promise<void> | null = null;
+
+  holdSipJournal(): () => void {
+    let release = (): void => undefined;
+    this.sipJournalHold = new Promise<void>((r) => {
+      release = () => {
+        this.sipJournalHold = null;
+        r();
+      };
+    });
+    return release;
+  }
+
+  private announceMissed(ws: string, userId: string): void {
+    const count = missedCount(this.state.sipJournal.values(), ws, userId, this.state.sipSeen.get(`${ws}|${userId}`) ?? 0);
+    this.toUser(userId, { event: { case: 'sipMissedChanged', value: { workspaceId: ws, count } } });
+  }
+
+  private announceJournal(r: JournalRow): void {
+    const ws = r.entry.call?.workspaceId ?? '';
+    this.toWorkspace(ws, { event: { case: 'sipJournalEntry', value: { entry: r.entry } } });
+  }
+
+  advanceSipJournal(callId?: string, by = ''): void {
+    const id = callId ?? [...this.state.sipJournal.values()].find((r) => isLiveSipStatus(r.entry.call?.status ?? SipCallStatus.UNSPECIFIED))?.entry.call?.id ?? '';
+    const r = this.state.sipJournal.get(id);
+    if (!r) throw notFound('call not found');
+    // The call's own clock (the fixture lives at the tests' NOW): 20 s after its last step.
+    const last = Math.max(...[r.entry.call?.startedAt, ...r.events.map((e) => e.at)].map((x) => (x ? timestampMs(x) : 0)));
+    const next = advanceCall(r, last + 20_000, by);
+    this.state.sipJournal.set(id, next);
+    this.announceJournal(next);
+    if (next.entry.missed) for (const p of next.entry.parties) this.announceMissed(next.entry.call?.workspaceId ?? '', p.userId);
+  }
+
+  ringSipJournal(number: string, ringing: string[]): string {
+    const ws = IDS.workspaces.main;
+    const id = nextId(this.state, 'file');
+    const row: JournalRow = {
+      entry: create(SipJournalEntrySchema, {
+        call: create(SipCallSchema, { id, workspaceId: ws, number, direction: SipCallDirection.IN, status: SipCallStatus.RINGING, startedAt: timestampFromMs(Date.now()), participantIdentity: `sip:${id}`, ringingUserIds: ringing, via: 'Отдел продаж' }),
+        origin: SipCallOrigin.INBOUND,
+        peerE164: normalizeCallee(number) ?? '',
+        parties: ringing.map((u) => create(SipCallPartySchema, { userId: u, rang: true })),
+        hasEvents: true,
+      }),
+      events: [create(SipCallEventSchema, { seq: 1, kind: SipCallEventKind.STARTED, at: timestampFromMs(Date.now()), digits: '+74951234567', reason: 'direct' })],
+    };
+    this.state.sipJournal.set(id, row);
+    this.announceJournal(row);
+    return id;
+  }
+
+  private sipJournalRoutes(): void {
+    const reader = (c: Ctx): { ws: string; me: string; all: boolean } => {
+      const me = this.uid(c);
+      const { ws, m } = this.workspaceFor(c.params[0] ?? '', me);
+      if (m.role === WorkspaceRole.GUEST) throw forbidden('guests have no journal');
+      return { ws: ws.id, me, all: has(workspacePermissions(this.memberRoles(m)), PERMISSION_BITS.VIEW_JOURNALS) };
+    };
+    const time = (v: string | null, field: string): number | null => {
+      if (!v) return null;
+      const t = Date.parse(v);
+      if (Number.isNaN(t)) throw invalid(field, `${field}: not RFC 3339`);
+      return t;
+    };
+    this.route('GET', '/api/workspaces/:id/sip/journal', async (c) => {
+      const { ws, me, all } = reader(c);
+      const sp = c.url.searchParams;
+      const scope = sp.get('scope') || 'mine';
+      if (scope !== 'mine' && scope !== 'all') throw invalid('scope', 'scope: mine | all');
+      if (scope === 'all' && !all) throw forbidden('VIEW_JOURNALS required');
+      const filter = sp.get('filter') ?? '';
+      if (filter && filter !== 'missed' && filter !== 'in' && filter !== 'out') throw invalid('filter', 'filter: missed | in | out');
+      const user = sp.get('user') ?? '';
+      if (user && scope !== 'all') throw invalid('user', 'user: with scope=all only');
+      const limit = Number(sp.get('limit') || '50');
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw invalid('limit', 'limit: 1..100');
+      if (this.sipJournalHold) await this.sipJournalHold;
+      const page = listJournal(this.state.sipJournal.values(), {
+        ws,
+        me,
+        scope,
+        filter: filter as '' | 'missed' | 'in' | 'out',
+        user,
+        q: sp.get('q') ?? '',
+        from: time(sp.get('from'), 'from'),
+        to: time(sp.get('to'), 'to'),
+        cursor: Number(sp.get('cursor') || '0'),
+        limit,
+      });
+      sendMsg(c.res, 200, ListSipJournalResponseSchema, page);
+    });
+    this.route('POST', '/api/workspaces/:id/sip/journal/seen', (c) => {
+      const { ws, me } = reader(c);
+      this.state.sipSeen.set(`${ws}|${me}`, Date.now());
+      this.announceMissed(ws, me);
+      noContent(c.res);
+    });
+    this.route('GET', '/api/workspaces/:id/sip/journal/:cid', (c) => {
+      const { ws, me, all } = reader(c);
+      const r = this.state.sipJournal.get(c.params[1] ?? '');
+      if (!r || r.entry.call?.workspaceId !== ws || !mayReadCall(r, me, all)) throw notFound('call not found');
+      sendMsg(c.res, 200, GetSipJournalEntryResponseSchema, { entry: r.entry, events: r.events, ...(r.recording ? { recording: r.recording } : {}) });
+    });
+  }
+
   private sipRoutes(): void {
     this.pbxRoutes();
+    this.sipJournalRoutes();
     this.route('GET', '/api/workspaces/:id/sip', (c) => {
       const { wsId } = this.sipAdmin(c);
       sendMsg(c.res, 200, GetSipSettingsResponseSchema, { settings: this.sipSettingsOf(wsId) });

@@ -79,7 +79,7 @@ async function toRoot(page: Page): Promise<void> {
 }
 
 /** A tab of the bottom tab bar (its root). */
-async function tab(page: Page, name: 'chats' | 'dms' | 'boards' | 'calendar' | 'disk' | 'wiki' | 'canvas' | 'profile'): Promise<void> {
+async function tab(page: Page, name: 'chats' | 'dms' | 'boards' | 'calendar' | 'disk' | 'wiki' | 'canvas' | 'telephony' | 'profile'): Promise<void> {
   await toRoot(page);
   const pinned = page.getByTestId(`phone-tab-${name}`);
   if ((await pinned.count()) > 0) {
@@ -1654,6 +1654,120 @@ test('m-settings-bots', async ({ page }) => {
 
 // ADR-0117, CBF-77: «Телефония» on a phone — the tabs as a picker button (five tabs, docs/08
 // «Choice»), the live calls, the numbers, a group form, a menu form.
+/**
+ * ADR-0137 «Телефония» (T3) on a phone: the section's row in «Ещё» with my missed calls; «Недавние»
+ * (a call ringing now, a missed one, an outbound one, a long name with a long company, a number
+ * without a contact, a hidden number), the loading and empty states, «Пропущенные», the filter card
+ * and its chips, a row's swipe and long-press menu, the detail of a transfer (route unfolded), of a
+ * missed call, of an outbound call and of a call from before the journal; the tab pinned to the bar.
+ */
+async function phoneRecents(page: Page): Promise<void> {
+  await toRoot(page);
+  await page.getByTestId('phone-tab-more').tap();
+  const more = page.getByTestId('more-row-telephony');
+  await expect(more).toContainText('2');
+  await checkpoint(page, 'm-tel-more');
+  await more.tap();
+  const root = page.getByTestId('phone-telephony');
+  await expect(root.getByTestId('tel-group').first()).toHaveText('Сейчас');
+  await expectNoFieldFocus(page, 'telephony recents');
+  await checkpoint(page, 'm-tel-recents');
+  const segment = (name: string): Locator => root.getByTestId('tel-segment').getByRole('radio', { name });
+
+  // «Пропущенные»: the six static rows while the page loads, then the two missed calls.
+  const release = mock.holdSipJournal();
+  await segment('Пропущенные').tap();
+  await expect(root.getByTestId('tel-skeleton')).toBeVisible();
+  await checkpoint(page, 'm-tel-recents-loading');
+  release();
+  await expect(root.getByTestId('tel-row')).toHaveCount(2);
+  await checkpoint(page, 'm-tel-missed');
+  await segment('Недавние').tap();
+  await expect(root.getByTestId('tel-group').first()).toHaveText('Сейчас');
+
+  // The funnel → the centred card; the set filters as chips under the search.
+  await root.getByTestId('tel-filter-open').tap();
+  const card = page.getByTestId('tel-filter-card');
+  await expect(card).toBeVisible();
+  await checkpoint(page, 'm-tel-filter-card');
+  await card.getByRole('radio', { name: 'Входящие' }).tap();
+  await card.getByRole('radio', { name: '7 дней' }).tap();
+  await page.getByTestId('tel-filter-done').tap();
+  await expect(card).toHaveCount(0);
+  await expect(root.getByTestId('tel-chips')).toBeVisible();
+  await checkpoint(page, 'm-tel-filter-chips');
+  await root.getByTestId('tel-chip-direction').tap();
+  await root.getByTestId('tel-chip-period').tap();
+  await expect(root.getByTestId('tel-chips')).toHaveCount(0);
+
+  // A row: the left swipe («Подробнее» · «Копировать»), the long-press menu.
+  const lutik = root.getByTestId('tel-row').filter({ hasText: 'ООО Лютик' });
+  await swipeLeft(lutik);
+  await expect(root.getByTestId('tel-swipe')).toBeVisible();
+  await checkpoint(page, 'm-tel-row-swipe');
+  await lutik.getByTestId('tel-row-tap').tap();
+  await expect(root.getByTestId('tel-swipe')).toHaveCount(0);
+  await longPress(lutik.getByTestId('tel-row-tap'));
+  await expectMenuCard(page, 'm-tel-row-menu', true);
+
+  // The details (pushed screens, «‹» back to the list).
+  const detail = page.getByTestId('tel-detail');
+  const openDetail = async (text: string): Promise<void> => {
+    await root.getByTestId('tel-row').filter({ hasText: text }).getByTestId('tel-row-info').tap();
+    await expect(detail.getByTestId('tel-step').first()).toBeVisible();
+  };
+  await openDetail('Анна Петрова');
+  await expect(detail.getByTestId('tel-detail-name')).toHaveText('Анна Петрова');
+  await expect(detail.getByTestId('tel-recording')).toContainText('6:20');
+  await expect(detail.getByTestId('tel-detail-recording')).toBeVisible();
+  await checkpoint(page, 'm-tel-detail-recording');
+  await detail.getByTestId('tel-step-rings').first().tap();
+  await expect(detail.getByTestId('tel-step-attempts')).toContainText('Вера Ким');
+  await detail.getByTestId('tel-step').filter({ hasText: 'переводит' }).scrollIntoViewIfNeeded();
+  await checkpoint(page, 'm-tel-detail-transfer');
+  await page.getByTestId('phone-back').tap();
+  await openDetail('+7 495 765-43-21');
+  await checkpoint(page, 'm-tel-detail-missed');
+  await page.getByTestId('phone-back').tap();
+  await openDetail('ООО Лютик');
+  await checkpoint(page, 'm-tel-detail-outbound');
+  await page.getByTestId('phone-back').tap();
+  // A call from before the journal: the route parsed, no times (the end of the list).
+  await root.locator('[data-virtuoso-scroller]').evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await openDetail('+7 495 111-22-33');
+  await detail.getByTestId('tel-route-legacy').scrollIntoViewIfNeeded();
+  await expect(detail.getByTestId('tel-route-legacy')).toBeVisible();
+  await checkpoint(page, 'm-tel-detail-legacy');
+  await page.getByTestId('phone-back').tap();
+
+  // Nothing yet / nothing missed.
+  mock.seedSipJournal({ empty: true });
+  await segment('Пропущенные').tap();
+  await expect(root.getByTestId('tel-empty')).toContainText('Пропущенных нет');
+  await checkpoint(page, 'm-tel-missed-empty');
+  await segment('Недавние').tap();
+  await expect(root.getByTestId('tel-empty')).toContainText('Звонков пока нет');
+  await checkpoint(page, 'm-tel-recents-empty');
+
+}
+
+// «Телефония» pinned to the bar (in place of «Календарь»): the tab with my missed calls.
+test('m-telephony-pinned', async ({ page }) => {
+  await signedIn(page, { phonePinnedTabs: ['chats', 'dms', 'boards', 'telephony'] });
+  mock.seedSipExchange();
+  mock.seedSipJournal();
+  await expect(page.getByTestId('phone-tab-telephony')).toContainText('2');
+  await checkpoint(page, 'm-tel-pinned');
+});
+
+test('m-telephony-recents', async ({ page }) => {
+  test.setTimeout(300_000);
+  await signedIn(page);
+  mock.seedSipExchange();
+  mock.seedSipJournal();
+  await phoneRecents(page);
+});
+
 test('m-telephony', async ({ page }) => {
   await signedIn(page);
   mock.seedSipExchange();
