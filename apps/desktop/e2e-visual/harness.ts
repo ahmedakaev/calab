@@ -1,9 +1,12 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { create } from '@bufbuild/protobuf';
+import { TimestampSchema } from '@bufbuild/protobuf/wkt';
+import { TaskAssigneeSchema } from '@calaba/protocol';
 import AxeBuilder from '@axe-core/playwright';
 import { _electron as electron, expect, type ElectronApplication, type Locator, type Page } from '@playwright/test';
-import { startMockServer, type MockServer } from '../e2e-support/mock-server';
+import { IDS, startMockServer, type MockServer } from '../e2e-support/mock-server';
 
 /**
  * Harness for the design tests (docs/08, «Тесты дизайна»): the production renderer (out/)
@@ -336,4 +339,58 @@ export async function checkpoint(s: Shot, name: string, opts: { mask?: Locator[]
   });
   await expectLayout(s.page, `${name} (${s.theme}, ${s.viewport.width})`);
   if (opts.axe !== false) await expectAccessible(s.page, `${name} (${s.theme}, ${s.viewport.width})`);
+}
+
+// ---------------------------------------------------------------- day separators and assignee stacks (#87, #92)
+
+/** Messages over several days (NOW = 15 Jan 2026 13:30 MSK): [days back, hour MSK, text]. */
+const DAYS_THREAD: Array<[number, number, string]> = [
+  [400, 10, 'Договор подписан в прошлом году'],
+  [3, 23, 'Отправил договор на согласование'],
+  [3, 23.2, 'Жду ответа'],
+  [1, 9, 'Вчера утром юристы вернули правки'],
+  [0, 9, 'Сегодня внёс правки, смотрите'],
+  [0, 10, 'Ок, принято'],
+];
+
+/** Writes DAYS_THREAD into `roomId` with their own dates (call before the app loads the room); `onlyAuthor` keeps unread badges as they are. */
+export function seedDays(mock: MockServer, roomId: string, onlyAuthor?: string): void {
+  for (const [days, hour, text] of DAYS_THREAD) {
+    const day = new Date(NOW.getTime() - days * 86_400_000);
+    day.setUTCHours(0, 0, 0, 0);
+    const m = mock.injectMessage({ roomId, authorId: onlyAuthor ?? (days % 2 ? IDS.users.boris : IDS.users.anna), content: text });
+    m.createdAt = create(TimestampSchema, { seconds: BigInt(Math.floor((day.getTime() + (hour - 3) * 3_600_000) / 1000)) });
+  }
+}
+
+/** CAL-1 one assignee, CAL-2 two, CAL-4 five (written straight into the mock: not everyone sees the board). */
+export function seedAssigneeCounts(mock: MockServer): void {
+  const u = IDS.users;
+  const set = (key: string, ids: string[]): void => {
+    const t = mock.boards.taskByKey(key);
+    if (!t) throw new Error(`no ${key}`);
+    t.task.assignees = ids.map((userId, i) => create(TaskAssigneeSchema, { userId, isLead: i === 0, assignedAt: create(TimestampSchema, { seconds: BigInt(1_768_000_000 + i * 60) }) }));
+  };
+  set('CAL-1', [u.anna]);
+  set('CAL-2', [u.anna, u.boris]);
+  set('CAL-4', [u.anna, u.boris, u.vera, u.grigory, u.dina]);
+}
+
+/** The three stacks (CAL-1/2/4): one circle height, the same distance from the card's right edge, «+3» on the five. */
+export async function expectAssigneeStacks(page: Page): Promise<void> {
+  const stacks = page.locator('[data-testid=task-card], [data-testid=list-row]').filter({ hasText: /Экспорт доски|Тёмная тема|Карточки задач/ }).getByTestId('assignee-stack');
+  // The kanban mounts only the columns near the viewport: the card with five people and at least one more.
+  await expect.poll(() => stacks.count()).toBeGreaterThanOrEqual(2);
+  await expect(page.getByTestId('assignee-more')).toHaveText('+3');
+  const more = await page.getByTestId('assignee-more').boundingBox();
+  expect([Math.round(more?.width ?? 0), Math.round(more?.height ?? 0)]).toEqual([20, 20]);
+  const boxes = await stacks.evaluateAll((els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect();
+      const c = e.closest('[data-testid=task-card],[data-testid=list-row]')?.getBoundingClientRect();
+      return { h: Math.round(r.height), right: Math.round((c?.right ?? 0) - r.right) };
+    }),
+  );
+  expect(new Set(boxes.map((b) => b.h)).size, JSON.stringify(boxes)).toBe(1);
+  expect(new Set(boxes.map((b) => b.right)).size, JSON.stringify(boxes)).toBe(1);
 }

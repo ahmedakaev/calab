@@ -7,7 +7,7 @@ import { FREE_PLAN_LIMITS, defaultSettings, mockPdf, ts } from '../e2e-support/f
 import { CODE_FIXTURE, IDS, MOCK_GPTUNNEL_CODE, MOCK_GPTUNNEL_WEB, PASSWORD, RECORDING_FIXTURE, slowWebpAnimation, type MockServer } from '../e2e-support/mock-server';
 import { encodePng } from '../e2e-support/png';
 import { expect, test } from './app';
-import { NOW, checkpoint, joinVoice, login, settle } from './harness';
+import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, settle } from './harness';
 import { DAY, seedDay } from './calendarWeb';
 import { startPublisher } from './publisher';
 
@@ -50,6 +50,7 @@ const KEY = new Set([
   'onboarding-layout',
   'welcome',
   'main-chat',
+  'dm-chat-days',
   'chat-inline-buttons',
   'sidebar-drag',
   'chat-hover-actions',
@@ -173,10 +174,12 @@ const KEY = new Set([
   'members-admissions',
   // Task boards (ADR-0042 §5).
   'boards-kanban',
+  'boards-kanban-assignees',
   'boards-create-menu',
   'boards-task',
   // «Комментарии | История» of the task panel (ADR-0091).
   'boards-task-comments',
+  'boards-task-comments-days',
   'boards-task-history',
   'boards-list',
   'boards-filter',
@@ -790,6 +793,15 @@ test('dm-chat', async ({ open, win, mock, shot }) => {
   await win.locator('[data-virtuoso-scroller]').first().evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
   await settle(win);
   await checkpoint(shot, 'dm-chat');
+  // #87: day pills in a chat (Сегодня / Вчера / «12 января» / the other year), each once.
+  seedDays(mock, IDS.dms.grigory); // a DM not opened yet: its history comes from the mock when opened
+  await list.getByRole('button', { name: /Григорий/ }).click();
+  await expect(win.getByRole('separator').filter({ hasText: 'Вчера' })).toHaveCount(1);
+  await expect(win.getByRole('separator').filter({ hasText: '12 января' })).toHaveCount(1);
+  await expect(win.getByRole('separator').filter({ hasText: '2024' })).toHaveCount(1);
+  await settle(win);
+  await win.locator('[data-virtuoso-scroller]').first().evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await checkpoint(shot, 'dm-chat-days', { axe: false });
 });
 
 /**
@@ -3996,9 +4008,15 @@ async function boardsMode(win: Page, mock: MockServer): Promise<void> {
 /** The kanban: the boards column, statuses with counts, cards with every chip (overdue CAL-3). */
 test('boards-kanban', async ({ open, win, mock, shot }) => {
   await open();
+  seedAssigneeCounts(mock); // #92: CAL-1 / CAL-2 / CAL-4 with 1 / 2 / 5 assignees (after open(): it resets the mock)
   await mainWindow(win, mock);
   await boardsMode(win, mock);
   await checkpoint(shot, 'boards-kanban');
+  // The third column («В работе», CAL-4 with five people) is past the 960 px edge: scroll the board sideways.
+  await win.getByTestId('kanban').evaluate((el) => [el, ...el.querySelectorAll<HTMLElement>('*')].forEach((e) => getComputedStyle(e).overflowX === 'auto' && e.scrollWidth > e.clientWidth && (e.scrollLeft = 320)));
+  await expect(win.getByTestId('task-card').filter({ hasText: 'Карточки задач' })).toBeVisible();
+  await expectAssigneeStacks(win);
+  await checkpoint(shot, 'boards-kanban-assignees', { axe: false });
 
   // CBF-58: the column's «+» — «Создать задачу», the boards to create in, a separator, category / board.
   await win.getByTestId('section-create-board').click();
@@ -4164,6 +4182,8 @@ test('boards-task', async ({ open, win, mock, shot }) => {
 /** CAL-3's panel at its lower section: the «Комментарии» tab (the default) with the composer. */
 test('boards-task-comments', async ({ open, win, mock, shot }) => {
   await open();
+  const cal4 = mock.boards.taskByKey('CAL-4');
+  if (cal4) seedDays(mock, cal4.task.roomId); // #87: CAL-4's comments over several days (after open(): it resets the mock)
   await mainWindow(win, mock);
   await boardsMode(win, mock);
   await win.getByTestId('task-card').filter({ hasText: 'CAL-3' }).getByTestId('card-title').click();
@@ -4173,6 +4193,15 @@ test('boards-task-comments', async ({ open, win, mock, shot }) => {
   await expect(panel.locator('[data-message-id]')).toHaveCount(2);
   await section.evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await checkpoint(shot, 'boards-task-comments');
+  // #87: another task whose comments span several days: the same pills as in the chat.
+  await win.getByTestId('boards-list').getByTestId('board-row').first().click(); // the board again: the panel closes
+  await expect(panel).toHaveCount(0);
+  await win.getByTestId('task-card').filter({ hasText: 'CAL-4' }).getByTestId('card-title').click();
+  const feed = win.getByTestId('activity-feed');
+  await expect(feed.getByRole('separator').filter({ hasText: 'Вчера' }).first()).toBeVisible();
+  await expect(feed.getByRole('separator').filter({ hasText: '2024' })).toHaveCount(1);
+  await feed.getByText('Ок, принято').scrollIntoViewIfNeeded();
+  await checkpoint(shot, 'boards-task-comments-days', { axe: false });
 });
 
 /**

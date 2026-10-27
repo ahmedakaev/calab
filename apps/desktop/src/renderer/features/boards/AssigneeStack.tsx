@@ -19,7 +19,7 @@ export const AssigneeStack = memo(function AssigneeStack({ workspaceId, assignee
   }, [assignees]);
   const hidden = more ? assignees.filter((a) => !shown.includes(a)) : [];
   return (
-    <span className="flex items-center -space-x-1.5" data-testid="assignee-stack">
+    <span className="flex items-center -space-x-1.5" data-testid="assignee-stack" aria-hidden>
       {shown.map((a) => (
         <span key={a.userId} className={`relative shrink-0 rounded-full ${RING}`} title={a.note ? `${memberName(workspaceId, a.userId)} — ${a.note}` : memberName(workspaceId, a.userId)}>
           <MemberAvatar workspaceId={workspaceId} userId={a.userId} size={20} />

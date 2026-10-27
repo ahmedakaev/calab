@@ -5,7 +5,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { AiState, FormerMemberReason, Plan, RecordingStatus, WorkspaceRole } from '@calaba/protocol';
 import { ts } from '../e2e-support/fixtures';
 import { CANVAS_PUBLIC_CODE, CODE_FIXTURE, IDS, MOCK_GPTUNNEL_WEB, WIKI_PUBLIC_CODE, startMockServer, type MockServer } from '../e2e-support/mock-server';
-import { expectAccessible, layoutProblems, NOW, PASSWORD, settle } from './harness';
+import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, settle } from './harness';
 import { seedDay } from './calendarWeb';
 
 /**
@@ -360,6 +360,7 @@ test('m-onboarding', async ({ page }) => {
 // ---------------------------------------------------------------- the app
 
 test('m-chat', async ({ page }) => {
+  seedDays(mock, IDS.rooms.dev); // #87: messages over several days in «разработка»
   await signedInRoom(page);
   await expect(page.getByTestId('composer')).toBeVisible();
   await expectNoFieldFocus(page, 'first room');
@@ -369,6 +370,11 @@ test('m-chat', async ({ page }) => {
   // Switching rooms from the list does not focus the composer either.
   await openRoom(page, /^разработка/);
   await expectNoFieldFocus(page, 'room switch');
+  // #87: day pills in the feed (Сегодня / Вчера / «12 января» / the other year), none twice.
+  await feedToBottom(page);
+  await expect(page.getByRole('separator').filter({ hasText: 'Вчера' }).first()).toBeVisible();
+  await expect(page.getByRole('separator').filter({ hasText: 'Сегодня' }).first()).toBeVisible();
+  await checkpoint(page, 'm-chat-days', { main: true });
   // A long room name: the header's buttons keep their size and place.
   await openRoom(page, /очень-длинное/);
   await checkpoint(page, 'm-chat-long-name', { main: true, snapshot: false });
@@ -986,6 +992,7 @@ test('m-my-tasks', async ({ page }) => {
 // Task boards on a phone (ADR-0042 §5): the «Доски» tab, the list by default, the task full screen.
 test('m-boards-list', async ({ page }) => {
   mock.setClock(NOW.getTime());
+  seedAssigneeCounts(mock); // #92: CAL-1 / CAL-2 / CAL-4 with 1 / 2 / 5 assignees
   await signedIn(page);
   // The «Доски» tab (ADR-0073, owner 06.10): the list of the open workspace, a board is pushed.
   await tab(page, 'boards');
@@ -997,6 +1004,8 @@ test('m-boards-list', async ({ page }) => {
   await expect(page.getByTestId('phone-tabbar')).toHaveCount(0);
   await expect(page.getByTestId('list-view')).toBeVisible();
   await checkpoint(page, 'm-boards-list');
+  await expectAssigneeStacks(page);
+  await checkpoint(page, 'm-boards-assignees');
   // «Архив задач» (owner 18.10): archive two tasks from their screens, then the board's «…» → the archive; both are restored after.
   for (const key of ['CAL-2', 'CAL-4']) {
     await page.getByTestId('list-row').filter({ hasText: key }).tap();
@@ -1070,11 +1079,21 @@ test('m-boards-smart', async ({ page }) => {
 
 test('m-boards-task', async ({ page }) => {
   mock.setClock(NOW.getTime());
+  const cal4 = mock.boards.taskByKey('CAL-4');
+  if (cal4) seedDays(mock, cal4.task.roomId); // #87: CAL-4's comments over several days
   await signedIn(page);
   // The «Доски» tab (ADR-0073, owner 06.10): the list of the open workspace, a board is pushed.
   await tab(page, 'boards');
   const nav = page.getByTestId('phone-boards');
   await nav.getByTestId('board-row').filter({ hasText: 'Разработка' }).getByRole('button').first().tap();
+  // #87: a task whose comments span several days shows the chat's day pills.
+  await page.getByTestId('list-row').filter({ hasText: 'CAL-4' }).getByText('Карточки задач').tap();
+  const feed = page.getByTestId('activity-feed');
+  await expect(feed.getByRole('separator').filter({ hasText: 'Вчера' }).first()).toBeVisible();
+  await expect(feed.getByRole('separator').filter({ hasText: '2024' })).toHaveCount(1);
+  await feed.getByText('Ок, принято').scrollIntoViewIfNeeded();
+  await checkpoint(page, 'm-boards-task-days');
+  await page.getByTestId('task-panel').getByTestId('phone-back').tap();
   // The title, not the row's centre (that is the due date cell, which opens its menu).
   await page.getByTestId('list-row').filter({ hasText: 'CAL-3' }).getByText('Эхо в звонке').tap();
   const panel = page.getByTestId('task-panel');
