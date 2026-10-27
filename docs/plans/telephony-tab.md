@@ -50,10 +50,14 @@ ADR: [0137 Раздел «Телефония»](../adr/0137-telephony-section.md
 
 ## T1 — Журнал на сервере (Opus)
 
-**Что.** ADR-0137 §1: `origin`, `peer_e164`, `sip_call_events`, `sip_call_parties`, `journal_days`,
+**Статус: сделан** (ветка `feat/telephony-journal-t1`). Отличия от плана — в ADR-0137: срок хранения и
+лимиты исходящих — `PUT …/sip/policy` (`retention_months`, `out_per_hour`, `out_per_user_hour`; решения
+владельца 27.10), `missed` хранится в строке звонка, события вне машины нумеруются с 1000001.
+
+**Что.** ADR-0137 §1: `origin`, `peer_e164`, `sip_call_events`, `sip_call_parties`, `retention_months`,
 `sip_seen_at`; эмиссия событий из машины входящих (`InCall.Seq`, `Effects.Events`, `c.log`), из исходящих
 комнатных звонков и из записи; запись событий и участников в той же транзакции, что строка, до сохранения
-Valkey; `ParseLegacyRoute`; REST `journal`, `journal/{cid}`, `journal/seen`, `journal-settings`;
+Valkey; `ParseLegacyRoute`; REST `journal`, `journal/{cid}`, `journal/seen`, `policy`;
 `SIP_JOURNAL_ENTRY` и `SIP_MISSED_CHANGED` с фильтром получателей; `WorkspaceSnapshot.sip_missed`;
 часовой воркер хранения. UI не трогает; старый `GET …/calls` без изменений.
 
@@ -66,7 +70,8 @@ Valkey; `ParseLegacyRoute`; REST `journal`, `journal/{cid}`, `journal/seen`, `jo
 - `apps/server/internal/sip/`: `machine.go`, `transfer.go`, `dial.go` (только `step` → `log`), `inbound.go`
   (`apply`: события/участники в транзакции), `calls.go` (события исходящих), новые `events.go`
   (типы, `log`, legacy-разбор), `journal.go` (REST, видимость, курсор), `retention.go` (воркер).
-- `apps/server/internal/recording/phone.go` — вызов `JournalSink` (интерфейс в `sip`, реализация
+- `apps/server/internal/recording/phone.go` — вызов `JournalSink` (интерфейс в `recording`, реализация —
+  `sip.Service`,
   подключается в `internal/app/app.go`).
 - `apps/server/internal/gateway/hub.go` (фильтр `VIEW_JOURNALS` + каналы участников), `internal/app/app.go`
   (маршруты, воркер), `identityroutes.go`, `botroutes.go`, справочник бота (`_routes.json`, события).
@@ -103,8 +108,9 @@ cp1251, предпросмотр), нормализация (+ правило 10
 `User.phone` сотрудника → номер, поля `SipCall.caller_name/caller_company/contact_id/caller_user_id` в
 `SIP_INBOUND_RING`/`SIP_CALL_UPDATE`, текст пуша; имена в `SipJournalEntry` (T1 отдаёт пустые); личный
 исходящий: `POST`/`DELETE …/sip/calls[/{cid}]`, комната `sipout_*`, набор после входа звонящего, 15 с на
-вход, занятость, `lost`, запись исходящих этой комнаты, события журнала; лимиты — **прежние 20/ч** под
-константой, готовые к ответу владельца (вопрос 3).
+вход, занятость, `lost`, запись исходящих этой комнаты, события журнала; лимиты — политика пространства
+из T1 (`Service.takeOutbound`: `out_per_hour` / `out_per_user_hour`, по умолчанию 120 / 30); контакты —
+удаление по `retention_months` (правило — ADR-0137 «Хранение», крючок в `sip/retention.go`).
 
 **Пути.**
 - `proto/calaba/v1/sip.proto` (контакты, `PlaceSipPersonalCallRequest/Response`, поля `SipCall`),
@@ -238,7 +244,7 @@ cp1251, предпросмотр), нормализация (+ правило 10
 по частям, `RecordingCard`, `ActiveCalls` → блок «Сейчас» уже в T3) переезжают в
 `features/telephony/settings/**` (`git mv` + разбиение на страницы; **формы, проверки и API не
 меняются**); группа «Настройки» в колонке и ⚙ на телефоне; новая страница «Хранение журнала»
-(`journal-settings`); видимость раздела для `MANAGE_INTEGRATIONS` без подключения (пустое состояние
+(`PUT …/sip/policy`: срок хранения 1/3/6 мес., 1/2/3 года и лимиты исходящих); видимость раздела для `MANAGE_INTEGRATIONS` без подключения (пустое состояние
 «Подключите SIP-провайдера») и после понижения тарифа (`PlanLock`); пункт `telephony` удалён из
 `WorkspaceSettings.tsx`, поиск по настройкам и старые deep-link ведут в раздел, «Тариф» ссылается на
 раздел. Телефон: список-вглубь (строки 52 px со значениями), экраны форм с липким «Сохранить» внизу,
@@ -285,5 +291,6 @@ cp1251, предпросмотр), нормализация (+ правило 10
 
 - Релизный агент: CHANGELOG «Коротко» (раздел «Телефония», контакты, звонок из раздела, подробный журнал),
   `docs/13-usage.md` — как обычно. Старый `GET …/calls` — удалить через два релиза (строка в docs/12).
-- Ответы владельца на вопросы ADR-0137 (срок хранения, текст о ПДн, лимиты) — отдельными мелкими
-  задачами: значение по умолчанию `journal_days`, текст лендинга, константы лимитов.
+- Текст о персональных данных (номера третьих лиц в журнале и книге: политика/оферта, подсказка в
+  разделе) — отдельный этап (владелец 27.10), черновик на согласование владельцу. Срок хранения и
+  лимиты решены и сделаны в T1.

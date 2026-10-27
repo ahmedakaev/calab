@@ -155,6 +155,8 @@ BOARD_RULE_DELETE             { workspace_id, board_id, rule_id } — (93) пр�
 TASK_GIT_LINKS_UPDATE         { workspace_id, board_id, task_id, links, count } — (94) Git-связи задачи (все, ≤ 50) изменились; зрителям доски и приглашённым по карточке (ADR-0059); рядом `TASK_UPDATE` (`git_links_count`) и `TASK_ACTIVITY` (`kind = git`)
 SIP_CALL_UPDATE               { call: SipCall } — телефонный звонок комнаты начат или сменил статус (ADR-0046); в READY — WorkspaceSnapshot.sip_calls (живые)
 SIP_CALLS_CHANGED             { workspace_id } — (107) живые звонки пространства изменились: начался, перешёл в меню / группу, ответили, закончился (ADR-0128); без деталей — клиент перечитывает `GET /api/workspaces/{id}/sip/calls`; участникам с `MANAGE_INTEGRATIONS` (не гостям, не ботам)
+SIP_JOURNAL_ENTRY             { entry: SipJournalEntry } — (113) строка журнала звонков: звонок появился, ответили / перевели, закончился (ADR-0137 §1); канал пространства, сессиям с `VIEW_JOURNALS` (комната звонка, если есть, видна) и участникам звонка (`entry.parties`), каждой один раз; не гостям, не ботам (они читают `GET …/sip/journal`)
+SIP_MISSED_CHANGED            { workspace_id, count } — (114) бейдж пропущенных звонков участника (≤ 999): пропущен звонок, который ему звонил, или он открыл «Недавние» на другом устройстве (`POST …/sip/journal/seen`); канал пользователя; в READY — WorkspaceSnapshot.sip_missed
 WORKSPACE_APP_UPSERT          { app: WorkspaceApp } — веб-приложение пространства добавлено / изменено / перенесено (ADR-0050; перенумерация — по событию на каждое); в READY — WorkspaceSnapshot.apps
 WORKSPACE_APP_DELETE          { workspace_id, app_id } — приложение удалено: клиент убирает иконку, десктоп закрывает вид и чистит данные сайта
 ```

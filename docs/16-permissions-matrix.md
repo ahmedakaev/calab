@@ -212,6 +212,10 @@
 | Позвонить на номер из комнаты (ADR-0046) | `PLACE_CALLS` + `VIEW_ROOM` + `CONNECT` room (по умолчанию ни у кого), не гость, в звонке этой комнаты, `Workspace.sip_enabled`; боты — так же | `sip.place` | — |
 | Положить телефонную линию | звонивший или `MUTE_MEMBERS` room (не гость) | `sip.hangup` | — |
 | Настройки SIP, проверка подключения | `MANAGE_INTEGRATIONS` ws (ADR-0048; не гость); боты — так же (ADR-0109) | `sip.manage` | — |
+| Срок хранения журнала, лимиты исходящих (`PUT …/sip/policy`, ADR-0137) | `MANAGE_INTEGRATIONS` ws (не гость), тариф телефонии; боты — так же | `sip.putPolicy` | — |
+| Свои звонки в журнале раздела (`GET …/sip/journal?scope=mine`, деталь своего звонка, `…/journal/seen`) | участник, не гость (звонил, ему звонили, ответил, переводил); боты — так же | `sip.listJournal`, `sip.journalEntry`, `sip.journalSeen` | — |
+| Все звонки раздела, фильтр по сотруднику (`scope=all`, `user=`) | `VIEW_JOURNALS` ws (не гость); звонки комнат, которых не видно, пропускаются; деталь чужого звонка без бита — 404 | `sip.listJournal`, `sip.journalEntry` | — |
+| Запись разговора в детали звонка | `DISK_VIEW` на файл записи (не в корзине), иначе поля нет | `sip.recordingFor` | — |
 
 ## Интеграции и боты
 
