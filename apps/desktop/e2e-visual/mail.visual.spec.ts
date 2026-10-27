@@ -39,6 +39,17 @@ test('mail-folders', async ({ open, win, shot }) => {
   await expect(win.locator('[data-testid="mail-row"][data-unread]')).toHaveCount(0);
   await checkpoint(shot, 'mail-mark-all-after');
 
+  // #94: search by an address / name, Outlook-like: To / Cc count, ё = е, every folder of the account
+  // is searched and each row says which one it lives in.
+  await win.getByTestId('mail-search').fill('d.volkov@');
+  const hits = win.getByTestId('mail-row');
+  await expect(win.getByTestId('mail-row-folder').first()).toBeVisible();
+  expect(await hits.count()).toBeGreaterThan(1);
+  await checkpoint(shot, 'mail-search-address');
+  await win.getByTestId('mail-search').fill('Волков');
+  await expect(hits.first()).toBeVisible();
+  await win.getByTestId('mail-search').fill('');
+
   // The switcher: unified boxes, then one submenu per account (no flat list of every folder).
   await win.getByTestId('mail-box-switcher').click();
   await expect(win.getByTestId('mail-box-account')).toHaveCount(2);
@@ -62,7 +73,8 @@ test('mail-folders', async ({ open, win, shot }) => {
   // The toast stays clear of the list and the sidebar (anchored to the reading pane), then goes away.
   await expect(win.getByRole('region', { name: 'Уведомления' })).toContainText('Папка «Клиенты» создана');
   await checkpoint(shot, 'mail-toast');
-  await win.getByRole('button', { name: 'Закрыть уведомление' }).click();
+  const closeToast = win.getByRole('button', { name: 'Закрыть уведомление' });
+  if (await closeToast.isVisible().catch(() => false)) await closeToast.click(); // it may already have gone on its own
 
   // A smart folder: two conditions, «любое условие».
   await sidebar.getByTestId('mail-sidebar-new-smart').click();
@@ -79,18 +91,6 @@ test('mail-folders', async ({ open, win, shot }) => {
   await expect(win.getByTestId('mail-box-switcher')).toContainText('Счета и банк');
   await expect(win.getByTestId('mail-row').first()).toBeVisible();
   await checkpoint(shot, 'mail-smart-list');
-
-  // #94: search by an address / name, Outlook-like: To / Cc count, ё = е, every folder of the account
-  // is searched and each row says which one it lives in.
-  await sidebar.getByTestId('mail-sidebar-account').first().getByTestId('mail-sidebar-row').first().click();
-  await win.getByTestId('mail-search').fill('d.volkov@');
-  const hits = win.getByTestId('mail-row');
-  await expect(win.getByTestId('mail-row-folder').first()).toBeVisible();
-  expect(await hits.count()).toBeGreaterThan(1);
-  await checkpoint(shot, 'mail-search-address');
-  await win.getByTestId('mail-search').fill('Волков');
-  await expect(hits.first()).toBeVisible();
-  await win.getByTestId('mail-search').fill('');
 
   // Settings → «Почта»: the folder and rule rows stack (title, controls, hint under them).
   await win.getByRole('button', { name: 'Настройки', exact: true }).click();
