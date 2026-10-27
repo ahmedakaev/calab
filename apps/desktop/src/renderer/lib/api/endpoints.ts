@@ -30,6 +30,10 @@ import {
   PutSipInboundResponseSchema,
   PutSipRecordingRequestSchema,
   PutSipRecordingResponseSchema,
+  PutSipPolicyRequestSchema,
+  PutSipPolicyResponseSchema,
+  PutSipScheduleRequestSchema,
+  PutSipScheduleResponseSchema,
   SipCallResponseSchema,
   SipInboundAcceptResponseSchema,
   TestSipResponseSchema,
@@ -784,6 +788,12 @@ export const api = {
     /** Call recording to the Disk (ADR-0131; MANAGE_INTEGRATIONS): the two switches; 409 before the provider is saved. */
     saveRecording: (workspaceId: string, init: MessageInitShape<typeof PutSipRecordingRequestSchema>) =>
       call('PUT', `/api/workspaces/${workspaceId}/sip/recording`, PutSipRecordingResponseSchema, body(PutSipRecordingRequestSchema, init)),
+    /** The journal's retention and the outbound limits (ADR-0137; MANAGE_INTEGRATIONS); 409 before the provider is saved. */
+    savePolicy: (workspaceId: string, init: MessageInitShape<typeof PutSipPolicyRequestSchema>) =>
+      call('PUT', `/api/workspaces/${workspaceId}/sip/policy`, PutSipPolicyResponseSchema, body(PutSipPolicyRequestSchema, init)),
+    /** The working-hours schedule of the entry point, replaced as a whole (ADR-0138; MANAGE_INTEGRATIONS). */
+    saveSchedule: (workspaceId: string, init: MessageInitShape<typeof PutSipScheduleRequestSchema>) =>
+      call('PUT', `/api/workspaces/${workspaceId}/sip/schedule`, PutSipScheduleResponseSchema, body(PutSipScheduleRequestSchema, init)),
     acceptInbound: (callId: string) => call('POST', `/api/sip/inbound/${callId}/accept`, SipInboundAcceptResponseSchema),
     joinInbound: (callId: string) => call('POST', `/api/sip/inbound/${callId}/join`, JoinVoiceResponseSchema),
     declineInbound: (callId: string) => callEmpty('POST', `/api/sip/inbound/${callId}/decline`),

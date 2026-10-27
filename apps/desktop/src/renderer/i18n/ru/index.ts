@@ -48,6 +48,7 @@ import { ruContacts } from './contacts';
 import { ruSip } from './sip';
 import { ruPbx } from './pbx';
 import { ruTelephony } from './telephony';
+import { ruTelephonySettings } from './telephonySettings';
 import { ruAi } from './ai';
 import { ruSmartTask } from './smartTask';
 import { ruWebApps } from './webapps';
@@ -70,6 +71,7 @@ export const ru = {
   ...ruSip,
   ...ruPbx,
   ...ruTelephony,
+  ...ruTelephonySettings,
   ...ruAi,
   ...ruSmartTask,
   ...ruWebApps,

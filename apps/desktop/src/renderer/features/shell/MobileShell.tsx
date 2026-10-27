@@ -39,6 +39,7 @@ import { PhoneDisk } from '../disk/PhoneDisk';
 import { PhoneWiki, PhoneWikiPage, PhoneWikiTrash } from '../wiki/PhoneWiki';
 import { PhoneTelephony } from '../telephony/PhoneTelephony';
 import { PhoneCallDetail } from '../telephony/CallDetail';
+import { PhoneTelSettings } from '../telephony/settings/PhoneSettings';
 import { SearchResultsPanel } from '../search/SearchResultsPanel';
 import { MembersPanel } from './MembersPanel';
 import { MobileVoiceStrip } from './MobileVoiceStrip';
@@ -326,6 +327,8 @@ function PushedScreen({ screen }: { screen: PhoneScreen }): ReactNode {
       return <ActiveWorkspace>{(ws) => <PhoneCanvasScreen key={screen.itemId} workspaceId={ws} itemId={screen.itemId} />}</ActiveWorkspace>;
     case 'telCall':
       return <ActiveWorkspace>{(ws) => <PhoneCallDetail key={screen.callId} ws={ws} callId={screen.callId} />}</ActiveWorkspace>;
+    case 'telSettings':
+      return <ActiveWorkspace>{(ws) => <PhoneTelSettings key={screen.page} workspaceId={ws} page={screen.page} />}</ActiveWorkspace>;
     case 'wiki':
       return <ActiveWorkspace>{(ws) => (screen.trash ? <PhoneWikiTrash workspaceId={ws} /> : <PhoneWikiPage key={screen.pageId} workspaceId={ws} pageId={screen.pageId} />)}</ActiveWorkspace>;
   }

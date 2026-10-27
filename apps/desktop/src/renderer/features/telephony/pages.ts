@@ -1,4 +1,4 @@
-import { History, type LucideIcon } from 'lucide-react';
+import { History, Settings, type LucideIcon } from 'lucide-react';
 import { t } from '../../i18n';
 import type { TelPage } from '../../stores/telephonyUi';
 
@@ -13,6 +13,11 @@ export interface TelPageDef {
   icon: LucideIcon;
   /** The red count of my missed calls next to it («Недавние»). */
   missedBadge?: boolean;
+  /** MANAGE_INTEGRATIONS only; the column shows it as the «Настройки» group of its pages (settings/pages.ts). */
+  manage?: boolean;
 }
 
-export const TEL_PAGES: readonly TelPageDef[] = [{ id: 'recents', label: () => t('tel.recents'), icon: History, missedBadge: true }];
+export const TEL_PAGES: readonly TelPageDef[] = [
+  { id: 'recents', label: () => t('tel.recents'), icon: History, missedBadge: true },
+  { id: 'settings', label: () => t('tset.title'), icon: Settings, manage: true },
+];

@@ -248,6 +248,11 @@ import {
   PutSipInboundRequestSchema,
   PutSipRecordingRequestSchema,
   PutSipRecordingResponseSchema,
+  PutSipPolicyRequestSchema,
+  PutSipPolicyResponseSchema,
+  PutSipScheduleRequestSchema,
+  PutSipScheduleResponseSchema,
+  SipScheduleSchema,
   PutSipInboundResponseSchema,
   SipCallDirection,
   SipCallResponseSchema,
@@ -599,6 +604,7 @@ import {
 } from './mock-calendar';
 import { avatarPicture, cardPicture, encodePng, pngSize } from './png';
 import { freeWindows, intersectIntervals, workIntervals } from '../src/renderer/lib/calendar/freebusy';
+import { hoursProblem } from '../src/renderer/features/telephony/settings/hours';
 import { admissionKey, admissionOutcome, deciderView, guestView, requiresApproval, type AdmissionRec } from './mock-admissions';
 
 export {
@@ -761,6 +767,12 @@ export interface MockServer {
    * contact) or `failed` (the provider refused the password).
    */
   setSipRegistration(state: 'registered' | 'failed'): void;
+  /**
+   * ADR-0138: the working hours of «Команда Calab» (after seedSipExchange): Пн 9:00–13:00 and
+   * 14:00–18:00, Вт–Пт 9:00–18:00 with a Friday night shift 22:00–02:00, the Russian calendar,
+   * off hours → the menu «Выходные» after a 0:06 notice.
+   */
+  seedSipSchedule(): void;
   /**
    * ADR-0117 §6: the next menu prompt saves (PATCH …/sip/ivr/{mid} with a prompt) wait until the
    * returned release is called — the «Обрабатываем запись…» state stays on screen.
@@ -978,6 +990,7 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     setSipCallStatus: (id, status, reason) => impl.setSipCallStatus(id, status, reason),
     seedSipExchange: (empty) => impl.seedSipExchange(empty),
     setSipRegistration: (st) => impl.setSipRegistration(st),
+    seedSipSchedule: () => impl.seedSipSchedule(),
     holdSipPrompt: () => impl.holdSipPrompt(),
     ringSipInbound: (to, number, via) => impl.ringSipInbound(to, number, via),
     seedSipActiveCalls: () => impl.seedSipActiveCalls(),
@@ -6215,6 +6228,27 @@ class MockImpl {
     );
   }
 
+  seedSipSchedule(): void {
+    const wsId = IDS.workspaces.main;
+    const weekend = this.pbxOf(wsId).menus.find((m) => m.name === 'Выходные');
+    const day = (weekday: number, startMin: number, endMin: number): { weekday: number; startMin: number; endMin: number } => ({ weekday, startMin, endMin });
+    this.state.sipSettings.set(
+      wsId,
+      create(SipSettingsSchema, {
+        ...this.sipSettingsOf(wsId),
+        schedule: create(SipScheduleSchema, {
+          enabled: true,
+          timeZone: 'Europe/Moscow',
+          hours: [day(1, 540, 780), day(1, 840, 1080), day(2, 540, 1080), day(3, 540, 1080), day(4, 540, 1080), day(5, 540, 1080), day(5, 1320, 120)],
+          productionCalendarRu: true,
+          offHours: create(SipRouteTargetSchema, { kind: SipRouteKind.MENU, id: weekend?.id ?? '' }),
+          noticeFileId: nextId(this.state, 'file'),
+          noticeDurationMs: 6000,
+        }),
+      }),
+    );
+  }
+
   private pbxRoutes(): void {
     this.route('GET', '/api/workspaces/:id/sip/extensions', (c) => {
       const me = this.uid(c);
@@ -6579,6 +6613,63 @@ class MockImpl {
       if (!cur.updatedAt) throw new HttpError(409, ErrorCode.CONFLICT, 'save the provider settings first');
       this.state.sipSettings.set(wsId, create(SipSettingsSchema, { ...cur, recordInbound: b.recordInbound, recordOutbound: b.recordOutbound }));
       sendMsg(c.res, 200, PutSipRecordingResponseSchema, { settings: this.sipSettingsOf(wsId) });
+    });
+
+    // ADR-0137: the journal's retention and the outbound limits (the server's ranges).
+    this.route('PUT', '/api/workspaces/:id/sip/policy', (c) => {
+      const { wsId } = this.sipAdmin(c);
+      const b = parseBody(c, PutSipPolicyRequestSchema);
+      const cur = this.sipSettingsOf(wsId);
+      if (!cur.updatedAt) throw new HttpError(409, ErrorCode.CONFLICT, 'save the provider settings first');
+      if (b.retentionMonths && ![1, 3, 6, 12, 24, 36].includes(b.retentionMonths)) throw invalid('retentionMonths', 'retentionMonths: 1, 3, 6, 12, 24 or 36');
+      if (b.outPerHour > 1000) throw invalid('outPerHour', 'outPerHour: 1..1000');
+      if (b.outPerUserHour > 1000) throw invalid('outPerUserHour', 'outPerUserHour: 1..1000');
+      this.state.sipSettings.set(
+        wsId,
+        create(SipSettingsSchema, { ...cur, retentionMonths: b.retentionMonths || 12, outPerHour: b.outPerHour || 120, outPerUserHour: b.outPerUserHour || 30 }),
+      );
+      sendMsg(c.res, 200, PutSipPolicyResponseSchema, { settings: this.sipSettingsOf(wsId) });
+    });
+
+    // ADR-0138: the schedule replaced as a whole (the server's interval rules); the notice — a
+    // fresh file id and 0:06, or removed with «».
+    this.route('PUT', '/api/workspaces/:id/sip/schedule', (c) => {
+      const { wsId } = this.sipAdmin(c);
+      const b = parseBody(c, PutSipScheduleRequestSchema);
+      const cur = this.sipSettingsOf(wsId);
+      if (!cur.updatedAt) throw new HttpError(409, ErrorCode.CONFLICT, 'save the provider settings first');
+      const sc = b.schedule ?? create(SipScheduleSchema, {});
+      const tz = sc.timeZone || 'Europe/Moscow';
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: tz });
+      } catch {
+        throw invalid('timeZone', 'an IANA time zone, e.g. Europe/Moscow');
+      }
+      if (hoursProblem(sc.hours.map((h) => ({ weekday: h.weekday, start: h.startMin, end: h.endMin })))) throw invalid('hours', 'working hours overlap');
+      if (sc.enabled && sc.hours.length === 0) throw invalid('hours', 'add the working hours');
+      if (sc.offHours?.kind === SipRouteKind.REPEAT) throw invalid('offHours', 'offHours: not repeat');
+      const old = cur.schedule;
+      const notice =
+        b.noticeSourceFileId === undefined
+          ? { noticeFileId: old?.noticeFileId ?? '', noticeDurationMs: old?.noticeDurationMs ?? 0 }
+          : b.noticeSourceFileId
+            ? { noticeFileId: nextId(this.state, 'file'), noticeDurationMs: 6000 }
+            : { noticeFileId: '', noticeDurationMs: 0 };
+      this.state.sipSettings.set(
+        wsId,
+        create(SipSettingsSchema, {
+          ...cur,
+          schedule: create(SipScheduleSchema, {
+            enabled: sc.enabled,
+            timeZone: tz,
+            hours: sc.hours,
+            productionCalendarRu: sc.productionCalendarRu,
+            offHours: sc.offHours ? create(SipRouteTargetSchema, sc.offHours) : create(SipRouteTargetSchema, { kind: SipRouteKind.HANGUP }),
+            ...notice,
+          }),
+        }),
+      );
+      sendMsg(c.res, 200, PutSipScheduleResponseSchema, { settings: this.sipSettingsOf(wsId) });
     });
 
     // ADR-0117/0121: the inbound settings as sent; the registration's state stays what the

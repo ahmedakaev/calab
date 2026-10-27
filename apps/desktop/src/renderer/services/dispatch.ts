@@ -52,7 +52,7 @@ import { applySnapshotRecordings, dropRecordings, onRoomRecording, resetRecordin
 import { applySnapshotSipCalls, dropSipCalls, onSipCallUpdate, resetSipCalls } from './sip';
 import { onSipInboundRing } from './sipInbound';
 import { applySnapshotSipMissed, dropSipMissed, onJournalEntry, onSipMissedChanged, resetSipMissed } from './sipJournal';
-import { activeCallsKey, coalescer, journalKey } from '../lib/sipPbx';
+import { activeCallsKey, coalescer } from '../lib/sipPbx';
 import { t } from '../i18n';
 import { dropStaleWorkspaceBackground } from './cameraBackground';
 import { applySnapshotSounds, useSounds } from '../stores/sounds';
@@ -144,12 +144,11 @@ onRoomArchived((roomId) => {
   if (room) removeRoom(room.workspaceId, roomId);
 });
 
-// «Активные звонки» (ADR-0128): re-read only if the tab is open and the window is seen; hidden —
-// just stale, refetched on focus / remount. A busy exchange's bursts: one re-read a second.
+// The live calls (ADR-0128, «Недавние» → «Сейчас»): re-read only if the list is open and the window is
+// seen; hidden — just stale, refetched on focus / remount. A busy exchange's bursts: one re-read a second.
 const callsChanged = coalescer((ws) => {
   const refetchType = document.hidden ? 'none' : 'active';
   void queryClient.invalidateQueries({ queryKey: activeCallsKey(ws), refetchType });
-  void queryClient.invalidateQueries({ queryKey: journalKey(ws), refetchType });
 }, 1000);
 
 export function applyDispatch(ev: DispatchEvent): void {

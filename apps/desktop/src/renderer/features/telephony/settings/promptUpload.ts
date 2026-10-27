@@ -1,12 +1,14 @@
+import type { MessageInitShape } from '@bufbuild/protobuf';
+import type { SipScheduleSchema, SipSettings } from '@calaba/protocol';
 import { create } from 'zustand';
-import { t } from '../../i18n';
-import { api, uploadFile, uploadPath } from '../../lib/api/endpoints';
-import { describeError } from '../../lib/api/errors';
-import { log } from '../../lib/log';
-import { queryClient } from '../../lib/queryClient';
-import { extensionsKey, fieldError, groupsKey, menusKey, promptFileError } from '../../lib/sipPbx';
-import { reportPlanError } from '../../services/plan';
-import { toast } from '../../stores/toasts';
+import { t } from '../../../i18n';
+import { api, uploadFile, uploadPath } from '../../../lib/api/endpoints';
+import { describeError } from '../../../lib/api/errors';
+import { log } from '../../../lib/log';
+import { queryClient } from '../../../lib/queryClient';
+import { extensionsKey, fieldError, groupsKey, menusKey, promptFileError } from '../../../lib/sipPbx';
+import { reportPlanError } from '../../../services/plan';
+import { toast } from '../../../stores/toasts';
 
 /*
  * The greeting of a voice menu (ADR-0117 §6, CBF-77): one upload at a time, outside the form
@@ -50,7 +52,29 @@ export function clearPromptError(menuId: string): void {
  * the store under the slot; true = the file is saved.
  */
 export async function uploadPrompt(workspaceId: string, menuId: string, file: File, kind: PromptKind = 'prompt'): Promise<boolean> {
-  const slot = promptSlot(menuId, kind);
+  return upload(workspaceId, promptSlot(menuId, kind), file, async (id) => {
+    await api.sip.updateMenu(workspaceId, menuId, kind === 'notice' ? { noticeSourceFileId: id } : { promptSourceFileId: id });
+    toast.success(t(kind === 'notice' ? 'pbx.menu.noticeSaved' : 'pbx.menu.promptSaved'));
+  });
+}
+
+/** The store slot of the schedule's off-hours notice (ADR-0138). */
+export const SCHEDULE_NOTICE = 'schedule:notice';
+
+/**
+ * The off-hours notice of the schedule (ADR-0138 §6): uploaded like a menu's prompt and set with
+ * PUT …/sip/schedule over the *saved* schedule (`saved`, the request form) — the form's unsaved
+ * hours are not sent with it. The settings come back in the answer.
+ */
+export async function uploadScheduleNotice(workspaceId: string, file: File, saved: MessageInitShape<typeof SipScheduleSchema>, onSaved: (s: SipSettings) => void): Promise<boolean> {
+  return upload(workspaceId, SCHEDULE_NOTICE, file, async (id) => {
+    const r = await api.sip.saveSchedule(workspaceId, { schedule: saved, noticeSourceFileId: id });
+    if (r.settings) onSaved(r.settings);
+    toast.success(t('tset.sched.noticeSaved'));
+  });
+}
+
+async function upload(workspaceId: string, slot: string, file: File, apply: (fileId: string) => Promise<void>): Promise<boolean> {
   const bad = promptFileError(file);
   if (bad) {
     promptError(slot, t(bad));
@@ -65,8 +89,7 @@ export async function uploadPrompt(workspaceId: string, menuId: string, file: Fi
       if (s.menuId === slot && s.pct !== null && s.pct !== pct) usePromptUpload.setState({ pct });
     }).promise;
     usePromptUpload.setState({ pct: null });
-    await api.sip.updateMenu(workspaceId, menuId, kind === 'notice' ? { noticeSourceFileId: meta.id } : { promptSourceFileId: meta.id });
-    toast.success(t(kind === 'notice' ? 'pbx.menu.noticeSaved' : 'pbx.menu.promptSaved'));
+    await apply(meta.id);
     return true;
   } catch (e) {
     log.warn('sip prompt upload', e);
