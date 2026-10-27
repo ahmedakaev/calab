@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -176,6 +177,16 @@ func TestSIPContacts(t *testing.T) {
 	bob.must(200, "GET", contacts+"?q=ромаш", nil, &list)
 	if got := contactNames(&list); len(got) != 1 || got[0] != "Анна Петрова" {
 		t.Fatalf("q text: %v", got)
+	}
+	// Case and ё folded whatever the database's locale (a C-locale lower() keeps Cyrillic capitals).
+	bob.must(200, "GET", contacts+"?q="+url.QueryEscape("РОМАШ"), nil, &list)
+	if got := contactNames(&list); len(got) != 1 || got[0] != "Анна Петрова" {
+		t.Fatalf("q upper: %v", got)
+	}
+	var folded string
+	if err := testDB.Pool.QueryRow(ctx, `SELECT sip_fold('ЁЛКИН Ёлкин ANNA Їжак' COLLATE "C")`).Scan(&folded); err != nil ||
+		folded != "елкин елкин anna їжак" {
+		t.Fatalf("sip_fold: %q %v", folded, err)
 	}
 	bob.must(200, "GET", contacts+"?q=%2B1%20212", nil, &list)
 	if got := contactNames(&list); len(got) != 1 || got[0] != "Zed" {

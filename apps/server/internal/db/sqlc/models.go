@@ -1666,6 +1666,7 @@ type SipContact struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	SortKey     *string
+	SearchKey   *string
 	SortGroup   *int16
 }
 

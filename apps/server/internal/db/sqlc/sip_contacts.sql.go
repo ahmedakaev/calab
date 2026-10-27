@@ -82,7 +82,7 @@ func (q *Queries) DeleteSipContactPhones(ctx context.Context, arg DeleteSipConta
 }
 
 const getSipContact = `-- name: GetSipContact :one
-SELECT id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, sort_group FROM sip_contacts WHERE workspace_id = $1 AND id = $2
+SELECT id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, search_key, sort_group FROM sip_contacts WHERE workspace_id = $1 AND id = $2
 `
 
 type GetSipContactParams struct {
@@ -104,13 +104,14 @@ func (q *Queries) GetSipContact(ctx context.Context, arg GetSipContactParams) (S
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SortKey,
+		&i.SearchKey,
 		&i.SortGroup,
 	)
 	return i, err
 }
 
 const getSipContactForUpdate = `-- name: GetSipContactForUpdate :one
-SELECT id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, sort_group FROM sip_contacts WHERE workspace_id = $1 AND id = $2 FOR UPDATE
+SELECT id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, search_key, sort_group FROM sip_contacts WHERE workspace_id = $1 AND id = $2 FOR UPDATE
 `
 
 type GetSipContactForUpdateParams struct {
@@ -132,6 +133,7 @@ func (q *Queries) GetSipContactForUpdate(ctx context.Context, arg GetSipContactF
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SortKey,
+		&i.SearchKey,
 		&i.SortGroup,
 	)
 	return i, err
@@ -157,7 +159,7 @@ func (q *Queries) HasSipExtension(ctx context.Context, arg HasSipExtensionParams
 const insertSipContact = `-- name: InsertSipContact :one
 INSERT INTO sip_contacts (id, workspace_id, name, company, note, created_by, updated_by)
 VALUES ($1, $2, $3, $4, $5, $6, $6)
-RETURNING id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, sort_group
+RETURNING id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, search_key, sort_group
 `
 
 type InsertSipContactParams struct {
@@ -190,6 +192,7 @@ func (q *Queries) InsertSipContact(ctx context.Context, arg InsertSipContactPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SortKey,
+		&i.SearchKey,
 		&i.SortGroup,
 	)
 	return i, err
@@ -480,10 +483,9 @@ func (q *Queries) ListSipContactRetention(ctx context.Context) ([]ListSipContact
 }
 
 const listSipContacts = `-- name: ListSipContacts :many
-SELECT c.id, c.workspace_id, c.name, c.company, c.note, c.created_by, c.updated_by, c.created_at, c.updated_at, c.sort_key, c.sort_group FROM sip_contacts c
+SELECT c.id, c.workspace_id, c.name, c.company, c.note, c.created_by, c.updated_by, c.created_at, c.updated_at, c.sort_key, c.search_key, c.sort_group FROM sip_contacts c
 WHERE c.workspace_id = $1
-  AND ($2::text = '' OR strpos(lower(c.name), lower($2::text)) > 0
-       OR strpos(lower(c.company), lower($2::text)) > 0)
+  AND ($2::text = '' OR strpos(c.search_key, sip_fold($2::text)) > 0)
   AND ($3::text = '' OR EXISTS (SELECT 1 FROM sip_contact_phones p
                                                WHERE p.contact_id = c.id AND strpos(p.number, $3::text) > 0))
   AND (NOT $4::bool OR (c.sort_group, c.sort_key COLLATE "C", c.id)
@@ -504,7 +506,7 @@ type ListSipContactsParams struct {
 }
 
 // A page of the phone book: by sort_group, sort_key, id; text matches a part of the name or the
-// company, digits a part of a number.
+// company (folded: sip_fold, any locale), digits a part of a number.
 func (q *Queries) ListSipContacts(ctx context.Context, arg ListSipContactsParams) ([]SipContact, error) {
 	rows, err := q.db.Query(ctx, listSipContacts,
 		arg.WorkspaceID,
@@ -534,6 +536,7 @@ func (q *Queries) ListSipContacts(ctx context.Context, arg ListSipContactsParams
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.SortKey,
+			&i.SearchKey,
 			&i.SortGroup,
 		); err != nil {
 			return nil, err
@@ -641,7 +644,7 @@ func (q *Queries) SipContactNumberOwners(ctx context.Context, arg SipContactNumb
 const sipContactNumbersByText = `-- name: SipContactNumbersByText :many
 SELECT p.number FROM sip_contacts c JOIN sip_contact_phones p ON p.contact_id = c.id
 WHERE c.workspace_id = $1
-  AND (strpos(lower(c.name), lower($2::text)) > 0 OR strpos(lower(c.company), lower($2::text)) > 0)
+  AND strpos(c.search_key, sip_fold($2::text)) > 0
 ORDER BY p.number
 LIMIT 500
 `
@@ -678,7 +681,7 @@ UPDATE sip_contacts
 SET name = $1, company = $2, note = $3,
     updated_by = $4, updated_at = now()
 WHERE workspace_id = $5 AND id = $6
-RETURNING id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, sort_group
+RETURNING id, workspace_id, name, company, note, created_by, updated_by, created_at, updated_at, sort_key, search_key, sort_group
 `
 
 type UpdateSipContactParams struct {
@@ -711,6 +714,7 @@ func (q *Queries) UpdateSipContact(ctx context.Context, arg UpdateSipContactPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.SortKey,
+		&i.SearchKey,
 		&i.SortGroup,
 	)
 	return i, err

@@ -55,11 +55,10 @@ SELECT * FROM sip_contact_phones WHERE contact_id = ANY (sqlc.arg('contact_ids')
 
 -- name: ListSipContacts :many
 -- A page of the phone book: by sort_group, sort_key, id; text matches a part of the name or the
--- company, digits a part of a number.
+-- company (folded: sip_fold, any locale), digits a part of a number.
 SELECT c.* FROM sip_contacts c
 WHERE c.workspace_id = sqlc.arg('workspace_id')
-  AND (sqlc.arg('text')::text = '' OR strpos(lower(c.name), lower(sqlc.arg('text')::text)) > 0
-       OR strpos(lower(c.company), lower(sqlc.arg('text')::text)) > 0)
+  AND (sqlc.arg('text')::text = '' OR strpos(c.search_key, sip_fold(sqlc.arg('text')::text)) > 0)
   AND (sqlc.arg('digits')::text = '' OR EXISTS (SELECT 1 FROM sip_contact_phones p
                                                WHERE p.contact_id = c.id AND strpos(p.number, sqlc.arg('digits')::text) > 0))
   AND (NOT sqlc.arg('after')::bool OR (c.sort_group, c.sort_key COLLATE "C", c.id)
@@ -72,7 +71,7 @@ LIMIT sqlc.arg('lim');
 -- has the text.
 SELECT p.number FROM sip_contacts c JOIN sip_contact_phones p ON p.contact_id = c.id
 WHERE c.workspace_id = sqlc.arg('workspace_id')
-  AND (strpos(lower(c.name), lower(sqlc.arg('text')::text)) > 0 OR strpos(lower(c.company), lower(sqlc.arg('text')::text)) > 0)
+  AND strpos(c.search_key, sip_fold(sqlc.arg('text')::text)) > 0
 ORDER BY p.number
 LIMIT 500;
 

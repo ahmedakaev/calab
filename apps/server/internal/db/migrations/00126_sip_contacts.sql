@@ -10,8 +10,23 @@
 -- sip_contact_phones  the contact's numbers in E.164, ≤ 10 per contact (the API), in its order
 --                     (position); a number belongs to one contact of the workspace, so caller
 --                     ID is unambiguous.
+-- sip_fold(text)      case folding for the list's order and its search that does not depend on
+--                     the database's locale: lower() of a C-locale database leaves Cyrillic as it
+--                     is, so the Cyrillic capitals are mapped explicitly (and ё to е — people
+--                     type either). search_key holds the folded name and company (a substring
+--                     search over ≤ 10 000 rows of one workspace: no index — a trigram index
+--                     would skip Cyrillic on a C-locale database too).
 
 -- +goose Up
+-- +goose StatementBegin
+CREATE FUNCTION sip_fold(t text) RETURNS text
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+AS $$
+    SELECT translate(lower(t), 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯІЇЄҐЎё',
+                               'абвгдеежзийклмнопрстуфхцчшщъыьэюяіїєґўе')
+$$;
+-- +goose StatementEnd
+
 CREATE TABLE sip_contacts (
     id           uuid PRIMARY KEY,
     workspace_id uuid NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
@@ -22,7 +37,8 @@ CREATE TABLE sip_contacts (
     updated_by   uuid REFERENCES users (id) ON DELETE SET NULL,
     created_at   timestamptz NOT NULL DEFAULT now(),
     updated_at   timestamptz NOT NULL DEFAULT now(),
-    sort_key     text GENERATED ALWAYS AS (lower(CASE WHEN name <> '' THEN name ELSE company END)) STORED,
+    sort_key     text GENERATED ALWAYS AS (sip_fold(CASE WHEN name <> '' THEN name ELSE company END)) STORED,
+    search_key   text GENERATED ALWAYS AS (sip_fold(name) || E'\n' || sip_fold(company)) STORED,
     sort_group   smallint GENERATED ALWAYS AS (
         CASE WHEN lower(CASE WHEN name <> '' THEN name ELSE company END) ~ '^[а-яёА-ЯЁ]' THEN 0
              WHEN lower(CASE WHEN name <> '' THEN name ELSE company END) ~ '^[a-zA-Z]' THEN 1
@@ -48,3 +64,4 @@ CREATE TABLE sip_contact_phones (
 -- +goose Down
 DROP TABLE sip_contact_phones;
 DROP TABLE sip_contacts;
+DROP FUNCTION sip_fold(text);
