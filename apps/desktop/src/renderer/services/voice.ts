@@ -139,6 +139,8 @@ const SEAT_SELF_GRACE_MS = 3000;
  * a moderator's (docs/05 «Несколько устройств»).
  */
 const REMOVED_GRACE_MS = 500;
+/** `devicechange` comes in bursts while the OS switches the output: re-bind the elements once it settles (#255). */
+const REBIND_SETTLE_MS = 400;
 /**
  * Mic track mute / unmute (ADR-0134): an op unsettled after this counts as failed (a lock held
  * across a dead link), and a failed one is retried after MUTE_RETRY_MS (by attempt, capped) —
@@ -238,6 +240,8 @@ class VoiceEngine {
   private trackLag = false;
   private trackLagTimer: number | null = null;
   private muteRetryTimer: number | null = null;
+  /** scheduleRebind: the settle timer after an output device change. */
+  private rebindTimer: number | null = null;
   private muteFails = 0;
   private room: Room | null = null;
   private nativeAudio: HostCallAudioSession | null = null;
@@ -378,6 +382,7 @@ class VoiceEngine {
       // macOS moves the default output (charger, dock, headphones): re-assert our sink and the
       // playback state (deafen!) on every remote element once the switch has settled.
       void this.applyOutputDevice();
+      this.scheduleRebind();
     });
     this.snapshotDevices(false);
     void this.applyOutputDevice(); // the chosen output for every remote element from the first one on
@@ -3513,6 +3518,24 @@ class VoiceEngine {
     if (this.settleTimer !== null) window.clearTimeout(this.settleTimer);
     this.settleTimer = null;
     this.closePlaybackPrompt();
+  }
+
+  /**
+   * Headphones switched (#255): the elements opened before the switch could stay silent — re-bind
+   * them once the burst of `devicechange` events has settled (one timeout, no polling).
+   */
+  private scheduleRebind(): void {
+    if (this.rebindTimer !== null) window.clearTimeout(this.rebindTimer);
+    this.rebindTimer = window.setTimeout(() => {
+      this.rebindTimer = null;
+      const room = this.room;
+      if (!room || this.audioOut.size === 0) return;
+      void this.audioOut.rebind().then((r) => {
+        if (this.room !== room) return;
+        log.info(`voice: output devices changed, ${r.rebound} remote audio element(s) re-bound`);
+        if (r.blocked > 0 && !document.hidden) this.offerPlayback();
+      });
+    }, REBIND_SETTLE_MS);
   }
 
   /** One pass of «play what the system paused» (RemoteAudioOut.replayPaused); a refusal offers the tap. */

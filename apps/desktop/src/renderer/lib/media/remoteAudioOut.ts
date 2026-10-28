@@ -23,7 +23,7 @@ import { remoteAudio } from '../voiceLogic';
  * (WebKit gates it behind a setting) have no such method — the OS picks the output there.
  */
 export type AudioOutElement = Pick<HTMLMediaElement, 'muted' | 'volume' | 'addEventListener' | 'removeEventListener'> &
-  Partial<Pick<HTMLMediaElement, 'setSinkId' | 'paused' | 'play'>>;
+  Partial<Pick<HTMLMediaElement, 'setSinkId' | 'paused' | 'play' | 'srcObject'>>;
 
 /** What one pass of `replayPaused` did. */
 export interface ReplayResult {
@@ -102,6 +102,36 @@ export class RemoteAudioOut<E extends AudioOutElement = HTMLMediaElement> {
   /** Leave: every element is forgotten; returns them for DOM removal. */
   clear(): E[] {
     return [...this.els.keys()].map((sid) => this.remove(sid)).filter((el): el is E => el !== undefined);
+  }
+
+  /**
+   * The OS switched the audio output (headphones in or out, AirPods, a dock): only people who
+   * joined after the switch were heard, the others stayed silent until the room was re-entered
+   * (#255). `setSinkId` with an unchanged id ('' = the system default) is a no-op and a WebRTC
+   * renderer opened before the switch can stay on the old route; re-assigning the element's own
+   * stream makes the engine open a renderer on the current output. The element stays the same
+   * (echo rule 2); sink, playback state and play() are pushed again. One pass, no retry.
+   */
+  async rebind(): Promise<{ rebound: number; blocked: number }> {
+    const out = { rebound: 0, blocked: 0 };
+    await Promise.all(
+      [...this.els.values()].map(async (entry) => {
+        const { el } = entry;
+        const src = el.srcObject;
+        if (!src) return;
+        el.srcObject = null;
+        el.srcObject = src;
+        out.rebound++;
+        await this.sink(entry, this.sinkId);
+        if (typeof el.play !== 'function') return;
+        try {
+          await el.play();
+        } catch (e) {
+          if ((e as { name?: unknown } | null)?.name === 'NotAllowedError') out.blocked++;
+        }
+      }),
+    );
+    return out;
   }
 
   /**

@@ -236,3 +236,56 @@ describe('replayPaused (audio paused by an interruption / the background)', () =
     expect(await out.replayPaused()).toEqual({ resumed: 0, blocked: 0, failed: 0 });
   });
 });
+
+describe('rebind (the OS switched the output: headphones in or out, #255)', () => {
+  /** An element with a stream: counts srcObject writes and play() calls. */
+  const bound = (stream: object | null, outcome: 'ok' | 'blocked' = 'ok') => {
+    const a = new FakeAudio() as FakeAudio & HTMLMediaElement & { writes: (object | null)[]; plays: number };
+    let src = stream;
+    a.writes = [];
+    a.plays = 0;
+    Object.defineProperty(a, 'srcObject', {
+      get: () => src,
+      set: (v: object | null) => {
+        a.writes.push(v);
+        src = v;
+      },
+    });
+    Object.defineProperty(a, 'play', {
+      value: () => {
+        a.plays++;
+        return outcome === 'ok' ? Promise.resolve() : Promise.reject(Object.assign(new Error('nope'), { name: 'NotAllowedError' }));
+      },
+    });
+    return a;
+  };
+
+  it('re-assigns every element its own stream on the chosen sink and plays it again', async () => {
+    const state: AudioOutState = { deafened: false, userVolumes: {}, mutedUsers: {}, streamVolume: {} };
+    const out = new RemoteAudioOut<ReturnType<typeof bound>>(() => state);
+    const s1 = {};
+    const s2 = {};
+    const a = bound(s1);
+    const b = bound(s2, 'blocked');
+    const none = bound(null);
+    out.add('a', a, 'u1', false);
+    out.add('b', b, 'u2', false);
+    out.add('c', none, 'u3', false);
+    await out.setSink('headphones');
+    expect(await out.rebind()).toEqual({ rebound: 2, blocked: 1 });
+    expect(a.writes).toEqual([null, s1]);
+    expect(b.writes).toEqual([null, s2]);
+    expect(a.srcObject).toBe(s1);
+    expect([a.plays, b.plays, none.plays]).toEqual([1, 1, 0]);
+    expect(a.sinkId).toBe('headphones');
+  });
+
+  it('keeps deafen across the re-bind', async () => {
+    const out = new RemoteAudioOut<ReturnType<typeof bound>>(() => ({ deafened: true, userVolumes: {}, mutedUsers: {}, streamVolume: {} }));
+    const a = bound({});
+    a.resetOnSink = true;
+    out.add('a', a, 'u1', false);
+    await out.rebind();
+    expect(a.muted).toBe(true);
+  });
+});
