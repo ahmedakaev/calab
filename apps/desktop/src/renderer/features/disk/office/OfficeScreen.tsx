@@ -211,6 +211,7 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
     document.addEventListener('visibilitychange', wake);
     return () => document.removeEventListener('visibilitychange', wake);
   }, [parked, retry]);
+
   // Both make a NEW Disk item and open it as its own tab (the source stays as it is).
   const copy = (run: () => Promise<{ item?: DiskItem }>, failText: string, done: boolean): void => {
     setSaving(true);

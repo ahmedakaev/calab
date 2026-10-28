@@ -648,7 +648,7 @@ authority/policy. Не отключать enforcement автоматически
 
 ### Редактор документов ONLYOFFICE (ADR-0143)
 
-Правка xlsx/docx/pptx (и odt/ods/odp/rtf/csv/txt) Диска в окне Calab, просмотр pdf и старых doc/xls/ppt. По умолчанию выключено: без `OFFICE_ENABLED=true` маршруты `/api/office/*` отвечают 404, `GET /api/office/capabilities` — `enabled: false`. Document Server — отдельный сервис (один инстанс, Community не кластеризуется), развёртывание — ADR-0143 «Развёртывание».
+Правка xlsx/docx/pptx (и odt/ods/odp/rtf/csv/txt) Диска в окне Calab, просмотр pdf и старых doc/xls/ppt, «Создать → Документ / Таблица / Презентация» в Диске. По умолчанию выключено: без `OFFICE_ENABLED=true` маршруты `/api/office/*` и `POST /api/workspaces/{id}/office/*` отвечают 404, `GET /api/office/capabilities` — `enabled: false`; клиент читает флаг оттуда при каждом READY (своего переключателя сборки нет), прячет «Открыть» в редакторе и пункты «Создать». Document Server — отдельный сервис (один инстанс, Community не кластеризуется). **Как поднять его в кластере — [docs/ops/office-onlyoffice-deploy.md](ops/office-onlyoffice-deploy.md)** (методичка для девопса: тома, NetworkPolicy, ingress, порядок выкатки, приёмка); почему так — ADR-0143 «Развёртывание».
 
 | Переменная | По умолчанию | Что |
 |---|---|---|
@@ -657,12 +657,14 @@ authority/policy. Не отключать enforcement автоматически
 | `OFFICE_DOCS_INTERNAL_URL` | = `OFFICE_DOCS_URL` | как API ходит к Document Server (in-cluster `http://onlyoffice.<ns>.svc`): сохранённые и сконвертированные файлы, `/converter`, `/command`. URL из callback принимается только на этих двух origin и скачивается через внутренний |
 | `OFFICE_API_URL` | = `PUBLIC_APP_URL` | как Document Server ходит к API: ссылки на файл и callback (in-cluster адрес API) |
 | `OFFICE_JWT_SECRET` | — (≥ 32 байт при включении) | общий секрет с `JWT_SECRET` контейнера Document Server (HS256 в обе стороны); только в Secret кластера |
-| `OFFICE_THEME_DARK`, `OFFICE_THEME_LIGHT` | `default-dark`, `default-light` | `uiTheme` редактора по теме приложения (или свои `theme-calab-*`) |
+| `OFFICE_THEME_DARK`, `OFFICE_THEME_LIGHT` | `default-dark`, `default-light` | `uiTheme` редактора по теме приложения; по желанию `OFFICE_THEME_DARK=theme-calab-dark` — цвета Calab (`infra/office/themes/theme-calab-dark.json`, смонтировать в `web-apps/apps/common/main/resources/themes`); открытый редактор следует смене темы приложения |
 | `OFFICE_FILE_URL_TTL` | `5m` | срок ссылки, по которой Document Server забирает файл (30 с … 1 ч) |
 | `OFFICE_MAX_SIZE_MB` | `100` | больше — файл не открывается в редакторе, сохранение больше — отклоняется |
 | `OFFICE_SESSION_TTL` | `24h` | сессия совместной правки в Valkey без открытий и callback'ов (1 … 168 ч) |
 
-Ключи Valkey: `office:s:<item>` (сессия, TTL), `office:live` (элементы с сессией), `rl:office-*` (лимиты). Логи: `office: open|callback|saved|drop|converted` — id пользователя, элемента, файла, ключ, статус, размер и sha256; содержимое не логируется.
+Хост-страница `infra/office/calab-editor.html` + `calab-editor.js` монтируется read-only в `web-apps/apps/calab/` Document Server (там же, где её ждёт клиент и Electron). Шаблоны «Создать» (`apps/server/internal/office/templates/blank.{docx,xlsx,pptx}`) встроены в API, отдельного монтирования нет.
+
+Ключи Valkey: `office:s:<item>` (сессия, TTL), `office:live` (элементы с сессией), `rl:office-*` (лимиты; `rl:office-config:` считает и «Создать»). Логи: `office: open|callback|saved|drop|converted|created` — id пользователя, элемента, файла, ключ, статус, размер и sha256; содержимое не логируется.
 
 ## Наблюдаемость
 
