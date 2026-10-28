@@ -1268,6 +1268,21 @@ test('m-menu', async ({ page }) => {
   await expect(page.getByRole('menu')).toBeVisible();
   await expectCentredCard(page, page.getByRole('menu'));
   await checkpoint(page, 'm-message-menu');
+  // ADR-0140: my message seen by Борис and Вера (✓✓), the next one by nobody (✓); a long press
+  // on it: «Прочитали» on top of the menu opens the list in place.
+  await page.touchscreen.tap(20, 120);
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  const seen = mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.anna, content: 'Посмотрите макет до обеда.' });
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.anna, content: 'И ссылку на прототип.' });
+  mock.markRead(IDS.users.boris, IDS.rooms.general, seen.id);
+  mock.markRead(IDS.users.vera, IDS.rooms.general, seen.id);
+  await feedToBottom(page);
+  const bubble = page.getByTestId('message-bubble').filter({ hasText: 'Посмотрите макет' });
+  await expect(bubble.getByTestId('read-ticks')).toBeVisible();
+  await bubble.getByText('Посмотрите макет').dispatchEvent('contextmenu', { clientX: 120, clientY: 400 });
+  await page.getByTestId('message-read-by').tap();
+  await expect(page.getByRole('menu').getByTestId('read-by-row')).toHaveCount(2);
+  await checkpoint(page, 'm-message-read-by');
 });
 
 // Owner 07.10: a sub-level («+» → «Создать задачу ▸») opens by a tap only — never on hover — as a

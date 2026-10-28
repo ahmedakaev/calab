@@ -1209,9 +1209,36 @@ export function Activity({ task, room, toEnd, commentsOff, aside }: { task: Task
     requestAnimationFrame(toEnd);
   }, [mine, toEnd]);
   const tab = useBoardsUi((s) => s.activityTab);
+  const section = useRef<HTMLElement>(null);
+  // Seen (ADR-0140): the newest comment is actually on screen (at least half of it, or 120 px of
+  // a tall one) with the window focused — the others' ✓✓ and «Прочитали». Opening the panel
+  // alone only marks read (above), as before.
+  useEffect(() => {
+    if (!lastSent || tab !== 'comments') return;
+    // Rows carry the item key (an own message keeps its local key after the send).
+    const key = useMessages.getState().rooms[room.id]?.items.at(-1)?.key ?? lastSent;
+    const el = section.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(key)}"]`);
+    if (!el) return;
+    let visible = false;
+    const mark = (): void => {
+      if (visible && document.hasFocus()) markRead(room.id, lastSent, true);
+    };
+    const io = new IntersectionObserver(
+      ([e]) => {
+        visible = !!e?.isIntersecting && (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= 120);
+        mark();
+      },
+      { threshold: [0, 0.25, 0.5, 1] },
+    );
+    io.observe(el);
+    window.addEventListener('focus', mark);
+    return () => {
+      io.disconnect();
+      window.removeEventListener('focus', mark);
+    };
+  }, [lastSent, room.id, tab]);
   // A jump to a comment (a search hit, ADR-0062 §4): page up to it, scroll it into view, flash it.
   const jump = useChatView((s) => (s.jump?.roomId === room.id ? s.jump : null));
-  const section = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!jump) return;
     useChatView.getState().clearJump();

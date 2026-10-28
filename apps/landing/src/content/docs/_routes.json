@@ -293,6 +293,7 @@
 {"method":"GET","path":"/api/rooms/{id}/messages","decision":"allow","group":"messages"},
 {"method":"POST","path":"/api/rooms/{id}/messages","decision":"allow","group":"messages"},
 {"method":"GET","path":"/api/rooms/{id}/messages/{messageId}","decision":"allow","group":"messages"},
+{"method":"GET","path":"/api/rooms/{id}/messages/{messageId}/readers","decision":"allow","group":"messages"},
 {"method":"POST","path":"/api/rooms/{id}/messages/{mid}/forward","decision":"allow","group":"messages"},
 {"method":"GET","path":"/api/rooms/{id}/pins","decision":"allow","group":"messages"},
 {"method":"PUT","path":"/api/rooms/{id}/read","decision":"allow","group":"messages"},

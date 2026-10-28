@@ -398,6 +398,7 @@ import {
   ListMembersResponseSchema,
   ListBirthdaysResponseSchema,
   ListMemberBirthdaysResponseSchema,
+  ListMessageReadersResponseSchema,
   ListMessagesResponseSchema,
   ListRoomInvitesResponseSchema,
   ListRoomsResponseSchema,
@@ -3023,6 +3024,7 @@ class MockImpl {
     const before = new Map([...this.state.users.keys()].map((u) => [u, this.peerRead(roomId, u)]));
     reads.set(roomId, messageId);
     this.state.readStates.set(userId, reads);
+    this.readSeq.set(`${userId}|${roomId}`, ++this.readSeqNext);
     this.toUser(userId, { event: { case: 'readStateUpdate', value: { readState: { roomId, lastReadMessageId: messageId, unreadCount: 0, mentionCount: 0 } } } });
     if (isBot(userId)) return true;
     this.toWorkspace(
@@ -4574,7 +4576,25 @@ class MockImpl {
         hasMore = older.length > limit;
       }
       const me = this.uid(c);
-      sendMsg(c.res, 200, ListMessagesResponseSchema, { messages: messages.map((m) => this.msgOut(m, me)), hasMore });
+      // ADR-0140: the room's ✓✓ marker for rooms READY does not list (task rooms).
+      sendMsg(c.res, 200, ListMessagesResponseSchema, { messages: messages.map((m) => this.msgOut(m, me)), hasMore, peerReadMessageId: this.peerRead(room.id, me) });
+    });
+
+    // ADR-0140: «Прочитали» — the author only; the people whose marker passed the message, in
+    // the order they read, a minute apart after it (the mock models every read as seen).
+    this.route('GET', '/api/rooms/:id/messages/:mid/readers', (c) => {
+      const me = this.uid(c);
+      const room = this.roomOrArchivedFor(c.params[0] ?? '', me);
+      const msg = (s().messages.get(room.id) ?? []).find((m) => m.id === c.params[1]);
+      if (!msg) throw notFound('message not found');
+      if (msg.authorId !== me) throw forbidden('only the author sees who read the message');
+      const base = msg.createdAt ? timestampMs(msg.createdAt) : Date.now();
+      const readers = [...this.state.readStates]
+        .filter(([u, reads]) => u !== me && !this.state.users.get(u)?.user.isBot && (reads.get(room.id) ?? '') >= msg.id)
+        .map(([u]) => ({ u, seq: this.readSeq.get(`${u}|${room.id}`) ?? 0 }))
+        .sort((a, b) => a.seq - b.seq)
+        .map(({ u }, i) => ({ userId: u, readAt: timestampFromMs(base + (i + 1) * 60_000) }));
+      sendMsg(c.res, 200, ListMessageReadersResponseSchema, { readers });
     });
 
     this.route('POST', '/api/rooms/:id/messages', (c) => {
@@ -7147,6 +7167,9 @@ class MockImpl {
   }
 
   private clockMs: number | null = null;
+  /** ADR-0140: the order markers moved in («Прочитали» lists readers in it). */
+  private readSeq = new Map<string, number>();
+  private readSeqNext = 0;
 
   // ------------------------------------------------ temporary rooms (ADR-0044)
 

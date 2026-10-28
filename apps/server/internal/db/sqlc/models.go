@@ -995,6 +995,11 @@ type ExternalRemindersSent struct {
 	SentAt       time.Time
 }
 
+type FeatureEpoch struct {
+	Name      string
+	StartedAt time.Time
+}
+
 type File struct {
 	ID              uuid.UUID
 	WorkspaceID     *uuid.UUID
@@ -1371,10 +1376,20 @@ type PushIntent struct {
 	CompletedAt     *time.Time
 }
 
+type ReadSpan struct {
+	RoomID  uuid.UUID
+	UptoID  uuid.UUID
+	UserID  uuid.UUID
+	AfterID *uuid.UUID
+	FirstAt time.Time
+	LastAt  time.Time
+}
+
 type ReadState struct {
 	UserID            uuid.UUID
 	RoomID            uuid.UUID
 	LastReadMessageID uuid.UUID
+	SeenMessageID     *uuid.UUID
 }
 
 type Room struct {
