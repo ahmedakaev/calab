@@ -110,9 +110,9 @@ export function isOfficeFile(name: string): boolean {
 }
 
 /**
- * The spike's switch (off by default): the build sets VITE_OFFICE=1. The full implementation
+ * The spike's switch (off by default): a build with CALABA_OFFICE=1 (electron-vite) or VITE_OFFICE=1 (web). The full implementation
  * reads the server's OFFICE_ENABLED instead (ADR-0143 «Остаётся»).
  */
 export function officeEnabled(): boolean {
-  return (import.meta.env['VITE_OFFICE'] as string | undefined) === '1';
+  return import.meta.env.VITE_OFFICE === '1';
 }

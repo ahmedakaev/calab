@@ -116,6 +116,8 @@ import {
   CreateDiskFolderRequestSchema,
   CreateDiskLinkRequestSchema,
   DISK_BITS,
+  OfficeConfigResponseSchema,
+  OfficeMode,
   DiskActivityPageSchema,
   DiskItemKind,
   DiskItemResponseSchema,
@@ -1335,6 +1337,13 @@ function send(res: ServerResponse, status: number, body: string | Buffer, type: 
   res.writeHead(status, { 'Content-Type': type, 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store', ...extra });
   res.end(body);
 }
+
+/** The office editor's host page (infra/office) and the STUB api.js, on the mock's origin (ADR-0143). */
+const OFFICE_STUB: Record<string, { file: URL; type: string }> = {
+  '/__office/calab-editor.html': { file: new URL('../../../infra/office/calab-editor.html', import.meta.url), type: 'text/html; charset=utf-8' },
+  '/__office/calab-editor.js': { file: new URL('../../../infra/office/calab-editor.js', import.meta.url), type: 'text/javascript; charset=utf-8' },
+  '/web-apps/apps/api/documents/api.js': { file: new URL('./assets/office-stub-api.js', import.meta.url), type: 'text/javascript; charset=utf-8' },
+};
 
 /** A search snippet as the server writes it (ADR-0062 §1): the first match of `q` wrapped in \u0002…\u0003. */
 function markHit(text: string, q: string): string {
@@ -3145,6 +3154,12 @@ class MockImpl {
       const raw = Buffer.concat(chunks);
       const isApi = url.pathname.startsWith('/api/') || url.pathname.startsWith('/__mock/');
       if (!isApi) {
+        // The office editor (ADR-0143): the real host page and a STUB of the Document Server's api.js.
+        const office = OFFICE_STUB[url.pathname];
+        if (office && method === 'GET') {
+          send(res, 200, readFileSync(office.file), office.type);
+          return;
+        }
         if (url.pathname === '/healthz') {
           send(res, 200, 'ok', 'text/plain');
           return;
@@ -8870,6 +8885,24 @@ class MockImpl {
     const d = (): DiskMock => this.disk;
     const q = (c: Ctx, k: string): string => c.url.searchParams.get(k) ?? '';
     const p0 = (c: Ctx): string => c.params[0] ?? '';
+    // GET /api/office/config (ADR-0143): the editor of an xlsx / docx; the «Document Server» is the
+    // mock itself (host page + STUB api.js), the config is unsigned (the stub checks nothing).
+    this.diskRoute('GET', '/api/office/config', (c, me) => {
+      const it = d().one(q(c, 'item'), me);
+      const ext = /\.(xlsx|docx)$/i.exec(it.name)?.[1]?.toLowerCase();
+      if (!ext) throw new HttpError(415, ErrorCode.VALIDATION, 'this file type does not open in the editor');
+      const edit = (it.myBits & DISK_BITS.WRITE) !== 0n && q(c, 'phone') !== '1';
+      const origin = `http://${c.req.headers.host ?? '127.0.0.1'}`;
+      const key = `calab-mock-${it.id}`;
+      const config = {
+        type: q(c, 'phone') === '1' ? 'mobile' : 'desktop',
+        documentType: ext === 'xlsx' ? 'cell' : 'word',
+        document: { fileType: ext, key, title: it.name, url: `${origin}/__office/file`, permissions: { edit } },
+        editorConfig: { mode: edit ? 'edit' : 'view', lang: 'ru', customization: { uiTheme: q(c, 'theme') === 'light' ? 'default-light' : 'default-dark', compactHeader: true, toolbarHideFileName: true } },
+        token: 'mock',
+      };
+      sendMsg(c.res, 200, OfficeConfigResponseSchema, { docsUrl: origin, hostUrl: `${origin}/__office/calab-editor.html`, configJson: JSON.stringify(config), mode: edit ? OfficeMode.EDIT : OfficeMode.VIEW, key });
+    });
     this.diskRoute('GET', '/api/workspaces/:id/disk/items', (c, me) => {
       const r = d().list(p0(c), me, { parent: q(c, 'parent'), trashed: q(c, 'trashed') === '1' || q(c, 'trashed') === 'true', sort: q(c, 'sort'), cursor: q(c, 'cursor'), limit: Number(q(c, 'limit')) || 0 });
       sendMsg(c.res, 200, ListDiskItemsResponseSchema, r);

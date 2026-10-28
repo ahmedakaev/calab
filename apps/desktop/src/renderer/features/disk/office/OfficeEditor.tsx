@@ -81,7 +81,8 @@ export function OfficeEditor({ itemId, name, onClose }: { itemId: string; name: 
   return (
     <DialogP.Root open onOpenChange={(o) => !o && onClose()}>
       <DialogP.Portal>
-        <DialogP.Overlay className="no-drag anim-in fixed inset-0 z-[var(--z-modal)] bg-[rgb(0_0_0/82%)]" />
+        {/* Opaque, unlike the viewers' 82 %: the editor is a workspace; nothing of the app shows through the bar. */}
+        <DialogP.Overlay className="no-drag anim-in fixed inset-0 z-[var(--z-modal)] bg-[rgb(0_0_0)]" />
         <DialogP.Content
           aria-modal="true"
           data-testid="office-editor"
