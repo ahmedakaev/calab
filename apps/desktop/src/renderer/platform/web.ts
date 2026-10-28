@@ -680,6 +680,7 @@ export function createWebPlatform(): Platform {
         return Promise.resolve('external');
       },
       attention: () => undefined,
+      showWindow: () => window.focus(),
       // Installed PWA: the app icon badge (Badging API, where supported).
       setBadge: (n) => {
         if (!('setAppBadge' in navigator)) return;

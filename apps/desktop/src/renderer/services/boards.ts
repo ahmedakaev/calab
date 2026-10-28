@@ -1,5 +1,6 @@
 import { pushOnTab } from '../lib/phoneNav';
 import { holdNotification } from '../lib/notifyHold';
+import { toSource } from '../lib/notifyClick';
 import { holdBoardsAddress } from './boardsAddress';
 import { create as createMsg, type MessageInitShape } from '@bufbuild/protobuf';
 import { timestampNow } from '@bufbuild/protobuf/wkt';
@@ -289,10 +290,7 @@ function notifyTask(u: TaskUpdate): void {
   const what = noticeText(task, n);
   try {
     const note = holdNotification(new Notification(`${task.key} · ${task.title}`, { body: what, silent: true, tag: `task:${task.id}` }));
-    note.onclick = () => {
-      window.focus();
-      openTaskAnywhere(task);
-    };
+    note.onclick = toSource(() => openTaskAnywhere(task));
   } catch {
     // notifications unavailable
   }
