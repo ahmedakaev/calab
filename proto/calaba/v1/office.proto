@@ -1,0 +1,29 @@
+syntax = "proto3";
+package calaba.v1;
+
+// Office editing of Disk files in ONLYOFFICE Docs (ADR-0143, spike, off by default:
+// OFFICE_ENABLED). The editing and recalculation run in the user's browser (the Document Server
+// JS API); the API only signs the editor configuration, serves the file to the Document Server by
+// a short-lived signed URL and stores what the Document Server sends back as a new version of
+// the same Disk item.
+
+enum OfficeMode {
+  OFFICE_MODE_UNSPECIFIED = 0;
+  OFFICE_MODE_VIEW = 1; // DISK_VIEW only, a trashed item, a read-only workspace, the phone
+  OFFICE_MODE_EDIT = 2; // DISK_VIEW | DISK_WRITE on the item
+}
+
+// GET /api/office/config?item={diskItemId}&theme=dark|light&phone=0|1: the editor of one Disk
+// file. 404 when the caller has no DISK_VIEW on it (or the feature is off), 415 for a type the
+// editor does not open (xlsx, docx in v1).
+message OfficeConfigResponse {
+  // Origin of the Document Server for the browser; the client loads
+  // {docs_url}/web-apps/apps/api/documents/api.js on «Открыть» only.
+  string docs_url = 1;
+  // The DocsAPI.DocEditor configuration as JSON, with its "token" (HS256 over the rest, the
+  // Document Server's JWT secret). Passed to the editor as is: the client never edits it.
+  string config_json = 2;
+  OfficeMode mode = 3;
+  // The co-editing key: the same for everyone who opens the item until its session ends.
+  string key = 4;
+}
