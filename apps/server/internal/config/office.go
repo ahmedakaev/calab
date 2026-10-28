@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Office is the editing of Disk xlsx/docx in ONLYOFFICE Docs (ADR-0143, spike): off by default;
+// Office is the editing of office files in ONLYOFFICE Docs (ADR-0143): off by default;
 // the Document Server runs as its own container, its host and secret come only from here.
 type Office struct {
 	Enabled bool `env:"OFFICE_ENABLED"`
@@ -24,6 +24,9 @@ type Office struct {
 	ThemeLight string        `env:"OFFICE_THEME_LIGHT" envDefault:"default-light"`
 	FileURLTTL time.Duration `env:"OFFICE_FILE_URL_TTL" envDefault:"5m"`
 	MaxSizeMB  int64         `env:"OFFICE_MAX_SIZE_MB" envDefault:"100"`
+	// SessionTTL: a co-editing session in Valkey without an open or a callback for this long is
+	// forgotten (the Document Server ends idle ones itself).
+	SessionTTL time.Duration `env:"OFFICE_SESSION_TTL" envDefault:"24h"`
 }
 
 func (o *Office) validate() error {
@@ -45,6 +48,9 @@ func (o *Office) validate() error {
 	}
 	if o.FileURLTTL < 30*time.Second || o.FileURLTTL > time.Hour {
 		errs = append(errs, errors.New("OFFICE_FILE_URL_TTL must be between 30s and 1h"))
+	}
+	if o.SessionTTL < time.Hour || o.SessionTTL > 7*24*time.Hour {
+		errs = append(errs, errors.New("OFFICE_SESSION_TTL must be between 1h and 168h"))
 	}
 	if o.MaxSizeMB < 1 {
 		errs = append(errs, errors.New("OFFICE_MAX_SIZE_MB must be >= 1"))

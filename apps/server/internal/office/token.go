@@ -16,8 +16,8 @@ import (
 
 // ---- the Document Server's JWT (api.onlyoffice.com «Signature») ----
 
-// signConfig signs the editor configuration: the token's claims are the configuration itself
-// (HS256), and the configuration gets it as "token".
+// signConfig signs the editor configuration or a request to the Document Server (/converter,
+// /command): the token's claims are the object itself (HS256), which gets it as "token".
 func signConfig(secret []byte, cfg map[string]any) (string, error) {
 	claims := jwt.MapClaims{}
 	for k, v := range cfg {
@@ -62,20 +62,23 @@ func checkOperation(claims jwt.MapClaims, op string) error {
 // ---- our URL tokens (file and callback URLs) ----
 
 const (
-	opFile     = "file"
-	opCallback = "callback"
+	opFile     = "file"     // a Disk item's file: subject = the item, fid = the pinned version
+	opAttach   = "afile"    // an attachment: subject = the file itself
+	opCallback = "callback" // a session's callback: subject = the item, k = the session key
 )
 
 type urlClaims struct {
 	Op   string `json:"op"`
 	File string `json:"fid,omitempty"`
+	Key  string `json:"k,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // signURL issues the token of a file URL (exp set, pinned to fileID) or a callback URL (no exp:
-// a session may stay open for days; the Document Server's own JWT authenticates the callback).
-func signURL(key []byte, op string, item, fileID uuid.UUID, exp time.Time) (string, error) {
-	c := urlClaims{Op: op, RegisteredClaims: jwt.RegisteredClaims{Subject: item.String(), Audience: jwt.ClaimStrings{"office"}}}
+// a session may stay open for days; the Document Server's own JWT authenticates the callback;
+// pinned to the session key, so one session's URL never carries another session's saves).
+func signURL(key []byte, op string, subject, fileID uuid.UUID, sessKey string, exp time.Time) (string, error) {
+	c := urlClaims{Op: op, Key: sessKey, RegisteredClaims: jwt.RegisteredClaims{Subject: subject.String(), Audience: jwt.ClaimStrings{"office"}}}
 	if fileID != uuid.Nil {
 		c.File = fileID.String()
 	}
@@ -85,30 +88,41 @@ func signURL(key []byte, op string, item, fileID uuid.UUID, exp time.Time) (stri
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).SignedString(key)
 }
 
-// parseURL verifies a URL token of operation op at now: the item and the pinned file.
-func parseURL(key []byte, op, tok string, now time.Time) (item, fileID uuid.UUID, err error) {
+// urlToken is a verified URL token.
+type urlToken struct {
+	Subject, FileID uuid.UUID
+	Key             string
+}
+
+// parseURL verifies a URL token of operation op at now.
+func parseURL(key []byte, op, tok string, now time.Time) (urlToken, error) {
 	var c urlClaims
-	_, err = jwt.ParseWithClaims(tok, &c, func(*jwt.Token) (any, error) { return key, nil },
+	var t urlToken
+	_, err := jwt.ParseWithClaims(tok, &c, func(*jwt.Token) (any, error) { return key, nil },
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithAudience("office"),
 		jwt.WithTimeFunc(func() time.Time { return now }))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, err
+		return t, err
 	}
 	if c.Op != op {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("office: url token for %q", c.Op)
+		return t, fmt.Errorf("office: url token for %q", c.Op)
 	}
-	if op == opFile && c.ExpiresAt == nil {
-		return uuid.Nil, uuid.Nil, errors.New("office: file url token without exp")
+	if (op == opFile || op == opAttach) && c.ExpiresAt == nil {
+		return t, errors.New("office: file url token without exp")
 	}
-	if item, err = uuid.Parse(c.Subject); err != nil {
-		return uuid.Nil, uuid.Nil, err
+	if op == opCallback && c.Key == "" {
+		return t, errors.New("office: callback url token without a session key")
+	}
+	if t.Subject, err = uuid.Parse(c.Subject); err != nil {
+		return t, err
 	}
 	if c.File != "" {
-		if fileID, err = uuid.Parse(c.File); err != nil {
-			return uuid.Nil, uuid.Nil, err
+		if t.FileID, err = uuid.Parse(c.File); err != nil {
+			return t, err
 		}
 	}
-	return item, fileID, nil
+	t.Key = c.Key
+	return t, nil
 }
 
 // DeriveURLKey derives the URL token key from the API's JWT_SECRET (a separate key: a leaked
@@ -128,4 +142,14 @@ func sessionKey(urlKey []byte, item, fileID uuid.UUID) string {
 	m.Write(item[:])
 	m.Write(fileID[:])
 	return "calab-" + hex.EncodeToString(m.Sum(nil)[:20])
+}
+
+// viewKey is the document.key of an attachment (prefix "a-": immutable, one key per file) or
+// of a conversion (prefix "c-": per file and target).
+func viewKey(urlKey []byte, prefix string, fileID uuid.UUID, extra string) string {
+	m := hmac.New(sha256.New, urlKey)
+	m.Write([]byte(prefix))
+	m.Write(fileID[:])
+	m.Write([]byte(extra))
+	return "calab-" + prefix + hex.EncodeToString(m.Sum(nil)[:20])
 }
