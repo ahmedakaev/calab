@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -23,7 +24,7 @@ import (
 // stands on (or an attachment). Our URL token (short-lived, pinned to the file) and the
 // Document Server's JWT in the Authorization header (operation "download") both have to pass.
 func (s *Service) file(w http.ResponseWriter, r *http.Request) error {
-	claims, err := parseDS(s.cfg.Secret, bearer(r))
+	claims, err := parseInbound(s.cfg.Secret, bearer(r))
 	if err != nil || checkOperation(claims, "download") != nil {
 		return httpx.Unauthenticated("document server token")
 	}
@@ -210,13 +211,13 @@ func (s *Service) verifyBody(r *http.Request, raw []byte) (cbBody, error) {
 	var claims jwt.MapClaims
 	var err error
 	if tok := bearer(r); tok != "" {
-		if claims, err = parseDS(s.cfg.Secret, tok); err != nil {
+		if claims, err = parseInbound(s.cfg.Secret, tok); err != nil {
 			return b, fmt.Errorf("header token: %w", err)
 		}
 		if err := checkOperation(claims, "callback"); err != nil {
 			return b, err
 		}
-		if p, ok := claims["payload"].(map[string]any); ok {
+		if p := nested(claims); p != nil {
 			claims = p
 		}
 	} else {
@@ -226,7 +227,7 @@ func (s *Service) verifyBody(r *http.Request, raw []byte) (cbBody, error) {
 		if json.Unmarshal(raw, &withTok) != nil || withTok.Token == "" {
 			return b, errors.New("office: callback without a token")
 		}
-		if claims, err = parseDS(s.cfg.Secret, withTok.Token); err != nil {
+		if claims, err = parseInbound(s.cfg.Secret, withTok.Token); err != nil {
 			return b, fmt.Errorf("body token: %w", err)
 		}
 	}
@@ -319,7 +320,7 @@ func (s *Service) fetch(ctx context.Context, raw string) ([]byte, error) {
 	}
 	res, err := s.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, redactURL(err)
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
@@ -339,6 +340,16 @@ func (s *Service) fetch(ctx context.Context, raw string) ([]byte, error) {
 		return nil, errTooLarge
 	}
 	return body, nil
+}
+
+// redactURL drops the URL from a transport error: the Document Server's links to saved and
+// converted files are signed capabilities and do not belong in the logs.
+func redactURL(err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return fmt.Errorf("office: document server request (%s): %w", ue.Op, ue.Err)
+	}
+	return err
 }
 
 // userIDs parses the editor ids of a callback (ours are user uuids; others are dropped).

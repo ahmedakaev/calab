@@ -18,8 +18,10 @@ import (
 //
 //	k       the session's document.key
 //	f       the file the session's edits stand on (forcesave moves it)
-//	e:{uid} a member who got an edit configuration of this session
-//	on      who is connected now, comma-separated (the last status 1)
+//	e:{uid} a member who got an edit configuration of this session: "1", or "0" once dropped
+//	        for losing «Правка» (revoked: not «editing», still rechecked)
+//	v:{uid} a member who got a view configuration of this session
+//	on      the connected editors, comma-separated (the last status 1)
 //
 // and a TTL that every open and every callback renews; the set office:live lists the items with
 // a session (the access sweep). Every change is one script: atomic per item.
@@ -31,19 +33,20 @@ type ValkeySessions struct {
 func sessKey(item uuid.UUID) string { return redisx.Key("office:s:" + item.String()) }
 func liveKey() string               { return redisx.Key("office:live") }
 
-// joinScript: KEYS session, live. ARGV key, file, editor ("" = none), ttl s, item.
+// joinScript: KEYS session, live. ARGV key, file, user, mode (e | v), ttl s, item.
 var joinScript = rueidis.NewLuaScript(`
 if redis.call('HEXISTS', KEYS[1], 'k') == 0 then
   redis.call('DEL', KEYS[1])
   redis.call('HSET', KEYS[1], 'k', ARGV[1], 'f', ARGV[2])
 end
-if ARGV[3] ~= '' then redis.call('HSET', KEYS[1], 'e:' .. ARGV[3], '1') end
-redis.call('EXPIRE', KEYS[1], ARGV[4])
-redis.call('SADD', KEYS[2], ARGV[5])
+if ARGV[4] == 'e' then redis.call('HSET', KEYS[1], 'e:' .. ARGV[3], '1')
+else redis.call('HSET', KEYS[1], 'v:' .. ARGV[3], '1') end
+redis.call('EXPIRE', KEYS[1], ARGV[5])
+redis.call('SADD', KEYS[2], ARGV[6])
 return redis.call('HMGET', KEYS[1], 'k', 'f')`)
 
 // casScript runs one change on the session with key ARGV[1] (0 when it is another or gone).
-// KEYS session, live. ARGV key, op (advance | online | revoke | end), value, ttl s, item.
+// KEYS session, live. ARGV key, op (advance | online | revoke | forget | end), value, ttl s, item.
 var casScript = rueidis.NewLuaScript(`
 if redis.call('HGET', KEYS[1], 'k') ~= ARGV[1] then return 0 end
 local op = ARGV[2]
@@ -61,7 +64,12 @@ if op == 'online' then
   return 2
 end
 if op == 'revoke' then
-  for id in string.gmatch(ARGV[3], '[^,]+') do redis.call('HDEL', KEYS[1], 'e:' .. id) end
+  for id in string.gmatch(ARGV[3], '[^,]+') do
+    if redis.call('HEXISTS', KEYS[1], 'e:' .. id) == 1 then redis.call('HSET', KEYS[1], 'e:' .. id, '0') end
+  end
+end
+if op == 'forget' then
+  for id in string.gmatch(ARGV[3], '[^,]+') do redis.call('HDEL', KEYS[1], 'e:' .. id, 'v:' .. id) end
 end
 redis.call('EXPIRE', KEYS[1], ARGV[4])
 return 1`)
@@ -75,13 +83,13 @@ func (v ValkeySessions) ttl() string {
 }
 
 // Join implements Sessions.
-func (v ValkeySessions) Join(ctx context.Context, item uuid.UUID, s Session, editor *uuid.UUID) (Session, error) {
-	ed := ""
-	if editor != nil {
-		ed = editor.String()
+func (v ValkeySessions) Join(ctx context.Context, item uuid.UUID, s Session, user uuid.UUID, edit bool) (Session, error) {
+	mode := "v"
+	if edit {
+		mode = "e"
 	}
 	vals, err := joinScript.Exec(ctx, v.C, []string{sessKey(item), liveKey()},
-		[]string{s.Key, s.FileID.String(), ed, v.ttl(), item.String()}).ToArray()
+		[]string{s.Key, s.FileID.String(), user.String(), mode, v.ttl(), item.String()}).ToArray()
 	if err != nil {
 		return Session{}, err
 	}
@@ -112,11 +120,22 @@ func parseSession(m map[string]string) (Session, bool, error) {
 		return Session{}, false, err
 	}
 	s := Session{Key: m["k"], FileID: fid}
-	for k := range m {
-		if id, ok := strings.CutPrefix(k, "e:"); ok {
-			if u, err := uuid.Parse(id); err == nil {
-				s.Editors = append(s.Editors, u)
-			}
+	for k, val := range m {
+		mark, id, ok := strings.Cut(k, ":")
+		if !ok {
+			continue
+		}
+		u, err := uuid.Parse(id)
+		if err != nil {
+			continue
+		}
+		switch {
+		case mark == "e" && val == "0":
+			s.Revoked = append(s.Revoked, u)
+		case mark == "e":
+			s.Editors = append(s.Editors, u)
+		case mark == "v":
+			s.Viewers = append(s.Viewers, u)
 		}
 	}
 	for _, id := range strings.Split(m["on"], ",") {
@@ -155,6 +174,12 @@ func (v ValkeySessions) Online(ctx context.Context, item uuid.UUID, key string, 
 // Revoke implements Sessions.
 func (v ValkeySessions) Revoke(ctx context.Context, item uuid.UUID, key string, users []uuid.UUID) error {
 	_, err := v.cas(ctx, item, key, "revoke", joinIDs(users))
+	return err
+}
+
+// Forget implements Sessions.
+func (v ValkeySessions) Forget(ctx context.Context, item uuid.UUID, key string, users []uuid.UUID) error {
+	_, err := v.cas(ctx, item, key, "forget", joinIDs(users))
 	return err
 }
 

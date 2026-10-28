@@ -16,27 +16,72 @@ import (
 
 // ---- the Document Server's JWT (api.onlyoffice.com «Signature») ----
 
+// ConfigTokenTTL bounds the signed editor configuration. The configuration reaches the browser
+// and the host page accepts it from any parent, so without an expiry a member who kept it could
+// rejoin the session after losing access for as long as the session lives (days: forcesave keeps
+// the key). Longer than a working day: the Document Server checks it on every (re)connect.
+const ConfigTokenTTL = 12 * time.Hour
+
+// requestTokenTTL bounds our requests to the Document Server (/command, /converter).
+const requestTokenTTL = 5 * time.Minute
+
 // signConfig signs the editor configuration or a request to the Document Server (/converter,
-// /command): the token's claims are the object itself (HS256), which gets it as "token".
-func signConfig(secret []byte, cfg map[string]any) (string, error) {
+// /command): the token's claims are the object itself (HS256), which gets it as "token". exp is
+// on the wall clock: the Document Server checks it with its own.
+func signConfig(secret []byte, cfg map[string]any, ttl time.Duration) (string, error) {
 	claims := jwt.MapClaims{}
 	for k, v := range cfg {
 		if k != "token" {
 			claims[k] = v
 		}
 	}
+	claims["exp"] = jwt.NewNumericDate(time.Now().Add(ttl))
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secret)
 }
 
-// parseDS verifies a token the Document Server signed and returns its claims.
+// parseDS verifies a token signed with the Document Server's secret and returns its claims:
+// HS256 only, exp required (the Document Server signs its outbox tokens with one, 5 min by
+// default: a captured request is not replayable for long), a minute of clock skew.
 func parseDS(secret []byte, tok string) (jwt.MapClaims, error) {
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(tok, claims, func(*jwt.Token) (any, error) { return secret, nil },
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired(), jwt.WithLeeway(time.Minute))
 	if err != nil {
 		return nil, err
 	}
 	return claims, nil
+}
+
+// errOwnToken: a token of ours (the editor configuration every opener gets, a command, a
+// conversion request) presented as a request of the Document Server. The secret is shared, so
+// the claims tell them apart.
+var errOwnToken = errors.New("office: not a document server request token")
+
+// parseInbound verifies the token of a request the Document Server sends us (file download,
+// callback): parseDS, then refuses the shapes we sign ourselves — above all the editor
+// configuration, which every browser that opens a file holds.
+func parseInbound(secret []byte, tok string) (jwt.MapClaims, error) {
+	claims, err := parseDS(secret, tok)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range []jwt.MapClaims{claims, nested(claims)} {
+		for _, k := range []string{"document", "editorConfig", "documentType", "c", "outputtype"} {
+			if _, ok := c[k]; ok {
+				return nil, errOwnToken
+			}
+		}
+	}
+	return claims, nil
+}
+
+// nested is claims.payload (the header token of the Document Server: the body under
+// "payload"), or nil.
+func nested(claims jwt.MapClaims) jwt.MapClaims {
+	if p, ok := claims["payload"].(map[string]any); ok {
+		return p
+	}
+	return nil
 }
 
 // bearer is the token of an "Authorization: Bearer …" header ("" without one).

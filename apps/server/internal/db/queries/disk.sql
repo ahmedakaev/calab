@@ -462,6 +462,11 @@ WHERE f.id IN (
 )
 RETURNING f.*;
 
+-- name: LastDiskFileVersion :one
+-- The file an item's current file replaced (its newest version; ADR-0143: an editor session on it
+-- is the one whose forcesave produced the current file).
+SELECT file_id FROM disk_file_versions WHERE item_id = $1 ORDER BY id DESC LIMIT 1;
+
 -- name: GetDiskItemByVersionFile :one
 -- The item a previous version belongs to (files.CanRead: a version is read through its item).
 SELECT di.* FROM disk_file_versions v JOIN disk_items di ON di.id = v.item_id WHERE v.file_id = $1;

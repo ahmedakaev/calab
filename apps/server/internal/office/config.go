@@ -130,14 +130,31 @@ func (s *Service) openItem(r *http.Request, uid uuid.UUID, raw string, phone boo
 		op.fileURL = s.cfg.APIURL + "/api/office/file/" + tok
 		return op, nil
 	}
-	var editor *uuid.UUID
-	if mode == v1.OfficeMode_OFFICE_MODE_EDIT {
-		editor = &uid
-	}
+	// Viewers are marked too: the Document Server never reports them (status 1 lists editors),
+	// so the access recheck finds them only by these marks.
+	editing := mode == v1.OfficeMode_OFFICE_MODE_EDIT
 	fresh := Session{Key: sessionKey(s.cfg.URLKey, it.ID, it.FileID), FileID: it.FileID}
-	sess, err := s.sessions.Join(ctx, it.ID, fresh, editor)
+	sess, err := s.sessions.Join(ctx, it.ID, fresh, uid, editing)
 	if err != nil {
 		return op, err
+	}
+	if sess.FileID != it.FileID {
+		// The current file replaced the session's own: a forcesave of this session committed and
+		// its Advance has not run yet (only a callback of the live key saves over the session's
+		// file). Ending the session here would refuse every later save of its editors.
+		prev, err := s.store.LastVersion(ctx, it.ID)
+		if err != nil {
+			return op, err
+		}
+		if prev == sess.FileID {
+			ok, err := s.sessions.Advance(ctx, it.ID, sess.Key, it.FileID)
+			if err != nil {
+				return op, err
+			}
+			if ok {
+				sess.FileID = it.FileID
+			}
+		}
 	}
 	if sess.FileID != it.FileID {
 		// A session left behind (the Document Server lost it, or the file changed outside the
@@ -146,7 +163,7 @@ func (s *Service) openItem(r *http.Request, uid uuid.UUID, raw string, phone boo
 		if err := s.sessions.End(ctx, it.ID, sess.Key); err != nil {
 			return op, err
 		}
-		if sess, err = s.sessions.Join(ctx, it.ID, fresh, editor); err != nil {
+		if sess, err = s.sessions.Join(ctx, it.ID, fresh, uid, editing); err != nil {
 			return op, err
 		}
 	}
@@ -251,7 +268,7 @@ func (s *Service) sign(op opening, uid uuid.UUID, name string, light, phone bool
 		},
 		"editorConfig": editorConfig,
 	}
-	tok, err := signConfig(s.cfg.Secret, cfg)
+	tok, err := signConfig(s.cfg.Secret, cfg, ConfigTokenTTL)
 	if err != nil {
 		return nil, err
 	}

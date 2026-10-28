@@ -738,6 +738,19 @@ func (q *Queries) LastDiskActivity(ctx context.Context, itemID *uuid.UUID) (Disk
 	return i, err
 }
 
+const lastDiskFileVersion = `-- name: LastDiskFileVersion :one
+SELECT file_id FROM disk_file_versions WHERE item_id = $1 ORDER BY id DESC LIMIT 1
+`
+
+// The file an item's current file replaced (its newest version; ADR-0143: an editor session on it
+// is the one whose forcesave produced the current file).
+func (q *Queries) LastDiskFileVersion(ctx context.Context, itemID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lastDiskFileVersion, itemID)
+	var file_id uuid.UUID
+	err := row.Scan(&file_id)
+	return file_id, err
+}
+
 const listDiskFiles = `-- name: ListDiskFiles :many
 SELECT id, workspace_id, uploader_id, key, thumbnail_key, name, mime, size, width, height, sha256, created_at, voice_duration_ms, voice_waveform FROM files WHERE id = ANY($1::uuid[])
 `

@@ -176,6 +176,15 @@ func (d *DiskStore) AddFile(r *http.Request, ws uuid.UUID, parent *uuid.UUID, na
 	return disk.ItemProto(it, nf, bits), nil
 }
 
+// LastVersion implements Store.
+func (d *DiskStore) LastVersion(ctx context.Context, itemID uuid.UUID) (uuid.UUID, error) {
+	id, err := d.DB.Q.LastDiskFileVersion(ctx, itemID)
+	if db.IsNotFound(err) {
+		return uuid.Nil, nil
+	}
+	return id, err
+}
+
 // DisplayName implements Store.
 func (d *DiskStore) DisplayName(ctx context.Context, uid uuid.UUID) (string, error) {
 	u, err := d.DB.Q.GetUser(ctx, uid)

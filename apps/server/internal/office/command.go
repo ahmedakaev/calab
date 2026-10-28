@@ -49,29 +49,49 @@ func (s *Service) RunSweep(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// recheck drops the connected users of item's session who lost access.
+// recheck drops the users of item's session who lost access. It checks everyone who got a
+// configuration of the session, not only the connected editors: the Document Server reports no
+// viewers (status 1 lists editors), and a configuration is signed for ConfigTokenTTL, so its
+// holder can reconnect after losing access.
+//   - no DISK_VIEW: dropped, marks forgotten (once the drop went through);
+//   - an edit configuration and no «Правка» now: dropped and its mark turned into a revoked one;
+//     a revoked editor is dropped again whenever they show up connected as an editor (a kept
+//     edit configuration), while a view configuration they open legitimately stays (viewers
+//     are never in Online).
 func (s *Service) recheck(ctx context.Context, item uuid.UUID) {
 	sess, ok, err := s.sessions.Get(ctx, item)
 	if err != nil || !ok {
 		return
 	}
-	editors := map[uuid.UUID]bool{}
-	for _, u := range sess.Editors {
-		editors[u] = true
+	editors, revoked, online := idSet(sess.Editors), idSet(sess.Revoked), idSet(sess.Online)
+	var users []uuid.UUID
+	seen := map[uuid.UUID]bool{}
+	for _, list := range [][]uuid.UUID{sess.Online, sess.Editors, sess.Revoked, sess.Viewers} {
+		for _, u := range list {
+			if !seen[u] {
+				seen[u] = true
+				users = append(users, u)
+			}
+		}
 	}
-	var drop, revoke []uuid.UUID
-	for _, u := range sess.Online {
+	var drop, revoke, forget []uuid.UUID
+	for _, u := range users {
 		it, err := s.store.ItemFor(ctx, u, item)
 		switch {
 		case errors.Is(err, ErrNotFound):
-			drop = append(drop, u)
+			drop, forget = append(drop, u), append(forget, u)
 		case err != nil:
 			slog.WarnContext(ctx, "office: recheck", "item", item, "err", err)
 			return
-		case editors[u]:
+		case editors[u] || revoked[u]:
 			f, _ := FormatOf(it.Name)
-			if Mode(it, f, false) != v1.OfficeMode_OFFICE_MODE_EDIT {
+			if Mode(it, f, false) == v1.OfficeMode_OFFICE_MODE_EDIT {
+				continue
+			}
+			if editors[u] {
 				drop, revoke = append(drop, u), append(revoke, u)
+			} else if online[u] {
+				drop = append(drop, u)
 			}
 		}
 	}
@@ -90,7 +110,21 @@ func (s *Service) recheck(ctx context.Context, item uuid.UUID) {
 	}
 	if err := s.command(ctx, map[string]any{"c": "drop", "key": sess.Key, "users": ids}); err != nil {
 		slog.WarnContext(ctx, "office: drop", "item", item, "err", err)
+		return // the marks stay: the next sweep drops them again
 	}
+	if len(forget) > 0 {
+		if err := s.sessions.Forget(ctx, item, sess.Key, forget); err != nil {
+			slog.WarnContext(ctx, "office: forget", "item", item, "err", err)
+		}
+	}
+}
+
+func idSet(ids []uuid.UUID) map[uuid.UUID]bool {
+	m := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		m[id] = true
+	}
+	return m
 }
 
 // command calls the Document Server's command service (POST {internal}/command, the JWT in
@@ -111,7 +145,7 @@ func (s *Service) command(ctx context.Context, cmd map[string]any) error {
 
 // postDS posts a signed JSON request to the Document Server and decodes its JSON answer.
 func (s *Service) postDS(ctx context.Context, path string, body map[string]any, out any) error {
-	tok, err := signConfig(s.cfg.Secret, body)
+	tok, err := signConfig(s.cfg.Secret, body, requestTokenTTL)
 	if err != nil {
 		return err
 	}
@@ -132,7 +166,7 @@ func (s *Service) postDS(ctx context.Context, path string, body map[string]any, 
 	req.Header.Set("Accept", "application/json")
 	res, err := s.HTTP.Do(req)
 	if err != nil {
-		return err
+		return redactURL(err)
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {

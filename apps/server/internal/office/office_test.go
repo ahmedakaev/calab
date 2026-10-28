@@ -74,6 +74,15 @@ func (f *fakeStore) AddFile(_ *http.Request, _ uuid.UUID, _ *uuid.UUID, name str
 
 func (f *fakeStore) DisplayName(context.Context, uuid.UUID) (string, error) { return "Имя", nil }
 
+func (f *fakeStore) LastVersion(_ context.Context, id uuid.UUID) (uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if v := f.versions[id]; len(v) > 0 {
+		return v[len(v)-1], nil
+	}
+	return uuid.Nil, nil
+}
+
 func (f *fakeStore) add(name string, body []byte) Item {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -138,18 +147,36 @@ type fakeSessions struct {
 	m  map[uuid.UUID]Session
 }
 
-func (f *fakeSessions) Join(_ context.Context, item uuid.UUID, s Session, editor *uuid.UUID) (Session, error) {
+func (f *fakeSessions) Join(_ context.Context, item uuid.UUID, s Session, user uuid.UUID, edit bool) (Session, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	cur, ok := f.m[item]
 	if !ok {
 		cur = s
 	}
-	if editor != nil && !slices.Contains(cur.Editors, *editor) {
-		cur.Editors = append(cur.Editors, *editor)
+	switch {
+	case edit && !slices.Contains(cur.Editors, user):
+		cur.Revoked = slices.DeleteFunc(cur.Revoked, func(u uuid.UUID) bool { return u == user })
+		cur.Editors = append(cur.Editors, user)
+	case !edit && !slices.Contains(cur.Viewers, user):
+		cur.Viewers = append(cur.Viewers, user)
 	}
 	f.m[item] = cur
 	return cur, nil
+}
+
+func (f *fakeSessions) Forget(_ context.Context, item uuid.UUID, key string, users []uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, ok := f.m[item]
+	if ok && s.Key == key {
+		gone := func(u uuid.UUID) bool { return slices.Contains(users, u) }
+		s.Editors = slices.DeleteFunc(s.Editors, gone)
+		s.Revoked = slices.DeleteFunc(s.Revoked, gone)
+		s.Viewers = slices.DeleteFunc(s.Viewers, gone)
+		f.m[item] = s
+	}
+	return nil
 }
 
 func (f *fakeSessions) Online(_ context.Context, item uuid.UUID, key string, users []uuid.UUID) (bool, error) {
@@ -170,7 +197,12 @@ func (f *fakeSessions) Revoke(_ context.Context, item uuid.UUID, key string, use
 	defer f.mu.Unlock()
 	s, ok := f.m[item]
 	if ok && s.Key == key {
-		s.Editors = slices.DeleteFunc(s.Editors, func(u uuid.UUID) bool { return slices.Contains(users, u) })
+		for _, u := range users {
+			if slices.Contains(s.Editors, u) {
+				s.Editors = slices.DeleteFunc(s.Editors, func(x uuid.UUID) bool { return x == u })
+				s.Revoked = append(s.Revoked, u)
+			}
+		}
 		f.m[item] = s
 	}
 	return nil
@@ -312,9 +344,14 @@ func dig(m map[string]any, path ...string) any {
 	return v
 }
 
-// dsToken signs as the Document Server.
+// dsToken signs as the Document Server (exp in 5 min unless claims set one; "exp": nil = none).
 func dsToken(t *testing.T, secret []byte, claims jwt.MapClaims) string {
 	t.Helper()
+	if v, ok := claims["exp"]; !ok {
+		claims["exp"] = time.Now().Add(5 * time.Minute).Unix()
+	} else if v == nil {
+		delete(claims, "exp")
+	}
 	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secret)
 	if err != nil {
 		t.Fatal(err)

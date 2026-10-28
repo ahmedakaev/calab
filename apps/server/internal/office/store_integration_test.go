@@ -149,6 +149,14 @@ func TestDiskStoreEndToEnd(t *testing.T) {
 	if versions != 1 {
 		t.Fatal("the previous file must be a version")
 	}
+	// The open-during-forcesave rule reads the newest version: the file the forcesave replaced.
+	ds2 := &DiskStore{DB: d, Files: fs, Disk: dk}
+	if last, err := ds2.LastVersion(ctx, it.ID); err != nil || last != f.ID {
+		t.Fatalf("last version %v %v", last, err)
+	}
+	if last, err := ds2.LastVersion(ctx, uuid.New()); err != nil || last != uuid.Nil {
+		t.Fatalf("no versions: %v %v", last, err)
+	}
 	// Alice (the item's owner) leaves the workspace during the session: her save is refused,
 	// nothing is stored.
 	if _, err := d.Pool.Exec(ctx, `DELETE FROM workspace_members WHERE workspace_id = $1 AND user_id = $2`, ws, alice); err != nil {

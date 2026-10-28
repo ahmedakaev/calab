@@ -103,6 +103,8 @@ type Store interface {
 	// AddFile stores body as a new Disk item named name in folder parent of workspace ws for the
 	// caller of r (DISK_WRITE on the folder): «Сохранить как».
 	AddFile(r *http.Request, ws uuid.UUID, parent *uuid.UUID, name string, f Format, body []byte) (*v1.DiskItem, error)
+	// LastVersion is the file the item's current file replaced (uuid.Nil: no versions).
+	LastVersion(ctx context.Context, itemID uuid.UUID) (uuid.UUID, error)
 	// DisplayName is the user's name shown to co-editors.
 	DisplayName(ctx context.Context, uid uuid.UUID) (string, error)
 }
@@ -114,16 +116,19 @@ type Session struct {
 	// FileID is the file the session's edits stand on: the file at its start, then the one
 	// each forcesave (status 6) stored.
 	FileID uuid.UUID
-	// Editors got an edit configuration of this session; Online are connected now (status 1).
-	Editors, Online []uuid.UUID
+	// Editors got an edit configuration of this session; Revoked got one too but were dropped
+	// for losing «Правка» (still rechecked: the signed configuration they hold lets them rejoin
+	// in edit mode until it expires); Viewers got a view configuration. Online are the
+	// connected editors (status 1: the Document Server reports no viewers).
+	Editors, Revoked, Viewers, Online []uuid.UUID
 }
 
 // Sessions keeps the live sessions (Valkey: sessions.go; fakes in the tests). Every method is
 // atomic per item.
 type Sessions interface {
-	// Join returns the item's live session or starts s (set if absent); editor (non-nil) is
-	// marked as one who got an edit configuration.
-	Join(ctx context.Context, item uuid.UUID, s Session, editor *uuid.UUID) (Session, error)
+	// Join returns the item's live session or starts s (set if absent); user is marked as one
+	// who got an edit (edit) or a view configuration of it.
+	Join(ctx context.Context, item uuid.UUID, s Session, user uuid.UUID, edit bool) (Session, error)
 	// Get returns the item's live session.
 	Get(ctx context.Context, item uuid.UUID) (Session, bool, error)
 	// Advance moves the session with key onto fileID (after a forcesave); false if it is gone.
@@ -131,8 +136,11 @@ type Sessions interface {
 	// Online records who is connected to the session with key (status 1); changed reports a
 	// different set than before.
 	Online(ctx context.Context, item uuid.UUID, key string, users []uuid.UUID) (changed bool, err error)
-	// Revoke takes the edit mark of users (dropped editors).
+	// Revoke turns the edit mark of users into a revoked one (editors dropped for losing
+	// «Правка»: no longer «editing», still rechecked).
 	Revoke(ctx context.Context, item uuid.UUID, key string, users []uuid.UUID) error
+	// Forget removes every mark of users (dropped for losing access to the item).
+	Forget(ctx context.Context, item uuid.UUID, key string, users []uuid.UUID) error
 	// End removes the session with key (compare and delete).
 	End(ctx context.Context, item uuid.UUID, key string) error
 	// Live lists the items with a session (the access sweep).
