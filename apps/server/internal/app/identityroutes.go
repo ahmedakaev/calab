@@ -226,6 +226,7 @@ var identityRoutes = map[string]identityScope{
 	"GET /api/rooms/{id}/invites":                                         scopeRoom,
 	"GET /api/rooms/{id}/messages":                                        scopeRoom,
 	"GET /api/rooms/{id}/messages/{messageId}":                            scopeRoom,
+	"GET /api/rooms/{id}/messages/{messageId}/readers":                    scopeRoom,
 	"GET /api/rooms/{id}/pins":                                            scopeRoom,
 	"GET /api/rooms/{id}/recordings/{rid}/transcript":                     scopeRoom,
 	"GET /api/sticker-packs/{id}":                                         scopePack,
