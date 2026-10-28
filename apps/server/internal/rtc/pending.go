@@ -69,7 +69,7 @@ func (s *Service) confirmConnect(wid, rid, uid, sid uuid.UUID, joinedAt int64) {
 }
 
 // dropPending removes a device state in st's room that has no LiveKit connection: still
-// pending, or a seat held after a lost connection (ADR-0142). A device the server takes out of
+// pending, or a seat held after a lost connection (ADR-0144). A device the server takes out of
 // voice (lost access, kicked, session revoked) without a connection has no participant_left to
 // clear its state. A connected device is left to participant_left.
 func (s *Service) dropPending(ctx context.Context, wid uuid.UUID, st voice.SessionState) {

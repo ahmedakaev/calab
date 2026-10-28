@@ -3120,7 +3120,7 @@ type VoiceState struct {
 	// user talks on an inbound phone call - connected, nothing published or received. Others show
 	// the row dimmed with a phone icon. Set through PATCH /api/voice/self.
 	OnPhone bool `protobuf:"varint,13,opt,name=on_phone,json=onPhone,proto3" json:"on_phone,omitempty"`
-	// Connection lost (ADR-0142): every device of the user in this room dropped out of LiveKit
+	// Connection lost (ADR-0144): every device of the user in this room dropped out of LiveKit
 	// involuntarily (a frozen phone, a lost network) and the server keeps the seat for
 	// VOICE_LOST_GRACE (60 s by default). Others show the row dimmed with «no connection», play no
 	// leave cue, and no join cue when the device comes back in time. The seat still counts against

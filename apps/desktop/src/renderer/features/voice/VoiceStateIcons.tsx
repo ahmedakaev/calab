@@ -13,7 +13,7 @@ export type VoiceStateIcon = 'server-muted' | 'muted' | 'deafened' | 'ptt-idle' 
  * Which icons a participant shows (docs/09 #15, Discord): the crossed mic first — red for a
  * moderator (server) mute, grey for a self-mute; deafen implies mute, so a deafened member shows
  * the crossed mic too, then the crossed headphones. On a phone call (ADR-0133) only the handset:
- * the mic state of a parked room says nothing then. A seat whose connection is lost (ADR-0142)
+ * the mic state of a parked room says nothing then. A seat whose connection is lost (ADR-0144)
  * shows only «нет связи»: nothing else of it is live.
  */
 export function voiceStateIcons(muted: boolean, deafened: boolean, serverMuted = false, pttIdle = false, onPhone = false, connectionLost = false): VoiceStateIcon[] {
@@ -44,7 +44,7 @@ export function VoiceStateIcons({
   pttIdle?: boolean;
   /** Parked here for a phone call (ADR-0133, VoiceState.on_phone): a handset instead. */
   onPhone?: boolean;
-  /** The seat is kept after a lost connection (ADR-0142, VoiceState.connection_lost). */
+  /** The seat is kept after a lost connection (ADR-0144, VoiceState.connection_lost). */
   connectionLost?: boolean;
   className?: string;
 }): ReactNode {
@@ -80,7 +80,7 @@ export function OnPhoneIcon({ className }: { className?: string }): ReactNode {
   );
 }
 
-/** «Нет связи» (ADR-0142): the seat is kept while the device reconnects; the tooltip is native. */
+/** «Нет связи» (ADR-0144): the seat is kept while the device reconnects; the tooltip is native. */
 export function ConnectionLostIcon({ className }: { className?: string }): ReactNode {
   return (
     <span className="inline-flex shrink-0" title={t('call.connectionLost')}>
