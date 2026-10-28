@@ -640,6 +640,8 @@ export function createWebPlatform(): Platform {
       setSettings: () => Promise.resolve(settings()),
       takeDeepLink,
       onDeepLink: noop,
+      // The browser's only power-like event: `online` as 'resume'. services/session.ts probes the
+      // gateway for it (lib/powerGateway.ts) instead of the desktop's reconnect after sleep.
       onPower: (cb: (e: PowerEvent) => void) => {
         const online = (): void => cb('resume');
         window.addEventListener('online', online);
