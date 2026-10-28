@@ -140,7 +140,7 @@ const REMOVED_GRACE_MS = 500;
 /**
  * Rejoin backoff (#255): 1, 2, 4, 8 s, then at most 15 s apart; at least 5 attempts and 90 s — the
  * server's default seat hold after a drop (VOICE_LOST_GRACE 60 s, removed by the next 30 s
- * reconcile, ADR-0144) — before «Не удалось вернуться в голосовую комнату».
+ * reconcile, ADR-0146) — before «Не удалось вернуться в голосовую комнату».
  */
 const REJOIN_MIN_ATTEMPTS = 5;
 const REJOIN_MAX_BACKOFF_MS = 15_000;
@@ -872,7 +872,7 @@ class VoiceEngine {
   /**
    * Rejoin after an unexpected disconnect: 1 s, 2 s, 4 s, 8 s, then every 15 s (`now`: the first one
    * at once), for at least 5 attempts and REJOIN_GIVE_UP_MS — as long as the server holds a dropped
-   * seat (ADR-0144), so a metro tunnel or a Wi-Fi ↔ LTE switch does not end the call while the
+   * seat (ADR-0146), so a metro tunnel or a Wi-Fi ↔ LTE switch does not end the call while the
    * others still see «Нет связи». The network coming back wakes the next attempt at once. The seat
    * (room id, phase 'reconnecting') stays in the store for the whole cycle: the voice panel keeps
    * its state and open menus instead of remounting on every attempt.
