@@ -29,6 +29,15 @@ const (
 	commentRoomCap = 5000
 	// commentTimeout bounds the comment pass; past it the search answers without comments.
 	commentTimeout = 1500 * time.Millisecond
+	// TaskSearchSlots is how many task searches run at once in one API process: well under the
+	// default pool of 20 (security review #95), since a filter-only search over a workspace and
+	// its archive, sorted by a computed column, reads every visible task.
+	TaskSearchSlots = 4
+	// TaskSearchTimeout is the statement budget of the key, task and snippet queries; past it
+	// the search answers 503 (snippets: none) rather than holding a connection.
+	TaskSearchTimeout = 3 * time.Second
+	// searchSlotWait is how long a search waits for a free slot before answering 503.
+	searchSlotWait = time.Second
 )
 
 // doneStatuses is the condition over tasks t of a status of a done type (completed, cancelled).
@@ -157,6 +166,11 @@ func (s *Service) search(w http.ResponseWriter, r *http.Request) error {
 	if err := take(r, s.SearchLimit); err != nil {
 		return err
 	}
+	release, err := s.searchSlot(r.Context(), searchSlotWait)
+	if err != nil {
+		return err
+	}
+	defer release()
 	all, err := VisibleBoards(r.Context(), s.db.Q, wsID, m)
 	if err != nil {
 		return err
@@ -216,9 +230,13 @@ func (s *Service) search(w http.ResponseWriter, r *http.Request) error {
 		where = append(where, text)
 	}
 	order := sortOrder(req, key, rank)
-	rows, err := queryTasks(r.Context(), s.db.Pool, "WHERE "+strings.Join(where, " AND ")+" ORDER BY "+order+
-		" LIMIT "+strconv.Itoa(req.limit+1)+" OFFSET "+strconv.Itoa(req.offset), a.Values()...)
-	if err != nil {
+	var rows []taskRow
+	if err := s.boundedRead(r.Context(), func(tx pgx.Tx) error {
+		var err error
+		rows, err = queryTasks(r.Context(), tx, "WHERE "+strings.Join(where, " AND ")+" ORDER BY "+order+
+			" LIMIT "+strconv.Itoa(req.limit+1)+" OFFSET "+strconv.Itoa(req.offset), a.Values()...)
+		return err
+	}); err != nil {
 		return err
 	}
 	if len(rows) > req.limit {
@@ -284,8 +302,13 @@ func (s *Service) keyTask(ctx context.Context, vis Visible, q string, viewer uui
 		return nil, nil
 	}
 	var a Args
-	rows, err := queryTasks(ctx, s.db.Pool, "WHERE "+vis.Cond(&a)+" AND "+kq.KeyMatchSQL(&a)+
-		" ORDER BY t.archived_at IS NOT NULL, t.updated_at DESC LIMIT 1", a.Values()...)
+	var rows []taskRow
+	err := s.boundedRead(ctx, func(tx pgx.Tx) error {
+		var err error
+		rows, err = queryTasks(ctx, tx, "WHERE "+vis.Cond(&a)+" AND "+kq.KeyMatchSQL(&a)+
+			" ORDER BY t.archived_at IS NOT NULL, t.updated_at DESC LIMIT 1", a.Values()...)
+		return err
+	})
 	if err != nil || len(rows) == 0 {
 		return nil, err
 	}
@@ -325,11 +348,57 @@ func (s *Service) commentRooms(ctx context.Context, scope string, args []any, pq
 		out, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 		return err
 	})
-	var pe *pgconn.PgError
-	if err != nil && ctx.Err() == nil && (errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &pe) && pe.Code == "57014")) {
+	if isSearchTimeout(ctx, err) {
 		return nil, nil
 	}
 	return out, err
+}
+
+// searchSlot takes one of the process's task search slots, waiting at most wait; 503 when none
+// frees up. release gives it back.
+func (s *Service) searchSlot(ctx context.Context, wait time.Duration) (release func(), err error) {
+	if s.searchSlots == nil {
+		return func() {}, nil
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case s.searchSlots <- struct{}{}:
+		return func() { <-s.searchSlots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-t.C:
+		return nil, httpx.Unavailable(errors.New("task search: no free slot"))
+	}
+}
+
+// boundedRead runs fn in a read-only transaction under the task search statement budget; a
+// query past it is 503 (wrapped: isSearchTimeout still recognises it).
+func (s *Service) boundedRead(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	budget := s.SearchTimeout
+	if budget <= 0 {
+		budget = TaskSearchTimeout
+	}
+	err := s.db.ReadTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT set_config('statement_timeout', $1, true)", strconv.FormatInt(budget.Milliseconds(), 10)); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
+	if isSearchTimeout(ctx, err) {
+		return httpx.Unavailable(err)
+	}
+	return err
+}
+
+// isSearchTimeout: err is a statement timeout (or a deadline) of a search query while the
+// request itself is still alive.
+func isSearchTimeout(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	var pe *pgconn.PgError
+	return errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &pe) && pe.Code == "57014")
 }
 
 // snippets: of the found tasks whose title has no matching word, a fragment of the description
@@ -353,7 +422,7 @@ func (s *Service) snippets(ctx context.Context, rows []taskRow, rooms []uuid.UUI
 		desc, comment *string
 	}
 	var list []row
-	err := s.db.ReadTx(ctx, func(tx pgx.Tx) error {
+	err := s.boundedRead(ctx, func(tx pgx.Tx) error {
 		res, err := tx.Query(ctx, sql, a.Values()...)
 		if err != nil {
 			return err
@@ -365,6 +434,9 @@ func (s *Service) snippets(ctx context.Context, rows []taskRow, rooms []uuid.UUI
 		})
 		return err
 	})
+	if isSearchTimeout(ctx, err) {
+		return nil, nil // the tasks are found; their fragments are a nicety
+	}
 	if err != nil {
 		return nil, err
 	}

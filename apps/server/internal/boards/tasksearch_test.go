@@ -2,12 +2,18 @@ package boards
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/calaba/calaba/server/internal/httpx"
 	"github.com/calaba/calaba/server/internal/perm"
 )
 
@@ -63,5 +69,70 @@ func TestSortOrderKeepsEmptyLast(t *testing.T) {
 				t.Errorf("%s desc=%v: %s", s, desc, o)
 			}
 		}
+	}
+}
+
+// Security review #95: task searches take one of a few process slots, so a burst of
+// workspace-wide searches cannot hold the whole database pool; a full set answers 503.
+func TestSearchSlotsBound(t *testing.T) {
+	s := &Service{searchSlots: make(chan struct{}, 2)}
+	ctx := context.Background()
+	var rel []func()
+	for range 2 {
+		r, err := s.searchSlot(ctx, time.Millisecond)
+		if err != nil {
+			t.Fatalf("free slot: %v", err)
+		}
+		rel = append(rel, r)
+	}
+	_, err := s.searchSlot(ctx, 5*time.Millisecond)
+	if e := httpx.AsError(err); e == nil || e.Status != http.StatusServiceUnavailable {
+		t.Fatalf("full: %v, want 503", err)
+	}
+	rel[0]()
+	r, err := s.searchSlot(ctx, time.Millisecond)
+	if err != nil {
+		t.Fatalf("released slot: %v", err)
+	}
+	r()
+	rel[1]()
+	if len(s.searchSlots) != 0 {
+		t.Fatalf("slots held: %d", len(s.searchSlots))
+	}
+	cctx, cancel := context.WithCancel(ctx)
+	cancel()
+	for range 2 {
+		s.searchSlots <- struct{}{}
+	}
+	if _, err := s.searchSlot(cctx, time.Second); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled request: %v", err)
+	}
+	if r, err := (&Service{}).searchSlot(ctx, 0); err != nil || r == nil {
+		t.Fatalf("unbounded service: %v", err)
+	}
+}
+
+func TestIsSearchTimeout(t *testing.T) {
+	ctx := context.Background()
+	stmt := &pgconn.PgError{Code: "57014"}
+	for name, c := range map[string]struct {
+		err  error
+		want bool
+	}{
+		"nil":       {nil, false},
+		"statement": {stmt, true},
+		"wrapped":   {httpx.Unavailable(fmt.Errorf("q: %w", stmt)), true},
+		"deadline":  {context.DeadlineExceeded, true},
+		"other pg":  {&pgconn.PgError{Code: "42601"}, false},
+		"other":     {errors.New("boom"), false},
+	} {
+		if got := isSearchTimeout(ctx, c.err); got != c.want {
+			t.Errorf("%s: %v, want %v", name, got, c.want)
+		}
+	}
+	gone, cancel := context.WithCancel(ctx)
+	cancel()
+	if isSearchTimeout(gone, stmt) {
+		t.Error("a request that ended is not a search timeout")
 	}
 }
