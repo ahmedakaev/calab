@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/calaba/calaba/server/gen/calaba/v1"
+	"github.com/calaba/calaba/server/internal/db"
 	"github.com/calaba/calaba/server/internal/db/sqlc"
 	"github.com/calaba/calaba/server/internal/httpx"
 	"github.com/calaba/calaba/server/internal/messages"
@@ -32,10 +33,14 @@ func (s *Service) logNotice(ctx context.Context, taskID uuid.UUID, n notice, tn 
 		}
 		return &u
 	}
-	err = s.db.Q.InsertTaskNotice(ctx, sqlc.InsertTaskNoticeParams{
-		ID: id, UserID: n.user, TaskID: taskID, Kind: int16(tn.GetKind()), //nolint:gosec // enum, < 100
-		ActorID: opt(n.actor), MessageID: opt(n.message), Text: tn.GetText(), RuleID: opt(n.rule),
-		ReRequested: n.reRequested, DueOn: n.dueOn, DaysLeft: n.daysLeft,
+	// The same commit admission as the task write that produced the notice: a request-born
+	// notice is admitted for its actor; a background notice (reminders) carries none.
+	err = db.GuardExec(ctx, s.db, func(guarded *sqlc.Queries) error {
+		return guarded.InsertTaskNotice(ctx, sqlc.InsertTaskNoticeParams{
+			ID: id, UserID: n.user, TaskID: taskID, Kind: int16(tn.GetKind()), //nolint:gosec // enum, < 100
+			ActorID: opt(n.actor), MessageID: opt(n.message), Text: tn.GetText(), RuleID: opt(n.rule),
+			ReRequested: n.reRequested, DueOn: n.dueOn, DaysLeft: n.daysLeft,
+		})
 	})
 	if err != nil {
 		slog.WarnContext(ctx, "boards: notice log", "task", taskID, "err", err)
