@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"context"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -30,7 +31,7 @@ func TestParseTaskSearch(t *testing.T) {
 		"filter=%7B":                    {err: true},
 		"q=" + strings.Repeat("a", 201): {err: true},
 	} {
-		got, err := parseTaskSearch(httptest.NewRequest("GET", "/x?"+raw, nil))
+		got, err := parseTaskSearch(httptest.NewRequestWithContext(context.Background(), "GET", "/x?"+raw, nil))
 		if (err != nil) != want.err {
 			t.Errorf("%q: err %v", raw, err)
 			continue
