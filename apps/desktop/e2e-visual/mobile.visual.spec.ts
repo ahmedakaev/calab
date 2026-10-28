@@ -465,6 +465,15 @@ test('m-chat-image', async ({ page }) => {
     expect(r.height).toBeLessThanOrEqual(vh * 0.6 + 1);
   }
   await checkpoint(page, 'm-chat-image', { main: true });
+  // Owner 28.10: a PNG stored with a wrong type and no thumbnail still shows as a picture.
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: '', attachments: [IDS.files.untypedPng] });
+  const untyped = page.getByRole('button', { name: 'Открыть изображение «image.png»' });
+  await expect.poll(() => untyped.locator('img').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth === 960)).toBe(true);
+  await feedToBottom(page);
+  await expect(page.locator('[data-virtuoso-scroller][data-scrolling]')).toHaveCount(0);
+  await page.mouse.move(0, 0);
+  await expectFeedFits(page);
+  await checkpoint(page, 'm-chat-image-untyped', { main: true });
 });
 
 // CBF-66: a Disk folder link in a chat is its own card — name, who shared, what is inside, «Открыть».

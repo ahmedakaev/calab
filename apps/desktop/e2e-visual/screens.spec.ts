@@ -3034,6 +3034,24 @@ test('chat-lightbox', async ({ open, win, mock, shot }) => {
   }
   await win.keyboard.press('Escape');
   await expect(box).toHaveCount(0);
+
+  // Owner 28.10: a PNG stored with a wrong type and no thumbnail is a picture too (the original is
+  // drawn in a box of the picture's size), next to a normal PNG (above) and a plain file (a chip).
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.grigory, content: '', attachments: [IDS.files.pdf] });
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: '', attachments: [IDS.files.untypedPng] });
+  const untyped = win.getByRole('button', { name: 'Открыть изображение «image.png»' });
+  await expect.poll(() => untyped.locator('img').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth === 960)).toBe(true);
+  await expect(win.getByRole('button', { name: /^Скачать load-test-report\.pdf/ }).last()).toBeVisible();
+  await feedAtBottom(win);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'chat-image-untyped');
+  await untyped.click();
+  await expect(frame).toHaveAttribute('data-state', 'loaded');
+  await expect(box.getByRole('heading', { name: 'image.png' })).toBeVisible();
+  await expect(box.getByRole('button', { name: 'Скачать' })).toBeVisible();
+  await checkpoint(shot, 'chat-lightbox-untyped');
+  await win.keyboard.press('Escape');
+  await expect(box).toHaveCount(0);
 });
 
 // Code blocks (docs/09 #45, docs/08 «Код в сообщениях»): Вера's 420-line log collapsed at 400
