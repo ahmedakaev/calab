@@ -423,6 +423,8 @@ function Bubble({
   const width = images.length ? imageBoxWidth(images) : videos.length ? VIDEO_WIDTH : undefined;
 
   const metaNode = <MetaInfo c={c} own={own} workspaceId={workspaceId} />;
+  // The invisible copy that reserves the time's room on the last line: no interactive ticks.
+  const metaSpacer = <MetaInfo c={c} own={own} workspaceId={workspaceId} spacer />;
   const tail = meta.last && !sticker;
 
   const radius = bubbleRadius(own, meta.first, meta.last, tail);
@@ -502,7 +504,7 @@ function Bubble({
             {!link && !files.length && !m.reactions.length ? (
               // Reserve room for the time on the last line (it is drawn absolutely, Telegram-style).
               <span className="invisible ml-2 inline-flex select-none" aria-hidden>
-                {metaNode}
+                {metaSpacer}
               </span>
             ) : null}
           </div>
@@ -794,7 +796,7 @@ export function Tail({ own }: { own: boolean }): ReactNode {
   );
 }
 
-function MetaInfo({ c, own, workspaceId }: { c: ChatMessage; own: boolean; workspaceId: string }): ReactNode {
+function MetaInfo({ c, own, workspaceId, spacer = false }: { c: ChatMessage; own: boolean; workspaceId: string; spacer?: boolean }): ReactNode {
   return (
     <TimeMeta at={toDate(c.msg.createdAt)} edited={!!c.msg.editedAt}>
       {own ? (
@@ -803,7 +805,7 @@ function MetaInfo({ c, own, workspaceId }: { c: ChatMessage; own: boolean; works
         ) : c.status === 'failed' ? (
           <AlertCircle className="size-3.5 text-danger" aria-label={t('chat.failed')} />
         ) : (
-          <Ticks roomId={c.msg.roomId} messageId={c.msg.id} workspaceId={workspaceId} />
+          <Ticks roomId={c.msg.roomId} messageId={c.msg.id} workspaceId={workspaceId} spacer={spacer} />
         )
       ) : null}
     </TimeMeta>

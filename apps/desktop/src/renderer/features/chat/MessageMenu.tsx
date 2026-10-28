@@ -185,7 +185,7 @@ function ReadByItem({ roomId, messageId, workspaceId }: { roomId: string; messag
         <span className="flex-1">{t('chat.readBy')}</span>
         <ChevronDown className={cx('size-4 transition-transform duration-[var(--motion-fast)]', open && 'rotate-180')} aria-hidden />
       </ContextMenu.Item>
-      {open ? <ReadersList roomId={roomId} messageId={messageId} workspaceId={workspaceId} /> : null}
+      {open ? <ReadersList roomId={roomId} messageId={messageId} workspaceId={workspaceId} title={false} /> : null}
       <ContextMenu.Separator className="mx-1 my-1 h-px bg-line" />
     </>
   );

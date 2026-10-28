@@ -17,15 +17,16 @@ import { MemberAvatar } from '../boards/menus';
  * docs/08 «Галочки» (docs/09 #92, ADR-0140): ✓ — the server has the message, ✓✓ — someone else saw
  * it on screen (the DM peer / another member). Nothing before read receipts started. A leaf with a
  * numeric selector: a READ_RECEIPT re-renders only the ticks it flips, not the bubble or the feed.
- * In a chat of several people ✓✓ is a button with «Прочитали».
+ * In a chat of several people ✓✓ is a button with «Прочитали»; `spacer` (the bubble's invisible
+ * copy of the time that reserves its room) draws the same box without the button.
  */
-export const Ticks = memo(function Ticks({ roomId, messageId, workspaceId }: { roomId: string; messageId: string; workspaceId: string }): ReactNode {
+export const Ticks = memo(function Ticks({ roomId, messageId, workspaceId, spacer = false }: { roomId: string; messageId: string; workspaceId: string; spacer?: boolean }): ReactNode {
   const state = useReadReceipt(roomId, messageId);
   const type = useRooms((s) => s.byId[roomId]?.type);
   // A notes shelf (ADR-0039) has no readers: no ticks at all.
   if (type === RoomType.NOTES || state === TICKS_NONE) return null;
   if (state === TICKS_SENT) return <Check className="size-4" aria-label={t('chat.statusSent')} />;
-  if (type === RoomType.DM) return <CheckCheck className="size-4" aria-label={t('chat.statusRead')} />;
+  if (type === RoomType.DM || spacer) return <CheckCheck className="size-4" aria-label={t('chat.statusRead')} />;
   return <ReadersButton roomId={roomId} messageId={messageId} workspaceId={workspaceId} />;
 });
 
@@ -53,7 +54,7 @@ function ReadersButton({ roomId, messageId, workspaceId }: { roomId: string; mes
           align="end"
           sideOffset={6}
           collisionPadding={12}
-          className="mat-popover anim-in z-[var(--z-popover)] w-64 rounded-[var(--radius-card)] p-1 text-body text-fg"
+          className="mat-popover anim-in z-[var(--z-popover)] w-72 rounded-[var(--radius-card)] p-1 text-body text-fg"
           data-testid="read-by-popover"
         >
           {open ? <ReadersList roomId={roomId} messageId={messageId} workspaceId={workspaceId} /> : null}
@@ -67,7 +68,7 @@ function ReadersButton({ roomId, messageId, workspaceId }: { roomId: string; mes
  * «Прочитали» (ADR-0140): who saw my message and when, oldest first — GET …/readers, the author
  * only (the server answers 403 to anyone else). Shared by the ✓✓ popover and the message menu.
  */
-export function ReadersList({ roomId, messageId, workspaceId }: { roomId: string; messageId: string; workspaceId: string }): ReactNode {
+export function ReadersList({ roomId, messageId, workspaceId, title = true }: { roomId: string; messageId: string; workspaceId: string; title?: boolean }): ReactNode {
   const q = useQuery({
     queryKey: ['message-readers', messageId],
     queryFn: ({ signal }) => api.messages.readers(roomId, messageId, signal),
@@ -75,8 +76,9 @@ export function ReadersList({ roomId, messageId, workspaceId }: { roomId: string
   });
   const readers = q.data?.readers ?? [];
   return (
-    <div className="flex flex-col" data-testid="read-by">
-      <div className="px-2.5 pb-1 pt-1.5 text-caption font-medium text-muted">{t('chat.readBy')}</div>
+    // A group, not a list: inside the message menu only menu roles may be its children.
+    <div role="group" aria-label={t('chat.readBy')} className="flex flex-col" data-testid="read-by">
+      {title ? <div className="px-2.5 pb-1 pt-1.5 text-caption font-medium text-muted" aria-hidden>{t('chat.readBy')}</div> : null}
       {q.isPending ? (
         <div className="grid h-9 place-items-center">
           <Spinner className="size-4" />
@@ -84,11 +86,11 @@ export function ReadersList({ roomId, messageId, workspaceId }: { roomId: string
       ) : q.isError || !readers.length ? (
         <div className="px-2.5 pb-2 pt-0.5 text-caption text-faint">{q.isError ? t('err.ctx.loadMessage') : t('chat.readByNone')}</div>
       ) : (
-        <ul className="max-h-64 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto">
           {readers.map((r) => (
             <ReaderRow key={r.userId} workspaceId={workspaceId} userId={r.userId} at={r.readAt ? timestampDate(r.readAt) : null} />
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
@@ -102,10 +104,10 @@ export function readTime(at: Date, now = new Date()): string {
 function ReaderRow({ workspaceId, userId, at }: { workspaceId: string; userId: string; at: Date | null }): ReactNode {
   const name = useMemberName(workspaceId || null, userId);
   return (
-    <li className="flex h-9 items-center gap-2 rounded-[6px] px-2.5" data-testid="read-by-row">
+    <div className="flex h-9 items-center gap-2 rounded-[6px] px-2.5" data-testid="read-by-row">
       <MemberAvatar workspaceId={workspaceId} userId={userId} size={24} />
       <span className="min-w-0 flex-1 truncate">{name}</span>
       {at ? <span className="shrink-0 text-caption text-muted tabular-nums">{readTime(at)}</span> : null}
-    </li>
+    </div>
   );
 }

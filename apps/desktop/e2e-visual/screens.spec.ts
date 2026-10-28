@@ -1204,6 +1204,25 @@ test('chat-context-menu', async ({ open, win, mock, shot }) => {
   await win.getByTestId('message-bubble').filter({ hasText: 'Готово, выдал' }).click({ button: 'right' });
   await expect(win.getByRole('menu')).toBeVisible();
   await checkpoint(shot, 'chat-context-menu');
+  // ADR-0140: my message seen by Борис and Вера (✓✓), the next one by nobody (✓); ✓✓ opens
+  // «Прочитали»; the same list on top of the message's menu.
+  await win.keyboard.press('Escape');
+  await expect(win.getByRole('menu')).toHaveCount(0);
+  const seen = mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.anna, content: 'Посмотрите макет до обеда.' });
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.anna, content: 'И ссылку на прототип.' });
+  mock.markRead(IDS.users.boris, IDS.rooms.general, seen.id);
+  mock.markRead(IDS.users.vera, IDS.rooms.general, seen.id);
+  const bubble = win.getByTestId('message-bubble').filter({ hasText: 'Посмотрите макет' });
+  await expect(bubble.getByTestId('read-ticks')).toBeVisible();
+  await expect(win.getByTestId('message-bubble').filter({ hasText: 'И ссылку' }).getByLabel('Отправлено').last()).toBeVisible();
+  await bubble.getByTestId('read-ticks').click();
+  await expect(win.getByTestId('read-by-popover').getByTestId('read-by-row')).toHaveCount(2);
+  await checkpoint(shot, 'chat-read-by');
+  await win.keyboard.press('Escape');
+  await bubble.getByText('Посмотрите макет').click({ button: 'right' });
+  await win.getByTestId('message-read-by').click();
+  await expect(win.getByRole('menu').getByTestId('read-by-row')).toHaveCount(2);
+  await checkpoint(shot, 'chat-read-by-menu');
 });
 
 test('chat-emoji-picker', async ({ open, win, mock, shot }) => {
@@ -4281,6 +4300,19 @@ test('boards-task-comments', async ({ open, win, mock, shot }) => {
   await expect(panel.locator('[data-message-id]')).toHaveCount(2);
   await section.evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await checkpoint(shot, 'boards-task-comments');
+  // ADR-0140: my comment seen by Борис — ✓✓ in the card's corner opens «Прочитали».
+  const cal3 = mock.boards.taskByKey('CAL-3');
+  if (cal3) {
+    const c = mock.injectMessage({ roomId: cal3.task.roomId, authorId: IDS.users.anna, content: 'Проверила на macOS, эха нет.' });
+    mock.markRead(IDS.users.boris, cal3.task.roomId, c.id);
+  }
+  const ticks = panel.locator('[data-message-id]').filter({ hasText: 'Проверила на macOS' }).getByTestId('read-ticks');
+  await expect(ticks).toBeVisible();
+  await ticks.scrollIntoViewIfNeeded();
+  await ticks.click();
+  await expect(win.getByTestId('read-by-popover').getByTestId('read-by-row')).toHaveCount(1);
+  await checkpoint(shot, 'boards-task-comment-read-by');
+  await win.keyboard.press('Escape');
   // #87: another task whose comments span several days: the same pills as in the chat.
   await win.getByTestId('boards-list').getByTestId('board-row').first().click(); // the board again: the panel closes
   await expect(panel).toHaveCount(0);
