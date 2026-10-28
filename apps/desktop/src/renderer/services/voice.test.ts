@@ -173,7 +173,13 @@ class FakeRoom {
   static onConnect: ((token: string) => Promise<void>) | null = null;
   connect(url: string, token: string): Promise<void> {
     this.connectedWith = [url, token];
-    return FakeRoom.onConnect ? FakeRoom.onConnect(token) : Promise.resolve();
+    if (!FakeRoom.onConnect) return Promise.resolve();
+    // As livekit-client: a failed connect emits Disconnected (the state was Connecting) before it rejects.
+    return FakeRoom.onConnect(token).catch((e: unknown) => {
+      this.state = 'Disconnected';
+      this.emit('Disconnected', 'UNKNOWN_REASON');
+      throw e;
+    });
   }
   /** When set, disconnect() waits for it (a slow network disconnect). */
   static disconnectGate: Promise<void> | null = null;
@@ -842,6 +848,26 @@ describe('VoiceEngine', () => {
     await vi.advanceTimersByTimeAsync(8_000);
     expect(useVoice.getState().phase).toBe('connected');
     expect(useVoice.getState().link.attempts).toBe(0);
+  });
+
+  it('a connect that keeps failing backs off 1/2/4/8/16 s and ends with the «lost» toast (#255)', async () => {
+    await voice.join('A', 'ws');
+    const { toast } = await import('../stores/toasts');
+    vi.mocked(toast.error).mockClear();
+    FakeRoom.onConnect = () => Promise.reject(Object.assign(new Error('could not establish signal connection'), { name: 'ConnectionError' }));
+    FakeRoom.all[0]?.emit('Disconnected', 'SIGNAL_CLOSE');
+    await settle();
+    // Rejoin attempts so far (the first /join was the user's).
+    const attempts = (): number => joinVoice.mock.calls.length - 1;
+    const steps: [number, number][] = [[999, 0], [1, 1], [1_999, 1], [1, 2], [3_999, 2], [1, 3], [7_999, 3], [1, 4], [15_999, 4], [1, 5]];
+    for (const [ms, n] of steps) {
+      await vi.advanceTimersByTimeAsync(ms);
+      expect(attempts()).toBe(n);
+    }
+    expect(vi.mocked(toast.error).mock.calls.map((c) => c[0])).toEqual(['Не удалось вернуться в голосовую комнату']);
+    expect(useVoice.getState()).toMatchObject({ phase: 'idle', roomId: null });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(attempts()).toBe(5);
   });
 
   it('the CSP blocking the LiveKit host: phase «blocked», the cycle stops, «Повторить» joins again', async () => {

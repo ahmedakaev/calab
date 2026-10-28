@@ -697,6 +697,7 @@ class VoiceEngine {
         autoSubscribe: false,
         ...(relayOnly ? { rtcConfig: { iceTransportPolicy: 'relay' } } : {}),
       });
+      this.reachedConnected.add(room);
       if (seq !== this.joinSeq) {
         if (this.room === room) this.room = null;
         await room.disconnect(false);
@@ -813,6 +814,9 @@ class VoiceEngine {
 
   /** Bumped by every user join/leave: a running rejoin loop stops when it changes. */
   private rejoinGen = 0;
+
+  /** Rooms whose room.connect() succeeded: only their Disconnected starts a rejoin cycle (#255). */
+  private readonly reachedConnected = new WeakSet<Room>();
 
   /** Bumped by every connect() and leave(): a connect still tearing down the old room bails out. */
   private intentSeq = 0;
@@ -1657,6 +1661,11 @@ class VoiceEngine {
         }
         else if (reason !== DisconnectReason.CLIENT_INITIATED) {
           setLink({ lastError: describeDisconnect(reason === undefined ? undefined : DisconnectReason[reason]) });
+          // A connect that never got in: livekit-client emits Disconnected right before
+          // room.connect() rejects, and connect()'s own failure path handles it (a rejoin attempt
+          // counts it and backs off; a user join reports it). A new cycle from here restarted the
+          // backoff at 1 s on every failure: /join every ~1.2 s for minutes, never the «lost» exit (#255).
+          if (!this.reachedConnected.has(room) || this.rejoinRoomId !== null) return;
           // Network-type loss that LiveKit could not resume itself (sleep, long freeze,
           // server restart): rejoin with a fresh token instead of dropping the user.
           void this.rejoin();
