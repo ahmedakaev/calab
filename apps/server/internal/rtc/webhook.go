@@ -418,7 +418,7 @@ func (s *Service) roomFinished(ctx context.Context, wid, rid uuid.UUID, keepHeld
 		return err
 	}
 	for _, st := range states {
-		if st.RoomID == rid && !(keepHeld && held(st)) {
+		if st.RoomID == rid && (!keepHeld || !held(st)) {
 			if err := s.update(ctx, wid, st.UserID, st.SessionID, func(*voice.SessionState) *voice.SessionState { return nil }); err != nil {
 				return err
 			}
