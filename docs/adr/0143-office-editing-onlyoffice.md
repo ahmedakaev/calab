@@ -1,6 +1,7 @@
-# ADR-0143. Правка xlsx и docx Диска в ONLYOFFICE Docs
+# ADR-0143. Правка офисных файлов Диска в ONLYOFFICE Docs
 
-Статус: **предложено** (спайк задачи #98, 28.10.2026; ветка `spike/onlyoffice-98`, не влита). Дополняет
+Статус: **принято**, сервер реализован (задача #98, 28.10.2026; спайк `spike/onlyoffice-98`, сервер
+`feat/office-server-98`; клиент — отдельная ветка). Дополняет
 [ADR-0094](0094-disk.md) (Диск). Решение о движке — владельца: ONLYOFFICE, потому что правка и
 пересчёт идут в браузере пользователя и сервер остаётся лёгким.
 
@@ -84,229 +85,325 @@ OOXML. Телефону достаточно просмотра.
 - Режимы `coEditing`: `fast` (по умолчанию, правки видны сразу) и `strict`. Совместная правка в
   Community доступна.
 
+
+**Форматы** ([ONLYOFFICE/document-formats](https://github.com/ONLYOFFICE/document-formats),
+`onlyoffice-docs-formats.json` — машиночитаемый список, по которому работают коннекторы
+ONLYOFFICE; сверено для Docs 10.0 28.10.2026; [fileType в config.document](https://api.onlyoffice.com/docs/docs-api/usage-api/config/document/)):
+
+| Расширение | type | actions в списке ONLYOFFICE |
+|---|---|---|
+| docx / xlsx / pptx | word / cell / slide | `view`, `edit` (родной формат) |
+| odt / ods / odp | word / cell / slide | `view`, `lossy-edit`, `auto-convert` |
+| rtf | word | `view`, `lossy-edit`, `auto-convert` |
+| txt / csv | word / cell | `view`, `lossy-edit` |
+| doc / ppt | word / slide | `view`, `auto-convert` (правки в формате нет) |
+| xls | cell | `view`, `lossy-edit`, `auto-convert` |
+| pdf | pdf | `view`, `edit`, `fill` |
+
+`lossy-edit` — Document Server сохраняет в тот же формат, но может потерять то, чего формат не
+держит; `auto-convert` — открывается через конвертацию в OOXML. Все они доступны в Community
+(ограничения редакции по форматам в документации нет).
+
 ## Решение
 
 ### 1. Схема
 ```
-Calab client ──GET /api/office/config?item=…──▶ API (signed config: mode, key, file URL, callback URL)
+Calab client ──GET /api/office/capabilities──▶ API (on/off, format map, max size, docs origin)
+     │       ──GET /api/office/config?item=|file=──▶ API (signed config: mode, key, file URL, callback URL)
      │  iframe {OFFICE_DOCS_URL}/web-apps/apps/calab/calab-editor.html   (only while open)
      │  postMessage: hello → open{config} → events(ready/state/error) → close
      ▼
 Document Server ──GET /api/office/file/{t}──▶ API (our URL token + DS JWT «download»; pinned version)
                 ──POST /api/office/callback/{t}─▶ API (DS JWT; status 2/6 → new version of the item)
+API ──POST {internal}/converter, /command──▶ Document Server («Сохранить как», drop)
+API ──GET {internal}/cache/…──▶ Document Server (saved / converted file; only its origin)
 ```
 - **JS Document Server не исполняется в странице Calab.** Клиент на «Открыть» создаёт `<iframe>`
-  на нашу страницу-хост `infra/office/calab-editor.html`. Она лежит на origin Document Server:
-  смонтирована read-only в его `web-apps/apps/calab/`, и nginx самого Document Server её уже
-  отдаёт. Хост грузит `api.js` только после `open` и создаёт `DocsAPI.DocEditor`. На `close`
-  вызывает `destroyEditor()`, после чего клиент удаляет iframe — уходят JS, сокет и таймеры
-  редактора. Поэтому не нужно исключений в `script-src` у приложения, сторонний код не попадает
-  рядом с мостом preload, а закрытое окно ничего не стоит.
-- Протокол postMessage. Клиент шлёт конфиг только на origin Document Server и принимает сообщения
-  только от `iframe.contentWindow` с этого origin. Хост принимает только от `window.parent`.
-  События (флаги состояния, коды ошибок) секретов не несут.
-- Сервер: пакет `internal/office`, включается `OFFICE_ENABLED`, по умолчанию выключен.
+  на хост-страницу `infra/office/calab-editor.html` на origin Document Server (смонтирована
+  read-only в его `web-apps/apps/calab/`). Хост грузит `api.js` только после `open`, на `close`
+  вызывает `destroyEditor()`, клиент удаляет iframe. Исключений в `script-src` нет, закрытое окно
+  ничего не стоит.
+- Протокол postMessage: конфиг — только на origin Document Server, сообщения — только от
+  `iframe.contentWindow` с этого origin; хост принимает только от `window.parent`.
+- Сервер: пакет `internal/office`, флаг `OFFICE_ENABLED` (по умолчанию выключен). Маршруты
+  зарегистрированы всегда (одна таблица маршрутов для ботов и identity), выключено — 404.
 
-### 2. Эндпоинты
-- `GET /api/office/config?item={diskItemId}&theme=dark|light&phone=1&lang=ru` (private):
-  `OfficeConfigResponse{docs_url, host_url, config_json, mode, key}` (proto `office.proto`). В
-  запросе id элемента Диска, а не файла: файл меняется с каждой версией, а элемент нет.
-  Ответы: 404 без `DISK_VIEW`, 415 — не xlsx/docx.
-- `GET /api/office/file/{token}` (анонимный). Наш URL-токен: HS256 ключом, выведенным из
-  `JWT_SECRET` API (`DeriveURLKey`), `aud=office`, `op=file`, `exp` = 5 мин, закреплён за
-  `file_id` версии сессии. Плюс JWT Document Server в `Authorization` с `operation`
-  `download` или без неё (до 10.0). Если элемент ушёл на новую версию — 410.
-- `POST /api/office/callback/{token}` (анонимный). Наш токен с `op=callback` (без exp: сессия может
-  жить днями) и JWT Document Server (заголовок с `payload` или `token` в теле, `operation` —
-  `callback`). Читаем только подписанное тело. Всегда отвечаем 200 с `{"error":0}` или
-  `{"error":1}`: на отказ Document Server оставляет правки у себя и показывает ошибку сохранения.
+### 2. Форматы — одна карта на сервере
+`internal/office/formats.go` — единственное место, которое решает, что и как открывается; клиент
+получает её из `GET /api/office/capabilities` и своей копии не держит.
 
-### 3. Права (diskacl)
-`Mode(item, phone)` ([config.go](../../apps/server/internal/office/config.go)):
-- `DISK_VIEW | DISK_WRITE` («Правка», владелец, `DISK_MANAGE`) → `edit`;
-- только `DISK_VIEW` → `view`;
-- без `DISK_VIEW` → 404, как во всём Диске;
-- элемент в корзине, пространство без записи (тариф) и телефон → `view`.
+| Формат | Capability | Режим | Сохранение |
+|---|---|---|---|
+| docx, xlsx, pptx | `EDIT` | правка по «Правке» | новая версия того же элемента |
+| odt, ods, odp, rtf, csv, txt | `EDIT`, `lossy: true` | правка по «Правке» | новая версия в том же формате; клиент предупреждает о возможных потерях |
+| doc, xls, ppt | `CONVERT`, `convert_to` = docx/xlsx/pptx | только просмотр | никогда в том же файле; «Сохранить как docx/xlsx/pptx» → **новый** элемент рядом со своим id |
+| pdf | `VIEW` | только просмотр | — |
+| остальное | нет в карте | как раньше (415 у config) | — |
 
-Биты — `perm.ComputeDiskItemIn` по цепочке `diskacl`. При сохранении права того, кто прислал
-изменения (`users[0]`), проверяются заново: потерял «Правку» — сохранение отклоняется. Сохранение
-без пользователя Calab тоже отклоняется. Боты в редактор не ходят (маршруты `botDeny`), файлы
-читают API Диска, как раньше.
+- xls в списке ONLYOFFICE — `lossy-edit`, но мы его в месте не пишем: бинарный формат, боты
+  читают его ненадёжно, а пересохранение старого файла рискованнее новой копии. pdf редактор умеет
+  (`edit`), но в объём задачи не входит.
+- Проверка байтов при каждом сохранении и конвертации, по формату: OOXML — zip с
+  `[Content_Types].xml` и главной частью (`word/document.xml`, `xl/workbook.xml`,
+  `ppt/presentation.xml`, так что docx под именем .xlsx не пройдёт); ODF — zip, запись `mimetype`
+  с точным типом формата и `content.xml`; rtf — `{\rtf`; csv/txt — UTF-8 (BOM допустим) без NUL.
+  Формат без проверки (doc/xls/ppt/pdf) не пишется никогда. Zip не распаковывается целиком —
+  читается только каталог и `mimetype` (≤ 128 байт).
+- Тип файла при сохранении определяет **текущее имя элемента**, а не `filetype` callback: если
+  элемент переименовали в `.doc` посреди сессии, сохранение отклоняется; `filetype` callback должен
+  совпадать с расширением.
 
-### 4. Сохранение как версия того же файла
-Callback со статусом 2 или 6:
-1. URL скачивания должен быть на origin `OFFICE_DOCS_URL` или `OFFICE_DOCS_INTERNAL_URL` (защита
-   от SSRF), размер — не больше `OFFICE_MAX_SIZE_MB`.
-2. `filetype` не должен смениться.
-3. `Store.SaveVersion(item, expect=session.file_id, actor, bytes)` в одной транзакции:
-   - новая строка `files` через `files.StoreSystemFile` (sha256, квота);
-   - у `disk_items` меняются `file_id` и `updated_at`; id, родитель и имя прежние;
-   - запись `disk_activity` вида `edit` (автор, размер до и после; склейка повторов за 5 мин
-     одного автора, как `rename`, ADR-0081);
-   - событие `DISK_ITEM_UPSERT`.
+### 3. Эндпоинты (итоговый контракт с клиентом)
+- `GET /api/office/capabilities` (private, без workspace): `OfficeCapabilitiesResponse{enabled,
+  formats[], max_size_bytes, docs_url}`. Боты — 403.
+- `GET /api/office/config?item={diskItemId}|file={fileId}&theme=dark|light&phone=1&lang=ru`
+  (private): `OfficeConfigResponse{docs_url, config_json, mode, key, host_url, format, item_id,
+  file_id}` — поля 1–5 из спайка не менялись, 6–8 добавлены. `item` — элемент Диска (сессия,
+  правка); `file` — вложение (только просмотр, без callback). Ответы: 404 — нет доступа / выключено;
+  415 — формата нет в карте; 413 — больше `OFFICE_MAX_SIZE_MB`; 429 — лимит; 403 — бот или запрос
+  от имени через бота.
+- `POST /api/disk/items/{id}/office/convert` (без тела) и `POST /api/workspaces/{id}/office/convert`
+  `{file_id, parent_id}` (вложение в папку пространства): «Сохранить как». 201 `DiskItemResponse`
+  нового элемента; 415 — формат без `convert_to`; 502 — Document Server не сконвертировал или
+  результат не прошёл проверку байтов.
+- `POST /api/workspaces/{id}/disk/import` `{file_id, parent_id, name}` — «Сохранить в Диск»: копия
+  читаемого файла (вложение чата или задачи) новым элементом; общий маршрут Диска (`DISK_WRITE`
+  на папке, боты — по правам, как загрузка).
+- `GET /api/office/file/{token}`, `POST /api/office/callback/{token}` — запросы Document Server
+  (анонимные, токены ниже). Callback всегда 200 `{"error":0|1}`.
+- `DiskItem.editor_ids` — кто сейчас правит файл (в листинге, `GET` и каждом `DISK_ITEM_UPSERT`);
+  `DISK_ACTIVITY_KIND_EDIT` — запись «Истории» о версии.
 
-   Прежний файл остаётся версией: таблица `disk_file_versions(item_id, file_id, actor_id,
-   created_at)` (миграция `00131`). `ListOrphanFiles` её учитывает, версии считаются в квоту и
-   хранятся N последних или 90 дней (настройка Диска). Если содержимое совпало с текущим (тот же
-   sha256), версия не создаётся. Синхронной конвертации нет: `GET …/disk` и скачивание сразу
-   отдают новую версию.
-4. Status 6 — версия сразу, сессия продолжается с тем же ключом (`Sessions.Advance` на новый
-   `file_id`). Status 2 — последняя версия, сессия закрывается.
+### 4. Права
+`Mode(item, format, phone)`:
+- `DISK_VIEW | DISK_WRITE` («Правка», владелец элемента, `DISK_MANAGE`) и формат `EDIT` → `edit`;
+- только `DISK_VIEW`, формат `VIEW`/`CONVERT`, элемент в корзине, пространство без записи
+  (приостановлено или ограниченный режим тарифа — `plans.RestrictedUpload`) и телефон → `view`;
+- без `DISK_VIEW` → 404, как во всём Диске.
 
-Чтобы диск не отставал от открытого редактора (бот забирает файл раз в час), на Document Server
-включаем forcesave по таймеру (`services.CoAuthoring.autoAssembly`, интервал 5 мин): пока есть
-правки, раз в 5 минут создаётся версия. Ctrl+S (`customization.forcesave`) сохраняет версию сразу.
+Биты — `perm.ComputeDiskItemIn` по цепочке `diskacl`; резолвер проверяет и identity-политику
+запроса (`perm.CheckAccess`): `GET /api/office/config?item=` классифицирован как Диск
+(`scopeOffice` → рабочее пространство элемента), `?file=` — как чтение файла (`files.CanRead` под
+той же политикой). Вложения — только через `files.CanRead` (комната, доска, Диск, …): токен
+редактора не открывает ничего, что человек не может скачать. Гости — по своим переопределениям,
+как в Диске. Боты в редактор не ходят (config, capabilities, convert — `botDeny`; от имени через
+бота — 403), файлы читают и пишут API Диска.
 
-### 5. Ключ — один на сессию
-`key = "calab-" + hex(HMAC(urlKey, item_id ‖ file_id начала сессии))[:40]` — детерминированный.
-Двое, открывшие файл одновременно, получают один ключ ещё до записи сессии. Ключ уникален для
-каждой установки на общем сервере документов. Сессия (`Sessions`: Valkey, хэш на элемент с TTL,
-который продлевает статус 1) хранит `{key, file_id}`:
-- первый открывший создаёт её (set-if-absent), следующие присоединяются к тому же ключу;
-- forcesave сдвигает `file_id`, ключ остаётся;
-- статус 2 или 4 закрывает её, и следующее открытие получает ключ новой версии;
-- если `file_id` сессии ≠ текущему файлу элемента (Document Server потерял сессию), открытие
-  начинает новую.
+### 5. Сохранение — версия того же элемента
+Callback 2 или 6:
+1. Наш URL-токен callback → элемент и **ключ сессии**; ключ тела должен совпасть с ключом токена
+   и с текущей сессией элемента в Valkey. Иначе — отказ (`error:1`), ничего не пишется.
+2. Права автора (`users[0]`) проверяются заново на текущий момент (`ItemFor` без кэша): нет
+   `edit` — отказ. Сохранение без пользователя Calab — отказ.
+3. Скачивание: URL только на origin `OFFICE_DOCS_URL` или `OFFICE_DOCS_INTERNAL_URL` (схема, хост
+   и порт; без userinfo), запрос идёт на внутренний адрес, редиректы не выполняются, только 200,
+   `Content-Type` — файловый (octet-stream, zip, OOXML, ODF, rtf, text/plain, text/csv; html —
+   отказ), `Content-Length` и тело ≤ `OFFICE_MAX_SIZE_MB`, затем проверка байтов формата (§2).
+4. `DiskStore.SaveVersion`: байты → `files.StoreSystemFile` (sha256, квота, загрузил — автор,
+   имя = имя элемента, mime формата) → `disk.SaveVersion` в одной транзакции: блокировка строки
+   квоты, затем элемента; **compare-and-swap** `file_id = expect` (`ReplaceDiskItemFile`), прежний
+   файл → `disk_file_versions`, обрезка до 50 версий с освобождением квоты, запись «Истории»
+   `edit` `{file_id, size, sha256}` до и после, `DISK_ITEM_UPSERT`. Тот же sha256 — версии нет.
+   Отказ или «без изменений» удаляет сохранённый файл.
+5. `GET /api/disk/items/{id}`, листинг и `GET /api/files/{fileId}` отдают новую версию сразу:
+   отложенной конвертации нет, sha256 и размер — из новой строки `files`, `updated_at` элемента
+   сдвинут. id, папка и имя прежние — бот по пути находит тот же файл с новым sha256.
+6. Статус 6 — сессия продолжается с тем же ключом (`Advance` на новый `file_id`); статус 2 —
+   сессия закрывается, следующее открытие получает ключ новой версии.
 
-### 6. Блокировки и конфликты
-- Внутри одной сессии конфликтов нет: Document Server сливает правки (`fast`). Копий не бывает.
-- Сохранение с чужим или устаревшим ключом (поздний статус 2 закрытой сессии) отклоняется
-  (`error:1`) и никогда не пишется поверх новой версии.
-- Файл сменился под сессией (`SaveVersion` получил `ErrConflict`) — отказ. Чтобы этого не было,
-  пока у элемента есть сессия, загрузка поверх, переименование типа и «Удалить навсегда» отвечают
-  409 «Файл сейчас редактируют». Перемещение и переименование без смены расширения разрешены: id
-  тот же.
-- Потеря «Правки» во время сессии: при сохранении — отказ (§3). Сразу при смене доступа —
-  `/command` `drop` для этого пользователя (в полной реализации).
-- В списке и карточке файла — «Редактирует Имя» (статус 1 → `Presence` → событие Диска).
+Прежние версии: скачиваются по `before.file_id` записи «Истории» (`GET /api/files/{id}`, доступ —
+через элемент). Восстановление версии — бэклог (docs/12). Чтобы Диск не отставал от открытого
+редактора (бот забирает файл раз в час), на Document Server включаем forcesave по таймеру
+(`services.CoAuthoring.autoAssembly`, 5 мин); Ctrl+S сохраняет версию сразу.
 
-### 7. Откуда открывается
-- **Диск** — «Открыть» и двойной клик по xlsx/docx (сделано в спайке). PDF, картинки и остальное —
-  как раньше.
-- **Вложения задач** — если вложение лежит на Диске, тот же редактор. Обычное вложение (`files`
-  без элемента Диска) открывается только на чтение (`GET /api/office/config?file=`, ключ = sha256
-  файла): версий у вложения нет. Предлагаем «Сохранить на Диск и править».
-- **Файлы чата** — так же: на чтение, «Сохранить на Диск и править».
-- Ссылка на файл Диска в чате (`DiskLinkChip`) — тот же редактор.
+### 6. Откуда открывается — и выбор для вложений
+- **Диск** — «Открыть» и двойной клик по формату из карты; ссылка на файл Диска в чате
+  (`DiskLinkChip`) — тот же элемент, тот же редактор.
+- **Вложения задач и файлы чата** — `task_attachments.file_id` и `message_attachments.file_id`
+  указывают на неизменяемые строки `files` (кэш отдачи `immutable` по id); версий у них нет, а
+  одна строка `files` может быть приложена к нескольким сообщениям и задачам. Правка на месте
+  означала бы либо переписать байты под тем же id (ломает кэш и sha256 у всех ссылок), либо
+  завести версии вложениям во всех слоях. Поэтому выбран безопасный вариант: «Открыть» вложения —
+  **редактор в режиме просмотра** (`?file=`, ключ `calab-a-…` на файл, без callback), рядом —
+  «Сохранить в Диск» (`POST …/disk/import`: копия новым элементом, дальше обычная правка с
+  версиями) и для doc/xls/ppt — «Сохранить как» в выбранную папку Диска
+  (`POST /api/workspaces/{id}/office/convert`). Исходное вложение не меняется никогда.
 
-### 8. Развёртывание (k8s, позже)
-- Отдельный `Deployment` `onlyoffice/documentserver:10.0.0` (1 реплика: Community не
-  кластеризуется), `Service` и `Ingress` на хосте из env (`OFFICE_DOCS_URL`, например
-  `docs.<домен>`).
-- Секрет `JWT_SECRET` — Kubernetes Secret, тот же в API как `OFFICE_JWT_SECRET`.
-- Хост-страница и темы `theme-calab-*.json` — `ConfigMap`, смонтированные read-only в
-  `web-apps/apps/calab` и `web-apps/apps/common/main/resources/themes`.
-- PVC на `/var/lib/onlyoffice` (кэш и несохранённые сессии) и `/var/www/onlyoffice/Data`.
-- `WOPI_ENABLED=false`, `PLUGINS_ENABLED=false`, `ALLOW_PRIVATE_IP_ADDRESS=true` (Document Server
-  ходит к API по in-cluster адресу `OFFICE_API_URL`). `NetworkPolicy`: Document Server ходит только
-  к API, а callback и file — только от Document Server.
-- Хостов и секретов в коде нет: `OFFICE_*` в env API, origin Document Server клиенту отдаёт
-  сервер.
-- Стенд (compose) — тот же образ с теми же env, только на тестовом хосте.
+### 7. Ключ и сессии (Valkey)
+`key = "calab-" + hex(HMAC(urlKey, item_id ‖ file_id начала сессии))[:40]` — детерминированный:
+двое, открывшие файл одновременно, получают один ключ ещё до записи сессии. Просмотр без правки
+(pdf, doc/xls/ppt) — ключ `calab-v-…` на версию, вложение — `calab-a-…` на файл, конвертация —
+`calab-c-…` на файл и цель; у них нет сессии и callback.
 
-### 9. CSP и frame-ancestors
-- Ingress Document Server: `Content-Security-Policy: frame-ancestors <PUBLIC_APP_URLS> 'self'` плюс
-  origin Electron (`file:`). Встраивать редактор может только Calab.
-- Веб Calab (Caddy): `frame-src https:` уже разрешает iframe. `script-src` не меняется.
-- **Electron**: навигацию подфреймов режут два guard'а — `windows.ts` (`will-frame-navigate`) и
-  `mail/frameGuard.ts`. Им нужно разрешение для origin Document Server. Origin main получает от
-  сервера, с которым залогинен (как `rendererServerUrl`), а не от renderer. В спайке этого нет:
-  поэтому снимки сделаны на веб-сборке.
-- Скрытое окно: iframe редактора держит сокет и таймеры. Правило CLAUDE.md — закрывать редактор,
-  если окно скрыто больше 5 минут и нет несохранённых правок (`state=false`); при возврате
-  открывать снова.
+`office.ValkeySessions` (`redisx`): хэш `office:s:{item}` с TTL `OFFICE_SESSION_TTL` (24 ч),
+продлевается каждым открытием и callback; поля `k` (ключ), `f` (файл, на котором стоят правки),
+`e:{uid}` (получил конфиг правки), `on` (кто подключён по последнему статусу 1); множество
+`office:live`. Все изменения — Lua-скрипты, атомарно на элемент, по compare-and-swap ключа:
+- первый открывший создаёт сессию, следующие присоединяются (просмотрщики тоже — один ключ);
+- forcesave сдвигает `f`, ключ остаётся; статус 2 или 4 закрывает сессию;
+- `f` ≠ текущему файлу элемента (Document Server потерял сессию, или TTL истёк после forcesave) —
+  открытие начинает новую сессию на текущем файле.
+- «Редактирует Имя»: `editor_ids` = `on ∩ e:*` (просмотрщики не «редактируют»). Статус 1 с другим
+  набором → `disk.Announce` → `DISK_ITEM_UPSERT`; листинг читает сессии одним `DoMulti` на
+  страницу и только при `OFFICE_ENABLED`; сбой Valkey оставляет метку пустой, листинг не падает.
 
-### 10. Телефон
-Community не правит в мобильном вебе, поэтому телефон всегда получает `mode: view`,
-`type: mobile` (это совпадает с non-goal задачи). Оболочка `apps/mobile` открывает тот же
-веб-клиент. Мобильный просмотр нужно проверить прогоном.
+### 8. Параллельная запись: политика
+- Внутри сессии конфликтов нет: Document Server сливает правки (`fast`), копий не бывает.
+- **Загрузка поверх не существует**: Диск никогда не заменяет файл загрузкой — занятое имя
+  получает «(2)» (ADR-0094). Бот или API, «перезаливающий» файл, создаёт рядом новый элемент и
+  правки в редакторе не теряет. Единственный путь сменить файл элемента — `SaveVersion` с
+  compare-and-swap по `file_id` сессии; при расхождении (`ErrConflict`) сохранение отклоняется,
+  Document Server оставляет правки у себя и показывает ошибку, следующее открытие стартует с
+  текущей версии.
+- Поздний статус 2 закрытой сессии или чужой ключ — отказ, поверх новой версии никогда не пишется.
+- «Удалить навсегда» файла, который сейчас правят (`editor_ids` не пуст), — 409
+  `DISK_FILE_EDITING`. Корзина разрешена: сохранение в элемент в корзине принимается (это тот же
+  элемент, восстановление вернёт его с правками). Переименование и перемещение разрешены (id тот
+  же); смена расширения на формат без правки останавливает сохранения (§2).
+- Удалён навсегда (папка целиком, сборщик корзины) во время сессии — callback получает 404
+  элемента: отказ, сессия закрывается, правки остаются только в Document Server (редактор
+  предлагает скачать копию).
 
-### 11. Стоимость и лимиты
-- Сервер Calab: только подпись конфига, отдача файла по ссылке и приём callback. CPU — на
-  клиенте (редактор) и на Document Server (конвертация при открытии и сохранении).
-- Document Server: один под. Память, CPU и размер образа — замерить по плану (§«План проверки»).
-  Исходное предположение для заявки ресурсов: requests 2 GiB RAM и 1 CPU, limits 4 GiB — уточнить
-  цифрами.
-- Клиент: редактор стоит, только пока открыт. До «Открыть» не грузится ничего, кроме чанка рамки
-  (lazy). После закрытия страница возвращается к базовой линии — проверяется в `bench.mjs`.
-- Лимиты: размер файла — `OFFICE_MAX_SIZE_MB` (100), ссылка на файл живёт `OFFICE_FILE_URL_TTL`
-  (5 мин). Лимита подключений нет (9.4+).
+### 9. Угрозы (для второго ревью)
+- **Подделка токена.** Три независимых ключа: конфиг редактора подписан `OFFICE_JWT_SECRET`
+  (HS256, `WithValidMethods` — `none`/RS-подмена не проходят); запросы Document Server
+  (`file`, `callback`) несут его JWT с `operation` 10.0 (`download` / `callback`, токен одной
+  операции не годится для другой); наши URL-токены подписаны ключом, выведенным из `JWT_SECRET`
+  API (`HMAC(…, "calab-office-url-v1")`), `aud=office`, `op` в `file|afile|callback`. Утечка
+  секрета Document Server не даёт URL-токенов (нельзя прочитать чужой файл без нашего токена),
+  утечка URL-токена не даёт права писать (нужен JWT Document Server) и не верифицируется как
+  сессионный токен API. Тело callback читается только из подписанных claims.
+- **Повтор ссылки между версиями.** Токен файла закреплён за `file_id` и живёт 5 мин; если элемент
+  ушёл на новую версию — 410, старые байты под новой сессией и новые под старой не отдаются.
+  Токен callback закреплён за ключом сессии: тело с другим ключом (другого файла или старой
+  сессии) — отказ. Сохранение — compare-and-swap по `file_id` сессии.
+- **SSRF через URL callback.** URL скачивания принимается только на настроенном origin Document
+  Server (точное совпадение схемы и хоста с портом, без userinfo; `docs.x.test.evil.test` и
+  `ftp://` не проходят), запрос всегда идёт на `OFFICE_DOCS_INTERNAL_URL`, редиректы не
+  выполняются, ответ ограничен по размеру, типу и проверке байтов. Те же правила — у результата
+  `/converter`. Других исходящих адресов у пакета нет (`/command`, `/converter` — только
+  внутренний origin).
+- **Path traversal в именах.** Имя элемента нигде не становится путём: ключ blob —
+  `<workspace>/<file id>`, имя файла — только метаданные (`files.SanitizeName`, имя элемента
+  уже прошло `cleanName` Диска: без `/`, `\`, управляющих, `.`/`..`). URL Document Server и его
+  `filetype` не влияют на имя и место хранения. Тип при сохранении — по текущему имени элемента.
+  «Сохранить как» строит имя из имени источника и нового расширения и проходит `cleanName` +
+  `freeName` Диска.
+- **Понижение прав во время открытой сессии.** (1) При каждом сохранении права автора проверяются
+  заново — без «Правки» отказ. (2) При каждом входе соавтора (статус 1 с новым набором) и обходом
+  раз в минуту (`RunSweep`) все подключённые перепроверяются: без `DISK_VIEW` — `drop`, с меткой
+  правки без `DISK_WRITE` — `drop` и снятие метки (`/command`, JWT в теле). Окно — до минуты,
+  при этом сохранить в это окно уже нельзя (1). Выход из пространства, смена ролей, ACL,
+  перемещение в restricted-папку — всё ловится, потому что проверка — по текущей цепочке.
+  Известное ограничение: правки, сделанные пониженным пользователем до `drop`, могут попасть в
+  версию, которую сохранит другой редактор с правом (Document Server не разделяет правки по
+  авторам); окно ограничено минутой.
+- **Callback для удалённого файла.** Элемент удалён навсегда → `ErrNotFound` → `error:1`, сессия
+  закрывается, сохранённый файл (если успели) удаляется; в другой элемент не пишется никогда
+  (элемент — из подписанного токена, а не из тела). Удаление навсегда файла, который правят, —
+  409 (§8).
+- **Прочее.** Лимиты: `config` 30/мин на пользователя, `convert` 5/мин, запросы Document Server
+  (`file`+`callback`) 120/мин на элемент; тело callback ≤ 1 МиБ. Логи — без содержимого (id,
+  ключ, статус, размер, sha256). `Cache-Control: no-store` у config и file.
 
-### 12. Вид: что совпадает с Calab без коммерческой лицензии
-- Совпадает:
-  - рамка Calab (общий `ViewerBar`: имя, «Изменения сохранены» / «Сохраняется…» / «Только
-    просмотр», «Скачать», «Закрыть»);
-  - тема редактора по теме приложения (`default-dark`/`default-light`, а лучше свои
-    `theme-calab-dark`/`-light` с цветами токенов);
-  - компактная шапка, имя файла только в рамке, без правой панели, «Справки», «Обратной связи»,
-    плагинов и AI.
-- Не совпадает:
-  - логотип ONLYOFFICE и раздел «О программе» (AGPL и лицензия);
-  - экран загрузки ONLYOFFICE;
-  - нельзя скрывать вкладки и меню «Файл» (`layout`), и нет своего шрифта интерфейса;
-  - вид ленты (табы и иконки) — ONLYOFFICE.
+### 10. Развёртывание (k8s, позже; кластер и стенд в этой задаче не трогаем)
+- **Один инстанс** `onlyoffice/documentserver:10.0.0` (`Deployment`, `replicas: 1`,
+  `strategy: Recreate`: Community не кластеризуется, два пода разделят сессии). Ресурсы для
+  заявки до замеров: requests 2 GiB / 1 CPU, limits 4 GiB / 2 CPU; уточнить `run.sh` (docker
+  stats в простое и с открытым документом).
+- **PVC** на `/var/lib/onlyoffice` (кэш, несохранённые сессии — переживают рестарт) и
+  `/var/www/onlyoffice/Data`.
+- **JWT**: `JWT_ENABLED=true`, `JWT_SECRET` из Kubernetes Secret — тот же Secret в API как
+  `OFFICE_JWT_SECRET`; `JWT_HEADER=Authorization`, `JWT_IN_BODY=true` допустим (API принимает оба).
+  `WOPI_ENABLED=false`, `PLUGINS_ENABLED=false`.
+- **Сеть.** Браузер → `Ingress` `OFFICE_DOCS_URL` (`docs.<домен>`, TLS) с
+  `Content-Security-Policy: frame-ancestors <PUBLIC_APP_URLS> 'self'`. Document Server → API —
+  in-cluster `OFFICE_API_URL` (`http://api.<ns>.svc`), поэтому `ALLOW_PRIVATE_IP_ADDRESS=true`
+  у Document Server. API → Document Server — `OFFICE_DOCS_INTERNAL_URL` (`http://onlyoffice.<ns>.svc`).
+  `NetworkPolicy`: egress Document Server только к API (и DNS); ingress Document Server — от
+  ingress-контроллера и от API; маршруты `/api/office/file|callback` снаружи не нужны —
+  при желании закрыть их на Ingress API.
+- Хост-страница и темы `theme-calab-*.json` — `ConfigMap`, read-only в `web-apps/apps/calab` и
+  `web-apps/apps/common/main/resources/themes`.
+- **Конфиг Document Server**: `services.CoAuthoring.autoAssembly` (`enable: true`, `interval: 5m`)
+  — версия на Диске не реже раза в 5 минут, пока идёт правка.
+- Хостов и секретов в коде нет: `OFFICE_*` в env API (docs/06 «Редактор документов ONLYOFFICE»),
+  origin Document Server клиенту отдаёт сервер (`capabilities`, `config`).
 
-## Что сделано в спайке
-- `proto/calaba/v1/office.proto`: `OfficeConfigResponse`, `OfficeMode`.
-- `apps/server/internal/office`:
-  - конфиг с JWT, `Mode` из битов Диска, ключ сессии, URL файла и callback;
-  - интерфейсы `Store`, `Sessions` и `Presence`;
-  - тесты с фейками: подпись и чужой секрет, права, статусы 1/2/3/4/6/7, forcesave с тем же
-    ключом, новый ключ после сохранения, устаревший ключ, тот же id и имя при новом файле, sha256
-    и размер, отказы (без токена, `operation`, SSRF, потеря «Правки», смена типа, файл сменился,
-    размер, чужой URL-токен), сессия-сирота;
-  - `config/office.go`: `OFFICE_*`, выключено по умолчанию, валидация.
-- Клиент:
-  - `features/disk/office/` (`OfficeEditor`, `bridge.ts`) за `CALABA_OFFICE=1` /
-    `VITE_OFFICE=1`; диалог `office` в `useUi`; «Открыть» xlsx/docx на Диске;
-  - тесты vitest: хост-страница с фейковым `DocsAPI` (api.js грузится только после `open`,
-    `destroyEditor` на `close`, чужие сообщения игнорируются) и мост.
-- `infra/office/calab-editor.{html,js}` — хост-страница.
-- Mock API: `GET /api/office/config`, хост-страница и **заглушка** `api.js`
-  (`e2e-support/assets/office-stub-api.js`) для снимков рамки.
-- `tools/office-fidelity/`: `fixtures.py`, `compare.py`, `bench.mjs`, `run.sh`.
+### 11. CSP, Electron, скрытое окно
+- Веб Calab (Caddy): `frame-src https:` уже разрешает iframe; `script-src` не меняется.
+- **Electron**: guard'ы подфреймов (`windows.ts` `will-frame-navigate`, `mail/frameGuard.ts`)
+  должны разрешить origin Document Server; origin main берёт с сервера, с которым залогинен
+  (`/api/office/capabilities`.`docs_url`), не от renderer.
+- Скрытое окно: закрывать редактор, если окно скрыто > 5 минут и нет несохранённых правок.
+
+### 12. Телефон
+Community не правит в мобильном вебе: телефон всегда `mode: view`, `type: mobile`.
+
+### 13. Стоимость и лимиты
+- Сервер Calab: подпись конфига, отдача файла, приём callback, раз в минуту обход живых сессий
+  (одна команда Valkey на сессию). Листинг Диска с включённым редактором — +1 round trip к Valkey
+  на страницу.
+- Document Server — один под (§10). Клиент — редактор стоит, только пока открыт.
+- Лимиты: `OFFICE_MAX_SIZE_MB` (100), ссылка на файл — `OFFICE_FILE_URL_TTL` (5 мин), сессия —
+  `OFFICE_SESSION_TTL` (24 ч), версий — 50 на файл, конвертация — 90 с.
+
+### 14. Вид: что совпадает с Calab без коммерческой лицензии
+- Совпадает: рамка Calab (`ViewerBar`: имя, «Изменения сохранены» / «Сохраняется…» / «Только
+  просмотр», «Скачать», «Закрыть»); тема по теме приложения; компактная шапка, имя только в
+  рамке, без правой панели, «Справки», «Обратной связи», плагинов и AI.
+- Не совпадает: логотип ONLYOFFICE и «О программе» (AGPL — остаются, решение владельца), экран
+  загрузки, вкладки и меню «Файл» (`layout`), шрифт интерфейса, вид ленты.
+
+## Что сделано
+- Спайк: proto `office.proto`, рамка клиента `features/disk/office/`, хост-страница
+  `infra/office/`, `tools/office-fidelity/`.
+- Сервер (`feat/office-server-98`):
+  - миграция `00131`: `disk_file_versions`, `disk_activity.kind = 'edit'`; сирот, квоты,
+    использование, удаление навсегда и `files.CanRead` учитывают версии;
+  - `disk.SaveVersion` (compare-and-swap, версии, «История», событие), `disk.AddFile`,
+    `POST …/disk/import`, `DiskItem.editor_ids`, 409 на удаление правящегося файла;
+  - `office`: карта форматов, `DiskStore` (настоящий Диск и `files.CanRead` для вложений),
+    `ValkeySessions`, callback с защитой §9, «Сохранить как» через `/converter`, обход прав
+    (`/command drop`), лимиты, логи;
+  - маршруты: `identityroutes` (`scopeOffice`), `botroutes`, `planinactive`, `_routes.json`.
+- Тесты: unit (`internal/office`: подписи, режимы, форматы и байты, вложения, боты, повтор
+  ссылок, SSRF-варианты, редирект, тип ответа, ключ callback, drop, конвертация), integration
+  (Valkey-сессии; `DiskStore` против Postgres; `disk` — версии, квота, обрезка, 409, импорт).
 
 ## План проверки (нужен Docker и ≥ 8 ГБ свободно; только localhost)
 `tools/office-fidelity/run.sh [OUT]`:
 1. Поднимает `onlyoffice/documentserver:10.0.0` на `127.0.0.1:18080` с `JWT_ENABLED=true` и
    секретом в `OUT/ds.env` (не в репозитории). Хост-страница монтируется в
    `web-apps/apps/calab`. Снимает `docker stats` в простое.
-2. `fixtures.py OUT` (openpyxl, python-docx):
-   - `vacations.xlsx` — формулы VLOOKUP/INDEX/MATCH между листами, SUM, SUMPRODUCT, COUNTIF, TEXT,
-     именованный диапазон, объединённые ячейки, форматы дат, ₽ и %, ширины колонок, закрепление,
-     условное форматирование (cellIs, expression, colorScale), проверка данных, стили;
-   - `contract.docx` — Title, Heading 1/2, нумерованные и маркированные списки, таблица со стилем,
-     повтором шапки и объединёнными ячейками, колонтитулы (свой для первой страницы), поля,
-     разрыв страницы, альбомная секция, жирный, курсив и цвет.
-3. `bench.mjs`:
-   - конвертация `/converter` xlsx→xlsx и docx→docx с JWT → `convert-*`;
-   - редактор через хост-страницу в Chromium (Playwright): размер загрузки JS редактора, время до
-     `ready`, CPU и heap в простое 30 с, правка C4 и абзаца, Ctrl+S → статус 6 → `editor6-*`,
-     закрытие → статус 2 → `editor2-*`, CPU, heap и число фреймов после закрытия против базовой
-     линии;
-   - снимки `editor-{default-dark,default-light}-*.png`.
-4. `docker stats` с открытым документом.
-5. `compare.py` по каждой паре. Критерий: `convert-*` без изменений; `editor*-*` — ровно одна
-   ожидаемая правка. Проверяются формулы (текст), объединения, форматы чисел, ширины, условное
-   форматирование, проверки данных, имена, стили, абзацы, стили списков, таблицы, колонтитулы,
-   поля.
-6. После прогона — снимки со своей темой `theme-calab-*` и с `compactToolbar`.
+2. `fixtures.py OUT` (openpyxl, python-docx, python-pptx): `vacations.xlsx` (формулы между
+   листами, имена, объединения, форматы дат, ₽ и %, ширины, закрепление, условное форматирование,
+   проверка данных, стили), `contract.docx` (заголовки, списки, таблица с повтором шапки и
+   объединениями, колонтитулы, поля, альбомная секция), `deck.pptx` (титул, уровни списка, таблица
+   с объединённой шапкой, заметки, 16:9), `staff.csv` (UTF-8, `;`, кавычки с `;` и переносом).
+3. `bench.mjs`: `/converter` каждого файла в свой формат → `convert-*`; путь «Сохранить как» для
+   старых форматов: xlsx → xls → xlsx, docx → doc → docx, pptx → ppt → pptx → `legacy-*`; редактор
+   через хост-страницу: время до `ready`, CPU и heap, правка, Ctrl+S → статус 6 → `editor6-*`,
+   закрытие → статус 2 → `editor2-*`, базовая линия после закрытия; снимки тем и pptx.
+4. `compare.py` по каждой паре (xlsx/docx/pptx/csv; legacy сравнивается с OOXML-оригиналом).
+   Критерий: `convert-*` без изменений; `editor*-*` — ровно одна ожидаемая правка; `legacy-*` —
+   список потерь старого формата (для подсказки в «Сохранить как»).
 
-`compare.py` проверен на контрольных парах: файл против себя — без изменений; openpyxl-пересохранение
-с правкой C4 — ровно одно изменение; python-docx с правкой абзаца — ровно одно.
+`compare.py` проверен на контрольных парах: файл против себя — без изменений; правка ячейки,
+абзаца, заголовка слайда, ячейки csv — ровно одно изменение.
 
-## Что остаётся (оценка ≈ 9–10 дней)
-| Работа | Дни |
+## Что остаётся
+| Работа | Кто |
 |---|---|
-| Store поверх Диска: `disk.Service` (элемент и биты, `ReplaceFile`), миграция `disk_file_versions` и вида `edit` в `disk_activity`, сборщик сирот, квота версий, «История» с версиями и восстановлением | 2 |
-| Sessions в Valkey, «Редактирует Имя» (событие и плашка в списке и карточке), 409 на загрузку поверх или удаление при сессии, `drop` при снятии прав | 1,5 |
-| Подключение в `app.go`, `botroutes` (`botDeny`) и `identityroutes`, флаг сервера клиенту вместо `VITE_OFFICE`, интеграционные тесты с Postgres | 1 |
-| Electron: origin Document Server в guard'ах (`windows.ts`, `mail/frameGuard.ts`) от сервера, закрытие в скрытом окне, визуальная спека `disk-office` (тёмная, светлая, телефон) | 1 |
-| k8s и стенд: Deployment, PVC, Ingress с frame-ancestors, ConfigMap хоста и тем, Secret, NetworkPolicy, ресурсы; docs/06 | 1,5 |
-| Вложения задач, файлы чата (просмотр, «Сохранить на Диск и править»), телефон (просмотр) | 1 |
-| Прогон плана проверки, правки по итогам, темы `theme-calab-*`, docs/04, docs/08, TESTING | 1,5 |
+| Клиент: карта из `capabilities` вместо `VITE_OFFICE`, «Открыть» вложений, «Сохранить в Диск», «Сохранить как», метка «Редактирует», предупреждение `lossy`, Electron guard'ы, визуальная спека | агент клиента |
+| k8s и стенд: Deployment, PVC, Ingress с frame-ancestors, ConfigMap, Secret, NetworkPolicy, autoAssembly | инфра |
+| Прогон плана проверки, темы `theme-calab-*` | после стенда |
+| Восстановление версии, настройка числа версий | docs/12 |
 
 ## Риски
+- **Форматы с потерями** (odt/ods/odp/rtf/csv/txt — `lossy-edit`): сохранение в том же формате
+  может потерять то, чего нет в модели ONLYOFFICE; клиент предупреждает (`lossy`), «История» хранит
+  прежнюю версию.
 - **Совместимость**: x2t конвертирует OOXML во внутренний формат и обратно. Сводные таблицы,
   макросы, внешние ссылки, срезы, спарклайны и редкое условное форматирование могут измениться.
   Пересчёт идёт формулами ONLYOFFICE, а кэшированные значения пишет он же (боты с

@@ -646,6 +646,24 @@ authority/policy. Не отключать enforcement автоматически
 - **Уборка:** janitor удаляет объекты записей по базе, как файлы на volume. «Бесхозные» `.mp4` в бакете он не ищет: `blob.Store` не умеет листинг, а листать весь бакет файлов ради `.mp4` каждый час дороже пользы. Остаются только объекты записей пространства, удалённого раньше, чем janitor убрал запись (до 7 дней после неё), — docs/12.
 - **Проверка:** `go test ./internal/recording/ ./internal/rtc/` (unit: оба режима, запрос к egress через twirp-сервер из `livekit/protocol`), `go test -tags integration -run TestRecordingBucket ./internal/app/` (запись в бакете: загрузка, повтор при недоступном бакете, объекта нет).
 
+### Редактор документов ONLYOFFICE (ADR-0143)
+
+Правка xlsx/docx/pptx (и odt/ods/odp/rtf/csv/txt) Диска в окне Calab, просмотр pdf и старых doc/xls/ppt. По умолчанию выключено: без `OFFICE_ENABLED=true` маршруты `/api/office/*` отвечают 404, `GET /api/office/capabilities` — `enabled: false`. Document Server — отдельный сервис (один инстанс, Community не кластеризуется), развёртывание — ADR-0143 «Развёртывание».
+
+| Переменная | По умолчанию | Что |
+|---|---|---|
+| `OFFICE_ENABLED` | `false` | включает редактор |
+| `OFFICE_DOCS_URL` | — (обязательна при включении) | origin Document Server для браузера (`https://docs.<домен>`): его `api.js`, рамка, `postMessage` |
+| `OFFICE_DOCS_INTERNAL_URL` | = `OFFICE_DOCS_URL` | как API ходит к Document Server (in-cluster `http://onlyoffice.<ns>.svc`): сохранённые и сконвертированные файлы, `/converter`, `/command`. URL из callback принимается только на этих двух origin и скачивается через внутренний |
+| `OFFICE_API_URL` | = `PUBLIC_APP_URL` | как Document Server ходит к API: ссылки на файл и callback (in-cluster адрес API) |
+| `OFFICE_JWT_SECRET` | — (≥ 32 байт при включении) | общий секрет с `JWT_SECRET` контейнера Document Server (HS256 в обе стороны); только в Secret кластера |
+| `OFFICE_THEME_DARK`, `OFFICE_THEME_LIGHT` | `default-dark`, `default-light` | `uiTheme` редактора по теме приложения (или свои `theme-calab-*`) |
+| `OFFICE_FILE_URL_TTL` | `5m` | срок ссылки, по которой Document Server забирает файл (30 с … 1 ч) |
+| `OFFICE_MAX_SIZE_MB` | `100` | больше — файл не открывается в редакторе, сохранение больше — отклоняется |
+| `OFFICE_SESSION_TTL` | `24h` | сессия совместной правки в Valkey без открытий и callback'ов (1 … 168 ч) |
+
+Ключи Valkey: `office:s:<item>` (сессия, TTL), `office:live` (элементы с сессией), `rl:office-*` (лимиты). Логи: `office: open|callback|saved|drop|converted` — id пользователя, элемента, файла, ключ, статус, размер и sha256; содержимое не логируется.
+
 ## Наблюдаемость
 
 - LiveKit: `/metrics` Prometheus на `127.0.0.1:6789` (`prometheus.port` в шаблоне; `bind_addresses: 127.0.0.1` действует и на него, снаружи порт ещё и закрыт файрволом). Проверка с хоста: `curl -s 127.0.0.1:6789/metrics | grep -c '^livekit_'` (сейчас ~60 метрик). **Скрейп пока не настроен.** Prometheus на самом хосте нет: `prometheus-node-exporter` (:9100) скрейпит внешний Prometheus из подсетей Yandex Cloud (`84.201.128.0/18`, `51.250.0.0/17`, `178.154.192.0/18` — разрешены в iptables только для 9100/9400). Варианты подключения, по возрастанию изменений:
