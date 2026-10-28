@@ -228,6 +228,10 @@ export interface CalabaApi {
     tipShow(tip: WebAppTip): Promise<void>;
     tipHide(): Promise<void>;
   };
+  /** The office editor's frame (ADR-0143), Electron only: announces the Document Server URL to the navigation guards. */
+  office?: {
+    setFrameOrigin(url: string | null): Promise<void>;
+  };
   /**
    * The mail engine bridge (ADR-0088 §7), Electron only. Raw transport: the renderer uses the typed
    * `MailApi` built over it (`platform.mail`, shared/mail.ts `createMailClient`).
