@@ -134,6 +134,8 @@ function parse(data: unknown): HostEvent | 'hello' | null {
 export interface HostConnection {
   /** Asks the host page to destroy the editor and stops listening (the caller removes the frame). */
   close(): void;
+  /** Asks the editor to save now (a forced save, when this editor version has one): the file is being left. */
+  save(): void;
   /** The app's theme changed while the editor is open (the host applies it when the editor supports that). */
   setTheme(theme: 'dark' | 'light'): void;
 }
@@ -165,6 +167,9 @@ export function connectHost(win: Window, frame: HTMLIFrameElement, docsOrigin: s
   };
   win.addEventListener('message', listener);
   return {
+    save() {
+      frame.contentWindow?.postMessage({ source: SRC, type: 'save' }, docsOrigin);
+    },
     setTheme(theme) {
       frame.contentWindow?.postMessage({ source: SRC, type: 'theme', theme: theme === 'light' ? 'default-light' : 'default-dark' }, docsOrigin);
     },

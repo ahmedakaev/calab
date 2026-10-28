@@ -1,27 +1,27 @@
 import { create } from '@bufbuild/protobuf';
-import { FileMetaSchema } from '@calaba/protocol';
-import { DiskItemKind } from '@calaba/protocol';
+import { DiskItemKind, FileMetaSchema } from '@calaba/protocol';
 import type { Page } from '@playwright/test';
 import { IDS, type MockServer } from '../e2e-support/mock-server';
 import { expect, test } from './app';
 import { checkpoint } from './harness';
 
 /**
- * «Открыть» of an office file in the Calab window (ADR-0143, docs/08 «Редактор документов»). The
- * Document Server is the mock itself: the real host page (infra/office) and a STUB api.js that
- * draws a fake sheet / document / slides (e2e-support/assets/office-stub-api.js), so the screens
- * check the Calab frame around the editor, not ONLYOFFICE. The feature is a build switch, so the
- * run needs it on in both builds:
+ * «Открыть» of an office file (ADR-0143, docs/08 «Файлы в редакторе»): the editor in the shell's
+ * content slot (the rail and the title bar stay), the opened files as tabs in the title bar's
+ * strip. The Document Server is the mock itself: the real host page (infra/office) and a STUB
+ * api.js that draws a fake document / sheet / slides in the layout of ONLYOFFICE
+ * (e2e-support/assets/office-stub-api.js), so the screens check the Calab shell around the editor,
+ * not ONLYOFFICE. The feature is a build switch, so the run needs it on in both builds:
  *
  *   CALABA_OFFICE=1 VITE_OFFICE=1 CALABA_VISUAL_MOCK_PORT=4318 MOCK_LIVEKIT_ROOM_PREFIX=office_ \
  *     pnpm -F @calaba/desktop e2e:visual -g "office-"
  *
- * Projects office-dark-960 (all) and office-light-960 (the open editors).
+ * Projects office-dark-960 (all) and office-light-960 (the file view and the tabs).
  */
 
 const WS = IDS.workspaces.main;
 
-/** The Disk fixture plus a presentation and a legacy .doc in the root (the mock's Disk has no events: before `open`). */
+/** The Disk fixture plus a presentation, a legacy .doc and a sheet in the root (the mock's Disk has no events: seed after `open`, before the Disk loads). */
 function seedOffice(mock: MockServer): void {
   const base = [...mock.disk.items.values()].find((i) => i.name === 'Бюджет 2026.xlsx')?.file;
   if (!base) throw new Error('no fixture xlsx');
@@ -42,8 +42,8 @@ async function openDisk(win: Page): Promise<void> {
 
 test('office-entry-points', async ({ open, win, mock, shot, theme }) => {
   test.skip(theme !== 'dark', 'dark only');
-  seedOffice(mock);
   await open({ prefs: { diskView: 'list' } });
+  seedOffice(mock);
   await openDisk(win);
   // The Disk row menu: «Открыть» is the editor for an office file.
   await row(win, 'График отпусков 2026.xlsx').click({ button: 'right' });
@@ -62,55 +62,77 @@ test('office-entry-points', async ({ open, win, mock, shot, theme }) => {
   await expect(win.getByTestId('task-attachment')).toBeVisible();
   await checkpoint(shot, 'office-entry-attachment');
   await win.getByTestId('task-attachment-open').click();
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-mode', 'view');
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-state', 'saved');
-  await win.getByRole('button', { name: 'Закрыть' }).first().click();
-  await expect(win.getByTestId('office-editor')).toHaveCount(0);
-  await win.keyboard.press('Escape');
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-mode', 'view');
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
+  // The editor's own «Открыть расположение файла» goes back to the task; the editor is gone, the tab stays.
+  await win.frameLocator('[data-testid="office-frame"]').getByTestId('stub-goback').click();
+  await expect(win.getByTestId('office-view')).toHaveCount(0);
+  await expect(win.getByTestId('task-attachment')).toBeVisible();
+  await expect(win.getByTestId('file-tab')).toHaveCount(1);
 
   // A file message in chat.
-  await win.getByTestId('section-chat').click();
+  await win.getByTestId('section-chats').click();
   await win.locator('aside').getByRole('button', { name: /общий/ }).first().click();
   mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: 'График на подпись', attachments: [IDS.files.sheet] });
   await expect(win.getByRole('button', { name: /Открыть График отпусков 2026\.xlsx/ })).toBeVisible();
-  await checkpoint(shot, 'office-entry-chat', { mask: [win.locator('[data-virtuoso-scroller]')] });
+  await win.locator('[data-virtuoso-scroller]').first().evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await checkpoint(shot, 'office-entry-chat');
 });
 
-test('office-editor-xlsx', async ({ open, win, mock, shot }) => {
-  seedOffice(mock);
+test('office-file-view', async ({ open, win, mock, shot }) => {
   await open({ prefs: { diskView: 'list' } });
+  seedOffice(mock);
   await openDisk(win);
   await row(win, 'График отпусков 2026.xlsx').dblclick();
-  const editor = win.getByTestId('office-editor');
-  await expect(editor).toHaveAttribute('data-state', 'saved');
-  await expect(editor).toHaveAttribute('data-mode', 'edit');
-  await expect(win.getByTestId('office-status')).toHaveText('Сохранено');
-  await checkpoint(shot, 'office-editor-xlsx');
+  const view = win.getByTestId('office-view');
+  await expect(view).toHaveAttribute('data-state', 'saved');
+  await expect(view).toHaveAttribute('data-mode', 'edit');
+  await expect(win.getByTestId('file-tab')).toHaveCount(1);
+  await checkpoint(shot, 'office-file-view');
 });
 
-test('office-unsaved-close', async ({ open, win, mock, shot, theme }) => {
-  test.skip(theme !== 'dark', 'dark only');
+test('office-tabs', async ({ open, win, mock, shot }) => {
+  await open({ prefs: { diskView: 'list' } });
   seedOffice(mock);
   mock.setOfficeFault('stuck');
-  await open({ prefs: { diskView: 'list' } });
   await openDisk(win);
   await row(win, 'График отпусков 2026.xlsx').dblclick();
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-state', 'saved');
-  // An edit inside the stub editor: unsaved («Сохраняется…»), the close asks.
-  await win.frameLocator('[data-testid="office-frame"]').locator('body').click({ position: { x: 300, y: 200 } });
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-state', 'saving');
-  await win.getByRole('button', { name: 'Закрыть' }).first().click();
-  await expect(win.getByRole('alertdialog')).toBeVisible();
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
+  // A second file: back to the Disk through the rail, open the presentation (the first one's editor saves and goes).
+  await win.getByTestId('section-disk').click();
+  await row(win, 'Питч для инвесторов.pptx').dblclick();
+  await expect(win.getByTestId('file-tab')).toHaveCount(2);
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
+  // A task joins the strip.
+  await win.getByTestId('section-boards').click();
+  await win.getByTestId('task-card').filter({ hasText: 'CAL-3' }).getByTestId('card-title').click();
+  await expect(win.getByTestId('task-tab')).toHaveCount(1);
+  await expect(win.getByTestId('file-tab')).toHaveCount(2);
+  await checkpoint(shot, 'office-tabs');
+  // The spreadsheet: the active tab; an edit marks it unsaved (the dot).
+  await win.getByTestId('file-tab').filter({ hasText: 'График отпусков' }).getByRole('button').first().click();
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
+  await win.frameLocator('[data-testid="office-frame"]').locator('body').click({ position: { x: 300, y: 260 } });
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saving');
+  await expect(win.getByTestId('file-tab-dot')).toBeVisible();
+  await checkpoint(shot, 'office-tab-unsaved');
+  // Closing it asks: save and close, discard, cancel.
+  await win.getByTestId('file-tab').filter({ hasText: 'График отпусков' }).getByTestId('file-tab-close').click();
+  await expect(win.getByTestId('office-unsaved-save')).toBeVisible();
   await checkpoint(shot, 'office-unsaved-confirm');
-  await win.getByRole('button', { name: 'Отмена' }).click();
-  await expect(win.getByTestId('office-editor')).toBeVisible();
+  await win.getByTestId('office-unsaved-cancel').click();
+  await expect(win.getByTestId('office-view')).toBeVisible();
+  // Discard: the tab goes, the other file stays.
+  await win.getByTestId('file-tab').filter({ hasText: 'График отпусков' }).getByTestId('file-tab-close').click();
+  await win.getByTestId('office-unsaved-discard').click();
+  await expect(win.getByTestId('file-tab')).toHaveCount(1);
 });
 
 test('office-error', async ({ open, win, mock, shot, theme }) => {
   test.skip(theme !== 'dark', 'dark only');
+  await open({ prefs: { diskView: 'list' } });
   seedOffice(mock);
   mock.setOfficeFault('token');
-  await open({ prefs: { diskView: 'list' } });
   await openDisk(win);
   await row(win, 'График отпусков 2026.xlsx').dblclick();
   await expect(win.getByTestId('office-error')).toBeVisible();
@@ -118,28 +140,19 @@ test('office-error', async ({ open, win, mock, shot, theme }) => {
   // «Повторить» fetches a fresh config and opens again.
   mock.setOfficeFault('');
   await win.getByTestId('office-retry').click();
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-state', 'saved');
-});
-
-test('office-pptx', async ({ open, win, mock, shot }) => {
-  seedOffice(mock);
-  await open({ prefs: { diskView: 'list' } });
-  await openDisk(win);
-  await row(win, 'Питч для инвесторов.pptx').dblclick();
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-state', 'saved');
-  await checkpoint(shot, 'office-editor-pptx');
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
 });
 
 test('office-legacy-doc', async ({ open, win, mock, shot, theme }) => {
   test.skip(theme !== 'dark', 'dark only');
-  seedOffice(mock);
   await open({ prefs: { diskView: 'list' } });
+  seedOffice(mock);
   await openDisk(win);
   await row(win, 'Договор (старый).doc').dblclick();
   await expect(win.getByTestId('office-convert-notice')).toContainText('.docx');
-  await expect(win.getByTestId('office-editor')).toHaveAttribute('data-state', 'saved');
+  await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
   await checkpoint(shot, 'office-legacy-doc');
   await win.getByTestId('office-save-as').click();
-  await expect(win.getByTestId('office-editor')).toBeVisible();
-  await expect(win.getByRole('heading', { name: 'Договор (старый).docx' })).toBeVisible();
+  await expect(win.getByTestId('file-tab')).toHaveCount(2);
+  await expect(win.getByTestId('file-tab').filter({ hasText: 'Договор (старый).docx' })).toHaveAttribute('data-active', 'true');
 });

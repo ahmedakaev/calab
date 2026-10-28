@@ -675,6 +675,8 @@ export function Modal({
   keepOpen,
   full = false,
   fullWidth = false,
+  titlePrefix,
+  titleSuffix,
   focusOnPhone = false,
 }: {
   open: boolean;
@@ -714,6 +716,9 @@ export function Modal({
   full?: boolean;
   /** With `full`: the whole window less the margin, not the 1000 px column (a spreadsheet / slides editor). */
   fullWidth?: boolean;
+  /** Before / after the title on its row (a file-type icon, a «view only» badge). */
+  titlePrefix?: ReactNode;
+  titleSuffix?: ReactNode;
   /** Phone: still focus `initialFocus` on open (the user asked to write, like «Ответить»). */
   focusOnPhone?: boolean;
 }): ReactNode {
@@ -768,7 +773,17 @@ export function Modal({
           <div className="flex shrink-0 items-start justify-between gap-4 px-5 pb-4 pt-5 mobile:px-4 mobile:pb-3 mobile:pt-3">
             {/* A flex sibling, never under the «×»: the title wraps before it (docs/09 #105). */}
             <div className="min-w-0 flex-1">
-              <DialogP.Title className="text-headline font-semibold">{title}</DialogP.Title>
+              {titlePrefix || titleSuffix ? (
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {titlePrefix}
+                  <DialogP.Title className="min-w-0 truncate text-headline font-semibold" title={title}>
+                    {title}
+                  </DialogP.Title>
+                  {titleSuffix}
+                </div>
+              ) : (
+                <DialogP.Title className="text-headline font-semibold">{title}</DialogP.Title>
+              )}
               {description ? (
                 <DialogP.Description className="mt-1 text-body text-muted">{description}</DialogP.Description>
               ) : (

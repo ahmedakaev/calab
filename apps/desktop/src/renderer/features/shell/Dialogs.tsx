@@ -28,14 +28,14 @@ import { TempExtendDialog, TempRoomDialog } from '../workspace/TempRoomDialog';
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from '../workspace/WorkspaceDialogs';
 import { AdminWindowLazy, AppSettingsWindow, WorkspaceSettingsWindow } from './lazyWindows';
 import { useSession } from '../../stores/session';
+import { useTaskTabs } from '../../stores/taskTabs';
 import { EventDialog } from '../calendar/EventDialog';
 import { SETTINGS_DIALOG_KINDS } from './SettingsScreen';
 import { AppDialog } from '../webapps/AppDialog';
 import { PlansDialog } from '../workspace/billing/PlansDialog';
 
 const RecordingResult = lazy(() => import('../chat/RecordingResult'));
-// The office editor's frame (ADR-0143): its chunk loads on the first «Открыть» of an xlsx / docx.
-const OfficeEditor = lazy(() => import('../disk/office/OfficeEditor').then((m) => ({ default: m.OfficeEditor })));
+const UnsavedDialog = lazy(() => import('../disk/office/UnsavedDialog').then((m) => ({ default: m.UnsavedDialog })));
 
 /** The send-to-chat dialog words itself by what is sent: a folder or a file. */
 const isFolderItem = (id: string): boolean => {
@@ -176,10 +176,10 @@ export function Dialogs(): ReactNode {
         node = <PdfViewer key={d.file.id} file={d.file} onClose={close} {...(diskId ? { onSendToChat: () => openSendToChat(diskId) } : {})} />;
         break;
       }
-      case 'office':
+      case 'office-unsaved':
         node = (
           <Suspense fallback={null}>
-            <OfficeEditor key={'itemId' in d.source ? d.source.itemId : d.source.fileId} source={d.source} name={d.name} onClose={close} />
+            <UnsavedDialog tabId={d.tabId} name={useTaskTabs.getState().tabs.find((x) => x.id === d.tabId)?.title ?? ''} onClose={close} />
           </Suspense>
         );
         break;

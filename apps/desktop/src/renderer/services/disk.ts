@@ -26,6 +26,7 @@ import {
 } from '@calaba/protocol';
 import { confirmAction } from '../components/Confirm';
 import { officeOpens } from '../features/disk/office/bridge';
+import { openOfficeFile } from '../features/disk/office/fileTabs';
 import { showMode } from '../features/shell/sectionNav';
 import { t } from '../i18n';
 import { ApiError, body, call, callEmpty, qs } from '../lib/api/client';
@@ -465,7 +466,7 @@ export function openItem(item: DiskItem, siblings: readonly string[] = []): void
   }
   // Office files in ONLYOFFICE Docs (ADR-0143; off unless the feature is on).
   if (officeOpens(item.name)) {
-    useUi.getState().openDialog({ kind: 'office', source: { itemId: item.id }, name: item.name });
+    openOfficeFile({ itemId: item.id }, item.name, item.workspaceId);
     return;
   }
   // A PDF opens in the PDF viewer (ADR-0103), like a task attachment.

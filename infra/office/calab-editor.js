@@ -9,6 +9,7 @@
 //   host → parent  event { name, data }          ready | state (true = unsaved changes) |
 //                                                 error | warning | requestClose
 //   parent → host  theme { theme }              the app theme changed (default-dark | default-light)
+//   parent → host  save                         leaving: save now if the editor can
 //   parent → host  close                         destroy the editor, then answer
 //   host → parent  closed
 // Messages are accepted only from window.parent; the host learns nothing it could leak: the
@@ -86,6 +87,18 @@
     }
   }
 
+  // The file is being left: ask the editor for a forced save when this version has one (its own
+  // autosave raises state=false either way; the client waits for that, never discarding edits).
+  function save() {
+    if (editor && typeof editor.requestSave === 'function') {
+      try {
+        editor.requestSave();
+      } catch (e) {
+        // the autosave still runs
+      }
+    }
+  }
+
   function close() {
     if (editor && typeof editor.destroyEditor === 'function') {
       try {
@@ -104,6 +117,7 @@
     if (!m || m.source !== SRC) return;
     if (m.type === 'open') open(m.config);
     else if (m.type === 'theme') theme(m.theme);
+    else if (m.type === 'save') save();
     else if (m.type === 'close') close();
   });
 

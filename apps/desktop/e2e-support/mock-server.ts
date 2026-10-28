@@ -8912,7 +8912,7 @@ class MockImpl {
         type: phone ? 'mobile' : 'desktop',
         documentType,
         document: { fileType: ext, key, title: name, url: `${origin}/__office/file`, permissions: { edit } },
-        editorConfig: { mode: edit ? 'edit' : 'view', lang: q(c, 'lang') || 'ru', customization: { uiTheme: q(c, 'theme') === 'light' ? 'default-light' : 'default-dark', compactHeader: true, toolbarHideFileName: true }, calabStub: { fault: this.officeFault } },
+        editorConfig: { mode: edit ? 'edit' : 'view', lang: q(c, 'lang') || 'ru', customization: { uiTheme: q(c, 'theme') === 'light' ? 'default-light' : 'default-dark', compactHeader: true, goback: { text: 'Открыть расположение файла', requestClose: true } }, calabStub: { fault: this.officeFault } },
         token: 'mock',
       };
       sendMsg(c.res, 200, OfficeConfigResponseSchema, { docsUrl: origin, hostUrl: `${origin}/web-apps/apps/calab/calab-editor.html`, configJson: JSON.stringify(config), mode: edit ? OfficeMode.EDIT : OfficeMode.VIEW, key });

@@ -2,7 +2,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import HOST_JS from '../../../../../../../infra/office/calab-editor.js?raw';
-import { FRAME_START, connectHost, convertTarget, frameReducer, isOfficeFile, nextStatus, officeCapability, originOf, problemOf, viewOnly, type HostEvent } from './bridge';
+import { officeOpens, FRAME_START, connectHost, convertTarget, frameReducer, isOfficeFile, nextStatus, officeCapability, originOf, problemOf, viewOnly, type HostEvent } from './bridge';
 
 /**
  * The office editor's two halves (ADR-0143): the Calab host page that runs on the Document
@@ -238,5 +238,19 @@ describe('capabilities and rules of the frame', () => {
     expect(events).toEqual([{ name: 'users', names: ['Анна'] }]);
     conn.setTheme('light');
     expect(out.at(-1)).toEqual({ source: 'calab-office', type: 'theme', theme: 'default-light' });
+  });
+});
+
+describe('entry-point visibility', () => {
+  it('«Открыть» is the editor only with the feature on and for a type in the capability table', () => {
+    vi.stubEnv('VITE_OFFICE', '');
+    expect(officeOpens('a.xlsx')).toBe(false);
+    vi.stubEnv('VITE_OFFICE', '1');
+    expect(officeOpens('a.xlsx')).toBe(true);
+    expect(officeOpens('a.pptx')).toBe(true);
+    expect(officeOpens('a.doc')).toBe(true);
+    expect(officeOpens('a.pdf')).toBe(false);
+    expect(officeOpens('a.txt')).toBe(false);
+    vi.unstubAllEnvs();
   });
 });

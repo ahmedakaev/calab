@@ -1,6 +1,7 @@
 import type { FileMeta } from '@calaba/protocol';
 import { t } from '../i18n';
 import { officeOpens } from '../features/disk/office/bridge';
+import { openOfficeFile } from '../features/disk/office/fileTabs';
 import { filePreview } from '../lib/filePreview';
 import { platform } from '../platform';
 import { toast } from '../stores/toasts';
@@ -27,7 +28,7 @@ export function openAttachment(f: FileMeta, list: readonly FileMeta[]): void {
   const ui = useUi.getState();
   // Office files: the editor, read-only for an attachment (the server decides, ADR-0143 §7).
   if (officeOpens(f.name)) {
-    ui.openDialog({ kind: 'office', source: { fileId: f.id }, name: f.name });
+    openOfficeFile({ fileId: f.id }, f.name, f.workspaceId);
     return;
   }
   const kind = filePreview(f, ui.phone.on);
