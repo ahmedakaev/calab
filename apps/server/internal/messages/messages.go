@@ -780,8 +780,9 @@ func (h *Handlers) read(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// ADR-0140: «on screen» moves the seen marker too; a bot's reads never count.
-	seen := req.GetSeen() && !auth.MustFromContext(r.Context()).IsBot
+	// ADR-0140: «on screen» moves the seen marker too; a bot's reads never count — nor a bot's
+	// request on behalf of a person (ADR-0106, ADR-0111): no screen is behind it.
+	seen := req.GetSeen() && !auth.MustFromContext(r.Context()).Machine()
 	rs, err := db.GuardValue(r.Context(), h.db, func(guarded *sqlc.Queries) (sqlc.AdvanceReadStateRow, error) {
 		rs, err := guarded.AdvanceReadState(r.Context(), sqlc.AdvanceReadStateParams{UserID: uid(r), RoomID: roomID, MessageID: mid, Seen: seen})
 		if err != nil || !rs.SeenAdvanced {

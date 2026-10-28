@@ -260,3 +260,45 @@ func TestReadReceiptsReaders(t *testing.T) {
 		t.Fatalf("task room peer_read_message_id = %q, want %s", page.GetPeerReadMessageId(), c1.GetId())
 	}
 }
+
+// TestReadReceiptsOnBehalf (ADR-0140 review): a bot acting for a person reads without a screen
+// behind it — its seen never counts, for the owner (ADR-0106) or a consenting member (ADR-0111);
+// a bot acting for a consenting member never learns who read the member's messages (its token is
+// the bot owner's), while one acting for its own owner does.
+func TestReadReceiptsOnBehalf(t *testing.T) {
+	o, bob, ws, _ := setupTeam(t)
+	wid := ws.GetId()
+	rid := textRoom(t, o, wid, "on-behalf-readers", false)
+	b := createBot(t, o, wid, "Delegate")
+	if st, _ := setActsAsOwner(o, wid, b.id, true); st != 200 {
+		t.Fatalf("acts_as_owner: %d", st)
+	}
+	bob.must(200, "PUT", "/api/workspaces/"+wid+"/bots/"+b.id+"/delegations/"+bob.id, nil, nil)
+	m1 := send(t, bob, rid, "от боба", uniq("rd-ob-1-"))
+	m2 := send(t, o, rid, "от владельца", uniq("rd-ob-2-"))
+
+	// seen on behalf moves nothing: no readers, no ✓✓ for anyone.
+	asOwner(b).must(204, "PUT", "/api/rooms/"+rid+"/read", &v1.UpdateReadStateRequest{MessageId: m2.GetId(), Seen: true}, nil)
+	asMember(b, bob.id).must(204, "PUT", "/api/rooms/"+rid+"/read", &v1.UpdateReadStateRequest{MessageId: m2.GetId(), Seen: true}, nil)
+	wantReaders(t, "m2 after on-behalf seen", readersOf(t, o.client, rid, m2.GetId()))
+	var page v1.ListMessagesResponse
+	o.must(200, "GET", "/api/rooms/"+rid+"/messages", nil, &page)
+	if page.GetPeerReadMessageId() != "" {
+		t.Fatalf("peer_read_message_id after on-behalf seen = %q", page.GetPeerReadMessageId())
+	}
+
+	// The owner really reads bob's message: bob's delegate learns nothing of it.
+	readUpTo(t, o.client, rid, m1.GetId())
+	wantReaders(t, "m1 to bob", readersOf(t, bob.client, rid, m1.GetId()), o.id)
+	mb := asMember(b, bob.id)
+	wantReason(t, mb, mb.do("GET", "/api/rooms/"+rid+"/messages/"+m1.GetId()+"/readers", nil, nil), 403, "ON_BEHALF_ROUTE")
+	var got v1.Message
+	mb.must(200, "GET", "/api/rooms/"+rid+"/messages/"+m1.GetId(), nil, &got)
+	if len(got.GetReadBy()) != 0 {
+		t.Fatalf("read_by to a member's delegate: %v", got.GetReadBy())
+	}
+
+	// bob reads the owner's message: the owner's own bot may tell the owner.
+	readUpTo(t, bob.client, rid, m2.GetId())
+	wantReaders(t, "m2 to the owner's bot", readersOf(t, asOwner(b), rid, m2.GetId()), bob.id)
+}

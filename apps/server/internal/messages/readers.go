@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/calaba/calaba/server/gen/calaba/v1"
+	"github.com/calaba/calaba/server/internal/auth"
 	"github.com/calaba/calaba/server/internal/db"
 	"github.com/calaba/calaba/server/internal/db/sqlc"
 	"github.com/calaba/calaba/server/internal/httpx"
@@ -36,17 +40,26 @@ func (h *Handlers) readersOf(ctx context.Context, acc perm.RoomAccess, room, aut
 	if err != nil {
 		return nil, err
 	}
-	var ids []uuid.UUID
+	var mine []sqlc.Message
 	for _, m := range ms {
 		if m.AuthorID == author && m.RoomID == room && bytes.Compare(m.ID[:], from[:]) >= 0 {
-			ids = append(ids, m.ID)
+			mine = append(mine, m)
 		}
 	}
 	out := map[uuid.UUID][]*v1.MessageReader{}
-	if len(ids) == 0 {
+	if len(mine) == 0 {
 		return out, nil
 	}
-	rows, err := h.db.Q.ListMessageReaders(ctx, sqlc.ListMessageReadersParams{RoomID: room, MessageIds: ids})
+	first, last := mine[0].ID, mine[0].ID
+	for _, m := range mine[1:] {
+		if bytes.Compare(m.ID[:], first[:]) < 0 {
+			first = m.ID
+		}
+		if bytes.Compare(m.ID[:], last[:]) > 0 {
+			last = m.ID
+		}
+	}
+	spans, err := h.db.Q.ListReadSpansCovering(ctx, sqlc.ListReadSpansCoveringParams{RoomID: room, AuthorID: author, FirstID: first, LastID: last})
 	if err != nil {
 		return nil, err
 	}
@@ -56,21 +69,55 @@ func (h *Handlers) readersOf(ctx context.Context, acc perm.RoomAccess, room, aut
 			return nil, err
 		}
 	}
-	for _, id := range ids {
-		out[id] = []*v1.MessageReader{}
-	}
-	for _, row := range rows {
-		if allowed != nil && !allowed[row.UserID] {
-			continue
-		}
-		out[row.MessageID] = append(out[row.MessageID], &v1.MessageReader{UserId: row.UserID.String(), ReadAt: timestamppb.New(row.ReadAt)})
+	for _, m := range mine {
+		out[m.ID] = coveringReaders(m, spans, allowed)
 	}
 	return out, nil
 }
 
+// coveringReaders picks for message m who saw it among spans (ADR-0140 §3): a person whose run
+// has after_id < m <= upto_id, at the message time clamped into the run (the earliest run if
+// several cover it), ordered by that time. allowed, when set, limits the people (a guest author).
+func coveringReaders(m sqlc.Message, spans []sqlc.ListReadSpansCoveringRow, allowed map[uuid.UUID]bool) []*v1.MessageReader {
+	at := map[uuid.UUID]time.Time{}
+	for _, s := range spans {
+		if bytes.Compare(s.UptoID[:], m.ID[:]) < 0 || (s.AfterID != nil && bytes.Compare(s.AfterID[:], m.ID[:]) >= 0) {
+			continue
+		}
+		if allowed != nil && !allowed[s.UserID] {
+			continue
+		}
+		t := m.CreatedAt
+		if t.Before(s.FirstAt) {
+			t = s.FirstAt
+		}
+		if t.After(s.LastAt) {
+			t = s.LastAt
+		}
+		if prev, ok := at[s.UserID]; !ok || t.Before(prev) {
+			at[s.UserID] = t
+		}
+	}
+	out := make([]*v1.MessageReader, 0, len(at))
+	for u, t := range at {
+		out = append(out, &v1.MessageReader{UserId: u.String(), ReadAt: timestamppb.New(t)})
+	}
+	slices.SortFunc(out, func(a, b *v1.MessageReader) int {
+		if c := a.GetReadAt().AsTime().Compare(b.GetReadAt().AsTime()); c != 0 {
+			return c
+		}
+		return strings.Compare(a.GetUserId(), b.GetUserId())
+	})
+	return out
+}
+
 // withReadBy fills Message.read_by of the caller's own messages among out (REST answers to the
-// author only, ADR-0140 §4).
+// author only, ADR-0140 §4). A bot acting for a consenting member (ADR-0111) gets none: its token
+// is the bot owner's, and the member's consent does not cover what others read.
 func (h *Handlers) withReadBy(r *http.Request, acc perm.RoomAccess, room uuid.UUID, ms []sqlc.Message, out []*v1.Message) error {
+	if auth.MustFromContext(r.Context()).ForMember {
+		return nil
+	}
 	by, err := h.readersOf(r.Context(), acc, room, uid(r), ms)
 	if err != nil {
 		return err
@@ -122,7 +169,7 @@ func (h *Handlers) readers(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if m.AuthorID != uid(r) {
+	if m.AuthorID != uid(r) || auth.MustFromContext(r.Context()).ForMember { // ADR-0111: not the member's bot
 		return httpx.Forbidden("only the author sees who read the message")
 	}
 	by, err := h.readersOf(r.Context(), acc, roomID, m.AuthorID, []sqlc.Message{m})

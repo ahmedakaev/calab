@@ -23,7 +23,10 @@ CREATE TABLE read_spans (
     after_id uuid,
     first_at timestamptz NOT NULL DEFAULT now(),
     last_at  timestamptz NOT NULL DEFAULT now(),
-    PRIMARY KEY (room_id, upto_id, user_id)
+    -- (room_id, user_id, upto_id): extending a run is an exact probe, and «who saw M» takes per
+    -- person of the room only the runs from M to the first one that reaches the page's last
+    -- message (ListReadSpansCovering) — bounded by the person, not by the room's history.
+    PRIMARY KEY (room_id, user_id, upto_id)
 );
 
 CREATE TABLE feature_epochs (

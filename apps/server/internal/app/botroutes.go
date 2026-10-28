@@ -912,6 +912,8 @@ var memberClosed = map[string]bool{
 	"PUT /api/disk/items/{id}/permissions":                 true,
 	"PUT /api/workspaces/{id}/disk/settings":               true,
 	"PUT /api/workspaces/{id}/wiki/settings":               true,
+	// ADR-0140: who read the member's messages is other people's reading, not the member's data.
+	"GET /api/rooms/{id}/messages/{messageId}/readers": true,
 }
 
 // onBehalfAllowedFor is onBehalfAllowed for id: a member's consent (ADR-0111) also closes

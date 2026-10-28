@@ -103,19 +103,26 @@ INSERT INTO read_spans (room_id, upto_id, user_id, after_id)
 VALUES (sqlc.arg('room_id'), sqlc.arg('upto_id'), sqlc.arg('user_id'), sqlc.narg('after_id'))
 ON CONFLICT DO NOTHING;
 
--- name: ListMessageReaders :many
--- ADR-0140 §3: who saw the given messages (all of one room) and when — the runs of the seen
--- marker that cover them, the author left out; read_at is the message time clamped into the run.
--- A range of read_spans' primary key (room_id, upto_id ≥ the message) per message.
-SELECT m.id AS message_id, s.user_id,
-       min(LEAST(GREATEST(s.first_at, m.created_at), s.last_at))::timestamptz AS read_at
-FROM messages m
-JOIN read_spans s ON s.room_id = m.room_id AND s.upto_id >= m.id
-     AND (s.after_id IS NULL OR s.after_id < m.id)
-WHERE m.id = ANY(sqlc.arg('message_ids')::uuid[]) AND m.room_id = sqlc.arg('room_id')
-  AND s.user_id <> m.author_id
-GROUP BY m.id, s.user_id
-ORDER BY m.id, read_at, s.user_id;
+-- name: ListReadSpansCovering :many
+-- ADR-0140 §3: the runs of the seen marker that may cover messages first_id..last_id of a room
+-- (the caller picks per message the run with after_id < M <= upto_id): per person whose seen
+-- marker reached first_id (the given author and bots left out), the runs from first_id up to the
+-- first run that reaches last_id. Two ranges of the primary key per person: the work is bounded
+-- by the room's readers, never by its history.
+SELECT s.user_id, s.after_id, s.upto_id, s.first_at, s.last_at
+FROM read_states rs
+JOIN users u ON u.id = rs.user_id AND NOT u.is_bot
+LEFT JOIN LATERAL (
+    SELECT e.upto_id FROM read_spans e
+    WHERE e.room_id = rs.room_id AND e.user_id = rs.user_id AND e.upto_id >= sqlc.arg('last_id')::uuid
+    ORDER BY e.upto_id
+    LIMIT 1
+) stop ON true
+JOIN read_spans s ON s.room_id = rs.room_id AND s.user_id = rs.user_id
+     AND s.upto_id >= sqlc.arg('first_id')::uuid AND (stop.upto_id IS NULL OR s.upto_id <= stop.upto_id)
+WHERE rs.room_id = sqlc.arg('room_id') AND rs.seen_message_id >= sqlc.arg('first_id')::uuid
+  AND rs.user_id <> sqlc.arg('author_id')::uuid
+ORDER BY s.user_id, s.upto_id;
 
 -- name: GetFeatureEpoch :one
 -- When a feature started (ADR-0140 §5: 'read_receipts').
