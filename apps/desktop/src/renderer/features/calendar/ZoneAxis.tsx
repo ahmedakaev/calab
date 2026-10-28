@@ -19,7 +19,7 @@ import { HOUR_PX, PX_PER_MIN } from './gridParts';
  */
 
 /** Width of an extra column (px): desktop / phone. */
-const COL_PX = 56;
+const COL_PX = 60;
 const PHONE_COL_PX = 44;
 /** The main scale's width (gridParts GUTTER), crossed by the axis «now» line. */
 const MAIN_GUTTER_PX = 60;
@@ -33,7 +33,7 @@ export function useZoneColPx(): number {
   return useMobile() ? PHONE_COL_PX : COL_PX;
 }
 
-const MUTED = 'text-faint opacity-80';
+const MUTED = 'text-faint';
 
 /**
  * The header cells of the extra columns (the week's day row, the day view's all-day row): the
@@ -53,7 +53,7 @@ export const ZoneHeads = memo(function ZoneHeads({ sig, at, bare = false }: { si
         return (
           <Tip key={z.zone} label={t('cal.tz.tip', { zone: z.zone, offset })}>
             <span
-              className={cx('flex shrink-0 flex-col items-center justify-center self-stretch overflow-hidden px-0.5 text-center text-micro leading-3', MUTED)}
+              className={cx('flex shrink-0 flex-col items-center justify-center self-stretch overflow-hidden text-center text-micro leading-3', MUTED)}
               style={{ width }}
               tabIndex={-1}
               data-testid="zone-head"

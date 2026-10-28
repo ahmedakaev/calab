@@ -115,7 +115,7 @@ function DayGrid({ workspaceId }: { workspaceId: string }): ReactNode {
       <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden" data-testid="day-scroller" {...swipe}>
         <div className="relative flex" style={{ height: 24 * HOUR_PX + 16 }}>
           {zones ? <ZoneScales sig={zones} day={day} nowDay={day === today ? day : ''} /> : null}
-          <HourScale />
+          <HourScale primary={!!zones} />
           <div
             ref={grid}
             className="relative mr-2 mt-2 flex-1 touch-pan-y"

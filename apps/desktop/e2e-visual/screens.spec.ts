@@ -4071,8 +4071,11 @@ test('settings-calendar', async ({ open, win, mock, shot }) => {
  * and labels it; the week and the day with both (New York on the previous day until 08:00 MSK).
  */
 test('calendar-zones', async ({ open, win, mock, shot }) => {
-  mock.setCalendarZones(IDS.users.anna, [{ zone: 'Asia/Kolkata' }]);
   await open();
+  // Me is read at start: the zone is set after the mock's reset, then the window reloads.
+  mock.setCalendarZones(IDS.users.anna, [{ zone: 'Asia/Kolkata' }]);
+  await win.reload();
+  await expect(win.locator('aside').first()).toBeVisible({ timeout: 30_000 });
   await mainWindow(win, mock);
   await calendarDay(win, mock);
   await win.locator(`[data-cal-day="${DAY}"]`).click();

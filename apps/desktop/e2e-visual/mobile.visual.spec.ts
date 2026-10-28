@@ -945,7 +945,7 @@ test('m-calendar-zones', async ({ page }) => {
   await openProfile(page);
   await page.getByTestId('phone-profile-calendar').tap();
   await expect(page.getByTestId('cal-zone-label')).toHaveCount(2);
-  await page.getByTestId('cal-zone-label').first().scrollIntoViewIfNeeded();
+  await page.getByTestId('cal-zone-label').last().evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await checkpoint(page, 'm-settings-calendar-zones');
 });
 

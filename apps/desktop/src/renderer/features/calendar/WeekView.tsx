@@ -126,7 +126,7 @@ export function WeekGrid({ workspaceId }: { workspaceId: string }): ReactNode {
       <div ref={scroller} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden" data-testid="week-scroller">
         <div className="relative flex" style={{ height: 24 * HOUR_PX + 16 }}>
           {zones ? <ZoneScales sig={zones} day={zoneDay} week nowDay={nowDay} /> : null}
-          <HourScale />
+          <HourScale primary={!!zones} />
           <div ref={grid} className="relative mr-2 mt-2 flex-1" style={{ height: 24 * HOUR_PX }} onPointerDown={drag.onGridDown} data-testid="week-grid">
             <HourLines />
             <div className="absolute inset-0 grid grid-cols-7" data-grid-bg>
