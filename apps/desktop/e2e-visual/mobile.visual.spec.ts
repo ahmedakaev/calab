@@ -986,7 +986,7 @@ test('m-my-tasks', async ({ page }) => {
   await expect(bar.getByRole('radio')).toHaveCount(0);
   await checkpoint(page, 'm-my-tasks');
   await bar.getByTestId('my-tasks-scope').tap();
-  await expect(page.getByRole('menuitemradio')).toHaveCount(5);
+  await expect(page.getByRole('menuitemradio')).toHaveCount(6);
   await checkpoint(page, 'm-my-tasks-picker');
   await page.getByTestId('my-tasks-scope-assigned').tap();
   await expect(page.getByRole('menuitemradio')).toHaveCount(0);
@@ -995,6 +995,13 @@ test('m-my-tasks', async ({ page }) => {
   await bar.getByTestId('completion-switch').getByRole('button').tap();
   await expect(page.getByRole('menuitemradio')).toHaveCount(3);
   await page.keyboard.press('Escape');
+  // ADR-0139: the task search on a phone — the same search and filters, cards instead of a table.
+  await bar.getByTestId('my-tasks-scope').tap();
+  await page.getByRole('menuitemradio', { name: 'Поиск' }).tap();
+  await page.getByTestId('all-tasks-search').fill('доск');
+  await expect(page.getByTestId('task-search-row')).toHaveCount(3);
+  await page.getByTestId('all-tasks-search').blur();
+  await checkpoint(page, 'm-task-search');
 });
 
 // Task boards on a phone (ADR-0042 §5): the «Доски» tab, the list by default, the task full screen.

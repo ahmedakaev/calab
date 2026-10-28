@@ -1154,6 +1154,39 @@ test('quick-switcher', async ({ open, win, mock, shot }) => {
   await expect(win.getByRole('button', { name: 'Подключиться: Переговорка' })).toBeVisible();
   await expect(win.getByRole('button', { name: 'Открыть чат: Переговорка' })).toBeVisible();
   await checkpoint(shot, 'quick-switcher', { keepPointer: true });
+  // ADR-0139: the «Задачи» tab — words, a «Доска» condition, the list with its columns.
+  mock.setClock(NOW.getTime());
+  await win.getByTestId('search-mode-tasks').click();
+  await win.keyboard.type('доск');
+  await win.getByTestId('task-search-filter').click();
+  await win.getByTestId('filter-fields').getByRole('option', { name: 'Доска' }).click();
+  await win.getByTestId('filter-values').getByRole('option', { name: /Разработка/ }).click();
+  await win.keyboard.press('Escape');
+  await expect(win.getByTestId('filter-chip')).toHaveCount(1);
+  await expect(win.getByTestId('task-search-row')).toHaveCount(2);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'quick-switcher-tasks');
+  // A typed key comes first as «Открыть CAL-3».
+  const field = win.getByRole('combobox');
+  await field.press(`${MOD}+a`);
+  await win.keyboard.type('CAL-3');
+  await expect(win.getByTestId('task-search-key')).toContainText('CAL-3');
+  // «Сохранить»: the conditions under a name, a row under «Мои задачи».
+  await field.press(`${MOD}+a`);
+  await win.keyboard.type('доск');
+  await win.getByTestId('task-search-save').click();
+  await win.getByTestId('task-search-save-name').fill('Доски в разработке');
+  await win.getByTestId('task-search-save-submit').click();
+  await expect(win.getByTestId('task-search-save-menu')).toHaveCount(0);
+  await win.keyboard.press('Escape');
+  await expect(win.getByTestId('quick-switcher')).toHaveCount(0);
+  while (await win.getByTestId('toast').count()) await win.getByTestId('toast').first().getByRole('button', { name: 'Закрыть' }).click();
+  await win.getByTestId('section-boards').click();
+  await win.getByTestId('saved-search').filter({ hasText: 'Доски в разработке' }).click();
+  await expect(win.getByTestId('task-search-page')).toBeVisible();
+  await expect(win.getByTestId('task-search-row')).toHaveCount(2);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-saved-search');
 });
 
 test('quick-switcher-filtered', async ({ open, win, mock, shot }) => {
@@ -4183,11 +4216,11 @@ test('boards-task', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('task-tab').nth(0)).toHaveAttribute('data-active', 'true');
   await panel.getByTestId('task-composer').getByRole('textbox').blur();
 
-  // #89: from the «Все задачи» search the path starts with the query; «×» returns to the same list.
+  // #89: from the «Поиск» tab (ADR-0139) the path starts with the query; «×» returns to the same list.
   await win.getByTestId('my-tasks').click();
-  await win.getByTestId('my-tasks-scope').getByRole('radio', { name: 'Все задачи' }).click();
+  await win.getByTestId('my-tasks-scope').getByRole('radio', { name: 'Поиск' }).click();
   await win.getByTestId('all-tasks-search').fill('эхо');
-  await win.getByTestId('list-row').first().click();
+  await win.getByTestId('task-search-row').first().click();
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId('panel-crumb-search')).toContainText('эхо');
   await win.mouse.move(0, 0);
@@ -4295,6 +4328,14 @@ test('boards-filter', async ({ open, win, mock, shot }) => {
   await win.getByTestId('filter-button').click();
   await expect(win.getByTestId('filter-fields')).toBeVisible();
   await checkpoint(shot, 'boards-filter');
+  // ADR-0139: the board's search field — the same search over this board, under the same filter.
+  await win.keyboard.press('Escape');
+  await win.getByTestId('board-search-open').click();
+  await win.getByTestId('board-search-input').fill('доск');
+  await expect(win.getByTestId('task-search-board')).toBeVisible();
+  await expect(win.getByTestId('task-search-row')).toHaveCount(1);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-search');
 });
 
 /** Board settings → «Статусы»: the development template's six statuses. */
