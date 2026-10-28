@@ -361,3 +361,15 @@ describe('boards 2.0 mock (ADR-0058)', () => {
     expect((await api(token, `/api/workspaces/${ws}/task-searches/${saved.search.id}`, { method: 'DELETE' })).status).toBe(204);
   });
 });
+
+describe('task notice history (ADR-0140)', () => {
+  it('a comment mention lands in the mentioned user’s GET /api/me/task-notices', async () => {
+    const token = await login();
+    const t = server.boards.taskByKey('CAL-3');
+    if (!t) throw new Error('CAL-3 is not seeded');
+    server.injectMessage({ roomId: t.task.roomId, authorId: IDS.users.vera, content: `@${IDS.users.anna} проверишь?` });
+    const r = await json<{ entries: Array<{ taskKey: string; notice: { actorId: string } }> }>(api(token, '/api/me/task-notices'));
+    expect(r.entries[0]?.taskKey).toBe('CAL-3');
+    expect(r.entries[0]?.notice.actorId).toBe(IDS.users.vera);
+  });
+});

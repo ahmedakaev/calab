@@ -1397,13 +1397,14 @@ test('room-notify-menu', async ({ open, win, mock, shot }) => {
 // «Упоминания» (ADR-0140, #99): chat mentions and task events together, newest first, each with
 // its source (room · workspace, KEY · title); unread ones carry a dot.
 test('inbox-popover', async ({ open, win, mock, shot }) => {
-  const task = mock.boards.taskByKey('CAL-3');
-  if (!task) throw new Error('CAL-3 is not seeded');
-  // A comment of Вера mentioning me in CAL-3: a MENTIONED task notice in my history.
-  mock.injectMessage({ roomId: task.task.roomId, authorId: IDS.users.vera, content: `@${IDS.users.anna} проверишь на Mac?` });
   await open();
   await mainWindow(win, mock);
-  await win.getByRole('button', { name: 'Упоминания' }).click();
+  // open() rebuilds the mock: a comment of Вера mentioning me in CAL-3 after it — a MENTIONED
+  // task notice (live, and in the history the popover reloads).
+  const task = mock.boards.taskByKey('CAL-3');
+  if (!task) throw new Error('CAL-3 is not seeded');
+  mock.injectMessage({ roomId: task.task.roomId, authorId: IDS.users.vera, content: `@${IDS.users.anna} проверишь на Mac?` });
+  await win.getByTestId('titlebar').getByRole('button', { name: 'Упоминания', exact: true }).click();
   const pop = win.getByRole('dialog', { name: 'Упоминания' });
   await expect(pop.getByText('CAL-3 · Эхо в звонке при включённых колонках')).toBeVisible();
   await expect(pop.getByText(/разработка · /).first()).toBeVisible();
