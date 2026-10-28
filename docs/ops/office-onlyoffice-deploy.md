@@ -62,6 +62,8 @@ API Calab  ──(внутри кластера)──►  Document Server
 `Content-Security-Policy: frame-ancestors 'self' <все публичные адреса приложения>`.
 Публичных адресов несколько (основной домен и алиас из `docs/06`, веб-версия). Приложение для компьютера (Electron) загружается из `file:`, и этот случай надо проверить отдельно **[проверить]**: если CSP не пускает `file:`, редактор в приложении будет пустой рамкой. Тогда либо убрать `frame-ancestors` и оставить защиту только JWT и NetworkPolicy, либо менять схему загрузки приложения. Решить на первом тесте.
 
+**Ловушка № 3: закрыть служебные пути редактора.** На публичном ingress Document Server (`docs.<домен>`) пользователю нужны только статика и страницы редактора. Служебные пути закрыть для интернета (отвечать 403 или 404): `/converter`, `/command`, `/ConvertService.ashx`, `/coauthoring/CommandService.ashx`, `/example`, `/info`. Их вызывает только API Calab внутри кластера по `OFFICE_DOCS_INTERNAL_URL`. Иначе подписанный запрос может заставить конвертер ходить по внутренней сети.
+
 **NetworkPolicy:**
 - Document Server → исходящий только к API Calab и DNS. Больше никуда.
 - Document Server ← входящий от ingress-контроллера и от API Calab.
@@ -88,7 +90,7 @@ API Calab  ──(внутри кластера)──►  Document Server
 | `OFFICE_DOCS_URL` | `https://docs.<домен>` | нет |
 | `OFFICE_DOCS_INTERNAL_URL` | `http://<service-document-server>.<ns>.svc` | нет |
 | `OFFICE_API_URL` | `http://<service-api>.<ns>.svc` (внутренний адрес API) | нет |
-| `OFFICE_JWT_SECRET` | случайные ≥ 32 байта | **да** |
+| `OFFICE_JWT_SECRET` | случайные ≥ 32 байта, **отдельный секрет**: не равен `JWT_SECRET` самого API Calab (иначе API не запустится) | **да** |
 | `OFFICE_THEME_DARK` / `OFFICE_THEME_LIGHT` | по умолчанию `default-dark` / `default-light`; можно `theme-calab-dark` / `theme-calab-light` | нет |
 | `OFFICE_FILE_URL_TTL` | `5m` | нет |
 | `OFFICE_MAX_SIZE_MB` | `100` | нет |
@@ -150,7 +152,9 @@ API Calab  ──(внутри кластера)──►  Document Server
 ## 9. Безопасность (чек-лист)
 
 - Секрет ≥ 32 байт, лежит только в Vault и в Secret. В логах, манифестах и репозитории его нет.
-- NetworkPolicy стоит, исходящий трафик Document Server ограничен API и DNS.
+- NetworkPolicy стоит, исходящий трафик Document Server ограничен API и DNS. Без неё `ALLOW_PRIVATE_IP_ADDRESS=true` опасен: подписанный запрос к `/converter` дойдёт до чего угодно в кластере.
+- Служебные пути (`/converter`, `/command`, `/ConvertService.ashx`, `/coauthoring/CommandService.ashx`, `/example`, `/info`) на публичном ingress закрыты (п. 3, ловушка № 3).
+- `OFFICE_JWT_SECRET` не равен `JWT_SECRET` API.
 - `ALLOW_PRIVATE_IP_ADDRESS=true` оправдано только вместе с NetworkPolicy.
 - `frame-ancestors` перечисляет только наши адреса. Встроить редактор в чужой сайт нельзя.
 - `WOPI_ENABLED=false`, `PLUGINS_ENABLED=false`.
@@ -162,6 +166,9 @@ API Calab  ──(внутри кластера)──►  Document Server
 - Нагрузка: десятки одновременных документов и конвертаций. Память и CPU подбирать по факту.
 - Электрон: работает ли встраивание при загрузке приложения из `file:`.
 - S3-хранилище на проде.
+- Как настоящий Document Server 10 ведёт себя при переподключении с конфигом старше 12 часов (срок жизни конфига — 12 ч): проверить на первом долгом сеансе.
+- Кластер Valkey: скрипты сессий используют два ключа и в режиме Valkey Cluster упадут. На одиночном экземпляре (как сейчас) всё работает.
+- Миграция `00131` на время проверки берёт жёсткую блокировку таблицы `disk_activity`: выкатывать в спокойное время.
 - Время старта пода и нужен ли том под встроенную базу образа.
 - Формат даты в русском интерфейсе (`01,07,2026` вместо `01.07.2026`) на настоящем «График отпусков 2026.xlsx».
 - Условное форматирование и проверка данных в xlsx после правки в редакторе переписываются в расширение, которое openpyxl не читает. Боту, который пересохраняет такой файл через openpyxl, правила пропадут. Обговорить с владельцами таких ботов.
