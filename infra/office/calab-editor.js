@@ -53,7 +53,9 @@
       config.width = '100%';
       config.height = '100%';
       config.events = {
-        onAppReady: function () {
+        // «ready» = the document is loaded and shown (onAppReady fires earlier, with the
+        // editor's own «Загрузка…» still over an empty sheet).
+        onDocumentReady: function () {
           event('ready');
         },
         onDocumentStateChange: function (e) {

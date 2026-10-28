@@ -12,6 +12,8 @@ names, fonts (bold / italic / size / colour), fills, borders, alignment.
 docx: paragraph texts and styles, run bold / italic, list numbering presence, tables (count,
 style, cell texts, merged cells), headers and footers per section (default / first page),
 section orientation, page size and margins (±0.05 cm), page breaks.
+pptx: slide size, layout names, per slide its layout, shapes (type, placeholder type, box ±0.05
+cm), texts with levels and bold, tables, charts (type, categories, series values), notes.
 """
 import json
 import re
@@ -20,9 +22,32 @@ from pathlib import Path
 
 
 def _norm_formula(v):
+    # Case, spaces, the _xlfn. prefix and quotes around sheet names ('Лист'!A1 = Лист!A1) do not
+    # change a formula.
     if isinstance(v, str) and v.startswith("="):
-        return re.sub(r"\s+", "", v).upper().replace("_XLFN.", "")
+        return re.sub(r"'([^'!]+)'!", r"\1!", re.sub(r"\s+", "", v)).upper().replace("_XLFN.", "")
     return v
+
+
+def _widths(ws):
+    """Column widths per letter: a <col min max> range covers every column in it."""
+    from openpyxl.utils import get_column_letter
+
+    out = {}
+    for d in ws.column_dimensions.values():
+        if d.width and d.min and d.max:
+            for i in range(d.min, d.max + 1):
+                out[get_column_letter(i)] = round(d.width, 1)
+    return out
+
+
+def _ext_rules(path):
+    """Conditional formats / validations kept only in the x14 extension (Excel reads them, openpyxl drops them)."""
+    import zipfile
+
+    with zipfile.ZipFile(path) as z:
+        return {n.rsplit("/", 1)[-1]: (z.read(n).count(b"<x14:conditionalFormatting"), z.read(n).count(b"<x14:dataValidation "))
+                for n in z.namelist() if n.startswith("xl/worksheets/sheet")}
 
 
 def _color(c):
@@ -36,7 +61,7 @@ def xlsx_snapshot(path):
     from openpyxl import load_workbook
 
     wb = load_workbook(path)  # formulas as text (data_only=False)
-    snap = {"sheets": wb.sheetnames, "names": sorted(wb.defined_names.keys()), "sheet": {}}
+    snap = {"sheets": wb.sheetnames, "names": sorted(wb.defined_names.keys()), "sheet": {}, "x14_ext (cf, dv)": _ext_rules(path)}
     for ws in wb.worksheets:
         cells, fmt, style = {}, {}, {}
         for row in ws.iter_rows():
@@ -60,7 +85,7 @@ def xlsx_snapshot(path):
         snap["sheet"][ws.title] = {
             "cells": cells, "fmt": fmt, "style": style,
             "merged": sorted(str(r) for r in ws.merged_cells.ranges),
-            "widths": {k: round(v.width, 1) for k, v in ws.column_dimensions.items() if v.width},
+            "widths": _widths(ws),
             "heights": {k: round(v.height, 1) for k, v in ws.row_dimensions.items() if v.height},
             "freeze": ws.freeze_panes, "cf": cf, "dv": dv,
         }
@@ -104,6 +129,32 @@ def docx_snapshot(path):
     return {"paragraphs": paras, "tables": tables, "sections": secs}
 
 
+def pptx_snapshot(path):
+    from pptx import Presentation
+    from pptx.util import Emu
+
+    prs = Presentation(path)
+    cm = lambda v: round(Emu(v or 0).cm, 2)
+    slides = []
+    for sl in prs.slides:
+        shapes = []
+        for sh in sl.shapes:
+            d = {"type": str(sh.shape_type), "name_kind": sh.name.rsplit(" ", 1)[0], "box": [cm(sh.left), cm(sh.top), cm(sh.width), cm(sh.height)]}
+            if sh.is_placeholder:
+                d["ph"] = str(sh.placeholder_format.type)
+            if sh.has_text_frame:
+                d["paras"] = [(p.text, p.level, [bool(r.font.bold) for r in p.runs if r.text.strip()]) for p in sh.text_frame.paragraphs if p.text.strip()]
+            if getattr(sh, "has_table", False) and sh.has_table:
+                d["table"] = [[c.text for c in r.cells] for r in sh.table.rows]
+            if getattr(sh, "has_chart", False) and sh.has_chart:
+                ch = sh.chart
+                d["chart"] = {"type": str(ch.chart_type), "cats": [str(c) for c in ch.plots[0].categories], "series": [(s.name, list(s.values)) for s in ch.plots[0].series]}
+            shapes.append(d)
+        notes = sl.notes_slide.notes_text_frame.text if sl.has_notes_slide else ""
+        slides.append({"layout": sl.slide_layout.name, "shapes": shapes, "notes": notes})
+    return {"size": [cm(prs.slide_width), cm(prs.slide_height)], "layouts": [l.name for l in prs.slide_layouts], "slides": slides}
+
+
 def diff(a, b, path=""):
     out = []
     if isinstance(a, dict) and isinstance(b, dict):
@@ -136,7 +187,7 @@ def main(argv):
         return 2
     before, after = Path(argv[1]), Path(argv[2])
     kind = before.suffix.lower()
-    snap = xlsx_snapshot if kind == ".xlsx" else docx_snapshot if kind == ".docx" else None
+    snap = {".xlsx": xlsx_snapshot, ".docx": docx_snapshot, ".pptx": pptx_snapshot}.get(kind)
     if snap is None:
         print(f"unsupported: {before}")
         return 2

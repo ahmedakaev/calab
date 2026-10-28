@@ -63,6 +63,7 @@
     var ev = config.events || {};
     setTimeout(function () {
       if (ev.onAppReady) ev.onAppReady();
+      if (ev.onDocumentReady) ev.onDocumentReady();
       if (ev.onDocumentStateChange) ev.onDocumentStateChange({ data: false });
     }, 30);
   }

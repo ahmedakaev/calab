@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Office fidelity fixtures (ADR-0143): realistic xlsx and docx like the Disk files bots read.
 
-  python3 -m venv /tmp/of && /tmp/of/bin/pip install openpyxl python-docx
+  python3 -m venv /tmp/of && /tmp/of/bin/pip install openpyxl python-docx python-pptx
   /tmp/of/bin/python tools/office-fidelity/fixtures.py OUT_DIR
 
-Writes OUT_DIR/vacations.xlsx («График отпусков»-like) and OUT_DIR/contract.docx («Лицензионный
+Writes OUT_DIR/deck.pptx (layouts Title, Title and Content with levels and notes, Two Content,
+Title Only with a table, a column chart and a styled text box, 16:9),
+OUT_DIR/vacations.xlsx («График отпусков»-like) and OUT_DIR/contract.docx («Лицензионный
 договор»-like). Every feature compare.py checks is in them: formulas (same-sheet, cross-sheet,
 absolute refs, functions with Russian text), merged cells, date / number / percent / currency
 formats, column widths and row heights, frozen panes, conditional formatting, data validation, a
@@ -175,9 +177,51 @@ def docx(path: Path) -> None:
     d.save(path)
 
 
+def pptx(path: Path) -> None:
+    from pptx import Presentation
+    from pptx.chart.data import CategoryChartData
+    from pptx.dml.color import RGBColor as PRGB
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Inches, Pt as PPt
+
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)  # 16:9
+    s = prs.slides.add_slide(prs.slide_layouts[0])  # Title Slide
+    s.shapes.title.text = "Итоги квартала"
+    s.placeholders[1].text = "Calab · Q3 2026"
+    s = prs.slides.add_slide(prs.slide_layouts[1])  # Title and Content
+    s.shapes.title.text = "Что сделали"
+    tf = s.placeholders[1].text_frame
+    tf.text = "Диск и версии файлов"
+    for txt, lvl in (("Правка xlsx/docx в окне", 1), ("Телефония", 0), ("Отметки о прочтении", 0)):
+        p = tf.add_paragraph()
+        p.text, p.level = txt, lvl
+    s.notes_slide.notes_text_frame.text = "Заметка докладчика: показать демо."
+    s = prs.slides.add_slide(prs.slide_layouts[3])  # Two Content
+    s.shapes.title.text = "Было / стало"
+    s.placeholders[1].text = "Скачать → править → загрузить"
+    s.placeholders[2].text = "Открыть → править"
+    s = prs.slides.add_slide(prs.slide_layouts[5])  # Title Only + table + chart + text box
+    s.shapes.title.text = "Цифры"
+    tbl = s.shapes.add_table(3, 3, Inches(0.5), Inches(1.6), Inches(6), Inches(1.5)).table
+    for r, row in enumerate((("Метрика", "Q2", "Q3"), ("Пользователи", "120", "180"), ("Выручка, ₽", "1,2 млн", "1,9 млн"))):
+        for c, v in enumerate(row):
+            tbl.cell(r, c).text = v
+    cd = CategoryChartData()
+    cd.categories = ["Июль", "Август", "Сентябрь"]
+    cd.add_series("Пользователи", (140, 160, 180))
+    s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(7), Inches(1.6), Inches(5.5), Inches(4), cd)
+    tb = s.shapes.add_textbox(Inches(0.5), Inches(6.3), Inches(6), Inches(0.6))
+    run = tb.text_frame.paragraphs[0].add_run()
+    run.text, run.font.bold, run.font.size = "Рост +50 %", True, PPt(20)
+    run.font.color.rgb = PRGB(0x1F, 0x7A, 0x3A)
+    prs.save(path)
+
+
 if __name__ == "__main__":
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "office-fixtures")
     out.mkdir(parents=True, exist_ok=True)
     xlsx(out / "vacations.xlsx")
     docx(out / "contract.docx")
-    print(out / "vacations.xlsx", out / "contract.docx")
+    pptx(out / "deck.pptx")
+    print(out / "vacations.xlsx", out / "contract.docx", out / "deck.pptx")

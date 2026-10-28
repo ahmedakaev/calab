@@ -79,7 +79,7 @@ describe('host page (infra/office/calab-editor.js)', () => {
     const h = host(true);
     h.send({ source: 'calab-office', type: 'open', config: {} });
     const ev = h.editors[0]?.config['events'] as Record<string, (e?: unknown) => void>;
-    ev['onAppReady']?.();
+    ev['onDocumentReady']?.();
     ev['onDocumentStateChange']?.({ data: true });
     ev['onDocumentStateChange']?.({ data: false });
     ev['onError']?.({ data: { errorCode: -4, errorDescription: 'download failed' } });

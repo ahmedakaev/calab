@@ -1,19 +1,22 @@
 #!/usr/bin/env node
-// ONLYOFFICE fidelity and cost bench (ADR-0143 «План проверки»). Needs a local Document Server
-// with JWT (tools/office-fidelity/run.sh starts one) and the fixtures (fixtures.py).
+// ONLYOFFICE fidelity and cost bench (ADR-0143 «План проверки»). Needs a Document Server with JWT
+// and the storage/callback stub harness.py next to it (run.sh starts both locally; a remote trial
+// reaches them through ssh -L).
 //
 //   node tools/office-fidelity/bench.mjs --ds http://localhost:18080 --secret-file OUT/ds.env \
-//        --fixtures OUT --out OUT [--port 18090] [--idle 30]
+//     --storage http://localhost:18091 --storage-for-ds http://onlyoffice-trial-harness:8000 --out OUT
 //
-// 1. Conversion round trip: POST {ds}/converter (JWT in body and header) xlsx→xlsx, docx→docx →
+// 1. Conversion round trip: POST {ds}/converter (JWT) xlsx→xlsx, docx→docx, pptx→pptx →
 //    OUT/convert-<name>.
 // 2. The editor through the Calab host page (infra/office/calab-editor.html, mounted into the
-//    Document Server's web-apps): a parent page frames it like the Calab client and sends the
-//    signed config; it measures the editor's download size, time to «ready», page CPU and JS
-//    heap while idle; edits one cell / paragraph with the keyboard, Ctrl+S (forcesave → status 6
-//    → OUT/editor6-<name>), closes (the iframe is removed → status 2 ≈10 s later →
-//    OUT/editor2-<name>), and measures the page again against the baseline before opening.
-// 3. OUT/bench.json with the numbers. Compare the files with compare.py.
+//    Document Server's web-apps), framed by a parent page like the Calab client. Per type, in a
+//    fresh browser context (cold cache): download size from the Document Server, time to «ready»,
+//    page CPU and JS heap over an idle minute; an edit with the keyboard, Ctrl+S → status 6, close
+//    (the iframe goes) → status 2 with timings; page CPU / heap / frames after close against the
+//    baseline before opening. Saved files: OUT/editor{6,2}-<name>.
+// 3. Screenshots: every type × dark / light × compact header on / off (warm cache, also the warm
+//    open time). OUT/shot-<type>-<theme>-<compact|full>.png.
+// 4. OUT/bench.json.
 import { createHmac, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -29,128 +32,102 @@ const arg = (k, d) => {
 };
 const DS = arg('ds', 'http://localhost:18080').replace(/\/$/, '');
 const SECRET = arg('secret') ?? /JWT_SECRET=(\S+)/.exec(readFileSync(arg('secret-file', 'ds.env'), 'utf8'))?.[1];
-const FIX = arg('fixtures', '.');
+const STORAGE = arg('storage', 'http://localhost:18091').replace(/\/$/, '');
+const STORAGE_FOR_DS = arg('storage-for-ds', 'http://host.docker.internal:18091').replace(/\/$/, '');
 const OUT = arg('out', '.');
-const PORT = Number(arg('port', '18090'));
-const IDLE_S = Number(arg('idle', '30'));
-// How the Document Server container reaches this harness (Docker Desktop / --add-host).
-const HARNESS_FOR_DS = arg('harness-for-ds', `http://host.docker.internal:${PORT}`);
-const HARNESS = `http://localhost:${PORT}`;
+const PORT = Number(arg('port', '18092'));
+const IDLE_S = Number(arg('idle', '60'));
+const ONLY = arg('only', 'convert,editor,shots').split(',');
+const PARENT = `http://localhost:${PORT}`;
 if (!SECRET) throw new Error('no JWT secret (--secret or --secret-file with JWT_SECRET=…)');
 
-const b64u = (b) => Buffer.from(b).toString('base64url');
 const sign = (payload) => {
-  const h = b64u(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const p = b64u(JSON.stringify(payload));
-  return `${h}.${p}.${createHmac('sha256', SECRET).update(`${h}.${p}`).digest('base64url')}`;
-};
-const verify = (tok) => {
-  const [h, p, s] = String(tok).split('.');
-  if (createHmac('sha256', SECRET).update(`${h}.${p}`).digest('base64url') !== s) throw new Error('bad signature');
-  return JSON.parse(Buffer.from(p, 'base64url').toString());
+  const b = (x) => Buffer.from(JSON.stringify(x)).toString('base64url');
+  const hp = `${b({ alg: 'HS256', typ: 'JWT' })}.${b(payload)}`;
+  return `${hp}.${createHmac('sha256', SECRET).update(hp).digest('base64url')}`;
 };
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---------------------------------------------------------------- the harness server
+// ---------------------------------------------------------------- callbacks (polled from the stub)
 
-const callbacks = []; // { name, status, at, url }
-const waiters = [];
-function waitCallback(pred, ms) {
-  const hit = callbacks.find(pred);
-  if (hit) return Promise.resolve(hit);
-  return new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error('callback timeout')), ms);
-    waiters.push({ pred, res: (c) => (clearTimeout(t), res(c)) });
-  });
+async function callbacks() {
+  return (await fetch(`${STORAGE}/callbacks`)).json();
+}
+/** Polls the stub every 250 ms; resolves with the callback and the local time it was seen. */
+async function waitCallback(pred, ms, since = 0) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const hit = (await callbacks()).slice(since).find(pred);
+    if (hit) return { ...hit, seenAt: Date.now() };
+    await sleep(250);
+  }
+  return { error: 'callback timeout' };
+}
+async function fetchSaved(cb) {
+  if (!cb?.file) return;
+  writeFileSync(join(OUT, cb.file), Buffer.from(await (await fetch(`${STORAGE}/saved/${encodeURIComponent(cb.file)}`)).arrayBuffer()));
 }
 
-const parentPage = (hostUrl, configJson) => `<!doctype html><meta charset="utf-8"><title>bench</title>
+// ---------------------------------------------------------------- the parent page (the «Calab client»)
+
+let pageHtml = '<!doctype html><title>blank</title>';
+const parentPage = (configJson) => `<!doctype html><meta charset="utf-8"><title>bench</title>
 <style>html,body{margin:0;height:100%;background:#000}iframe{border:0;width:100%;height:100%}</style>
 <body><script>
 window.__events = [];
 const DOCS = ${JSON.stringify(new URL(DS).origin)};
 const f = document.createElement('iframe');
-f.src = ${JSON.stringify(hostUrl)};
+f.src = DOCS + '/web-apps/apps/calab/calab-editor.html';
 addEventListener('message', (e) => {
   if (e.source !== f.contentWindow || e.origin !== DOCS || !e.data || e.data.source !== 'calab-office') return;
   if (e.data.type === 'hello') f.contentWindow.postMessage({ source: 'calab-office', type: 'open', config: ${configJson} }, DOCS);
-  else window.__events.push({ t: performance.now(), type: e.data.type, name: e.data.name, data: e.data.data });
+  else window.__events.push({ t: Date.now(), type: e.data.type, name: e.data.name, data: e.data.data });
 });
 window.__close = () => { f.contentWindow && f.contentWindow.postMessage({ source: 'calab-office', type: 'close' }, DOCS); setTimeout(() => f.remove(), 200); };
 document.body.appendChild(f);
 </script></body>`;
-
-let pageHtml = '';
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url, HARNESS);
-  try {
-    if (req.method === 'GET' && url.pathname.startsWith('/files/')) {
-      const name = decodeURIComponent(url.pathname.slice(7));
-      const auth = req.headers.authorization?.replace(/^Bearer /, '');
-      if (auth) verify(auth); // the Document Server signs its download (JWT_ENABLED)
-      const b = readFileSync(join(FIX, name));
-      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': b.length });
-      return res.end(b);
-    }
-    if (req.method === 'POST' && url.pathname.startsWith('/callback/')) {
-      const name = decodeURIComponent(url.pathname.slice(10));
-      const chunks = [];
-      for await (const c of req) chunks.push(c);
-      const raw = JSON.parse(Buffer.concat(chunks).toString() || '{}');
-      const auth = req.headers.authorization?.replace(/^Bearer /, '');
-      const claims = auth ? verify(auth) : verify(raw.token);
-      const body = claims.payload ?? claims;
-      const cb = { name, status: body.status, at: Date.now(), url: body.url, users: body.users, forcesavetype: body.forcesavetype, operation: claims.operation };
-      if ((body.status === 2 || body.status === 6) && body.url) {
-        const r = await fetch(body.url);
-        const file = join(OUT, `editor${body.status}-${name}`);
-        writeFileSync(file, Buffer.from(await r.arrayBuffer()));
-        cb.file = file;
-      }
-      callbacks.push(cb);
-      log('callback', JSON.stringify(cb));
-      for (const w of waiters.splice(0)) (w.pred(cb) ? w.res(cb) : waiters.push(w));
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end('{"error":0}');
-    }
-    if (url.pathname === '/parent.html') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(pageHtml);
-    }
-    res.writeHead(404).end();
-  } catch (e) {
-    log('harness error', e.message);
-    res.writeHead(500).end(String(e));
-  }
+const server = createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(pageHtml);
 });
-await new Promise((r) => server.listen(PORT, '0.0.0.0', r));
+await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 
 // ---------------------------------------------------------------- 1. conversion round trip
 
 async function convert(name) {
   const ext = name.split('.').pop();
-  const body = { async: false, filetype: ext, outputtype: ext, key: `bench-${randomBytes(6).toString('hex')}`, title: name, url: `${HARNESS_FOR_DS}/files/${encodeURIComponent(name)}` };
+  const body = { async: false, filetype: ext, outputtype: ext, key: `bench-${randomBytes(6).toString('hex')}`, title: name, url: `${STORAGE_FOR_DS}/files/${encodeURIComponent(name)}` };
   const tok = sign({ ...body, operation: 'converter' });
+  const t0 = Date.now();
   const r = await fetch(`${DS}/converter`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ ...body, token: tok }) });
-  const j = await r.json();
+  const text = await r.text();
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return { name, error: `HTTP ${r.status}: ${text.slice(0, 200)}` };
+  }
   if (!j.endConvert || !j.fileUrl) return { name, error: j.error ?? j };
+  const u = new URL(j.fileUrl);
   const file = join(OUT, `convert-${name}`);
-  writeFileSync(file, Buffer.from(await (await fetch(j.fileUrl)).arrayBuffer()));
-  return { name, file };
+  writeFileSync(file, Buffer.from(await (await fetch(`${DS}${u.pathname}${u.search}`)).arrayBuffer()));
+  return { name, file, ms: Date.now() - t0 };
 }
 
 // ---------------------------------------------------------------- 2. the editor
 
-const editorConfig = (name, theme) => {
+const DOC_TYPE = { xlsx: 'cell', docx: 'word', pptx: 'slide' };
+const editorConfig = (name, theme, compact) => {
   const ext = name.split('.').pop();
   const cfg = {
     type: 'desktop',
-    documentType: ext === 'xlsx' ? 'cell' : 'word',
-    document: { fileType: ext, key: `bench-${randomBytes(8).toString('hex')}`, title: name, url: `${HARNESS_FOR_DS}/files/${encodeURIComponent(name)}`, permissions: { edit: true, download: true, chat: false } },
+    documentType: DOC_TYPE[ext],
+    document: { fileType: ext, key: `bench-${randomBytes(8).toString('hex')}`, title: name, url: `${STORAGE_FOR_DS}/files/${encodeURIComponent(name)}`, permissions: { edit: true, download: true, print: true, chat: false } },
     editorConfig: {
-      mode: 'edit', lang: 'ru', callbackUrl: `${HARNESS_FOR_DS}/callback/${encodeURIComponent(name)}`,
-      user: { id: '00000000-0000-7000-8000-000000000001', name: 'Bench' },
-      customization: { uiTheme: theme, compactHeader: true, toolbarHideFileName: true, hideRightMenu: true, autosave: true, forcesave: true, help: false, feedback: false, plugins: false },
+      mode: 'edit', lang: 'ru', callbackUrl: `${STORAGE_FOR_DS}/callback/${encodeURIComponent(name)}`,
+      user: { id: '00000000-0000-7000-8000-000000000001', name: 'Анна Иванова' },
+      customization: { uiTheme: theme, compactHeader: compact, toolbarHideFileName: compact, hideRightMenu: true, autosave: true, forcesave: true, help: false, feedback: false, plugins: false },
     },
   };
   return { ...cfg, token: sign(cfg) };
@@ -160,96 +137,146 @@ async function metrics(cdp) {
   const m = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((x) => [x.name, x.value]));
   return { task: m.TaskDuration, heap: m.JSHeapUsedSize, nodes: m.Nodes, frames: m.Frames, docs: m.Documents };
 }
+const mb = (b) => +(b / 1048576).toFixed(1);
 
-async function editor(browser, name, theme, edit) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  const cdp = await page.context().newCDPSession(page);
+async function open(context, name, theme, compact) {
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
-  let bytes = 0;
-  let requests = 0;
+  const net = { bytes: 0, requests: 0, js: 0 };
   page.on('requestfinished', async (rq) => {
     if (!rq.url().startsWith(DS)) return;
-    requests++;
     try {
       const s = await rq.sizes();
-      bytes += s.responseBodySize + s.responseHeadersSize;
+      const r = await rq.response();
+      if (r?.fromServiceWorker()) return;
+      net.requests++;
+      net.bytes += s.responseBodySize + s.responseHeadersSize;
+      if (/\.js(\?|$)/.test(rq.url())) net.js += s.responseBodySize;
     } catch {
       // gone
     }
   });
   pageHtml = '<!doctype html><title>blank</title>';
-  await page.goto(`${HARNESS}/parent.html`);
+  await page.goto(`${PARENT}/blank`);
   await cdp.send('HeapProfiler.collectGarbage');
   const base = await metrics(cdp);
-
-  pageHtml = parentPage(`${DS}/web-apps/apps/calab/calab-editor.html`, JSON.stringify(editorConfig(name, theme)));
+  pageHtml = parentPage(JSON.stringify(editorConfig(name, theme, compact)));
   const t0 = Date.now();
-  await page.goto(`${HARNESS}/parent.html`);
-  await page.waitForFunction(() => window.__events.some((e) => e.name === 'ready' || e.name === 'error'), null, { timeout: 120_000 });
-  const openMs = Date.now() - t0;
-  const err = await page.evaluate(() => window.__events.find((e) => e.name === 'error'));
-  await page.waitForTimeout(3000); // the first paint after ready
-  await page.screenshot({ path: join(OUT, `editor-${theme}-${name}.png`) });
-  const openBytes = bytes;
-  const openRequests = requests;
-
-  // Idle: nothing touched for IDLE_S seconds.
-  const a = await metrics(cdp);
-  await page.waitForTimeout(IDLE_S * 1000);
-  const b = await metrics(cdp);
-  const idleCpu = (b.task - a.task) / IDLE_S;
-
-  // Edit + Ctrl+S (forcesave → status 6).
-  let forcesave = null;
-  if (edit && !err) {
-    await page.mouse.click(720, 450);
-    await edit(page);
-    await page.keyboard.press('Control+S');
-    forcesave = await waitCallback((c) => c.name === name && c.status === 6, 60_000).catch((e) => ({ error: e.message }));
-  }
-
-  // Close: the iframe goes; status 2 follows ≈10 s after the last editor leaves.
-  await page.evaluate(() => window.__close());
-  await page.waitForTimeout(5000);
-  await cdp.send('HeapProfiler.collectGarbage');
-  const after = await metrics(cdp);
-  const c1 = await metrics(cdp);
-  await page.waitForTimeout(10_000);
-  const c2 = await metrics(cdp);
-  const final = edit && !err ? await waitCallback((c) => c.name === name && (c.status === 2 || c.status === 4), 60_000).catch((e) => ({ error: e.message })) : null;
-  await page.close();
-  return {
-    name, theme, error: err ?? null, openMs, openBytes, openRequests,
-    idleCpuPercent: +(idleCpu * 100).toFixed(2), heapOpenMB: +(b.heap / 1048576).toFixed(1),
-    base: { heapMB: +(base.heap / 1048576).toFixed(1), frames: base.frames, nodes: base.nodes },
-    afterClose: { heapMB: +(after.heap / 1048576).toFixed(1), frames: after.frames, nodes: after.nodes, cpuPercent: +(((c2.task - c1.task) / 10) * 100).toFixed(2) },
-    forcesave, final,
-  };
+  await page.goto(`${PARENT}/editor`);
+  await page.waitForFunction(() => window.__events.some((e) => e.name === 'ready' || e.name === 'error'), null, { timeout: 180_000 });
+  const ready = await page.evaluate(() => window.__events.find((e) => e.name === 'ready' || e.name === 'error'));
+  return { page, cdp, net, base, openMs: ready.t - t0, error: ready.name === 'error' ? ready.data : null };
 }
 
-const typeXlsx = async (page) => {
+async function close(page) {
+  await page.evaluate(() => window.__close());
+  return Date.now();
+}
+
+const EDIT = {
   // C4 (the first vacation start) := 02.07.2026
-  await page.keyboard.press('Control+Home');
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
-  for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowRight');
-  await page.keyboard.type('02.07.2026');
-  await page.keyboard.press('Enter');
-};
-const typeDocx = async (page) => {
-  await page.keyboard.press('Control+Home');
-  await page.keyboard.press('End');
-  await page.keyboard.type(' (правка из редактора)');
+  xlsx: async (page) => {
+    await page.mouse.click(700, 500);
+    await page.keyboard.press('Control+Home');
+    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+    for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowRight');
+    await page.keyboard.type('02.07.2026');
+    await page.keyboard.press('Enter');
+  },
+  docx: async (page) => {
+    await page.mouse.click(720, 500);
+    await page.keyboard.press('Control+Home');
+    await page.keyboard.press('End');
+    await page.keyboard.type(' (правка из редактора)');
+  },
+  // the title placeholder of the first slide
+  pptx: async (page) => {
+    const box = await page.evaluate(() => [innerWidth, innerHeight]);
+    await page.mouse.dblclick(box[0] * 0.58, box[1] * 0.45);
+    await page.keyboard.press('End');
+    await page.keyboard.type(' (правка)');
+    await page.keyboard.press('Escape');
+  },
 };
 
-const browser = await chromium.launch({ args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'] });
-const report = { ds: DS, at: new Date().toISOString(), convert: [], editor: [] };
-for (const n of ['vacations.xlsx', 'contract.docx']) report.convert.push(await convert(n).catch((e) => ({ name: n, error: e.message })));
-report.editor.push(await editor(browser, 'vacations.xlsx', 'default-dark', typeXlsx));
-report.editor.push(await editor(browser, 'contract.docx', 'default-light', typeDocx));
-// Look and feel: the same files read-only and in the other theme (no edit), for screenshots.
-report.editor.push(await editor(browser, 'vacations.xlsx', 'default-light', null));
-report.editor.push(await editor(browser, 'contract.docx', 'default-dark', null));
-await browser.close();
-server.close();
-writeFileSync(join(OUT, 'bench.json'), JSON.stringify(report, null, 1));
+async function measure(browser, name) {
+  const ext = name.split('.').pop();
+  // Cold cache, and no service worker: the editor's own SW would serve its scripts unseen.
+  const context = await browser.newContext({ locale: 'ru-RU', serviceWorkers: 'block' });
+  const before = (await callbacks()).length;
+  const o = await open(context, name, 'default-dark', true);
+  log(name, 'ready in', o.openMs, 'ms,', o.net.requests, 'requests', mb(o.net.bytes), 'MB');
+  await sleep(5000);
+  const a = await metrics(o.cdp);
+  await sleep(IDLE_S * 1000);
+  const b = await metrics(o.cdp);
+  const res = {
+    name, error: o.error, openMs: o.openMs, coldRequests: o.net.requests, coldMB: mb(o.net.bytes), coldJsMB: mb(o.net.js),
+    idle: { seconds: IDLE_S, cpuPercent: +(((b.task - a.task) / IDLE_S) * 100).toFixed(2), heapMB: mb(b.heap), nodes: b.nodes, frames: b.frames },
+    base: { heapMB: mb(o.base.heap), nodes: o.base.nodes, frames: o.base.frames },
+  };
+  if (!o.error) {
+    await EDIT[ext](o.page);
+    const tEdit = Date.now();
+    await sleep(1500);
+    await o.page.screenshot({ path: join(OUT, `edited-${ext}.png`) });
+    await o.page.keyboard.press('Control+S');
+    const tSave = Date.now();
+    const c6 = await waitCallback((c) => c.name === name && c.status === 6, 60_000, before);
+    await fetchSaved(c6);
+    const tClose = await close(o.page);
+    const c2 = await waitCallback((c) => c.name === name && (c.status === 2 || c.status === 4), 90_000, before);
+    await fetchSaved(c2);
+    res.save = {
+      forcesave: c6.error ? c6 : { afterCtrlS_s: +((c6.seenAt - tSave) / 1000).toFixed(1), size: c6.size, forcesavetype: c6.forcesavetype, operation: c6.operation },
+      final: c2.error ? c2 : { status: c2.status, afterClose_s: +((c2.seenAt - tClose) / 1000).toFixed(1), afterLastEdit_s: +((c2.seenAt - tEdit) / 1000).toFixed(1), size: c2.size },
+    };
+  } else {
+    await close(o.page);
+  }
+  await sleep(3000);
+  await o.cdp.send('HeapProfiler.collectGarbage');
+  const c1 = await metrics(o.cdp);
+  await sleep(10_000);
+  const c2 = await metrics(o.cdp);
+  res.afterClose = { heapMB: mb(c2.heap), nodes: c2.nodes, frames: c2.frames, cpuPercent: +(((c2.task - c1.task) / 10) * 100).toFixed(2) };
+  await context.close();
+  log(JSON.stringify(res));
+  return res;
+}
+
+async function shots(browser, name) {
+  const ext = name.split('.').pop();
+  const context = await browser.newContext({ locale: 'ru-RU' });
+  const out = [];
+  for (const theme of ['default-dark', 'default-light']) {
+    for (const compact of [true, false]) {
+      const o = await open(context, name, theme, compact);
+      await sleep(4000);
+      const file = join(OUT, `shot-${ext}-${theme.replace('default-', '')}-${compact ? 'compact' : 'full'}.png`);
+      await o.page.screenshot({ path: file });
+      out.push({ file, warmOpenMs: o.openMs, warmMB: mb(o.net.bytes), error: o.error });
+      await close(o.page);
+      await o.page.close();
+    }
+  }
+  await context.close();
+  return out;
+}
+
+const FILES = ['vacations.xlsx', 'contract.docx', 'deck.pptx'];
+const report = { ds: DS, at: new Date().toISOString(), convert: [], editor: [], shots: [] };
+const browser = await chromium.launch({ args: ['--enable-precise-memory-info'] });
+try {
+  if (ONLY.includes('convert')) for (const n of FILES) report.convert.push(await convert(n).catch((e) => ({ name: n, error: e.message })));
+  log('convert', JSON.stringify(report.convert));
+  if (ONLY.includes('editor')) for (const n of FILES) report.editor.push(await measure(browser, n).catch((e) => ({ name: n, error: e.message })));
+  if (ONLY.includes('shots')) for (const n of FILES) report.shots.push(...(await shots(browser, n).catch((e) => [{ name: n, error: e.message }])));
+} finally {
+  await browser.close();
+  server.close();
+  writeFileSync(join(OUT, 'bench.json'), JSON.stringify(report, null, 1));
+}
 console.log(JSON.stringify(report, null, 1));
