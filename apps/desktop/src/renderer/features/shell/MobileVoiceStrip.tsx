@@ -81,7 +81,9 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
   if (!roomId) return null;
   const connected = phase === 'connected';
   // While the PTT button is held the status line says so (the button itself is a 40 px circle).
-  const phaseText = dialing && (connected || phase === 'connecting') ? t('telc.call.dialing') : connected && ptt && onAir ? t('mobile.pttOn') : connected && micTrouble ? t(micTrouble === 'busy' ? 'voice.micBusyShort' : 'voice.micUnheardShort') : connected ? t('voice.connected') : phase === 'reconnecting' ? t('voice.reconnecting') : phase === 'blocked' ? t('voice.blocked') : t('voice.connecting');
+  // A mic problem (#255) takes the status line; it is two lines at this width, so the room name gives way.
+  const troubleShown = connected && !dialing && !!micTrouble && !(ptt && onAir);
+  const phaseText = dialing && (connected || phase === 'connecting') ? t('telc.call.dialing') : connected && ptt && onAir ? t('mobile.pttOn') : troubleShown ? t(micTrouble === 'busy' ? 'voice.micBusyShort' : 'voice.micUnheardShort') : connected ? t('voice.connected') : phase === 'reconnecting' ? t('voice.reconnecting') : phase === 'blocked' ? t('voice.blocked') : t('voice.connecting');
   return (
     <div className={cx('shrink-0 px-4 pt-1 [.kb-open_&]:hidden', aboveTabs ? 'pb-2' : 'pb-[calc(var(--safe-bottom,0px)+8px)]')} data-testid="mobile-voice-strip">
       {/* Push-to-talk: a big hold button above the island, in the flow — the feed and the composer above it shrink by its height. */}
@@ -130,7 +132,7 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
                 (line-clamp keeps the strip 56 px). A single word wider than the slot (≈ 75–90 px between the
                 avatar and five buttons: «Подключение…») is hyphenated by the document language
                 («Подклю-чение…»), not broken at an arbitrary letter. */}
-            <span className={cx('line-clamp-2 min-w-0 break-words text-[12px] font-semibold leading-[15px] [hyphens:auto]', connected && !dialing ? (micTrouble && !(ptt && onAir) ? 'text-danger-text' : 'text-ok') : 'text-warn')} data-testid="mobile-voice-status">
+            <span className={cx('line-clamp-2 min-w-0 break-words text-[12px] font-semibold leading-[15px] [hyphens:auto]', troubleShown ? 'text-danger-text' : connected && !dialing ? 'text-ok' : 'text-warn')} data-testid="mobile-voice-status">
               {phaseText}
             </span>
             {/* Recording (docs/09 #30): the red dot only — the strip has no room for the timer; a tap
@@ -138,9 +140,11 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
             {recording ? <MobileRecDot roomId={roomId} workspaceId={wsId} rec={recording} className="pointer-events-auto -my-1 relative" /> : null}
             {call ? null : <TempExpiry roomId={roomId} workspaceId={wsId} compact />}
           </span>
-          <span className="pointer-events-none max-w-full truncate text-[12px] leading-[15px] text-muted" data-testid="mobile-voice-label">
-            {call ? callLabel : (room?.name ?? '')}
-          </span>
+          {troubleShown ? null : (
+            <span className="pointer-events-none max-w-full truncate text-[12px] leading-[15px] text-muted" data-testid="mobile-voice-label">
+              {call ? callLabel : (room?.name ?? '')}
+            </span>
+          )}
             </>
           )}
         </div>

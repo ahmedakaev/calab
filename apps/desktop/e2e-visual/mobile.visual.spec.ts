@@ -733,6 +733,8 @@ test('m-home', async ({ page }) => {
   await expect(page.getByTestId('toast')).toHaveCount(1);
   await expect(page.getByTestId('toast').filter({ hasText: 'Микрофон занят другим приложением' })).toBeVisible();
   await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Микрофон занят');
+  // Two lines at this width: the room name gives way instead of a cramped third line.
+  await expect(strip.getByTestId('mobile-voice-label')).toHaveCount(0);
   await checkpoint(page, 'm-voice-recovery');
   await page.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
   await expect(page.getByTestId('toast').filter({ hasText: 'Вас не слышно: микрофон занят системой' })).toBeVisible();
