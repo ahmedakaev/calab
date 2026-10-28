@@ -104,6 +104,43 @@ def docx_snapshot(path):
     return {"paragraphs": paras, "tables": tables, "sections": secs}
 
 
+def pptx_snapshot(path):
+    from pptx import Presentation
+
+    prs = Presentation(path)
+    slides = []
+    for sl in prs.slides:
+        shapes = []
+        for sh in sl.shapes:
+            item = {"kind": str(sh.shape_type), "name": sh.name}
+            if sh.has_text_frame:
+                item["paras"] = [{"text": p.text, "level": p.level,
+                                  "bold": [r.text for r in p.runs if r.font.bold and r.text.strip()]}
+                                 for p in sh.text_frame.paragraphs if p.text.strip()]
+            if getattr(sh, "has_table", False) and sh.has_table:
+                t = sh.table
+                item["cells"] = [[c.text for c in r.cells] for r in t.rows]
+                item["merged"] = sum(1 for r in t.rows for c in r.cells if c.is_merge_origin)
+            shapes.append(item)
+        notes = sl.notes_slide.notes_text_frame.text if sl.has_notes_slide else ""
+        slides.append({"layout": sl.slide_layout.name, "shapes": shapes, "notes": notes})
+    return {"size": [round(prs.slide_width / 360000, 2), round(prs.slide_height / 360000, 2)], "slides": slides}
+
+
+def csv_snapshot(path):
+    import csv
+
+    raw = Path(path).read_bytes()
+    text = raw.decode("utf-8-sig")
+    dialect = csv.Sniffer().sniff(text.splitlines()[0], delimiters=";,\t")
+    return {"delimiter": dialect.delimiter, "bom": raw.startswith(b"\xef\xbb\xbf"),
+            "rows": [{"cells": r} for r in csv.reader(text.splitlines(keepends=True), dialect)]}
+
+
+SNAPSHOTS = {".xlsx": xlsx_snapshot, ".xls": xlsx_snapshot, ".docx": docx_snapshot, ".doc": docx_snapshot,
+             ".pptx": pptx_snapshot, ".ppt": pptx_snapshot, ".csv": csv_snapshot}
+
+
 def diff(a, b, path=""):
     out = []
     if isinstance(a, dict) and isinstance(b, dict):
@@ -135,8 +172,9 @@ def main(argv):
         print(__doc__)
         return 2
     before, after = Path(argv[1]), Path(argv[2])
-    kind = before.suffix.lower()
-    snap = xlsx_snapshot if kind == ".xlsx" else docx_snapshot if kind == ".docx" else None
+    # A legacy round trip (xlsx → xls → xlsx, …) compares two OOXML files: the snapshot is the
+    # original's format.
+    snap = SNAPSHOTS.get(before.suffix.lower())
     if snap is None:
         print(f"unsupported: {before}")
         return 2

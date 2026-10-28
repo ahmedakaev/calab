@@ -38,7 +38,7 @@ until [ "$(curl -fsS http://localhost:18080/healthcheck 2>/dev/null)" = "true" ]
 docker stats --no-stream --format '{{.Name}} idle: {{.MemUsage}} cpu {{.CPUPerc}}' "$NAME" | tee "$OUT/ds-idle.txt"
 
 VENV=${VENV:-/tmp/calab-office-venv}
-[ -x "$VENV/bin/python" ] || { python3 -m venv "$VENV" && "$VENV/bin/pip" install -q openpyxl python-docx; }
+[ -x "$VENV/bin/python" ] || { python3 -m venv "$VENV" && "$VENV/bin/pip" install -q openpyxl python-docx python-pptx; }
 "$VENV/bin/python" -I "$ROOT/tools/office-fidelity/fixtures.py" "$OUT"
 
 # Container memory with one open document: sampled while the bench idles in the editor.
@@ -46,8 +46,8 @@ VENV=${VENV:-/tmp/calab-office-venv}
 node "$ROOT/tools/office-fidelity/bench.mjs" --ds http://localhost:18080 --secret-file "$OUT/ds.env" --fixtures "$OUT" --out "$OUT"
 wait
 
-for f in vacations.xlsx contract.docx; do
-  for kind in convert editor6 editor2; do
+for f in vacations.xlsx contract.docx deck.pptx staff.csv; do
+  for kind in convert editor6 editor2 legacy; do
     [ -f "$OUT/$kind-$f" ] && "$VENV/bin/python" -I "$ROOT/tools/office-fidelity/compare.py" "$OUT/$f" "$OUT/$kind-$f" | sed "s/^/[$kind] /" || true
   done
 done

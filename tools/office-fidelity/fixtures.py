@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Office fidelity fixtures (ADR-0143): realistic xlsx and docx like the Disk files bots read.
+"""Office fidelity fixtures (ADR-0143): realistic files like the Disk files bots read.
 
-  python3 -m venv /tmp/of && /tmp/of/bin/pip install openpyxl python-docx
+  python3 -m venv /tmp/of && /tmp/of/bin/pip install openpyxl python-docx python-pptx
   /tmp/of/bin/python tools/office-fidelity/fixtures.py OUT_DIR
 
-Writes OUT_DIR/vacations.xlsx («График отпусков»-like) and OUT_DIR/contract.docx («Лицензионный
-договор»-like). Every feature compare.py checks is in them: formulas (same-sheet, cross-sheet,
+Writes OUT_DIR/vacations.xlsx («График отпусков»-like), OUT_DIR/contract.docx («Лицензионный
+договор»-like), OUT_DIR/deck.pptx (a team deck: title, bullets with levels, a table with a merged
+header, speaker notes, 16:9) and OUT_DIR/staff.csv (UTF-8, «;», quoted fields with «;» and
+newlines). The legacy doc / xls / ppt are made from these by the Document Server itself in
+bench.mjs (no Python library writes them). Every feature compare.py checks is in them: formulas (same-sheet, cross-sheet,
 absolute refs, functions with Russian text), merged cells, date / number / percent / currency
 formats, column widths and row heights, frozen panes, conditional formatting, data validation, a
 defined name, styles (fonts, fills, borders, alignment); a docx with heading and list styles, a
@@ -175,9 +178,52 @@ def docx(path: Path) -> None:
     d.save(path)
 
 
+def pptx(path: Path) -> None:
+    from pptx import Presentation
+    from pptx.util import Cm, Pt
+
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = Cm(33.867), Cm(19.05)  # 16:9
+    s1 = prs.slides.add_slide(prs.slide_layouts[0])
+    s1.shapes.title.text = "План отпусков 2026"
+    s1.placeholders[1].text = "HR · Кадры"
+    s1.notes_slide.notes_text_frame.text = "Заметка докладчика: сроки согласования до 15.03."
+    s2 = prs.slides.add_slide(prs.slide_layouts[1])
+    s2.shapes.title.text = "Правила"
+    tf = s2.placeholders[1].text_frame
+    tf.text = "Заявление за 14 дней"
+    for text, level in (("через Calab", 1), ("согласует руководитель", 1), ("Перенос — по согласованию", 0)):
+        para = tf.add_paragraph()
+        para.text, para.level = text, level
+    run = tf.paragraphs[0].runs[0]
+    run.font.bold, run.font.size = True, Pt(28)
+    s3 = prs.slides.add_slide(prs.slide_layouts[5])
+    s3.shapes.title.text = "Сводка"
+    rows = [["Отдел", "Сотрудники", "Дней"], ["Разработка", "12", "336"], ["Продажи", "7", "196"], ["Итого", "19", "532"]]
+    table = s3.shapes.add_table(len(rows) + 1, 3, Cm(2), Cm(4), Cm(24), Cm(8)).table
+    table.cell(0, 0).merge(table.cell(0, 2))
+    table.cell(0, 0).text = "Отпуска по отделам"
+    for r, row in enumerate(rows, start=1):
+        for c, v in enumerate(row):
+            table.cell(r, c).text = v
+    prs.save(path)
+
+
+def csv_file(path: Path) -> None:
+    import csv
+
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f, delimiter=";")
+        w.writerow(["ФИО", "Должность", "Начало", "Дней", "Комментарий"])
+        w.writerow(["Иванова Анна", "Бухгалтер", "02.07.2026", "14", "с переносом; по согласованию"])
+        w.writerow(["Петров Пётр", "Инженер", "15.08.2026", "28", "две части\nиюль и август"])
+
+
 if __name__ == "__main__":
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "office-fixtures")
     out.mkdir(parents=True, exist_ok=True)
     xlsx(out / "vacations.xlsx")
     docx(out / "contract.docx")
-    print(out / "vacations.xlsx", out / "contract.docx")
+    pptx(out / "deck.pptx")
+    csv_file(out / "staff.csv")
+    print(out / "vacations.xlsx", out / "contract.docx", out / "deck.pptx", out / "staff.csv")

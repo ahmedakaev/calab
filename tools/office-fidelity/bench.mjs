@@ -5,8 +5,10 @@
 //   node tools/office-fidelity/bench.mjs --ds http://localhost:18080 --secret-file OUT/ds.env \
 //        --fixtures OUT --out OUT [--port 18090] [--idle 30]
 //
-// 1. Conversion round trip: POST {ds}/converter (JWT in body and header) xlsx→xlsx, docx→docx →
-//    OUT/convert-<name>.
+// 1. Conversion round trips: POST {ds}/converter (JWT in body and header) of every fixture into
+//    its own format → OUT/convert-<name>; and the legacy path of «Сохранить как» (ADR-0143
+//    «Форматы»): xlsx → xls → xlsx, docx → doc → docx, pptx → ppt → pptx → OUT/legacy-<name>
+//    (compare.py against the original shows what the legacy format loses).
 // 2. The editor through the Calab host page (infra/office/calab-editor.html, mounted into the
 //    Document Server's web-apps): a parent page frames it like the Calab client and sends the
 //    signed config; it measures the editor's download size, time to «ready», page CPU and JS
@@ -127,14 +129,14 @@ await new Promise((r) => server.listen(PORT, '0.0.0.0', r));
 
 // ---------------------------------------------------------------- 1. conversion round trip
 
-async function convert(name) {
+async function convert(name, to, out = `convert-${name}`) {
   const ext = name.split('.').pop();
-  const body = { async: false, filetype: ext, outputtype: ext, key: `bench-${randomBytes(6).toString('hex')}`, title: name, url: `${HARNESS_FOR_DS}/files/${encodeURIComponent(name)}` };
+  const body = { async: false, filetype: ext, outputtype: to ?? ext, key: `bench-${randomBytes(6).toString('hex')}`, title: name, url: `${HARNESS_FOR_DS}/files/${encodeURIComponent(name)}` };
   const tok = sign({ ...body, operation: 'converter' });
   const r = await fetch(`${DS}/converter`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ ...body, token: tok }) });
   const j = await r.json();
   if (!j.endConvert || !j.fileUrl) return { name, error: j.error ?? j };
-  const file = join(OUT, `convert-${name}`);
+  const file = join(OUT, out);
   writeFileSync(file, Buffer.from(await (await fetch(j.fileUrl)).arrayBuffer()));
   return { name, file };
 }
@@ -145,7 +147,7 @@ const editorConfig = (name, theme) => {
   const ext = name.split('.').pop();
   const cfg = {
     type: 'desktop',
-    documentType: ext === 'xlsx' ? 'cell' : 'word',
+    documentType: { xlsx: 'cell', csv: 'cell', pptx: 'slide' }[ext] ?? 'word',
     document: { fileType: ext, key: `bench-${randomBytes(8).toString('hex')}`, title: name, url: `${HARNESS_FOR_DS}/files/${encodeURIComponent(name)}`, permissions: { edit: true, download: true, chat: false } },
     editorConfig: {
       mode: 'edit', lang: 'ru', callbackUrl: `${HARNESS_FOR_DS}/callback/${encodeURIComponent(name)}`,
@@ -243,12 +245,23 @@ const typeDocx = async (page) => {
 
 const browser = await chromium.launch({ args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'] });
 const report = { ds: DS, at: new Date().toISOString(), convert: [], editor: [] };
-for (const n of ['vacations.xlsx', 'contract.docx']) report.convert.push(await convert(n).catch((e) => ({ name: n, error: e.message })));
+const FIXTURES = ['vacations.xlsx', 'contract.docx', 'deck.pptx', 'staff.csv'];
+for (const n of FIXTURES) report.convert.push(await convert(n).catch((e) => ({ name: n, error: e.message })));
+// The legacy path: the Document Server writes the legacy file (into FIX, so the harness serves
+// it), then «Сохранить как» converts it back to OOXML.
+for (const [n, legacy] of [['vacations.xlsx', 'xls'], ['contract.docx', 'doc'], ['deck.pptx', 'ppt']]) {
+  const base = n.replace(/\.[^.]+$/, '');
+  const old = await convert(n, legacy, `${base}.${legacy}`).catch((e) => ({ name: n, error: e.message }));
+  if (old.error) { report.convert.push(old); continue; }
+  writeFileSync(join(FIX, `${base}.${legacy}`), readFileSync(old.file));
+  report.convert.push(await convert(`${base}.${legacy}`, n.split('.').pop(), `legacy-${n}`).catch((e) => ({ name: `${base}.${legacy}`, error: e.message })));
+}
 report.editor.push(await editor(browser, 'vacations.xlsx', 'default-dark', typeXlsx));
 report.editor.push(await editor(browser, 'contract.docx', 'default-light', typeDocx));
 // Look and feel: the same files read-only and in the other theme (no edit), for screenshots.
 report.editor.push(await editor(browser, 'vacations.xlsx', 'default-light', null));
 report.editor.push(await editor(browser, 'contract.docx', 'default-dark', null));
+report.editor.push(await editor(browser, 'deck.pptx', 'default-dark', null));
 await browser.close();
 server.close();
 writeFileSync(join(OUT, 'bench.json'), JSON.stringify(report, null, 1));
