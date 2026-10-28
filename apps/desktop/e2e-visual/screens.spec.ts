@@ -175,6 +175,7 @@ const KEY = new Set([
   // Task boards (ADR-0042 §5).
   'boards-kanban',
   'boards-kanban-assignees',
+  'boards-status-menu',
   'boards-create-menu',
   'boards-task',
   // «Комментарии | История» of the task panel (ADR-0091).
@@ -4092,6 +4093,16 @@ test('boards-kanban', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('task-card').filter({ hasText: 'Карточки задач' })).toBeVisible();
   await expectAssigneeStacks(win);
   await checkpoint(shot, 'boards-kanban-assignees', { axe: false });
+
+  // Status picker on a task waiting for approval: the statuses it may not reach carry a second
+  // line («нужно согласование»); one-line and two-line rows keep the same padding and rhythm.
+  await win.getByTestId('task-card').filter({ hasText: 'Ревью: права досок' }).getByTestId('card-status').click();
+  const statusMenu = win.getByTestId('status-menu');
+  await expect(statusMenu.getByTestId('picker-option').first()).toBeVisible();
+  await expect(statusMenu).toContainText('нужно согласование');
+  await checkpoint(shot, 'boards-status-menu', { axe: false });
+  await win.keyboard.press('Escape');
+  await expect(statusMenu).toBeHidden();
 
   // CBF-58: the column's «+» — «Создать задачу», the boards to create in, a separator, category / board.
   await win.getByTestId('section-create-board').click();
