@@ -3,7 +3,7 @@ import { DiskItemKind, FileMetaSchema } from '@calaba/protocol';
 import type { Page } from '@playwright/test';
 import { IDS, type MockServer } from '../e2e-support/mock-server';
 import { expect, test } from './app';
-import { checkpoint } from './harness';
+import { checkpoint, joinVoice } from './harness';
 
 /**
  * «Открыть» of an office file (ADR-0143, docs/08 «Файлы в редакторе»): the editor in the shell's
@@ -11,12 +11,12 @@ import { checkpoint } from './harness';
  * strip. The Document Server is the mock itself: the real host page (infra/office) and a STUB
  * api.js that draws a fake document / sheet / slides in the layout of ONLYOFFICE
  * (e2e-support/assets/office-stub-api.js), so the screens check the Calab shell around the editor,
- * not ONLYOFFICE. The feature is a build switch, so the run needs it on in both builds:
+ * not ONLYOFFICE. The editor is on in the mock per test (`open({ office: true })`: the server's
+ * GET /api/office/capabilities); the call checkpoint needs the dev LiveKit:
  *
- *   CALABA_OFFICE=1 VITE_OFFICE=1 CALABA_VISUAL_MOCK_PORT=4318 MOCK_LIVEKIT_ROOM_PREFIX=office_ \
- *     pnpm -F @calaba/desktop e2e:visual -g "office-"
+ *   CALABA_VISUAL_MOCK_PORT=4318 MOCK_LIVEKIT_ROOM_PREFIX=office_ pnpm -F @calaba/desktop e2e:visual -g "office-"
  *
- * Projects office-dark-960 (all) and office-light-960 (the file view and the tabs).
+ * Projects office-dark-960 (all) and office-light-960 (the file view, the tabs, «Создать»).
  */
 
 const WS = IDS.workspaces.main;
@@ -31,6 +31,9 @@ function seedOffice(mock: MockServer): void {
   put('Питч для инвесторов.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
   put('Договор (старый).doc', 'application/msword');
   put('График отпусков 2026.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  // «Редактирует Вера» (DiskItem.editor_ids): the budget is open in Vera's editor.
+  const budget = [...mock.disk.items.values()].find((i) => i.name === 'Бюджет 2026.xlsx');
+  if (budget) budget.editorIds = [IDS.users.vera];
 }
 
 const row = (win: Page, name: string) => win.getByTestId('disk-row').filter({ hasText: name });
@@ -42,7 +45,7 @@ async function openDisk(win: Page): Promise<void> {
 
 test('office-entry-points', async ({ open, win, mock, shot, theme }) => {
   test.skip(theme !== 'dark', 'dark only');
-  await open({ prefs: { diskView: 'list' } });
+  await open({ office: true, prefs: { diskView: 'list' } });
   seedOffice(mock);
   await openDisk(win);
   // The Disk row menu: «Открыть» is the editor for an office file.
@@ -64,6 +67,9 @@ test('office-entry-points', async ({ open, win, mock, shot, theme }) => {
   await win.getByTestId('task-attachment-open').click();
   await expect(win.getByTestId('office-view')).toHaveAttribute('data-mode', 'view');
   await expect(win.getByTestId('office-view')).toHaveAttribute('data-state', 'saved');
+  // An attachment views only (config ?file=): «Сохранить в Диск» makes an editable copy.
+  await expect(win.getByTestId('office-attachment-notice')).toBeVisible();
+  await checkpoint(shot, 'office-attachment');
   // The editor's own «Открыть расположение файла» goes back to the task; the editor is gone, the tab stays.
   await win.frameLocator('[data-testid="office-frame"]').getByTestId('stub-goback').click();
   await expect(win.getByTestId('office-view')).toHaveCount(0);
@@ -80,7 +86,7 @@ test('office-entry-points', async ({ open, win, mock, shot, theme }) => {
 });
 
 test('office-file-view', async ({ open, win, mock, shot }) => {
-  await open({ prefs: { diskView: 'list' } });
+  await open({ office: true, prefs: { diskView: 'list' } });
   seedOffice(mock);
   await openDisk(win);
   await row(win, 'График отпусков 2026.xlsx').dblclick();
@@ -88,11 +94,63 @@ test('office-file-view', async ({ open, win, mock, shot }) => {
   await expect(view).toHaveAttribute('data-state', 'saved');
   await expect(view).toHaveAttribute('data-mode', 'edit');
   await expect(win.getByTestId('file-tab')).toHaveCount(1);
+  // «Редактирует Вера» on the row being edited elsewhere is in the Disk under the view (checked in office-create).
   await checkpoint(shot, 'office-file-view');
+
+  // In a call the bottom island stays (mute, the self panel); the editor ends above it.
+  await joinVoice(win);
+  await win.getByTestId('file-tab').getByRole('button').first().click();
+  await expect(view).toHaveAttribute('data-state', 'saved');
+  const island = win.getByTestId('bottom-island');
+  await expect(island).toBeVisible();
+  const frameBox = await win.getByTestId('office-frame').boundingBox();
+  const islandBox = await island.boundingBox();
+  expect(frameBox && islandBox && frameBox.y + frameBox.height <= islandBox.y + 0.5).toBe(true);
+  await checkpoint(shot, 'office-file-view-voice');
+});
+
+test('office-create', async ({ open, win, mock, shot }) => {
+  await open({ office: true, prefs: { diskView: 'list' } });
+  seedOffice(mock);
+  await openDisk(win);
+  await expect(row(win, 'Бюджет 2026.xlsx').getByTestId('disk-editing')).toContainText('Редактирует');
+  // «Создать»: Папка, then Документ, Таблица, Презентация (the editor is on and the folder is writable), then «Загрузить файлы».
+  await win.getByTestId('disk-create').click();
+  const menu = win.getByTestId('disk-create-menu');
+  await expect(menu.getByTestId('disk-new-docx')).toBeVisible();
+  await expect(menu.getByTestId('disk-new-xlsx')).toBeVisible();
+  await expect(menu.getByTestId('disk-new-pptx')).toBeVisible();
+  await checkpoint(shot, 'office-create-menu');
+  // A blank document: created in the open folder and opened at once in the editor.
+  await menu.getByTestId('disk-new-docx').click();
+  const view = win.getByTestId('office-view');
+  await expect(view).toHaveAttribute('data-mode', 'edit');
+  await expect(view).toHaveAttribute('data-state', 'saved');
+  await expect(win.getByTestId('file-tab').filter({ hasText: 'Новый документ.docx' })).toHaveAttribute('data-active', 'true');
+  await checkpoint(shot, 'office-created');
+  // A second one gets « (2)».
+  await win.getByTestId('section-disk').click();
+  await win.getByTestId('disk-create').click();
+  await win.getByTestId('disk-create-menu').getByTestId('disk-new-docx').click();
+  await expect(win.getByTestId('file-tab').filter({ hasText: 'Новый документ (2).docx' })).toHaveAttribute('data-active', 'true');
+});
+
+test('office-off', async ({ open, win, theme }) => {
+  test.skip(theme !== 'dark', 'dark only');
+  // The editor off on the server: no office items in «Создать», a sheet opens its card as before.
+  await open({ prefs: { diskView: 'list' } });
+  await openDisk(win);
+  await win.getByTestId('disk-create').click();
+  await expect(win.getByTestId('disk-new-folder')).toBeVisible();
+  await expect(win.getByTestId('disk-new-docx')).toHaveCount(0);
+  await win.keyboard.press('Escape');
+  await row(win, 'Бюджет 2026.xlsx').dblclick();
+  await expect(win.getByTestId('disk-file-card')).toBeVisible();
+  await expect(win.getByTestId('office-view')).toHaveCount(0);
 });
 
 test('office-tabs', async ({ open, win, mock, shot }) => {
-  await open({ prefs: { diskView: 'list' } });
+  await open({ office: true, prefs: { diskView: 'list' } });
   seedOffice(mock);
   mock.setOfficeFault('stuck');
   await openDisk(win);
@@ -130,7 +188,7 @@ test('office-tabs', async ({ open, win, mock, shot }) => {
 
 test('office-error', async ({ open, win, mock, shot, theme }) => {
   test.skip(theme !== 'dark', 'dark only');
-  await open({ prefs: { diskView: 'list' } });
+  await open({ office: true, prefs: { diskView: 'list' } });
   seedOffice(mock);
   mock.setOfficeFault('token');
   await openDisk(win);
@@ -145,7 +203,7 @@ test('office-error', async ({ open, win, mock, shot, theme }) => {
 
 test('office-legacy-doc', async ({ open, win, mock, shot, theme }) => {
   test.skip(theme !== 'dark', 'dark only');
-  await open({ prefs: { diskView: 'list' } });
+  await open({ office: true, prefs: { diskView: 'list' } });
   seedOffice(mock);
   await openDisk(win);
   await row(win, 'Договор (старый).doc').dblclick();

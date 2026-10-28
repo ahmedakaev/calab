@@ -2370,8 +2370,10 @@ test('m-chat-inline-buttons', async ({ page }) => {
 });
 
 // ADR-0143: an office file on the phone — a full-screen view with a back arrow, view only, no tab
-// strip. The feature is a build switch: `VITE_OFFICE=1 pnpm -F @calaba/desktop e2e:visual:mobile -g m-office`.
+// strip; «Создать» makes a blank file that stays in the Disk with a note (editing is on a computer).
+// The editor is on in the mock per test: `pnpm -F @calaba/desktop e2e:visual:mobile -g m-office`.
 test('m-office-view', async ({ page }) => {
+  mock.setOffice(true);
   await signedIn(page, { diskView: 'list' });
   await tab(page, 'disk');
   const root = page.getByTestId('phone-disk');
@@ -2384,6 +2386,15 @@ test('m-office-view', async ({ page }) => {
   await checkpoint(page, 'm-office-view');
   await page.getByTestId('office-back').tap();
   await expect(view).toHaveCount(0);
+
+  await page.getByTestId('disk-create').tap();
+  await expect(page.getByTestId('disk-new-pptx')).toBeVisible();
+  await checkpoint(page, 'm-office-create-menu');
+  await page.getByTestId('disk-new-xlsx').tap();
+  await expect(page.getByText('Править его можно на компьютере')).toBeVisible();
+  await expect(root.getByTestId('disk-row').filter({ hasText: 'Новая таблица.xlsx' })).toBeVisible();
+  await expect(view).toHaveCount(0);
+  await checkpoint(page, 'm-office-created');
 });
 
 // ADR-0094 §8: «Диск» on the phone — the tab root (the workspace root as 56 px rows), a folder and

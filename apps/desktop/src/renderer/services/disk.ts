@@ -182,8 +182,11 @@ export function refreshDisk(ws: string, parents: readonly string[] = []): void {
   });
 }
 
-/** The disk of `ws` is on screen (the section open in that workspace). */
-const onScreen = (ws: string): boolean => useDiskUi.getState().active && useUi.getState().activeWorkspaceId === ws;
+/** The disk of `ws` is on screen: the section open in that workspace, or the phone's «Диск» tab (it never turns the section on). */
+const onScreen = (ws: string): boolean => {
+  const ui = useUi.getState();
+  return (useDiskUi.getState().active || (ui.phone.on && ui.phone.tab === 'disk')) && ui.activeWorkspaceId === ws;
+};
 
 /** Workspace → mounted storage meters (the disk footer, «Место», «Тариф»). */
 const meters = new Map<string, number>();

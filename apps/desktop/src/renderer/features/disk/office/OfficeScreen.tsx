@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useReducer, useRef, useState, type ReactN
 import { Button, IconButton, Spinner, cx } from '../../../components/ui';
 import { getLocale, t } from '../../../i18n';
 import { ApiError, call, qs } from '../../../lib/api/client';
+import { usePageVisible } from '../../../lib/pageVisible';
 import { platform } from '../../../platform';
 import { toast } from '../../../stores/toasts';
 import { useTaskTabs, type TaskTab } from '../../../stores/taskTabs';
@@ -19,6 +20,8 @@ const appTheme = (): 'dark' | 'light' => (document.documentElement.dataset['them
 const HELLO_TIMEOUT_MS = 15_000;
 /** Leaving a file with changes pending: how long the editor gets to save before the edits are kept on screen. */
 export const SAVE_WAIT_MS = 8_000;
+/** A hidden window with nothing unsaved keeps the editor this long, then lets it go (docs/14: a hidden window runs nothing). */
+export const HIDDEN_PARK_MS = 5 * 60_000;
 
 export const officeApi = {
   /** GET /api/office/config: the signed editor configuration of a Disk item or, view only, of a plain file (ADR-0143). */
@@ -183,10 +186,31 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
     return () => window.clearTimeout(timer);
   }, [shown, closing, state.status, id, name]);
 
-  const retry = (): void => {
+  const retry = useCallback((): void => {
     dispatch({ name: 'reset' });
     setAttempt((n) => n + 1);
-  };
+  }, []);
+
+  // A hidden window (ADR-0143 §11, docs/14): after HIDDEN_PARK_MS with nothing unsaved the editor
+  // goes (its iframe, socket and timers); when the window shows again it opens afresh. One
+  // one-shot timer while hidden, none while shown.
+  const pageVisible = usePageVisible();
+  const [parked, setParked] = useState(false);
+  useEffect(() => {
+    if (pageVisible || parked || state.status === 'saving') return;
+    const id = window.setTimeout(() => setParked(true), HIDDEN_PARK_MS);
+    return () => window.clearTimeout(id);
+  }, [pageVisible, parked, state.status]);
+  useEffect(() => {
+    if (!parked) return;
+    const wake = (): void => {
+      if (document.hidden) return;
+      setParked(false);
+      retry();
+    };
+    document.addEventListener('visibilitychange', wake);
+    return () => document.removeEventListener('visibilitychange', wake);
+  }, [parked, retry]);
   // Both make a NEW Disk item and open it as its own tab (the source stays as it is).
   const copy = (run: () => Promise<{ item?: DiskItem }>, failText: string, done: boolean): void => {
     setSaving(true);
@@ -271,7 +295,7 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
         </div>
       ) : null}
       <div className="relative min-h-0 flex-1">
-        {load.kind === 'ready' && !failed ? <EditorFrame cfg={load.cfg} title={name} loading={state.status === 'loading'} onEvent={onEvent} onConn={onConn} /> : null}
+        {load.kind === 'ready' && !failed && !parked ? <EditorFrame cfg={load.cfg} title={name} loading={state.status === 'loading'} onEvent={onEvent} onConn={onConn} /> : null}
         {failed ? (
           <div role="alert" className="grid size-full place-items-center p-6 text-center" data-testid="office-error">
             <div className="flex max-w-[360px] flex-col items-center gap-3">
