@@ -5,8 +5,8 @@
   /tmp/of/bin/python tools/office-fidelity/fixtures.py OUT_DIR
 
 Writes OUT_DIR/vacations.xlsx («График отпусков»-like), OUT_DIR/contract.docx («Лицензионный
-договор»-like), OUT_DIR/deck.pptx (a team deck: title, bullets with levels, a table with a merged
-header, speaker notes, 16:9) and OUT_DIR/staff.csv (UTF-8, «;», quoted fields with «;» and
+договор»-like), OUT_DIR/deck.pptx (layouts Title, Title and Content with levels and notes, Two Content,
+Title Only with a table, a column chart and a styled text box, 16:9) and OUT_DIR/staff.csv (UTF-8, «;», quoted fields with «;» and
 newlines). The legacy doc / xls / ppt are made from these by the Document Server itself in
 bench.mjs (no Python library writes them). Every feature compare.py checks is in them: formulas (same-sheet, cross-sheet,
 absolute refs, functions with Russian text), merged cells, date / number / percent / currency
@@ -216,35 +216,6 @@ def pptx(path: Path) -> None:
     run = tb.text_frame.paragraphs[0].add_run()
     run.text, run.font.bold, run.font.size = "Рост +50 %", True, PPt(20)
     run.font.color.rgb = PRGB(0x1F, 0x7A, 0x3A)
-    prs.save(path)
-
-
-    from pptx.util import Cm, Pt
-
-    prs = Presentation()
-    prs.slide_width, prs.slide_height = Cm(33.867), Cm(19.05)  # 16:9
-    s1 = prs.slides.add_slide(prs.slide_layouts[0])
-    s1.shapes.title.text = "План отпусков 2026"
-    s1.placeholders[1].text = "HR · Кадры"
-    s1.notes_slide.notes_text_frame.text = "Заметка докладчика: сроки согласования до 15.03."
-    s2 = prs.slides.add_slide(prs.slide_layouts[1])
-    s2.shapes.title.text = "Правила"
-    tf = s2.placeholders[1].text_frame
-    tf.text = "Заявление за 14 дней"
-    for text, level in (("через Calab", 1), ("согласует руководитель", 1), ("Перенос — по согласованию", 0)):
-        para = tf.add_paragraph()
-        para.text, para.level = text, level
-    run = tf.paragraphs[0].runs[0]
-    run.font.bold, run.font.size = True, Pt(28)
-    s3 = prs.slides.add_slide(prs.slide_layouts[5])
-    s3.shapes.title.text = "Сводка"
-    rows = [["Отдел", "Сотрудники", "Дней"], ["Разработка", "12", "336"], ["Продажи", "7", "196"], ["Итого", "19", "532"]]
-    table = s3.shapes.add_table(len(rows) + 1, 3, Cm(2), Cm(4), Cm(24), Cm(8)).table
-    table.cell(0, 0).merge(table.cell(0, 2))
-    table.cell(0, 0).text = "Отпуска по отделам"
-    for r, row in enumerate(rows, start=1):
-        for c, v in enumerate(row):
-            table.cell(r, c).text = v
     prs.save(path)
 
 
