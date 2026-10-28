@@ -1,6 +1,6 @@
 import * as Popover from '../../components/radix/popover';
 import { WorkspaceRole, type UpcomingBirthday, type WorkspaceMember } from '@calaba/protocol';
-import { ChevronRight, MonitorUp, Phone, Video, Volume2 } from 'lucide-react';
+import { ChevronRight, MonitorUp, Phone, Video, Volume2, WifiOff } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Avatar } from '../../components/Avatar';
@@ -405,6 +405,17 @@ const MemberRow = memo(function MemberRow({
         <span className="min-w-0 truncate">{activityLabel}</span>
       </>
     );
+  } else if (line.activity === 'voice' && v && !isMe && v.connectionLost) {
+    // ADR-0144: «Нет связи» takes the room name's place, the room stays in the line's tooltip —
+    // side by side in this one 16 px line the room name truncated to «Перегов…».
+    const lost = t('call.connectionLost');
+    activityLabel = roomName ? `${lost} · ${roomName}` : lost;
+    activity = (
+      <>
+        <WifiOff className="size-3.5 shrink-0 text-muted" aria-hidden data-voice-icon="connection-lost" />
+        <span className="min-w-0 truncate" data-testid="connection-lost-caption">{lost}</span>
+      </>
+    );
   } else if (line.activity === 'voice' && v) {
     activityLabel = roomName ?? t('people.inVoice');
     activity = (
@@ -414,7 +425,7 @@ const MemberRow = memo(function MemberRow({
         {v.camera ? <Video className="size-3.5 shrink-0" aria-label={t('video.stateOn')} role="img" /> : null}
         {v.musician ? <MusicianIcon className="size-3.5" /> : null}
         {/* #96: my own line draws the self panel's view, not the server copy. */}
-        {isMe ? <SelfVoiceStateIcons onPhone={v.onPhone} pttWait={false} /> : <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} onPhone={v.onPhone} connectionLost={v.connectionLost} lostCaption />}
+        {isMe ? <SelfVoiceStateIcons onPhone={v.onPhone} pttWait={false} /> : <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} onPhone={v.onPhone} />}
       </>
     );
   } else if (line.activity === 'call') {
