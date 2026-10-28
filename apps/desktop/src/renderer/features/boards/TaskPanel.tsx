@@ -80,7 +80,7 @@ import { descriptionToDoc, docToDescription } from './descriptionDoc';
 import { RichDescription } from './RichDescription';
 import { preloadWikiEditor, type UploadedImage, type WikiEditorApi } from '../wiki/editor';
 import type { PmNode } from '@calaba/wiki-doc/markdown';
-import { MediaImg } from '../../components/MediaImg';
+import { AttachmentImg } from '../../components/AttachmentImg';
 import { THUMB_LARGE, thumbWidthPath } from '../../lib/thumbs';
 import { openAttachment } from '../../services/files';
 import { TaskDates } from './TaskDates';
@@ -413,7 +413,7 @@ const DescriptionImage = memo(function DescriptionImage({ id, name, list }: { id
       className="my-1 w-fit max-w-full cursor-zoom-in rounded-[var(--radius-card)] border border-line"
       data-testid="task-description-img"
     >
-      <MediaImg path={thumbWidthPath(thumbnailPath(f.id), THUMB_LARGE)} alt={name} loading="lazy" className="block max-h-[420px] max-w-full rounded-[var(--radius-card)] object-contain" />
+      <AttachmentImg f={f} thumb={thumbWidthPath(thumbnailPath(f.id), THUMB_LARGE)} alt={name} loading="lazy" className="block max-h-[420px] max-w-full rounded-[var(--radius-card)] object-contain" />
     </div>
   );
 });
