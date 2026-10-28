@@ -338,6 +338,7 @@ PUT    /api/tasks/{id}/subscription {muted}          · PUT /api/tasks/{id}/read
 GET    /api/tasks/{id}/activity?before&limit&only    лента: сообщения комнаты задачи и журнал вперемешку, новые первыми (id — uuidv7); only=journal — только журнал (с comment*), only=comments — только сообщения (ADR-0091)
 GET    /api/t/{KEY-N}[?workspace_id=]                задача по ключу среди пространств вызывающего (TaskResponse + board)
 GET    /api/me/tasks?workspace_id&scope=assigned|lead|created|subscribed&open=1&cursor
+GET    /api/me/task-notices?before&limit             ListTaskNoticesResponse — история моих уведомлений о задачах (ADR-0140): от новых к старым, курсор before (id — uuidv7), только задачи, которые я вижу сейчас, ключ и заголовок — текущие; хранится 90 дней; TaskNotice.id в живом TASK_UPDATE — id той же записи
 GET    /api/workspaces/{id}/tasks/search?q&limit&state  ключ и слова по видимым доскам (тот же разбор, что /api/search, ADR-0062); state=open|done|all (по умолчанию all) — по типу статуса completed/cancelled; ключ в любом написании (`doc532`, `doc 532`, `doc_532`, `док-532`, раскладка ЙЦУКЕН), голый номер `532` — карточки `*-532` всех досок; точное совпадение ключа первым (docs/09 #88)
 ```
 

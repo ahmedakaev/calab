@@ -1332,6 +1332,28 @@ message TaskNotice {
   string due_on = 8;
   // DUE_SOON: 1 = due tomorrow, 0 = due today; OVERDUE: the days past due, negative (-1).
   int32 days_left = 9;
+  // The notice's id in the recipient's notice history (ADR-0140, GET /api/me/task-notices):
+  // uuidv7, time-ordered. Empty from an older server.
+  string id = 10;
+}
+
+// One entry of GET /api/me/task-notices (ADR-0140): a task notice the caller got, with the
+// task as it is named now. Only tasks the caller still sees are listed.
+message TaskNoticeEntry {
+  string id = 1;
+  string workspace_id = 2;
+  string board_id = 3;
+  string task_id = 4;
+  string task_key = 5;
+  string task_title = 6;
+  TaskNotice notice = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+// GET /api/me/task-notices?before=<id>&limit= — newest first.
+message ListTaskNoticesResponse {
+  repeated TaskNoticeEntry entries = 1;
+  bool has_more = 2;
 }
 
 enum TaskNoticeKind {

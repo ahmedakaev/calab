@@ -371,6 +371,7 @@
 {"method":"GET","path":"/api/me/sessions","decision":"deny","group":"profile"},
 {"method":"DELETE","path":"/api/me/sessions/{id}","decision":"deny","group":"profile"},
 {"method":"PATCH","path":"/api/me/status","decision":"deny","group":"profile"},
+{"method":"GET","path":"/api/me/task-notices","decision":"allow","group":"profile"},
 {"method":"GET","path":"/api/rooms/{id}/bot-commands","decision":"allow","group":"profile"},
 {"method":"GET","path":"/api/usernames/{name}/available","decision":"deny","group":"profile"},
 {"method":"GET","path":"/api/users/{id}/note","decision":"deny","group":"profile"},

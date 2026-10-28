@@ -72,7 +72,11 @@ func dueDay(now time.Time, loc *time.Location) (pgtype.Date, bool) {
 // DeliverDueNotices claims and sends the due notices of today and returns how many went out.
 func (s *Service) DeliverDueNotices(ctx context.Context, loc *time.Location) (int, error) {
 	if err := db.GuardExec(ctx, s.db, func(guarded *sqlc.Queries) error {
-		_, err := guarded.PurgeTaskDueNotices(ctx)
+		if _, err := guarded.PurgeTaskDueNotices(ctx); err != nil {
+			return err
+		}
+		// The inbox's task notice history keeps NoticeLogRetention (ADR-0140).
+		_, err := guarded.PruneTaskNoticeLog(ctx, s.Now().Add(-NoticeLogRetention))
 		return err
 	}); err != nil {
 		return 0, err

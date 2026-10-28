@@ -235,6 +235,7 @@ func (s *Service) sendNotices(ctx context.Context, taskID uuid.UUID, ns []notice
 		if n.rule != uuid.Nil {
 			tn.Text, tn.RuleId = n.text, n.rule.String()
 		}
+		tn.Id = s.logNotice(ctx, t.ID, n, tn)
 		s.ev.User(ctx, n.user, &v1.DispatchEvent{Event: &v1.DispatchEvent_TaskUpdate{TaskUpdate: &v1.TaskUpdate{Task: pbs[0], Notice: tn}}})
 		s.relayNotice(ctx, t, n.user, pbs[0], tn, &boardName)
 	}

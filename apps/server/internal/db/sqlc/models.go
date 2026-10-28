@@ -1915,6 +1915,21 @@ type TaskMilestone struct {
 	UpdatedAt   time.Time
 }
 
+type TaskNoticeLog struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	TaskID      uuid.UUID
+	Kind        int16
+	ActorID     *uuid.UUID
+	MessageID   *uuid.UUID
+	Text        string
+	RuleID      *uuid.UUID
+	ReRequested bool
+	DueOn       string
+	DaysLeft    int32
+	CreatedAt   time.Time
+}
+
 type TaskRelation struct {
 	TaskID    uuid.UUID
 	RelatedID uuid.UUID
