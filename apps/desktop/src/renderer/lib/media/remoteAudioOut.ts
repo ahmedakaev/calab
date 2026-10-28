@@ -23,7 +23,17 @@ import { remoteAudio } from '../voiceLogic';
  * (WebKit gates it behind a setting) have no such method — the OS picks the output there.
  */
 export type AudioOutElement = Pick<HTMLMediaElement, 'muted' | 'volume' | 'addEventListener' | 'removeEventListener'> &
-  Partial<Pick<HTMLMediaElement, 'setSinkId'>>;
+  Partial<Pick<HTMLMediaElement, 'setSinkId' | 'paused' | 'play'>>;
+
+/** What one pass of `replayPaused` did. */
+export interface ReplayResult {
+  /** Paused elements that play again. */
+  resumed: number;
+  /** play() refused without a user gesture (NotAllowedError): the caller offers a tap. */
+  blocked: number;
+  /** play() failed otherwise (no source, aborted): left for the next event. */
+  failed: number;
+}
 
 /** Everything the playback of one element depends on (voice store + prefs). */
 export interface AudioOutState {
@@ -92,6 +102,30 @@ export class RemoteAudioOut<E extends AudioOutElement = HTMLMediaElement> {
   /** Leave: every element is forgotten; returns them for DOM removal. */
   clear(): E[] {
     return [...this.els.keys()].map((sid) => this.remove(sid)).filter((el): el is E => el !== undefined);
+  }
+
+  /**
+   * Plays again every element the system paused behind our back — an audio interruption (another
+   * app's music, a video note), the page frozen in the background, a back/forward-cache restore.
+   * One play() per paused element and pass, no retry loop: the caller runs a pass on events
+   * (page visible, pageshow, Reconnected, a rejoin, an interruption's end). Muted / volume are not
+   * touched (deafen stays: a muted element plays silence).
+   */
+  async replayPaused(): Promise<ReplayResult> {
+    const out: ReplayResult = { resumed: 0, blocked: 0, failed: 0 };
+    await Promise.all(
+      [...this.els.values()].map(async ({ el }) => {
+        if (el.paused !== true || typeof el.play !== 'function') return;
+        try {
+          await el.play();
+          out.resumed++;
+        } catch (e) {
+          if ((e as { name?: unknown } | null)?.name === 'NotAllowedError') out.blocked++;
+          else out.failed++;
+        }
+      }),
+    );
+    return out;
   }
 
   /** Deafen / volumes / mutes changed: re-apply to every element. */

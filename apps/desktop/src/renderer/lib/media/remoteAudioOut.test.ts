@@ -182,3 +182,57 @@ describe('RemoteAudioOut — engines without setSinkId', () => {
     expect([a.muted, b.muted]).toEqual([true, true]);
   });
 });
+
+describe('replayPaused (audio paused by an interruption / the background)', () => {
+  /** An element with play(): `outcome` decides what the next play() does. */
+  const playable = (paused: boolean, outcome: 'ok' | 'blocked' | 'fail' = 'ok') => {
+    const a = new FakeAudio() as FakeAudio & HTMLMediaElement & { plays: number };
+    let isPaused = paused;
+    a.plays = 0;
+    Object.defineProperty(a, 'paused', { get: () => isPaused });
+    Object.defineProperty(a, 'play', {
+      value: () => {
+        a.plays++;
+        if (outcome === 'ok') {
+          isPaused = false;
+          return Promise.resolve();
+        }
+        return Promise.reject(Object.assign(new Error('nope'), { name: outcome === 'blocked' ? 'NotAllowedError' : 'AbortError' }));
+      },
+    });
+    return a;
+  };
+
+  it('plays only the paused elements, once each, and counts what happened', async () => {
+    const state: AudioOutState = { deafened: false, userVolumes: {}, mutedUsers: {}, streamVolume: {} };
+    const out = new RemoteAudioOut<FakeAudio & HTMLMediaElement & { plays: number }>(() => state);
+    const playing = playable(false);
+    const paused = playable(true);
+    const blocked = playable(true, 'blocked');
+    const broken = playable(true, 'fail');
+    out.add('a', playing, 'u1', false);
+    out.add('b', paused, 'u2', false);
+    out.add('c', blocked, 'u3', false);
+    out.add('d', broken, 'u4', false);
+    expect(await out.replayPaused()).toEqual({ resumed: 1, blocked: 1, failed: 1 });
+    expect([playing.plays, paused.plays, blocked.plays, broken.plays]).toEqual([0, 1, 1, 1]);
+    // The next pass touches only what is still paused (no loop of its own).
+    expect(await out.replayPaused()).toEqual({ resumed: 0, blocked: 1, failed: 1 });
+    expect(paused.plays).toBe(1);
+  });
+
+  it('keeps deafen: a replayed element stays muted', async () => {
+    const out = new RemoteAudioOut<FakeAudio & HTMLMediaElement & { plays: number }>(() => ({ deafened: true, userVolumes: {}, mutedUsers: {}, streamVolume: {} }));
+    const el = playable(true);
+    out.add('a', el, 'u1', false);
+    await out.replayPaused();
+    expect(el.plays).toBe(1);
+    expect(el.muted).toBe(true);
+  });
+
+  it('elements without play() (unit fakes, old engines) are skipped', async () => {
+    const out = new RemoteAudioOut<FakeAudio & HTMLMediaElement>(() => ({ deafened: false, userVolumes: {}, mutedUsers: {}, streamVolume: {} }));
+    out.add('a', new FakeAudio() as FakeAudio & HTMLMediaElement, 'u1', false);
+    expect(await out.replayPaused()).toEqual({ resumed: 0, blocked: 0, failed: 0 });
+  });
+});
