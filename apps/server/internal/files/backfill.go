@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/calaba/calaba/server/internal/db"
 	"github.com/calaba/calaba/server/internal/db/sqlc"
 	"github.com/calaba/calaba/server/internal/pbconv"
 )
@@ -106,8 +107,12 @@ func (s *Service) backfillThumb(ctx context.Context, f sqlc.File) (sqlc.File, bo
 	if st.thumbKey == nil && mt == f.Mime && sameDim(st.width, f.Width) && sameDim(st.height, f.Height) {
 		return f, false
 	}
-	row, err := s.db.Q.SetFileImage(ctx, sqlc.SetFileImageParams{
-		ID: f.ID, Mime: mt, Width: st.width, Height: st.height, ThumbnailKey: st.thumbKey,
+	// The same commit admission as other writes: a request-born repair is admitted for the
+	// requesting user, a background one carries none.
+	row, err := db.GuardValue(ctx, s.db, func(q *sqlc.Queries) (sqlc.File, error) {
+		return q.SetFileImage(ctx, sqlc.SetFileImageParams{
+			ID: f.ID, Mime: mt, Width: st.width, Height: st.height, ThumbnailKey: st.thumbKey,
+		})
 	})
 	if err != nil {
 		// The thumbnail blob stays: its key is fixed, the next attempt overwrites it, and a
