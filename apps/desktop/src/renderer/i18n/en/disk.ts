@@ -175,4 +175,10 @@ export const enDisk: DictShape<typeof ruDisk> = {
   'disk.view.failed': 'Couldn’t open the file',
   'disk.view.empty': 'The file is empty',
   'disk.view.rowsCapped': 'The first {n} rows are shown. Download the file for the rest.',
+  'office.loading': 'Opening the editor',
+  'office.saving': 'Saving…',
+  'office.saved': 'Changes saved',
+  'office.view': 'View only',
+  'office.failed': 'Could not open the editor',
+  'office.unsupported': 'This file does not open in the editor',
 };

@@ -183,4 +183,10 @@ export const ruDisk = {
   'disk.view.failed': 'Не удалось открыть файл',
   'disk.view.empty': 'Файл пустой',
   'disk.view.rowsCapped': 'Показаны первые {n} строк. Остальное — в скачанном файле.',
+  'office.loading': 'Открываем редактор',
+  'office.saving': 'Сохраняется…',
+  'office.saved': 'Изменения сохранены',
+  'office.view': 'Только просмотр',
+  'office.failed': 'Не удалось открыть редактор',
+  'office.unsupported': 'Этот файл не открывается в редакторе',
 };

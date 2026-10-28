@@ -91,7 +91,12 @@ export default defineConfig({
       include: ['@rnnoise-dist/polyfills.js', '@rnnoise-dist/generated/rnnoise-sync.js', 'livekit-client'],
     },
     // CALABA_MAIL_MOCK=1 pnpm dev:desktop: the mail section on the in-memory mock (ADR-0088 §7).
-    ...(process.env['CALABA_MAIL_MOCK'] === '1' ? { define: { 'import.meta.env.VITE_MAIL_MOCK': JSON.stringify('1') } } : {}),
+    // CALABA_MAIL_MOCK=1: the mail mock; CALABA_OFFICE=1: «Открыть» of xlsx / docx in the office
+    // editor (ADR-0143 spike, off by default).
+    define: {
+      ...(process.env['CALABA_MAIL_MOCK'] === '1' ? { 'import.meta.env.VITE_MAIL_MOCK': JSON.stringify('1') } : {}),
+      ...(process.env['CALABA_OFFICE'] === '1' ? { 'import.meta.env.VITE_OFFICE': JSON.stringify('1') } : {}),
+    },
     worker: { format: 'es', plugins: () => [bundledPackages(BUNDLED)] },
     plugins: [react(), tailwindcss(), fullReloadOnly(), bundledPackages(BUNDLED)],
   },

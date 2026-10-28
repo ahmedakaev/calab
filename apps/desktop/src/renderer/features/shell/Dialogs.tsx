@@ -34,6 +34,8 @@ import { AppDialog } from '../webapps/AppDialog';
 import { PlansDialog } from '../workspace/billing/PlansDialog';
 
 const RecordingResult = lazy(() => import('../chat/RecordingResult'));
+// The office editor's frame (ADR-0143): its chunk loads on the first «Открыть» of an xlsx / docx.
+const OfficeEditor = lazy(() => import('../disk/office/OfficeEditor').then((m) => ({ default: m.OfficeEditor })));
 
 /** The send-to-chat dialog words itself by what is sent: a folder or a file. */
 const isFolderItem = (id: string): boolean => {
@@ -174,6 +176,13 @@ export function Dialogs(): ReactNode {
         node = <PdfViewer key={d.file.id} file={d.file} onClose={close} {...(diskId ? { onSendToChat: () => openSendToChat(diskId) } : {})} />;
         break;
       }
+      case 'office':
+        node = (
+          <Suspense fallback={null}>
+            <OfficeEditor key={d.itemId} itemId={d.itemId} name={d.name} onClose={close} />
+          </Suspense>
+        );
+        break;
       case 'disk-file':
         node = <DiskFileDialog itemId={d.itemId} onClose={close} />;
         break;
