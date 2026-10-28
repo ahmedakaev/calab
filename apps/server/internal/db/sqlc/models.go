@@ -2016,6 +2016,7 @@ type User struct {
 	Phone                          *string
 	TaskNotifyOff                  []string
 	TaskNotifyBots                 []uuid.UUID
+	CalendarZones                  []byte
 }
 
 type UserAttribution struct {
