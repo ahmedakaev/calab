@@ -60,14 +60,24 @@ export interface WakeGate {
   quiet: { from: number; to: number } | null;
   dailyCap: number;
   wakesToday: number;
+  /** The pending wake has only outsiders' GitHub changes (no board, no chat, no insider). */
+  outsiderOnly?: boolean;
+  outsiderCap?: number;
+  outsiderToday?: number;
 }
 
-export type WakeBlock = 'off' | 'quiet' | 'cap' | null;
+export type WakeBlock = 'off' | 'quiet' | 'cap' | 'outsider-cap' | null;
+
+/** Whether a wake would be caused only by outsiders (see Change.trusted). */
+export function outsiderOnly(changes: readonly Change[], chats: number): boolean {
+  return chats === 0 && changes.length > 0 && changes.every((c) => !c.trusted);
+}
 
 export function wakeBlocked(g: WakeGate, now: Date, timeZone?: string): WakeBlock {
   if (!g.enabled) return 'off';
   if (g.quietFile || inQuiet(now, g.quiet, timeZone)) return 'quiet';
   if (g.wakesToday >= g.dailyCap) return 'cap';
+  if (g.outsiderOnly && (g.outsiderToday ?? 0) >= (g.outsiderCap ?? 0)) return 'outsider-cap';
   return null;
 }
 

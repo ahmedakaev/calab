@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffSnapshots, emptyPollState, GithubSource, Poller, type Actors, type BoardItem, type GhItem, type Snapshot } from '../src/poll.js';
+import { diffSnapshots, emptyPollState, GithubSource, Poller, type Actors, type BoardItem, type GhCommenter, type GhItem, type Snapshot } from '../src/poll.js';
 
 const BOT = 'bot-id';
 const actors: Actors = { ignoreAuthors: new Set(['dependabot[bot]']), ghSelf: 'itrcz', botId: BOT };
@@ -41,7 +41,7 @@ describe('diffSnapshots', () => {
   });
 });
 
-function fakePoller(o: { gh: Record<string, GhItem>[]; board: Record<string, BoardItem>[]; ghAuthors?: string[]; boardAuthors?: string[] }) {
+function fakePoller(o: { gh: Record<string, GhItem>[]; board: Record<string, BoardItem>[]; ghAuthors?: GhCommenter[]; boardAuthors?: string[] }) {
   let i = 0;
   let j = 0;
   const calls: string[] = [];
@@ -74,7 +74,7 @@ describe('Poller', () => {
     const { p, calls } = fakePoller({
       gh: [{ 'pr#1': gh() }, { 'pr#1': gh({ comments: 1 }) }],
       board: [{ '#85': task() }, { '#85': task({ comments: 2 }) }],
-      ghAuthors: ['itrcz'],
+      ghAuthors: [{ login: 'itrcz', assoc: 'OWNER' }],
       boardAuthors: [BOT, BOT],
     });
     await p.changes(T(0));
@@ -96,6 +96,23 @@ describe('Poller', () => {
     // the wake run answers and moves the task; afterwards nothing is pending
     await p.rebaseline(T(10));
     expect(await p.changes(T(15))).toEqual([]);
+  });
+
+  it('marks outsiders\' GitHub activity untrusted, insiders\' and the board\'s trusted', async () => {
+    const { p } = fakePoller({
+      gh: [{ 'issue#1': gh({ kind: 'issue' }), 'issue#2': gh({ kind: 'issue' }) }, { 'issue#1': gh({ kind: 'issue', comments: 1 }), 'issue#2': gh({ kind: 'issue', comments: 1 }), 'issue#3': gh({ kind: 'issue', author: 'mallory', assoc: 'NONE' }), 'pr#4': gh({ author: 'anna', assoc: 'COLLABORATOR' }) }],
+      board: [{}, { '#9': task() }],
+      ghAuthors: [{ login: 'mallory', assoc: 'NONE' }],
+    });
+    await p.changes(T(0));
+    const c = await p.changes(T(5));
+    expect(c.map((x) => [x.key, x.trusted])).toEqual([
+      ['issue#1', false],
+      ['issue#2', false],
+      ['issue#3', false],
+      ['pr#4', true],
+      ['#9', true],
+    ]);
   });
 
   it('a failing source keeps its previous part instead of looking all new', async () => {

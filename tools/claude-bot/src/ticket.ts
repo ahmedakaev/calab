@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gate, type MemberLike } from './gate.js';
-import { cleanName, ID_RE, SAFE_ID_RE, ticketDir, type Requester, type Ticket, type TicketSource } from './inbox.js';
+import { cleanName, ID_RE, SAFE_ID_RE, ticketDir, type Requester, type Ticket, type TicketSource, type TicketTools } from './inbox.js';
 
 /** The requester of a wake run's own requests (no chat author behind them). */
 export const WAKE_REQUESTER: Requester = { userId: 'mr-claude-wake', name: 'Mr.Claude (wake)' };
@@ -31,6 +31,7 @@ export function issueTicket(opts: {
   sources: SourceInput[];
   ttlMs: number;
   now: number;
+  tools?: TicketTools;
 }): { id: string; ticket: Ticket } {
   const id = randomBytes(16).toString('hex');
   const dir = ticketDir(opts.inboxDir, id);
@@ -48,6 +49,7 @@ export function issueTicket(opts: {
     roomId: SAFE_ID_RE.test(opts.roomId) ? opts.roomId : '-',
     sources,
     expiresAt: opts.now + opts.ttlMs,
+    ...(opts.tools ? { tools: opts.tools } : {}),
   };
   writeFileSync(join(dir, 'ticket.json'), JSON.stringify(ticket), { mode: 0o600 });
   return { id, ticket };

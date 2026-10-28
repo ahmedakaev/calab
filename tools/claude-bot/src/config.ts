@@ -8,12 +8,14 @@ import { dirname, join } from 'node:path';
 export interface Config {
   apiUrl: string;
   token: string;
-  /** The lead's checkout (main): cwd of /check runs. */
+  /** The lead's checkout (main): where the editable prompts are read from. */
   leadRepo: string;
-  /** A separate checkout of main for the Sonnet assistant (no .env, nothing else of the owner's). */
+  /** A separate, clean checkout of main: cwd of the sandboxed runs (wake and assistant; no .env, nothing of the owner's). */
   assistRepo: string;
-  /** The directory of the env file (the owner's main checkout): denied to the assistant. */
+  /** The directory of the env file (the owner's main checkout): denied to the sandboxed runs. */
   ownerDir: string;
+  /** The env file itself (its values are redacted from everything the runs post). */
+  envFile: string;
   claudeBin: string;
   bugboard: string;
   boardId: string;
@@ -39,6 +41,8 @@ export interface Config {
     cooldownMs: number;
     timeoutMs: number;
     dailyCap: number;
+    /** Wakes a day caused only by outsiders' GitHub activity (a flood cannot use up the daily cap). */
+    outsiderCap: number;
     /** `23-08` = no wakes from 23:00 to 08:00; '' = none. */
     quietHours: string;
     /** While this file exists, no wakes (a switch without a restart). */
@@ -102,6 +106,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, installDir = ''
     leadRepo,
     assistRepo: get('CLAUDE_BOT_ASSIST_REPO', join(home, '.calab-claude-bot', 'repo')),
     ownerDir: dirname(envFile),
+    envFile,
     claudeBin: get('CLAUDE_BOT_CLAUDE_BIN', join(home, '.local', 'bin', 'claude')),
     bugboard: get('CLAUDE_BOT_BUGBOARD', join(home, '.calab-tools', 'bugboard.py')),
     boardId: get('CLAUDE_BOT_BOARD_ID', DEFAULT_BOARD),
@@ -121,6 +126,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, installDir = ''
       cooldownMs: minutes('CLAUDE_BOT_COOLDOWN_MIN', 10),
       timeoutMs: minutes('CLAUDE_BOT_WAKE_TIMEOUT_MIN', 30),
       dailyCap: num('CLAUDE_BOT_WAKE_DAILY_CAP', 8),
+      outsiderCap: num('CLAUDE_BOT_WAKE_OUTSIDER_CAP', 2),
       quietHours: get('CLAUDE_BOT_QUIET_HOURS'),
       quietFile: get('CLAUDE_BOT_QUIET_FILE', join(botHome, 'quiet')),
       maxBudgetUsd: num('CLAUDE_BOT_WAKE_BUDGET_USD', 5),

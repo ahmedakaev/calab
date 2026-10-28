@@ -12,6 +12,8 @@ export interface GhItem {
   /** PR head sha (open PRs only). */
   sha?: string;
   author: string;
+  /** GitHub `author_association` (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE…). */
+  assoc?: string;
 }
 
 export interface BoardItem {
@@ -39,7 +41,15 @@ export interface Change {
   newComments: number;
   /** Board: the task's comment room; GitHub: the number. */
   ref: string;
+  /**
+   * Caused by someone with a stake: the board (workspace members) or a GitHub owner/member/collaborator.
+   * Wakes caused only by outsiders have their own, smaller daily cap, so a flood cannot starve the rest.
+   */
+  trusted: boolean;
 }
+
+/** GitHub author associations that count as insiders. */
+export const TRUSTED_ASSOC = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
 export interface Actors {
   /** Item authors whose items never wake the bot (dependabot). */
@@ -59,7 +69,7 @@ export function diffSnapshots(base: Snapshot, cur: Snapshot, actors: Actors): Ch
     if (actors.ignoreAuthors.has(it.author.toLowerCase())) continue;
     const self = isSelfGh(it.author, actors);
     const was = base.gh[key];
-    const c: Change = { source: 'github', key, title: it.title, author: it.author, what: [], newComments: 0, ref: key.replace(/^\D+/, '') };
+    const c: Change = { source: 'github', key, title: it.title, author: it.author, what: [], newComments: 0, ref: key.replace(/^\D+/, ''), trusted: TRUSTED_ASSOC.has(it.assoc ?? '') };
     if (!was) {
       if (self) continue; // the lead's own PRs/issues
       c.what.push('new');
@@ -76,7 +86,7 @@ export function diffSnapshots(base: Snapshot, cur: Snapshot, actors: Actors): Ch
   }
   for (const [key, it] of Object.entries(cur.board)) {
     const was = base.board[key];
-    const c: Change = { source: 'board', key, title: it.title, author: it.createdBy, what: [], newComments: 0, ref: it.roomId };
+    const c: Change = { source: 'board', key, title: it.title, author: it.createdBy, what: [], newComments: 0, ref: it.roomId, trusted: true };
     if (!was) {
       if (it.createdBy === actors.botId) continue;
       c.what.push(`new (${it.status})`);
@@ -95,6 +105,11 @@ export function diffSnapshots(base: Snapshot, cur: Snapshot, actors: Actors): Ch
 
 // ---- sources ----
 
+export interface GhCommenter {
+  login: string;
+  assoc: string;
+}
+
 type FetchLike = (url: string, init: { headers: Record<string, string> }) => Promise<{ status: number; headers: { get(name: string): string | null }; json(): Promise<unknown> }>;
 
 export interface GhCache {
@@ -108,6 +123,7 @@ interface RawIssue {
   title?: string | undefined;
   comments?: number | undefined;
   user?: { login?: string | undefined } | null | undefined;
+  author_association?: string | undefined;
   pull_request?: unknown;
   head?: { sha?: string | undefined } | undefined;
 }
@@ -147,6 +163,7 @@ export class GithubSource {
         title: (i.title ?? '').slice(0, 200),
         comments: i.comments,
         user: { login: i.user?.login ?? '' },
+        author_association: i.author_association ?? '',
         pull_request: i.pull_request ? true : undefined,
       })),
     );
@@ -166,17 +183,18 @@ export class GithubSource {
         comments: i.comments ?? 0,
         ...(s ? { sha: s } : {}),
         author: i.user?.login ?? '',
+        ...(i.author_association ? { assoc: i.author_association } : {}),
       };
     }
     return out;
   }
 
-  /** Logins of the comments on issue/PR `n` updated since `since`. */
-  async commentAuthors(n: string, since: string): Promise<string[]> {
+  /** Authors (login, association) of the comments on issue/PR `n` updated since `since`. */
+  async commentAuthors(n: string, since: string): Promise<GhCommenter[]> {
     const url = `${this.o.api ?? 'https://api.github.com'}/repos/${this.o.repo}/issues/${n}/comments?since=${encodeURIComponent(since)}&per_page=100`;
     const r = await this.o.fetch(url, { headers: { authorization: `Bearer ${await this.o.token()}`, accept: 'application/vnd.github+json', 'user-agent': 'calab-claude-bot' } });
     if (r.status !== 200) throw new Error(`github comments #${n}: HTTP ${String(r.status)}`);
-    return ((await r.json()) as { user?: { login?: string } | null }[]).map((c) => c.user?.login ?? '');
+    return ((await r.json()) as { user?: { login?: string } | null; author_association?: string }[]).map((c) => ({ login: c.user?.login ?? '', assoc: c.author_association ?? '' }));
   }
 }
 
@@ -193,17 +211,19 @@ export const emptyPollState = (): PollState => ({ baseline: null, current: null,
 export interface PollerDeps {
   ghItems: () => Promise<Record<string, GhItem>>;
   boardItems: () => Promise<Record<string, BoardItem>>;
-  /** GitHub logins of the comments on item `n` since an ISO time. */
-  ghCommentAuthors: (n: string, since: string) => Promise<string[]>;
+  /** GitHub authors of the comments on item `n` since an ISO time. */
+  ghCommentAuthors: (n: string, since: string) => Promise<GhCommenter[]>;
   /** Author ids of the newest `count` messages of a task room. */
   boardCommentAuthors: (roomId: string, count: number) => Promise<string[]>;
   actors: () => Actors;
   log?: (m: string) => void;
 }
 
+type Others = 'none' | 'outsider' | 'insider';
+
 export class Poller {
-  /** Comment checks already made: `key@count` → someone else wrote. */
-  private readonly checked = new Map<string, boolean>();
+  /** Comment checks already made: `key@count` → who else wrote. */
+  private readonly checked = new Map<string, Others>();
 
   constructor(
     readonly state: PollState,
@@ -242,27 +262,30 @@ export class Poller {
     const actors = this.d.actors();
     const out: Change[] = [];
     for (const c of diffSnapshots(base, cur, actors)) {
-      if (c.newComments > 0 && !(await this.othersCommented(c, base.at, actors))) {
-        c.what = c.what.filter((w) => !w.startsWith('comments +'));
-        if (c.what.length === 0) continue;
+      if (c.newComments > 0) {
+        const others = await this.othersCommented(c, base.at, actors);
+        if (others === 'none') {
+          c.what = c.what.filter((w) => !w.startsWith('comments +'));
+          if (c.what.length === 0) continue;
+        } else if (others === 'insider') c.trusted = true;
       }
       out.push(c);
     }
     return out;
   }
 
-  private async othersCommented(c: Change, since: string, actors: Actors): Promise<boolean> {
+  private async othersCommented(c: Change, since: string, actors: Actors): Promise<Others> {
     const k = `${c.key}@${String(c.newComments)}@${since}`;
     const hit = this.checked.get(k);
     if (hit !== undefined) return hit;
-    let others = true; // when the check fails, count it (better a wake than a missed question)
+    let others: Others = 'outsider'; // when the check fails, count it (better a wake than a missed question)
     try {
       if (c.source === 'github') {
-        const logins = await this.d.ghCommentAuthors(c.ref, since);
-        others = logins.some((l) => !isSelfGh(l, actors) && !actors.ignoreAuthors.has(l.toLowerCase()));
+        const rest = (await this.d.ghCommentAuthors(c.ref, since)).filter((x) => !isSelfGh(x.login, actors) && !actors.ignoreAuthors.has(x.login.toLowerCase()));
+        others = rest.length === 0 ? 'none' : rest.some((x) => TRUSTED_ASSOC.has(x.assoc)) ? 'insider' : 'outsider';
       } else {
         const ids = await this.d.boardCommentAuthors(c.ref, Math.min(c.newComments, 50));
-        others = ids.some((id) => id !== actors.botId);
+        others = ids.some((id) => id !== actors.botId) ? 'insider' : 'none';
       }
     } catch (err) {
       this.d.log?.(`comment check ${c.key} failed: ${(err as Error).message}`);

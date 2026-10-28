@@ -20,8 +20,9 @@ import { emptyPollState, GithubSource, Poller, type BoardItem, type Change, type
 import { RateLimiter } from './ratelimit.js';
 import { redact, trimTo } from './redact.js';
 import { RunLock } from './runlock.js';
+import { ASSIST_TOOL_VERBS, WAKE_TOOL_VERBS } from './tools.js';
 import { createdBy, dropAllTickets, dropTicket, issueTicket, takeReplies, WAKE_REQUESTER, type SourceInput } from './ticket.js';
-import { buildWakePrompt, dayKey, Debounce, parseQuiet, wakeBlocked, type ChatEvent, type WakeBlock } from './wake.js';
+import { buildWakePrompt, dayKey, Debounce, outsiderOnly, parseQuiet, wakeBlocked, type ChatEvent, type WakeBlock } from './wake.js';
 
 const installDir = dirname(fileURLToPath(import.meta.url));
 const cfg = loadConfig(process.env, installDir);
@@ -49,6 +50,8 @@ const env = childEnv(process.env);
 /** The handoff writer as the runs call it (an absolute node, the installed bundle). */
 const handoff = `${process.execPath} ${join(installDir, 'handoff.mjs')}`;
 let workspaceId = cfg.workspaceId;
+/** What a run's ticket lets it call through `handoff.mjs gh|board` (src/tools.ts). */
+const ticketTools = (allow: readonly string[]) => ({ allow: [...allow], ghRepo: cfg.ghRepo, ghBin: cfg.ghBin, bugboard: cfg.bugboard, envFile: cfg.envFile });
 
 // ---- members (gate + names), cached for 5 minutes ----
 
@@ -205,10 +208,11 @@ async function answer(m: Message, kind: 'dm' | 'task', askerName: string): Promi
       sources: [],
       ttlMs: cfg.assistTimeoutMs + 60_000,
       now: Date.now(),
+      tools: ticketTools(ASSIST_TOOL_VERBS),
     });
     ticketId = t.id;
     const systemPrompt = readPrompt('assistant-prompt.md').replaceAll('{{BUGBOARD}}', cfg.bugboard).replaceAll('{{HANDOFF}}', handoff);
-    const argv = assistArgv({ systemPrompt, bugboard: cfg.bugboard, home: homedir(), ownerRepo: cfg.ownerDir, handoff, inboxDir: cfg.inboxDir });
+    const argv = assistArgv({ systemPrompt, home: homedir(), ownerRepo: cfg.ownerDir, handoff, inboxDir: cfg.inboxDir });
     const t0 = Date.now();
     const r = await runAssistant({
       bin: cfg.claudeBin,
@@ -241,7 +245,7 @@ async function answer(m: Message, kind: 'dm' | 'task', askerName: string): Promi
 interface StateFile {
   v: 1;
   poll: PollState;
-  wakes: { day: string; count: number };
+  wakes: { day: string; count: number; outsider?: number };
 }
 
 function loadState(): StateFile {
@@ -335,13 +339,22 @@ const chats = new Map<string, QueuedChat>();
 
 function wakesToday(now: Date): number {
   const day = dayKey(now, cfg.timeZone);
-  if (state.wakes.day !== day) state.wakes = { day, count: 0 };
+  if (state.wakes.day !== day) state.wakes = { day, count: 0, outsider: 0 };
   return state.wakes.count;
 }
 
 function blocked(now: Date): WakeBlock {
   return wakeBlocked(
-    { enabled: cfg.wake.enabled, quietFile: existsSync(cfg.wake.quietFile), quiet, dailyCap: cfg.wake.dailyCap, wakesToday: wakesToday(now) },
+    {
+      enabled: cfg.wake.enabled,
+      quietFile: existsSync(cfg.wake.quietFile),
+      quiet,
+      dailyCap: cfg.wake.dailyCap,
+      wakesToday: wakesToday(now),
+      outsiderOnly: outsiderOnly(pendingChanges, chats.size),
+      outsiderCap: cfg.wake.outsiderCap,
+      outsiderToday: state.wakes.outsider ?? 0,
+    },
     now,
     cfg.timeZone,
   );
@@ -401,7 +414,9 @@ async function runWake(now: Date): Promise<void> {
   pendingChanges = [];
   pendingSig = '';
   debounce.clear();
+  const outsiders = outsiderOnly(changes, taken.length);
   state.wakes.count = wakesToday(now) + 1;
+  if (outsiders) state.wakes.outsider = (state.wakes.outsider ?? 0) + 1;
   saveState();
 
   // chat-N refs: the messages the run may answer; their authors pass the gate again in issueTicket.
@@ -417,7 +432,16 @@ async function runWake(now: Date): Promise<void> {
     events.push({ ref, kind: c.kind, authorName: c.name, authorId: c.message.authorId, roomId: c.message.roomId, messageId: c.message.id, taskKey: taskByRoom.get(c.message.roomId), count: c.count });
     byRef.set(ref, c.message);
   }
-  const t = issueTicket({ inboxDir: cfg.inboxDir, workspaceId, requester: WAKE_REQUESTER, roomId: '-', sources, ttlMs: cfg.wake.timeoutMs + 60_000, now: now.getTime() });
+  const t = issueTicket({
+    inboxDir: cfg.inboxDir,
+    workspaceId,
+    requester: WAKE_REQUESTER,
+    roomId: '-',
+    sources,
+    ttlMs: cfg.wake.timeoutMs + 60_000,
+    now: now.getTime(),
+    tools: ticketTools(WAKE_TOOL_VERBS),
+  });
   const answered = new Set<string>();
   const pump = async (): Promise<void> => {
     for (const r of takeReplies(cfg.inboxDir, t.id)) {
@@ -438,9 +462,7 @@ async function runWake(now: Date): Promise<void> {
   });
   const argv = wakeArgv({
     model: cfg.wake.model,
-    bugboard: cfg.bugboard,
     handoff,
-    ghRepo: cfg.ghRepo,
     home: homedir(),
     ownerRepo: cfg.ownerDir,
     inboxDir: cfg.inboxDir,
@@ -448,11 +470,12 @@ async function runWake(now: Date): Promise<void> {
   });
   const stamp = now.toISOString().replace(/[:.]/g, '-');
   const logFile = join(cfg.logDir, `wake-${stamp}.log`);
-  log('wake', { model: cfg.wake.model, changes: changes.map((c) => c.key), chats: events.length, today: state.wakes.count, log: logFile });
+  log('wake', { model: cfg.wake.model, changes: changes.map((c) => c.key), chats: events.length, today: state.wakes.count, outsiders, log: logFile });
+  // cwd: the clean checkout of main, never the owner's (an .env and other agents' worktrees live there).
   const r = await runLead({
     bin: cfg.claudeBin,
     argv,
-    cwd: cfg.leadRepo,
+    cwd: cfg.assistRepo,
     env: { ...env, CALAB_HANDOFF_DIR: cfg.inboxDir, CALAB_HANDOFF_TICKET: t.id },
     logFile,
     timeoutMs: cfg.wake.timeoutMs,
@@ -527,7 +550,7 @@ async function main(): Promise<void> {
   log('commands registered:', cmds.map((c) => `/${c.name}`).join(' '));
   const ready = await bot.start();
   log(`online as ${ready.me?.user?.displayName ?? '?'} · workspace ${workspaceId} · ${ready.dms.length} DM(s) · assistant ${cfg.assistant ? 'on' : 'off'} · wake ${cfg.wake.enabled ? `on (${cfg.wake.model}, every ${String(cfg.wake.pollMs / 60_000)} min, cap ${String(cfg.wake.dailyCap)}/day)` : 'off'}`);
-  if (cfg.assistant) {
+  if (cfg.assistant || cfg.wake.enabled) {
     refreshAssistRepo();
     setInterval(refreshAssistRepo, 60 * 60_000).unref();
   }

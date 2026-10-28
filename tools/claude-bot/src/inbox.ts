@@ -163,6 +163,18 @@ export interface Ticket {
   /** Chat messages of this run (`chat-1`…): their authors passed the gate. */
   sources: Record<string, TicketSource>;
   expiresAt: number;
+  /** What the run may call through `handoff.mjs gh|board` (src/tools.ts); absent = nothing. */
+  tools?: TicketTools;
+}
+
+export interface TicketTools {
+  /** `gh.pr-view`, `board.comment`, … */
+  allow: string[];
+  ghRepo: string;
+  ghBin: string;
+  bugboard: string;
+  /** The env file whose values are redacted from everything posted. */
+  envFile: string;
 }
 
 export function ticketDir(inboxDir: string, ticketId: string): string {
@@ -183,7 +195,30 @@ export function readTicket(inboxDir: string, ticketId: string, now: number): Tic
   if (!requester || !SAFE_ID_RE.test(requester.userId) || typeof roomId !== 'string' || !SAFE_ID_RE.test(roomId) || typeof sources !== 'object') {
     return fail('повреждённый запуск бота');
   }
-  return { v: 1, requester, roomId, sources, expiresAt: t.expiresAt };
+  const tools = t.tools;
+  const okTools =
+    tools === undefined ||
+    (Array.isArray(tools.allow) && tools.allow.every((x) => typeof x === 'string') && [tools.ghRepo, tools.ghBin, tools.bugboard, tools.envFile].every((x) => typeof x === 'string'));
+  if (!okTools) return fail('повреждённый запуск бота');
+  return { v: 1, requester, roomId, sources, expiresAt: t.expiresAt, ...(tools ? { tools } : {}) };
+}
+
+/**
+ * Takes one of `cap` write slots of `bucket` for this run, or refuses. A slot is a file created with
+ * O_EXCL, so parallel calls cannot exceed the cap.
+ */
+export function reserveWrite(inboxDir: string, ticketId: string, bucket: string, cap: number): void {
+  const dir = join(ticketDir(inboxDir, ticketId), 'writes');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  for (let i = 0; i < cap; i++) {
+    try {
+      writeFileSync(join(dir, `${bucket}-${String(i)}`), '', { flag: 'wx', mode: 0o600 });
+      return;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    }
+  }
+  fail(`лимит запуска: не больше ${String(cap)} (${bucket})`);
 }
 
 function ticketCreated(inboxDir: string, ticketId: string): string[] {

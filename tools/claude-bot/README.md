@@ -10,7 +10,7 @@ A small launchd daemon for the bot «Mr.Claude» (board «Calab bugs&features»)
   starts no CLI for `/check`.
 - **Chat assistant** (off by default, `CLAUDE_BOT_ASSISTANT=on`): a DM or a mention in a task chat is answered
   by `claude -p --model sonnet` (`assistant-prompt.md`): the last 20 messages on stdin as untrusted data;
-  tools only `Read/Grep/Glob` of docs/ and apps/ of its own checkout, `bugboard.py list|show|comment|create|label`
+  tools only `Read/Grep/Glob` of docs/ and apps/ of its own checkout, `handoff.mjs board list|show|comment|create|label`
   and `handoff.mjs add`; `dontAsk` refuses the rest; no settings, MCP, skills or CLAUDE.md. When it is off,
   DMs and mentions wake the lead instead.
 
@@ -33,17 +33,25 @@ What wakes the bot (checked every `CLAUDE_BOT_POLL_MIN`, default 5 min):
   cap), the person hears so once.
 
 A change waits 60 s for more to arrive (at most 5 min), then one run starts: `claude -p --model
-$CLAUDE_BOT_WAKE_MODEL` (default `opus`) in the lead checkout with `wake-prompt.md`; the prompt lists the
-changes as metadata only (keys, titles, who, counts) and the run looks up the details itself. It is **not**
-`bypassPermissions`: `dontAsk` with an allowlist — Read/Grep/Glob of the repo; `gh pr view|list|diff|checks`,
-`gh issue view|list`, `gh run list|view`, `gh api repos/<repo>/…` (GET; write flags denied), `gh pr|issue
-comment` (no `--body-file`/`-F`); `bugboard.py list|show|author|comment|create|label|priority|status|ask-owner`;
-`handoff.mjs add|reply|chat`. No other Bash, no Write/Edit, no git push, no web; `.env*`, `~/.calab-tools`,
-`~/.claude`, `~/.ssh`, `~/Library`, the owner's checkout and the inbox are denied. Chat answers go through
+$CLAUDE_BOT_WAKE_MODEL` (default `opus`) with `wake-prompt.md`, in the **clean checkout of main**
+(`CLAUDE_BOT_ASSIST_REPO`, refreshed hourly), never the owner's checkout. The prompt lists the changes as
+metadata only (keys, titles, who, counts) and the run looks up the details itself. It is **not**
+`bypassPermissions`: `dontAsk` with an allowlist of Read/Grep/Glob of that checkout and one Bash prefix per
+`handoff.mjs` subcommand (`add|reply|chat|gh|board`); no `gh`, `python3` or any other program directly
+(Bash prefix rules are not a boundary: `gh pr comment:*` also admits `-R other/repo` or `--body-file
+~/.ssh/…`). `handoff.mjs gh|board` parses its own arguments into one fixed command each (`src/tools.ts`: the
+configured repo only, no `api`, no file arguments; board statuses only Todo / Waiting for reply / Closed),
+runs it with execFile in a clean env, redacts every text it posts, and caps a run at 8 comments, 3 new tasks
+and 20 triage edits. Text comes only from a heredoc (`< file` is refused). `--settings` turns on
+`blockReadsOutsideWorkingDirectories` (Claude Code runs `cat`/`grep`/`find` without a prompt otherwise),
+common readers, interpreters and network tools are denied, and so are `.env*`, `~/.calab-tools`, `~/.claude`,
+`~/.ssh`, `~/.kube`, `~/.config`, `~/Library`, the owner's checkout and the inbox. Chat answers go through
 `handoff.mjs reply chat-N` and the daemon posts them (redacted) to that chat. Code work goes to the inbox.
 
 One run at a time, ≥ `CLAUDE_BOT_COOLDOWN_MIN` (10) between starts, timeout `CLAUDE_BOT_WAKE_TIMEOUT_MIN` (30),
-at most `CLAUDE_BOT_WAKE_DAILY_CAP` (8) a day. Quiet mode: `CLAUDE_BOT_QUIET_HOURS=23-08`, or `touch
+at most `CLAUDE_BOT_WAKE_DAILY_CAP` (8) a day, of which at most `CLAUDE_BOT_WAKE_OUTSIDER_CAP` (2) may be
+caused only by outsiders (GitHub authors who are not owner/member/collaborator), so an issue or comment flood
+cannot use up the day; their changes wait for the next wake with a board change, a chat or an insider. Quiet mode: `CLAUDE_BOT_QUIET_HOURS=23-08`, or `touch
 ~/.calab-claude-bot/quiet` (remove the file to resume; no restart needed). Changes keep waiting and wake the bot
 afterwards. After a run the poller takes a new baseline, so the run's own comments and replies do not wake it
 again. Transcript: `wake-<time>.log` in the log directory; poller state: `~/.calab-claude-bot/state.json`.
@@ -86,7 +94,7 @@ process env wins over the file. Nothing from the file is exported to the claude 
 | `CALAB_BUGS_BOT_TOKEN` | — (required) |
 | `CALAB_API_URL` | `https://app.calab.io` |
 | `CLAUDE_BOT_LEAD_REPO` | `/Users/mac/orca/workspaces/Calaba/Clade-Team` |
-| `CLAUDE_BOT_ASSIST_REPO` | `~/.calab-claude-bot/repo` (detached worktree of main, refreshed hourly) |
+| `CLAUDE_BOT_ASSIST_REPO` | `~/.calab-claude-bot/repo` (detached worktree of main, refreshed hourly; cwd of wake and assistant runs) |
 | `CLAUDE_BOT_CLAUDE_BIN` | `~/.local/bin/claude` |
 | `CLAUDE_BOT_BUGBOARD` | `~/.calab-tools/bugboard.py` |
 | `CLAUDE_BOT_BOARD_ID` / `CLAUDE_BOT_WORKSPACE_ID` | the bug board / its workspace |
@@ -94,7 +102,7 @@ process env wins over the file. Nothing from the file is exported to the claude 
 | `CLAUDE_BOT_ASSISTANT` · `CLAUDE_BOT_ASSIST_TIMEOUT_MIN` | off · 3 |
 | `CLAUDE_BOT_WAKE` · `CLAUDE_BOT_WAKE_MODEL` | on · opus |
 | `CLAUDE_BOT_POLL_MIN` · `CLAUDE_BOT_COOLDOWN_MIN` · `CLAUDE_BOT_WAKE_TIMEOUT_MIN` | 5 · 10 · 30 |
-| `CLAUDE_BOT_WAKE_DAILY_CAP` · `CLAUDE_BOT_WAKE_BUDGET_USD` | 8 · 5 |
+| `CLAUDE_BOT_WAKE_DAILY_CAP` · `CLAUDE_BOT_WAKE_OUTSIDER_CAP` · `CLAUDE_BOT_WAKE_BUDGET_USD` | 8 · 2 · 5 |
 | `CLAUDE_BOT_QUIET_HOURS` · `CLAUDE_BOT_QUIET_FILE` | — · `~/.calab-claude-bot/quiet` |
 | `CLAUDE_BOT_GH_REPO` · `CLAUDE_BOT_GH_BIN` | `itrcz/calab` · `gh` (its login token is used for polling) |
 | `CLAUDE_BOT_GH_IGNORE_AUTHORS` · `CLAUDE_BOT_GH_SELF` | `dependabot[bot],dependabot` · the `gh` login |
