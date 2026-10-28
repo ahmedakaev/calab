@@ -414,7 +414,7 @@ const MemberRow = memo(function MemberRow({
         {v.camera ? <Video className="size-3.5 shrink-0" aria-label={t('video.stateOn')} role="img" /> : null}
         {v.musician ? <MusicianIcon className="size-3.5" /> : null}
         {/* #96: my own line draws the self panel's view, not the server copy. */}
-        {isMe ? <SelfVoiceStateIcons onPhone={v.onPhone} pttWait={false} /> : <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} onPhone={v.onPhone} />}
+        {isMe ? <SelfVoiceStateIcons onPhone={v.onPhone} pttWait={false} /> : <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} onPhone={v.onPhone} connectionLost={v.connectionLost} />}
       </>
     );
   } else if (line.activity === 'call') {

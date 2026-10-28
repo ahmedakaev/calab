@@ -47,7 +47,7 @@ import { VoiceGate, rmsToDb } from '../lib/media/vad';
 import { denoiseMode, wakeDbFor } from '../lib/media/denoiseSleep';
 import { isMobileNow } from '../lib/mobile';
 import { playSound } from '../lib/sounds';
-import { joinLeaveCue, joinLeaveSoundMax } from '../lib/media/joinLeaveSound';
+import { SeatCues, joinLeaveCue, joinLeaveSoundMax, type SeatVerdict } from '../lib/media/joinLeaveSound';
 import { PttRelease } from '../lib/pttRelease';
 import { SpeakingDebouncer, speakingUserIds } from '../lib/speaking';
 import { AUTO_MUTE_TOAST, AutoMuteTimer, autoMuteArmed, type AutoMuteSec } from '../lib/autoMute';
@@ -1717,12 +1717,13 @@ class VoiceEngine {
         if (pub.source === Track.Source.ScreenShare || pub.source === Track.Source.Camera) setVoice({ trackEpoch: useVoice.getState().trackEpoch + 1 });
       })
       .on(RoomEvent.ParticipantConnected, (p) => {
-        if (this.joinLeaveCue(room, p.identity)) playSound('join');
+        this.peerCue(room, userIdOf(p.identity), true);
       })
       .on(RoomEvent.ParticipantDisconnected, (p) => {
         const gone = userIdOf(p.identity);
-        if (![...room.remoteParticipants.values()].some((o) => userIdOf(o.identity) === gone)) this.active.drop(gone);
-        if (this.joinLeaveCue(room, p.identity)) playSound('leave');
+        const still = [...room.remoteParticipants.values()].some((o) => userIdOf(o.identity) === gone);
+        if (!still) this.active.drop(gone);
+        if (!still) this.peerCue(room, gone, false);
         for (const set of this.viewers.values()) set.delete(p.identity);
         annot.participantLeft(p.identity);
         this.publishViewers();
@@ -2111,11 +2112,67 @@ class VoiceEngine {
   }
 
   /** Others' join/leave cue: only while the room with that person has ≤ join_leave_sound_max people. */
-  private joinLeaveCue(room: Room, identity: string): boolean {
+  private joinLeaveCue(room: Room, who: string): boolean {
     const max = joinLeaveSoundMax(this.roomId ? useRooms.getState().byId[this.roomId]?.media : undefined);
     if (max <= 0) return false;
     const others = Array.from(room.remoteParticipants.values(), (o) => userIdOf(o.identity));
-    return joinLeaveCue(others, userIdOf(identity), userIdOf(room.localParticipant.identity), max);
+    return joinLeaveCue(others, who, userIdOf(room.localParticipant.identity), max);
+  }
+
+  /** Whose LiveKit connection went while the server keeps their seat (ADR-0142), per room. */
+  private seatCues = new SeatCues();
+  private seatCuesRoom: Room | null = null;
+  private seatCuesOff: (() => void) | null = null;
+
+  /**
+   * Someone's (last) LiveKit connection in my room appeared or went: the cue follows the server's
+   * seat (ADR-0142, SeatCues) — no «leave» while the seat is kept after a lost connection, no
+   * «join» when they come back to it, «leave» when the server removes it.
+   */
+  private peerCue(room: Room, who: string, joined: boolean): void {
+    if (this.seatCuesRoom !== room) this.resetSeatCues(room);
+    const seat = this.seatOf(who);
+    const due = joined ? this.seatCues.connected(who, seat) : this.seatCues.disconnected(who, seat);
+    if (due && this.joinLeaveCue(room, who)) playSound(joined ? 'join' : 'leave');
+    this.watchSeats();
+  }
+
+  /** The server's seat of `who` in my voice room (a DM call has no per-user seats here: gone). */
+  private seatOf(who: string): SeatVerdict {
+    const { workspaceId, roomId } = useVoice.getState();
+    const v = workspaceId && roomId ? useWorkspaces.getState().byId[workspaceId]?.voice[who] : undefined;
+    if (!v || v.roomId !== roomId) return 'gone';
+    return v.connectionLost ? 'lost' : 'present';
+  }
+
+  /** Follows the voice states only while someone's seat awaits the server's word: no timer. */
+  private watchSeats(): void {
+    if (this.seatCues.size === 0) {
+      this.seatCuesOff?.();
+      this.seatCuesOff = null;
+      return;
+    }
+    if (this.seatCuesOff) return;
+    this.seatCuesOff = useWorkspaces.subscribe((s, prev) => {
+      const ws = useVoice.getState().workspaceId;
+      if (!ws || s.byId[ws]?.voice === prev.byId[ws]?.voice) return;
+      const room = this.seatCuesRoom;
+      if (!room || room !== this.room) {
+        this.resetSeatCues(null);
+        return;
+      }
+      for (const who of this.seatCues.settle((id) => this.seatOf(id))) {
+        if (this.joinLeaveCue(room, who)) playSound('leave');
+      }
+      if (this.seatCues.size === 0) this.watchSeats();
+    });
+  }
+
+  private resetSeatCues(room: Room | null): void {
+    this.seatCues.clear();
+    this.seatCuesRoom = room;
+    this.seatCuesOff?.();
+    this.seatCuesOff = null;
   }
 
   private inRoom(userId: string): boolean {
