@@ -86,6 +86,7 @@ const (
 	DiskActivityKind_DISK_ACTIVITY_KIND_TRASH       DiskActivityKind = 8
 	DiskActivityKind_DISK_ACTIVITY_KIND_RESTORE     DiskActivityKind = 9
 	DiskActivityKind_DISK_ACTIVITY_KIND_DELETE      DiskActivityKind = 10 // deleted forever
+	DiskActivityKind_DISK_ACTIVITY_KIND_EDIT        DiskActivityKind = 11 // a saved version (ADR-0143): before / after = file_id, size, sha256 of the files
 )
 
 // Enum value maps for DiskActivityKind.
@@ -102,6 +103,7 @@ var (
 		8:  "DISK_ACTIVITY_KIND_TRASH",
 		9:  "DISK_ACTIVITY_KIND_RESTORE",
 		10: "DISK_ACTIVITY_KIND_DELETE",
+		11: "DISK_ACTIVITY_KIND_EDIT",
 	}
 	DiskActivityKind_value = map[string]int32{
 		"DISK_ACTIVITY_KIND_UNSPECIFIED": 0,
@@ -115,6 +117,7 @@ var (
 		"DISK_ACTIVITY_KIND_TRASH":       8,
 		"DISK_ACTIVITY_KIND_RESTORE":     9,
 		"DISK_ACTIVITY_KIND_DELETE":      10,
+		"DISK_ACTIVITY_KIND_EDIT":        11,
 	}
 )
 
@@ -1870,7 +1873,7 @@ const file_calaba_v1_disk_proto_rawDesc = "" +
 	"\fDiskItemKind\x12\x1e\n" +
 	"\x1aDISK_ITEM_KIND_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15DISK_ITEM_KIND_FOLDER\x10\x01\x12\x17\n" +
-	"\x13DISK_ITEM_KIND_FILE\x10\x02*\xec\x02\n" +
+	"\x13DISK_ITEM_KIND_FILE\x10\x02*\x89\x03\n" +
 	"\x10DiskActivityKind\x12\"\n" +
 	"\x1eDISK_ACTIVITY_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19DISK_ACTIVITY_KIND_CREATE\x10\x01\x12\x1d\n" +
@@ -1883,7 +1886,8 @@ const file_calaba_v1_disk_proto_rawDesc = "" +
 	"\x18DISK_ACTIVITY_KIND_TRASH\x10\b\x12\x1e\n" +
 	"\x1aDISK_ACTIVITY_KIND_RESTORE\x10\t\x12\x1d\n" +
 	"\x19DISK_ACTIVITY_KIND_DELETE\x10\n" +
-	"B\x97\x01\n" +
+	"\x12\x1b\n" +
+	"\x17DISK_ACTIVITY_KIND_EDIT\x10\vB\x97\x01\n" +
 	"\rcom.calaba.v1B\tDiskProtoP\x01Z6github.com/calaba/calaba/server/gen/calaba/v1;calabav1\xa2\x02\x03CXX\xaa\x02\tCalaba.V1\xca\x02\tCalaba\\V1\xe2\x02\x15Calaba\\V1\\GPBMetadata\xea\x02\n" +
 	"Calaba::V1b\x06proto3"
 

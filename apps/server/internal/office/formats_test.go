@@ -248,7 +248,7 @@ func TestSaveSourceChecks(t *testing.T) {
 			t.Fatal("not saved")
 		}
 	})
-	for name, src := range map[string]string{
+	for name, src := range map[string]string{ //nolint:gosec // URLs with test credentials
 		"other host":       "https://evil.test/cache/x",
 		"credentials":      "https://user:pw@docs.calab.test/cache/x",
 		"scheme":           "ftp://docs.calab.test/cache/x",
@@ -269,7 +269,7 @@ func TestSaveSourceChecks(t *testing.T) {
 	})
 	t.Run("redirect not followed", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
-		other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(xlsxOf(t, "r")) }))
+		other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(xlsxOf(t, "r")) }))
 		defer other.Close()
 		redirect := httptest.NewServer(http.RedirectHandler(other.URL, http.StatusFound))
 		defer redirect.Close()
@@ -280,7 +280,7 @@ func TestSaveSourceChecks(t *testing.T) {
 	})
 	t.Run("html content type", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html")
 			_, _ = w.Write(xlsxOf(t, "h"))
 		}))

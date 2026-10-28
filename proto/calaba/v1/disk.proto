@@ -95,6 +95,7 @@ enum DiskActivityKind {
   DISK_ACTIVITY_KIND_TRASH = 8;
   DISK_ACTIVITY_KIND_RESTORE = 9;
   DISK_ACTIVITY_KIND_DELETE = 10; // deleted forever
+  DISK_ACTIVITY_KIND_EDIT = 11; // a saved version (ADR-0143): before / after = file_id, size, sha256 of the files
 }
 
 // A journal entry (disk_activity). before / after carry name snapshots (the destination

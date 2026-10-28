@@ -203,12 +203,13 @@ func (v ValkeySessions) EditorsOf(ctx context.Context, items []uuid.UUID) (map[u
 			return nil, err
 		}
 		s, ok, err := parseSession(m)
-		if err != nil || !ok {
+		if err != nil || !ok || i >= len(items) {
 			continue
 		}
+		id := items[i] //nolint:gosec // DoMulti answers one result per command, i < len(items) checked
 		for _, u := range s.Online {
 			if slices.Contains(s.Editors, u) {
-				out[items[i]] = append(out[items[i]], u)
+				out[id] = append(out[id], u)
 			}
 		}
 	}
