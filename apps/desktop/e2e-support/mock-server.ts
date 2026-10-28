@@ -54,6 +54,7 @@ import {
   ListBoardsResponseSchema,
   ListTasksResponseSchema,
   MyTasksResponseSchema,
+  ListTaskNoticesResponseSchema,
   SearchTasksResponseSchema,
   CreateSavedTaskSearchRequestSchema,
   ListSavedTaskSearchesResponseSchema,
@@ -8649,6 +8650,11 @@ class MockImpl {
         items: r.items.map((x) => (x.message ? { item: { case: 'message' as const, value: this.msgOut(x.message, me) } } : { item: { case: 'activity' as const, value: x.activity as TaskActivity } })),
         hasMore: r.hasMore,
       });
+    });
+    this.boardRoute('GET', '/api/me/task-notices', (c, me) => {
+      if (q(c, 'after')) throw invalid('after', 'only before is supported');
+      const limit = Math.min(100, Math.max(1, Number(q(c, 'limit') || '50') || 50));
+      sendMsg(c.res, 200, ListTaskNoticesResponseSchema, b().notices(me, q(c, 'before'), limit));
     });
     this.boardRoute('GET', '/api/me/tasks', (c, me) => {
       sendMsg(c.res, 200, MyTasksResponseSchema, { tasks: b().mine(q(c, 'workspace_id'), me, q(c, 'scope') || 'assigned', q(c, 'open') === '1'), nextCursor: '' });

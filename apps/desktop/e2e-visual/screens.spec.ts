@@ -58,6 +58,7 @@ const KEY = new Set([
   'tooltip-lazy',
   'chat-context-menu',
   'room-notify-menu',
+  'inbox-popover',
   'dm-list',
   'nav-badges',
   'dm-archive',
@@ -1391,6 +1392,23 @@ test('room-notify-menu', async ({ open, win, mock, shot }) => {
   await expect(win.getByRole('menuitemradio', { name: 'Как в пространстве (Только упоминания)' })).toHaveAttribute('aria-checked', 'true');
   await expect(win.getByRole('menuitem', { name: 'До утра' })).toBeVisible();
   await checkpoint(shot, 'room-notify-menu');
+});
+
+// «Упоминания» (ADR-0140, #99): chat mentions and task events together, newest first, each with
+// its source (room · workspace, KEY · title); unread ones carry a dot.
+test('inbox-popover', async ({ open, win, mock, shot }) => {
+  const task = mock.boards.taskByKey('CAL-3');
+  if (!task) throw new Error('CAL-3 is not seeded');
+  // A comment of Вера mentioning me in CAL-3: a MENTIONED task notice in my history.
+  mock.injectMessage({ roomId: task.task.roomId, authorId: IDS.users.vera, content: `@${IDS.users.anna} проверишь на Mac?` });
+  await open();
+  await mainWindow(win, mock);
+  await win.getByRole('button', { name: 'Упоминания' }).click();
+  const pop = win.getByRole('dialog', { name: 'Упоминания' });
+  await expect(pop.getByText('CAL-3 · Эхо в звонке при включённых колонках')).toBeVisible();
+  await expect(pop.getByText(/разработка · /).first()).toBeVisible();
+  await settle(win);
+  await checkpoint(shot, 'inbox-popover');
 });
 
 test('shell-shortcuts', async ({ open, win, mock, shot }) => {

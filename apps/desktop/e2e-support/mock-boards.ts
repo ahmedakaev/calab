@@ -43,6 +43,8 @@ import {
   TaskAssigneeSchema,
   TaskField,
   TaskNoticeKind,
+  TaskNoticeSchema,
+  ListTaskNoticesResponseSchema,
   TaskOp,
   TaskPriority,
   TaskRelationKind,
@@ -542,12 +544,51 @@ export class BoardsMock {
     const b = this.boards.get(t.task.boardId);
     if (!b) return;
     const sees = this.viewers(b);
+    const ids = new Map<string, string>();
+    if (kind === 'taskUpdate' && notice) {
+      for (const u of notice.to) if (sees(u)) ids.set(u, this.logNotice(u, t, { kind: notice.kind, actorId: notice.actor, messageId: notice.messageId ?? '' }));
+    }
     this.host.fanout((u) => {
       if (!sees(u)) return null;
       if (kind === 'taskCreate') return { event: { case: 'taskCreate', value: { task: this.taskOut(t, u, true) } } };
-      const n = notice && notice.to.has(u) ? { kind: notice.kind, actorId: notice.actor, messageId: notice.messageId ?? '' } : undefined;
+      const n = notice && notice.to.has(u) ? { kind: notice.kind, actorId: notice.actor, messageId: notice.messageId ?? '', id: ids.get(u) ?? '' } : undefined;
       return { event: { case: 'taskUpdate', value: { task: this.taskOut(t, u, true), ...(n ? { notice: n } : {}) } } };
     });
+  }
+
+  /** Task notices as the server keeps them (ADR-0140): one row per recipient. */
+  private readonly noticeLog: Array<{ id: string; user: string; taskId: string; notice: MessageInitShape<typeof TaskNoticeSchema>; at: Timestamp }> = [];
+
+  private noticeSeq = 0;
+
+  /**
+   * Its own id sequence (kind 0xbc) and the change's time: neither the shared id sequence nor the
+   * clock moves, so the other screens keep their ids and times.
+   */
+  private logNotice(user: string, t: TaskRec, notice: MessageInitShape<typeof TaskNoticeSchema>, at?: Timestamp): string {
+    this.noticeSeq += 1;
+    const id = `00000000-0000-7000-80bc-${this.noticeSeq.toString(16).padStart(12, '0')}`;
+    this.noticeLog.push({ id, user, taskId: t.task.id, notice: { ...notice, id }, at: at ?? t.task.updatedAt ?? timestampFromMs(0) });
+    return id;
+  }
+
+  /** GET /me/task-notices (ADR-0140): mine, newest first, of tasks I see now, with the current key and title. */
+  notices(userId: string, before: string, limit: number): MessageInitShape<typeof ListTaskNoticesResponseSchema> {
+    const all = this.noticeLog
+      .filter((l) => l.user === userId && (!before || l.id < before))
+      .filter((l) => {
+        const t = this.tasks.get(l.taskId);
+        const b = t ? this.boards.get(t.task.boardId) : undefined;
+        return !!t && !!b && !b.board.archivedAt && !!this.host.member(t.task.workspaceId, userId) && this.perms(b.board, userId) !== 0n;
+      })
+      .sort((a, b) => (a.id < b.id ? 1 : -1));
+    return {
+      entries: all.slice(0, limit).map((l) => {
+        const t = this.tasks.get(l.taskId)?.task;
+        return { id: l.id, workspaceId: t?.workspaceId ?? '', boardId: t?.boardId ?? '', taskId: l.taskId, taskKey: t?.key ?? '', taskTitle: t?.title ?? '', notice: l.notice, createdAt: l.at };
+      }),
+      hasMore: all.length > limit,
+    };
   }
 
   private emitTaskDelete(t: TaskRec, purged: boolean, board: BoardRec): void {
@@ -1558,10 +1599,16 @@ export class BoardsMock {
     const b = this.boards.get(t.task.boardId);
     if (!b) return;
     const sees = this.viewers(b);
+    const kindOf = (u: string): TaskNoticeKind | undefined => (mentionSet.has(u) ? TaskNoticeKind.MENTIONED : to.has(u) ? TaskNoticeKind.COMMENT : undefined);
+    const ids = new Map<string, string>();
+    for (const u of new Set([...mentionSet, ...to])) {
+      const kind = kindOf(u);
+      if (kind && sees(u)) ids.set(u, this.logNotice(u, t, { kind, actorId: authorId, messageId: msg.id }, msg.createdAt));
+    }
     this.host.fanout((u) => {
       if (!sees(u)) return null;
-      const kind = mentionSet.has(u) ? TaskNoticeKind.MENTIONED : to.has(u) ? TaskNoticeKind.COMMENT : undefined;
-      return { event: { case: 'taskUpdate', value: { task: this.taskOut(t, u, true), ...(kind ? { notice: { kind, actorId: authorId, messageId: msg.id } } : {}) } } };
+      const kind = kindOf(u);
+      return { event: { case: 'taskUpdate', value: { task: this.taskOut(t, u, true), ...(kind ? { notice: { kind, actorId: authorId, messageId: msg.id, id: ids.get(u) ?? '' } } : {}) } } };
     });
   }
 
