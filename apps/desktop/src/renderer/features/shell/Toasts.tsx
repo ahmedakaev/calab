@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck, Info } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react';
 import { useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { CloseButton, cx } from '../../components/ui';
 import { t } from '../../i18n';
@@ -125,7 +125,8 @@ export function Toasts(): ReactNode {
   );
 }
 
-const ICON = { error: CircleAlert, success: CircleCheck, info: Info } as const;
+const ICON = { error: CircleAlert, success: CircleCheck, info: Info, warning: TriangleAlert } as const;
+const ICON_TONE = { error: 'text-danger', success: 'text-ok', info: 'text-accent', warning: 'text-warn' } as const;
 
 function ToastItem({ toast: x, paused }: { toast: Toast; paused: boolean }): ReactNode {
   const dismiss = useToasts((s) => s.dismiss);
@@ -156,7 +157,7 @@ function ToastItem({ toast: x, paused }: { toast: Toast; paused: boolean }): Rea
       }}
       className="mat-popover anim-in pointer-events-auto flex items-center gap-2.5 rounded-[20px] py-2.5 pl-4 pr-2.5 text-body text-fg"
     >
-      <Icon className={cx('size-[18px] shrink-0', x.kind === 'error' ? 'text-danger' : x.kind === 'success' ? 'text-ok' : 'text-accent')} aria-hidden />
+      <Icon className={cx('size-[18px] shrink-0', ICON_TONE[x.kind])} aria-hidden />
       <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
         <span className="selectable break-words [overflow-wrap:anywhere]">
           {x.text}
@@ -165,7 +166,8 @@ function ToastItem({ toast: x, paused }: { toast: Toast; paused: boolean }): Rea
         {x.action ? (
           <button
             type="button"
-            className="-ml-1 rounded-[var(--radius-control)] px-1 text-body font-medium text-accent-text hover:underline"
+            // A 44 px touch target on a phone without growing the row: the hit area extends above and below the text.
+            className="relative -ml-1 rounded-[var(--radius-control)] px-1 text-body font-medium text-accent-text before:absolute before:-inset-x-2 before:-inset-y-2 before:content-[''] hover:underline mobile:before:-inset-y-3"
             onClick={() => {
               dismiss(x.id);
               x.action?.run();

@@ -728,12 +728,16 @@ test('m-home', async ({ page }) => {
     w.__calabaVoiceRecovery?.('busy');
     w.__calabaVoiceRecovery?.('playback');
   });
-  await expect(page.getByTestId('toast').filter({ hasText: 'Связь пропадала 12 с' })).toBeVisible();
+  // One recovery toast at a time (the outage notice, the mic and the sound prompt used to stack):
+  // the mic-busy warning wins, the strip says it too.
+  await expect(page.getByTestId('toast')).toHaveCount(1);
   await expect(page.getByTestId('toast').filter({ hasText: 'Микрофон занят другим приложением' })).toBeVisible();
-  await expect(page.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Микрофон занят');
   await checkpoint(page, 'm-voice-recovery');
   await page.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
   await expect(page.getByTestId('toast').filter({ hasText: 'Вас не слышно: микрофон занят системой' })).toBeVisible();
+  await expect(page.getByTestId('toast')).toHaveCount(1);
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Вас не слышно');
   await checkpoint(page, 'm-voice-recovery-unheard');
 });
 

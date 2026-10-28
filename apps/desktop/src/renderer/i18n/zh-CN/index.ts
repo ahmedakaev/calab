@@ -406,6 +406,8 @@ export const zhCN: Dict = {
   'voice.audioBlockedAction': '开启声音',
   'voice.micBusy': '麦克风正被其他应用使用',
   'voice.micUnheard': '别人听不到你：麦克风被系统占用',
+  'voice.micBusyShort': '麦克风被占用',
+  'voice.micUnheardShort': '别人听不到你',
   'voice.linkWasDown': '连接中断了 {s} 秒',
   'voice.connected': '语音已连接',
   'voice.blocked': '语音不可用',

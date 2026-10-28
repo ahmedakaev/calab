@@ -62,6 +62,7 @@ import { roomClosedToast } from './roomClosed';
 import { prefs, usePrefs, type Prefs } from '../stores/prefs';
 import { useSession } from '../stores/session';
 import { toast, useToasts } from '../stores/toasts';
+import { recoveryToasts } from './recoveryToasts';
 import { memberName, rolesOf, useWorkspaces } from '../stores/workspaces';
 import { setVoice, useVoice, type RemoteCamera, type RemoteStream, type StreamQuality, type VoiceLink, type VoicePhase } from '../stores/voice';
 import { platform } from '../platform';
@@ -3387,8 +3388,6 @@ class VoiceEngine {
   private micCheckTimer: number | null = null;
   /** Resubscriptions spent per remote mic publication on this connection (bounded). */
   private readonly resubscribes = new Map<string, number>();
-  /** The «Нажмите, чтобы включить звук» toast (its id) while it may be on screen. */
-  private playbackPrompt: number | null = null;
   /** The mic check's episode: muted since, resumes / rebuilds spent (reset when healthy or the page is back). */
   private micMutedAt: number | null = null;
   private micResumes = 0;
@@ -3493,7 +3492,7 @@ class VoiceEngine {
       this.linkDownAt = null;
       log.info(`voice: link back after ${Math.round(ms / 1000)} s`);
       const s = outageSeconds(ms);
-      if (s !== null) toast.info(t('voice.linkWasDown', { s }));
+      if (s !== null) recoveryToasts.raise('outage', 'info', t('voice.linkWasDown', { s }));
       return;
     }
     if (phase === 'idle' || phase === 'blocked') this.linkDownAt = null;
@@ -3542,15 +3541,12 @@ class VoiceEngine {
   }
 
   private offerPlayback(): void {
-    const toasts = useToasts.getState();
-    const shown = this.playbackPrompt;
-    if (shown !== null && toasts.items.some((x) => x.id === shown)) return;
-    this.playbackPrompt = toasts.push('info', t('voice.audioBlocked'), { label: t('voice.audioBlockedAction'), run: () => this.enablePlayback() }, PLAYBACK_PROMPT_MS);
+    if (recoveryToasts.isShown('playback')) return;
+    recoveryToasts.raise('playback', 'info', t('voice.audioBlocked'), { label: t('voice.audioBlockedAction'), run: () => this.enablePlayback() }, PLAYBACK_PROMPT_MS);
   }
 
   private closePlaybackPrompt(): void {
-    if (this.playbackPrompt !== null) useToasts.getState().dismiss(this.playbackPrompt);
-    this.playbackPrompt = null;
+    recoveryToasts.close('playback');
   }
 
   /**
@@ -3558,7 +3554,6 @@ class VoiceEngine {
    * inside it (its play() calls run before its first await); the capture's context resumes with it.
    */
   private enablePlayback(): void {
-    this.playbackPrompt = null;
     void this.mic?.resumeContext();
     const room = this.room;
     if (!room) return;
@@ -3731,7 +3726,9 @@ class VoiceEngine {
     const textOf = (k: 'busy' | 'unheard'): string => t(k === 'busy' ? 'voice.micBusy' : 'voice.micUnheard');
     const was = this.micTrouble;
     this.micTrouble = kind;
+    setVoice({ micTrouble: kind });
     if (!kind) {
+      if (was) recoveryToasts.close(was);
       // Only our own text: a device / permission error written meanwhile stays.
       if (was && useVoice.getState().micError === textOf(was)) setVoice({ micError: null, micErrorAction: null });
       return;
@@ -3739,8 +3736,7 @@ class VoiceEngine {
     const text = textOf(kind);
     log.info(`voice: mic trouble shown: ${kind}`);
     setVoice({ micError: text, micErrorAction: null });
-    if (kind === 'busy') toast.info(text);
-    else toast.error(text);
+    recoveryToasts.raise(kind, kind === 'busy' ? 'warning' : 'error', text);
   }
 
   // ------------------------------------------------------------ stats / quality

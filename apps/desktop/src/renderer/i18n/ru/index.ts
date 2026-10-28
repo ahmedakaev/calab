@@ -405,6 +405,8 @@ export const ru = {
   'voice.audioBlockedAction': 'Включить звук',
   'voice.micBusy': 'Микрофон занят другим приложением',
   'voice.micUnheard': 'Вас не слышно: микрофон занят системой',
+  'voice.micBusyShort': 'Микрофон занят',
+  'voice.micUnheardShort': 'Вас не слышно',
   'voice.linkWasDown': 'Связь пропадала {s} с',
   'voice.connected': 'Голос подключён',
   'voice.blocked': 'Голос недоступен',

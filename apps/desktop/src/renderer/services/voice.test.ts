@@ -2883,10 +2883,8 @@ describe('the page away and back', () => {
     doc.hidden = hidden;
     for (const fn of docListeners.get('visibilitychange') ?? []) fn({});
   };
-  const toasts = async (kind: 'info' | 'error'): Promise<string[]> => {
-    const { toast } = await import('../stores/toasts');
-    return vi.mocked(toast[kind]).mock.calls.map((c) => c[0]);
-  };
+  /** The recovery toasts go through the store's push (services/recoveryToasts): kind, text. */
+  const pushedTexts = (kind: string): string[] => pushToast.mock.calls.filter((c) => c[0] === kind).map((c) => c[1] as string);
   const reconnecting = (room: FakeRoom): void => {
     room.state = 'Reconnecting';
     room.emit('ConnectionStateChanged', 'Reconnecting');
@@ -2916,7 +2914,7 @@ describe('the page away and back', () => {
     expect(joinVoice.mock.calls).toEqual([['A']]); // not after the 5 s / 30 s timers
     expect(useVoice.getState()).toMatchObject({ roomId: 'A', phase: 'connected' });
     expect(playSound.mock.calls).toEqual([['reconnect']]);
-    expect(await toasts('info')).toContain('Связь пропадала 25 с');
+    expect(pushedTexts('info')).toContain('Связь пропадала 25 с');
   });
 
   it('a short hide: LiveKit’s own resume gets the visible grace (15 s) before the seat check rejoins', async () => {
@@ -2976,7 +2974,8 @@ describe('the page away and back', () => {
     await vi.advanceTimersByTimeAsync(600);
     expect(micStarts.n).toBe(2);
     expect(useVoice.getState().micError).toBe('Вас не слышно: микрофон занят системой');
-    expect(await toasts('error')).toEqual(['Вас не слышно: микрофон занят системой']);
+    expect(pushedTexts('warning')).toEqual(['Микрофон занят другим приложением']); // a warning, like the red panel line
+    expect(pushedTexts('error')).toEqual(['Вас не слышно: микрофон занят системой']);
     await vi.advanceTimersByTimeAsync(30_000);
     expect(micStarts.n).toBe(2); // one rebuild per episode
   });

@@ -1525,8 +1525,9 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
     w.__calabaVoiceRecovery?.('playback');
   });
   await expect(win.getByText('Микрофон занят другим приложением').first()).toBeVisible();
-  await expect(win.getByTestId('toast').filter({ hasText: 'Связь пропадала 12 с' })).toBeVisible();
-  await expect(win.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  // One recovery toast: the mic-busy warning wins over the outage notice and the sound prompt.
+  await expect(win.getByTestId('toast')).toHaveCount(1);
+  await expect(win.getByTestId('toast').filter({ hasText: 'Микрофон занят другим приложением' })).toBeVisible();
   await checkpoint(shot, 'voice-audio-recovery-seat');
   await win.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
   await expect(win.getByText('Вас не слышно: микрофон занят системой').first()).toBeVisible();
