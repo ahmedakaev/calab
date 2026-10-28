@@ -1340,8 +1340,8 @@ function send(res: ServerResponse, status: number, body: string | Buffer, type: 
 
 /** The office editor's host page (infra/office) and the STUB api.js, on the mock's origin (ADR-0143). */
 const OFFICE_STUB: Record<string, { file: URL; type: string }> = {
-  '/__office/calab-editor.html': { file: new URL('../../../infra/office/calab-editor.html', import.meta.url), type: 'text/html; charset=utf-8' },
-  '/__office/calab-editor.js': { file: new URL('../../../infra/office/calab-editor.js', import.meta.url), type: 'text/javascript; charset=utf-8' },
+  '/web-apps/apps/calab/calab-editor.html': { file: new URL('../../../infra/office/calab-editor.html', import.meta.url), type: 'text/html; charset=utf-8' },
+  '/web-apps/apps/calab/calab-editor.js': { file: new URL('../../../infra/office/calab-editor.js', import.meta.url), type: 'text/javascript; charset=utf-8' },
   '/web-apps/apps/api/documents/api.js': { file: new URL('./assets/office-stub-api.js', import.meta.url), type: 'text/javascript; charset=utf-8' },
 };
 
@@ -8901,7 +8901,7 @@ class MockImpl {
         editorConfig: { mode: edit ? 'edit' : 'view', lang: 'ru', customization: { uiTheme: q(c, 'theme') === 'light' ? 'default-light' : 'default-dark', compactHeader: true, toolbarHideFileName: true } },
         token: 'mock',
       };
-      sendMsg(c.res, 200, OfficeConfigResponseSchema, { docsUrl: origin, hostUrl: `${origin}/__office/calab-editor.html`, configJson: JSON.stringify(config), mode: edit ? OfficeMode.EDIT : OfficeMode.VIEW, key });
+      sendMsg(c.res, 200, OfficeConfigResponseSchema, { docsUrl: origin, hostUrl: `${origin}/web-apps/apps/calab/calab-editor.html`, configJson: JSON.stringify(config), mode: edit ? OfficeMode.EDIT : OfficeMode.VIEW, key });
     });
     this.diskRoute('GET', '/api/workspaces/:id/disk/items', (c, me) => {
       const r = d().list(p0(c), me, { parent: q(c, 'parent'), trashed: q(c, 'trashed') === '1' || q(c, 'trashed') === 'true', sort: q(c, 'sort'), cursor: q(c, 'cursor'), limit: Number(q(c, 'limit')) || 0 });

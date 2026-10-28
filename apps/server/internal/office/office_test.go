@@ -275,7 +275,7 @@ func TestConfigSignedAndShaped(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("config %d %s", w.Code, w.Body)
 	}
-	if resp.DocsUrl != "https://docs.calab.test" || resp.HostUrl != "https://docs.calab.test/calab/calab-editor.html" || resp.Mode != v1.OfficeMode_OFFICE_MODE_EDIT {
+	if resp.DocsUrl != "https://docs.calab.test" || resp.HostUrl != "https://docs.calab.test/web-apps/apps/calab/calab-editor.html" || resp.Mode != v1.OfficeMode_OFFICE_MODE_EDIT {
 		t.Fatalf("resp %+v", resp)
 	}
 	// The token verifies with the Document Server's secret and its claims are the config.

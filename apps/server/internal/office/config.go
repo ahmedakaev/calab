@@ -16,9 +16,10 @@ import (
 	"github.com/calaba/calaba/server/internal/perm"
 )
 
-// HostPath is where the Calab host page (infra/office/calab-editor.html) is served on the
-// Document Server's origin.
-const HostPath = "/calab/calab-editor.html"
+// HostPath is where the Calab host page (infra/office/calab-editor.{html,js}) is served on the
+// Document Server's origin: mounted read-only into its web-apps tree, which the Document Server's
+// own nginx already serves (no extra ingress rule).
+const HostPath = "/web-apps/apps/calab/calab-editor.html"
 
 // docKind is the Document Server's fileType and documentType of a name ("" = not opened here).
 func docKind(name string) (fileType, documentType string) {
