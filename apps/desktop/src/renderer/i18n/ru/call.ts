@@ -54,7 +54,7 @@ export const ruCall = {
   'call.sipParkedLeave': 'Выйти из комнаты',
   'call.sipParkedAfter': 'Войдёте в комнату после звонка',
   'call.onPhone': 'Разговаривает по телефону',
-  // a voice seat kept after a lost connection (ADR-0144)
+  // a voice seat kept after a lost connection (ADR-0146)
   'call.connectionLost': 'Нет связи',
   // transfer of a phone call (ADR-0132)
   'call.sipTransfer': 'Перевести',

@@ -23,13 +23,13 @@ export function joinLeaveCue(others: Iterable<string>, who: string, me: string, 
 }
 
 /**
- * Where the server has a person's seat in my room (ADR-0144): `gone` (not in this room), `lost`
+ * Where the server has a person's seat in my room (ADR-0146): `gone` (not in this room), `lost`
  * (kept after a lost connection, VoiceState.connection_lost) or `present`.
  */
 export type SeatVerdict = 'gone' | 'lost' | 'present';
 
 /**
- * Others' join/leave cues follow the server's seat, not the bare LiveKit connection (ADR-0144).
+ * Others' join/leave cues follow the server's seat, not the bare LiveKit connection (ADR-0146).
  * A person whose last LiveKit connection disappears is not announced until the server rules: the
  * seat is gone → «leave»; kept as lost (or not ruled yet) → nothing now, «leave» once it is
  * removed; back on LiveKit before that → no cue at all, no «join» either. A full reconnect

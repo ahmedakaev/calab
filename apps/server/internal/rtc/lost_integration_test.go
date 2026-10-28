@@ -15,7 +15,7 @@ import (
 	"github.com/calaba/calaba/server/internal/voice"
 )
 
-// lostFixture: a workspace room with one connected device, the grace on (ADR-0144).
+// lostFixture: a workspace room with one connected device, the grace on (ADR-0146).
 type lostFixture struct {
 	s             *Service
 	rc            rueidis.Client

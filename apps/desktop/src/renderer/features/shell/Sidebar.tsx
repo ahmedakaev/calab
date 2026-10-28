@@ -1655,7 +1655,7 @@ function VoiceMember({
   const connectingRing = useConnectingRing(workspaceId, state.userId, state.pending);
   // Parked for a phone call (ADR-0133): dimmed, a handset, never the speaking ring.
   const onPhone = state.onPhone;
-  // Someone else's seat kept after a lost connection (ADR-0144): dimmed, «нет связи».
+  // Someone else's seat kept after a lost connection (ADR-0146): dimmed, «нет связи».
   const lost = !isMe && state.connectionLost;
   const talking = speaking && !state.muted && !connectingRing && !onPhone && !lost;
   const { setNodeRef, listeners, attributes, isDragging } = useDraggable({

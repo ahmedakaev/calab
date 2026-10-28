@@ -187,7 +187,7 @@ func TestVoiceLostGrace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if c.VoiceLostGrace != time.Minute {
-		t.Fatalf("default VOICE_LOST_GRACE = %v, want 1m (ADR-0144)", c.VoiceLostGrace)
+		t.Fatalf("default VOICE_LOST_GRACE = %v, want 1m (ADR-0146)", c.VoiceLostGrace)
 	}
 	for in, want := range map[string]time.Duration{"0": 0, "0s": 0, "90s": 90 * time.Second, "10m": 10 * time.Minute} {
 		t.Setenv("VOICE_LOST_GRACE", in)

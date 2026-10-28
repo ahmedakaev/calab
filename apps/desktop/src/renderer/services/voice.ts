@@ -2119,14 +2119,14 @@ class VoiceEngine {
     return joinLeaveCue(others, who, userIdOf(room.localParticipant.identity), max);
   }
 
-  /** Whose LiveKit connection went while the server keeps their seat (ADR-0144), per room. */
+  /** Whose LiveKit connection went while the server keeps their seat (ADR-0146), per room. */
   private seatCues = new SeatCues();
   private seatCuesRoom: Room | null = null;
   private seatCuesOff: (() => void) | null = null;
 
   /**
    * Someone's (last) LiveKit connection in my room appeared or went: the cue follows the server's
-   * seat (ADR-0144, SeatCues) — no «leave» while the seat is kept after a lost connection, no
+   * seat (ADR-0146, SeatCues) — no «leave» while the seat is kept after a lost connection, no
    * «join» when they come back to it, «leave» when the server removes it.
    */
   private peerCue(room: Room, who: string, joined: boolean): void {

@@ -119,7 +119,7 @@ type Config struct {
 	LiveKitAPIKey          string `env:"LIVEKIT_API_KEY"`
 	LiveKitAPISecret       string `env:"LIVEKIT_API_SECRET"`
 	LiveKitMaxParticipants uint32 `env:"LIVEKIT_MAX_PARTICIPANTS" envDefault:"50"`
-	// How long a device's voice seat outlives an involuntary LiveKit drop (ADR-0144): others see
+	// How long a device's voice seat outlives an involuntary LiveKit drop (ADR-0146): others see
 	// it as «no connection» and a /join of the device within this time takes it back without a
 	// leave/join. 0 = off (the seat goes with the drop). At most 10m.
 	VoiceLostGrace time.Duration `env:"VOICE_LOST_GRACE" envDefault:"60s"`
@@ -240,6 +240,9 @@ type Config struct {
 
 	// Balance billing (ADR-0080 v5): BILLING_* and STRIPE_* (config/billing.go).
 	Billing Billing
+
+	// Office editing in ONLYOFFICE Docs (ADR-0143, spike): OFFICE_* (config/office.go).
+	Office Office
 }
 
 // BotLimits returns the effective bot limits (defaults for 0).
@@ -460,6 +463,9 @@ func (c *Config) Validate() error {
 		errs = append(errs, errors.New("RECORDINGS_PATH must be set and RECORDING_EGRESS_DIR an absolute path (STORAGE_DRIVER=fs)"))
 	}
 	if err := c.Billing.validate(); err != nil {
+		errs = append(errs, err)
+	}
+	if err := c.Office.validate(c.JWTSecret); err != nil {
 		errs = append(errs, err)
 	}
 	if c.BotRatePerSec < 0 || c.BotRatePerSec > 10000 || c.BotMessagesPerMin < 0 || c.BotMessagesPerMin > 100000 {
