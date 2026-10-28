@@ -293,6 +293,7 @@
 {"method":"GET","path":"/api/rooms/{id}/messages","decision":"allow","group":"messages"},
 {"method":"POST","path":"/api/rooms/{id}/messages","decision":"allow","group":"messages"},
 {"method":"GET","path":"/api/rooms/{id}/messages/{messageId}","decision":"allow","group":"messages"},
+{"method":"GET","path":"/api/rooms/{id}/messages/{messageId}/readers","decision":"allow","group":"messages"},
 {"method":"POST","path":"/api/rooms/{id}/messages/{mid}/forward","decision":"allow","group":"messages"},
 {"method":"GET","path":"/api/rooms/{id}/pins","decision":"allow","group":"messages"},
 {"method":"PUT","path":"/api/rooms/{id}/read","decision":"allow","group":"messages"},
@@ -563,6 +564,10 @@
 {"method":"PUT","path":"/api/workspaces/{id}/sip/schedule","decision":"allow","group":"workspaces"},
 {"method":"POST","path":"/api/workspaces/{id}/sip/test","decision":"allow","group":"workspaces"},
 {"method":"POST","path":"/api/workspaces/{id}/smart-tasks","decision":"deny","group":"workspaces"},
+{"method":"GET","path":"/api/workspaces/{id}/task-searches","decision":"deny","group":"workspaces"},
+{"method":"POST","path":"/api/workspaces/{id}/task-searches","decision":"deny","group":"workspaces"},
+{"method":"PATCH","path":"/api/workspaces/{id}/task-searches/{sid}","decision":"deny","group":"workspaces"},
+{"method":"DELETE","path":"/api/workspaces/{id}/task-searches/{sid}","decision":"deny","group":"workspaces"},
 {"method":"GET","path":"/api/workspaces/{id}/users","decision":"allow","group":"workspaces"},
 {"method":"GET","path":"/api/workspaces/discover","decision":"deny","group":"workspaces"}
 ]

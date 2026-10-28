@@ -33,34 +33,53 @@ func (q *Queries) AddReaction(ctx context.Context, arg AddReactionParams) (int64
 
 const advanceReadState = `-- name: AdvanceReadState :one
 WITH prev AS (
-    SELECT p.last_read_message_id FROM read_states p
+    SELECT p.last_read_message_id, p.seen_message_id FROM read_states p
     WHERE p.user_id = $1 AND p.room_id = $2
 )
-INSERT INTO read_states (user_id, room_id, last_read_message_id)
-VALUES ($1, $2, $3)
+INSERT INTO read_states (user_id, room_id, last_read_message_id, seen_message_id)
+VALUES ($1, $2, $3,
+        CASE WHEN $4::boolean THEN $3::uuid END)
 ON CONFLICT (user_id, room_id) DO UPDATE
-    SET last_read_message_id = GREATEST(read_states.last_read_message_id, EXCLUDED.last_read_message_id)
+    SET last_read_message_id = GREATEST(read_states.last_read_message_id, EXCLUDED.last_read_message_id),
+        seen_message_id = GREATEST(read_states.seen_message_id, EXCLUDED.seen_message_id)
 RETURNING read_states.last_read_message_id,
-    (NOT EXISTS (SELECT 1 FROM prev WHERE prev.last_read_message_id >= $3))::boolean AS advanced
+    (NOT EXISTS (SELECT 1 FROM prev WHERE prev.last_read_message_id >= $3))::boolean AS advanced,
+    ($4::boolean AND NOT EXISTS (
+        SELECT 1 FROM prev WHERE prev.seen_message_id >= $3))::boolean AS seen_advanced,
+    (SELECT prev.seen_message_id FROM prev) AS prev_seen_message_id
 `
 
 type AdvanceReadStateParams struct {
 	UserID    uuid.UUID
 	RoomID    uuid.UUID
 	MessageID uuid.UUID
+	Seen      bool
 }
 
 type AdvanceReadStateRow struct {
 	LastReadMessageID uuid.UUID
 	Advanced          bool
+	SeenAdvanced      bool
+	PrevSeenMessageID *uuid.UUID
 }
 
 // UpsertReadState that also reports whether the marker moved (PUT /api/rooms/{id}/read:
-// read receipts are published only then; docs/09 #92). prev sees the row before the upsert.
+// docs/09 #92). With seen (ADR-0140) the seen marker moves too; seen_advanced and prev_seen
+// (the seen marker before) drive read receipts and read_spans. prev sees the row before the upsert.
 func (q *Queries) AdvanceReadState(ctx context.Context, arg AdvanceReadStateParams) (AdvanceReadStateRow, error) {
-	row := q.db.QueryRow(ctx, advanceReadState, arg.UserID, arg.RoomID, arg.MessageID)
+	row := q.db.QueryRow(ctx, advanceReadState,
+		arg.UserID,
+		arg.RoomID,
+		arg.MessageID,
+		arg.Seen,
+	)
 	var i AdvanceReadStateRow
-	err := row.Scan(&i.LastReadMessageID, &i.Advanced)
+	err := row.Scan(
+		&i.LastReadMessageID,
+		&i.Advanced,
+		&i.SeenAdvanced,
+		&i.PrevSeenMessageID,
+	)
 	return i, err
 }
 
@@ -101,6 +120,34 @@ func (q *Queries) DetachMessageFiles(ctx context.Context, messageID uuid.UUID) e
 	return err
 }
 
+const extendReadSpan = `-- name: ExtendReadSpan :execrows
+UPDATE read_spans SET upto_id = $1, last_at = now()
+WHERE room_id = $2 AND upto_id = $3::uuid AND user_id = $4
+  AND last_at > now() - interval '5 minutes'
+`
+
+type ExtendReadSpanParams struct {
+	UptoID uuid.UUID
+	RoomID uuid.UUID
+	PrevID uuid.UUID
+	UserID uuid.UUID
+}
+
+// ADR-0140 §3: the seen marker moved on from prev within 5 minutes of the run that ended there —
+// that run grows (a primary-key probe). 0 rows → InsertReadSpan.
+func (q *Queries) ExtendReadSpan(ctx context.Context, arg ExtendReadSpanParams) (int64, error) {
+	result, err := q.db.Exec(ctx, extendReadSpan,
+		arg.UptoID,
+		arg.RoomID,
+		arg.PrevID,
+		arg.UserID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const forwardSources = `-- name: ForwardSources :many
 SELECT m.id, (CASE WHEN r.workspace_id IS NULL THEN NULL ELSE m.room_id END)::uuid AS room_id
 FROM messages m JOIN rooms r ON r.id = m.room_id
@@ -131,6 +178,18 @@ func (q *Queries) ForwardSources(ctx context.Context, ids []uuid.UUID) ([]Forwar
 		return nil, err
 	}
 	return items, nil
+}
+
+const getFeatureEpoch = `-- name: GetFeatureEpoch :one
+SELECT started_at FROM feature_epochs WHERE name = $1
+`
+
+// When a feature started (ADR-0140 §5: 'read_receipts').
+func (q *Queries) GetFeatureEpoch(ctx context.Context, name string) (time.Time, error) {
+	row := q.db.QueryRow(ctx, getFeatureEpoch, name)
+	var started_at time.Time
+	err := row.Scan(&started_at)
+	return started_at, err
 }
 
 const getMessage = `-- name: GetMessage :one
@@ -378,6 +437,30 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (M
 	return i, err
 }
 
+const insertReadSpan = `-- name: InsertReadSpan :exec
+INSERT INTO read_spans (room_id, upto_id, user_id, after_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT DO NOTHING
+`
+
+type InsertReadSpanParams struct {
+	RoomID  uuid.UUID
+	UptoID  uuid.UUID
+	UserID  uuid.UUID
+	AfterID *uuid.UUID
+}
+
+// A new run of the seen marker: (after_id, upto_id] seen from now (after_id NULL — from the start).
+func (q *Queries) InsertReadSpan(ctx context.Context, arg InsertReadSpanParams) error {
+	_, err := q.db.Exec(ctx, insertReadSpan,
+		arg.RoomID,
+		arg.UptoID,
+		arg.UserID,
+		arg.AfterID,
+	)
+	return err
+}
+
 const lastMessages = `-- name: LastMessages :many
 SELECT r.id::uuid AS room_id, lm.id, lm.created_at, lm.author_id,
        left(lm.content, 200)::text AS preview,
@@ -476,6 +559,52 @@ func (q *Queries) ListAttachments(ctx context.Context, ids []uuid.UUID) ([]ListA
 			&i.File.VoiceDurationMs,
 			&i.File.VoiceWaveform,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMessageReaders = `-- name: ListMessageReaders :many
+SELECT m.id AS message_id, s.user_id,
+       min(LEAST(GREATEST(s.first_at, m.created_at), s.last_at))::timestamptz AS read_at
+FROM messages m
+JOIN read_spans s ON s.room_id = m.room_id AND s.upto_id >= m.id
+     AND (s.after_id IS NULL OR s.after_id < m.id)
+WHERE m.id = ANY($1::uuid[]) AND m.room_id = $2
+  AND s.user_id <> m.author_id
+GROUP BY m.id, s.user_id
+ORDER BY m.id, read_at, s.user_id
+`
+
+type ListMessageReadersParams struct {
+	MessageIds []uuid.UUID
+	RoomID     uuid.UUID
+}
+
+type ListMessageReadersRow struct {
+	MessageID uuid.UUID
+	UserID    uuid.UUID
+	ReadAt    time.Time
+}
+
+// ADR-0140 §3: who saw the given messages (all of one room) and when — the runs of the seen
+// marker that cover them, the author left out; read_at is the message time clamped into the run.
+// A range of read_spans' primary key (room_id, upto_id ≥ the message) per message.
+func (q *Queries) ListMessageReaders(ctx context.Context, arg ListMessageReadersParams) ([]ListMessageReadersRow, error) {
+	rows, err := q.db.Query(ctx, listMessageReaders, arg.MessageIds, arg.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMessageReadersRow{}
+	for rows.Next() {
+		var i ListMessageReadersRow
+		if err := rows.Scan(&i.MessageID, &i.UserID, &i.ReadAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -666,10 +795,11 @@ func (q *Queries) ListMessagesByIDs(ctx context.Context, ids []uuid.UUID) ([]Mes
 }
 
 const listPeerReads = `-- name: ListPeerReads :many
-SELECT DISTINCT ON (rs.room_id) rs.room_id, rs.last_read_message_id
+SELECT DISTINCT ON (rs.room_id) rs.room_id, rs.seen_message_id::uuid AS last_read_message_id
 FROM read_states rs JOIN users u ON u.id = rs.user_id
 WHERE rs.room_id = ANY($1::uuid[]) AND rs.user_id <> $2::uuid AND NOT u.is_bot
-ORDER BY rs.room_id, rs.last_read_message_id DESC
+  AND rs.seen_message_id IS NOT NULL
+ORDER BY rs.room_id, rs.seen_message_id DESC
 `
 
 type ListPeerReadsParams struct {
@@ -682,8 +812,8 @@ type ListPeerReadsRow struct {
 	LastReadMessageID uuid.UUID
 }
 
-// READY (docs/09 #92): per given room, the furthest read marker of the other people (bots'
-// reads do not count); rooms nobody else read are absent.
+// READY (docs/09 #92, ADR-0140): per given room, the furthest seen marker of the other people
+// (bots' reads do not count); rooms nobody else saw are absent.
 func (q *Queries) ListPeerReads(ctx context.Context, arg ListPeerReadsParams) ([]ListPeerReadsRow, error) {
 	rows, err := q.db.Query(ctx, listPeerReads, arg.RoomIds, arg.UserID)
 	if err != nil {
@@ -1158,10 +1288,10 @@ func (q *Queries) SoftDeleteMessage(ctx context.Context, id uuid.UUID) (int64, e
 }
 
 const topRoomReads = `-- name: TopRoomReads :many
-SELECT rs.user_id, rs.last_read_message_id
+SELECT rs.user_id, rs.seen_message_id::uuid AS last_read_message_id
 FROM read_states rs JOIN users u ON u.id = rs.user_id
-WHERE rs.room_id = $1 AND NOT u.is_bot
-ORDER BY rs.last_read_message_id DESC
+WHERE rs.room_id = $1 AND NOT u.is_bot AND rs.seen_message_id IS NOT NULL
+ORDER BY rs.seen_message_id DESC
 LIMIT 3
 `
 
@@ -1170,9 +1300,9 @@ type TopRoomReadsRow struct {
 	LastReadMessageID uuid.UUID
 }
 
-// The three furthest read markers of a room among people (bots' reads do not count): read
-// receipts of workspace rooms (docs/09 #92). A probe of read_states_room_id_idx over the
-// room's markers (one per member who ever read it) and a top-3 sort.
+// The three furthest seen markers of a room among people (bots' reads do not count): read
+// receipts of workspace rooms (docs/09 #92, ADR-0140). A probe of read_states_room_id_idx over
+// the room's markers (one per member who ever read it) and a top-3 sort.
 func (q *Queries) TopRoomReads(ctx context.Context, roomID uuid.UUID) ([]TopRoomReadsRow, error) {
 	rows, err := q.db.Query(ctx, topRoomReads, roomID)
 	if err != nil {
@@ -1282,7 +1412,7 @@ INSERT INTO read_states (user_id, room_id, last_read_message_id)
 VALUES ($1, $2, $3)
 ON CONFLICT (user_id, room_id) DO UPDATE
     SET last_read_message_id = GREATEST(read_states.last_read_message_id, EXCLUDED.last_read_message_id)
-RETURNING user_id, room_id, last_read_message_id
+RETURNING user_id, room_id, last_read_message_id, seen_message_id
 `
 
 type UpsertReadStateParams struct {
@@ -1295,6 +1425,11 @@ type UpsertReadStateParams struct {
 func (q *Queries) UpsertReadState(ctx context.Context, arg UpsertReadStateParams) (ReadState, error) {
 	row := q.db.QueryRow(ctx, upsertReadState, arg.UserID, arg.RoomID, arg.LastReadMessageID)
 	var i ReadState
-	err := row.Scan(&i.UserID, &i.RoomID, &i.LastReadMessageID)
+	err := row.Scan(
+		&i.UserID,
+		&i.RoomID,
+		&i.LastReadMessageID,
+		&i.SeenMessageID,
+	)
 	return i, err
 }

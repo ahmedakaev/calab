@@ -169,6 +169,7 @@ var botRouteGroups = []botRouteGroup{
 	{access: botAllow, why: "messages, DMs (members of shared workspaces, unless blocked), files and search by VIEW_ROOM / SEND_MESSAGES / MANAGE_MESSAGES (ADR-0033, ADR-0062)", routes: []string{
 		"GET /api/rooms/{id}/messages",
 		"GET /api/rooms/{id}/messages/{messageId}",
+		"GET /api/rooms/{id}/messages/{messageId}/readers", // the author only (ADR-0140)
 		"POST /api/rooms/{id}/messages",
 		"POST /api/rooms/{id}/messages/{mid}/forward",
 		"PATCH /api/messages/{id}",
