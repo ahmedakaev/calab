@@ -30,6 +30,7 @@ func TestOfficeValidation(t *testing.T) {
 		{"OFFICE_JWT_SECRET", "short", "OFFICE_JWT_SECRET"},
 		{"OFFICE_API_URL", "api", "OFFICE_API_URL"},
 		{"OFFICE_FILE_URL_TTL", "24h", "OFFICE_FILE_URL_TTL"},
+		{"OFFICE_JWT_SECRET", "0123456789abcdef0123456789abcdef", "must differ from JWT_SECRET"}, // = JWT_SECRET of billingEnv
 	} {
 		t.Run(c.key+"="+c.value, func(t *testing.T) {
 			t.Setenv(c.key, c.value)

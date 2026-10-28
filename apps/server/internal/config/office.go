@@ -29,11 +29,17 @@ type Office struct {
 	SessionTTL time.Duration `env:"OFFICE_SESSION_TTL" envDefault:"24h"`
 }
 
-func (o *Office) validate() error {
+// validate checks the office settings; apiSecret is JWT_SECRET, which OFFICE_JWT_SECRET must not
+// reuse: the Document Server (and every browser's signed editor configuration) holds the
+// office secret, and the API's own tokens must not verify with it.
+func (o *Office) validate(apiSecret string) error {
 	if !o.Enabled {
 		return nil
 	}
 	var errs []error
+	if o.JWTSecret != "" && o.JWTSecret == apiSecret {
+		errs = append(errs, errors.New("OFFICE_JWT_SECRET must differ from JWT_SECRET"))
+	}
 	if Origin(o.DocsURL) == "" {
 		errs = append(errs, errors.New("OFFICE_DOCS_URL must be an http(s) origin when OFFICE_ENABLED"))
 	}
