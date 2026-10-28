@@ -53,8 +53,8 @@ node "$ROOT/tools/office-fidelity/bench.mjs" --ds http://localhost:18080 --secre
   --storage http://localhost:18091 --storage-for-ds "http://$NAME-harness:8000" --out "$OUT"
 wait
 
-for f in vacations.xlsx contract.docx deck.pptx; do
-  for kind in convert editor6 editor2; do
+for f in vacations.xlsx contract.docx deck.pptx staff.csv; do
+  for kind in convert editor6 editor2 legacy; do
     [ -f "$OUT/$kind-$f" ] && "$VENV/bin/python" -I "$ROOT/tools/office-fidelity/compare.py" "$OUT/$f" "$OUT/$kind-$f" | sed "s/^/[$kind] /" || true
   done
 done

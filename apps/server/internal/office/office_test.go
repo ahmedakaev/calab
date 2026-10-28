@@ -1,6 +1,7 @@
 package office
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -33,10 +35,52 @@ type fakeStore struct {
 	bits     map[uuid.UUID]perm.Bits // per user
 	versions map[uuid.UUID][]uuid.UUID
 	actors   []uuid.UUID
+	attach   map[uuid.UUID]File // attachments; readable by readers
+	readers  map[uuid.UUID]bool
+	added    []string // AddFile names
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{items: map[uuid.UUID]Item{}, files: map[uuid.UUID][]byte{}, bits: map[uuid.UUID]perm.Bits{}, versions: map[uuid.UUID][]uuid.UUID{}}
+	return &fakeStore{items: map[uuid.UUID]Item{}, files: map[uuid.UUID][]byte{}, bits: map[uuid.UUID]perm.Bits{}, versions: map[uuid.UUID][]uuid.UUID{},
+		attach: map[uuid.UUID]File{}, readers: map[uuid.UUID]bool{}}
+}
+
+func (f *fakeStore) addAttachment(name string, body []byte) File {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a := File{ID: uuid.New(), Name: name, Size: int64(len(body)), Sha256: sum(body)}
+	f.attach[a.ID], f.files[a.ID] = a, body
+	return a
+}
+
+func (f *fakeStore) FileFor(r *http.Request, id uuid.UUID) (File, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a, ok := f.attach[id]
+	if !ok || !f.readers[auth.MustFromContext(r.Context()).UserID] {
+		return File{}, ErrNotFound
+	}
+	return a, nil
+}
+
+func (f *fakeStore) AddFile(_ *http.Request, _ uuid.UUID, _ *uuid.UUID, name string, _ Format, body []byte) (*v1.DiskItem, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.added = append(f.added, name)
+	id := uuid.New()
+	f.files[id] = body
+	return &v1.DiskItem{Id: id.String(), Name: name}, nil
+}
+
+func (f *fakeStore) DisplayName(context.Context, uuid.UUID) (string, error) { return "Имя", nil }
+
+func (f *fakeStore) LastVersion(_ context.Context, id uuid.UUID) (uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if v := f.versions[id]; len(v) > 0 {
+		return v[len(v)-1], nil
+	}
+	return uuid.Nil, nil
 }
 
 func (f *fakeStore) add(name string, body []byte) Item {
@@ -73,28 +117,28 @@ func (f *fakeStore) Item(_ context.Context, id uuid.UUID) (Item, error) {
 func (f *fakeStore) OpenFile(_ context.Context, id uuid.UUID) (io.ReadCloser, int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	b := f.files[id]
+	b, ok := f.files[id]
+	if !ok {
+		return nil, 0, ErrNotFound
+	}
 	return io.NopCloser(bytes.NewReader(b)), int64(len(b)), nil
 }
 
-func (f *fakeStore) SaveVersion(_ context.Context, id, expect uuid.UUID, actor *uuid.UUID, body io.Reader, size int64) (Item, error) {
+func (f *fakeStore) SaveVersion(_ context.Context, id, expect, actor uuid.UUID, _ Format, b []byte) (Item, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	it := f.items[id]
+	it, ok := f.items[id]
+	if !ok {
+		return Item{}, ErrNotFound
+	}
 	if it.FileID != expect {
 		return Item{}, ErrConflict
 	}
-	b, _ := io.ReadAll(body)
-	if int64(len(b)) != size {
-		panic("size")
-	}
 	f.versions[id] = append(f.versions[id], it.FileID)
-	it.FileID, it.Size, it.Sha256 = uuid.New(), size, sum(b)
+	it.FileID, it.Size, it.Sha256 = uuid.New(), int64(len(b)), sum(b)
 	f.files[it.FileID] = b
 	f.items[id] = it
-	if actor != nil {
-		f.actors = append(f.actors, *actor)
-	}
+	f.actors = append(f.actors, actor)
 	return it, nil
 }
 
@@ -103,14 +147,75 @@ type fakeSessions struct {
 	m  map[uuid.UUID]Session
 }
 
-func (f *fakeSessions) Join(_ context.Context, item uuid.UUID, s Session) (Session, error) {
+func (f *fakeSessions) Join(_ context.Context, item uuid.UUID, s Session, user uuid.UUID, edit bool) (Session, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if cur, ok := f.m[item]; ok {
-		return cur, nil
+	cur, ok := f.m[item]
+	if !ok {
+		cur = s
 	}
+	switch {
+	case edit && !slices.Contains(cur.Editors, user):
+		cur.Revoked = slices.DeleteFunc(cur.Revoked, func(u uuid.UUID) bool { return u == user })
+		cur.Editors = append(cur.Editors, user)
+	case !edit && !slices.Contains(cur.Viewers, user):
+		cur.Viewers = append(cur.Viewers, user)
+	}
+	f.m[item] = cur
+	return cur, nil
+}
+
+func (f *fakeSessions) Forget(_ context.Context, item uuid.UUID, key string, users []uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, ok := f.m[item]
+	if ok && s.Key == key {
+		gone := func(u uuid.UUID) bool { return slices.Contains(users, u) }
+		s.Editors = slices.DeleteFunc(s.Editors, gone)
+		s.Revoked = slices.DeleteFunc(s.Revoked, gone)
+		s.Viewers = slices.DeleteFunc(s.Viewers, gone)
+		f.m[item] = s
+	}
+	return nil
+}
+
+func (f *fakeSessions) Online(_ context.Context, item uuid.UUID, key string, users []uuid.UUID) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, ok := f.m[item]
+	if !ok || s.Key != key {
+		return false, nil
+	}
+	changed := !slices.Equal(s.Online, users)
+	s.Online = users
 	f.m[item] = s
-	return s, nil
+	return changed, nil
+}
+
+func (f *fakeSessions) Revoke(_ context.Context, item uuid.UUID, key string, users []uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, ok := f.m[item]
+	if ok && s.Key == key {
+		for _, u := range users {
+			if slices.Contains(s.Editors, u) {
+				s.Editors = slices.DeleteFunc(s.Editors, func(x uuid.UUID) bool { return x == u })
+				s.Revoked = append(s.Revoked, u)
+			}
+		}
+		f.m[item] = s
+	}
+	return nil
+}
+
+func (f *fakeSessions) Live(context.Context) ([]uuid.UUID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []uuid.UUID
+	for id := range f.m {
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func (f *fakeSessions) Get(_ context.Context, item uuid.UUID) (Session, bool, error) {
@@ -141,9 +246,9 @@ func (f *fakeSessions) End(_ context.Context, item uuid.UUID, key string) error 
 	return nil
 }
 
-type fakePresence struct{ got []uuid.UUID }
+type fakeAnnounce struct{ n int }
 
-func (p *fakePresence) Editing(_ context.Context, _ uuid.UUID, users []uuid.UUID) { p.got = users }
+func (p *fakeAnnounce) Announce(context.Context, uuid.UUID) error { p.n++; return nil }
 
 // ---- harness ----
 
@@ -158,8 +263,10 @@ type harness struct {
 	store    *fakeStore
 	sessions *fakeSessions
 	mux      *http.ServeMux
-	ds       *httptest.Server // the Document Server's saved-file host
+	ds       *httptest.Server // the Document Server: saved files, /converter, /command
 	saved    map[string][]byte
+	commands []map[string]any
+	convert  func(req jwt.MapClaims) map[string]any
 	now      time.Time
 }
 
@@ -167,6 +274,25 @@ func newHarness(t *testing.T) *harness {
 	t.Helper()
 	h := &harness{t: t, store: newFakeStore(), sessions: &fakeSessions{m: map[uuid.UUID]Session{}}, mux: http.NewServeMux(), saved: map[string][]byte{}, now: time.Date(2026, 10, 28, 12, 0, 0, 0, time.UTC)}
 	h.ds = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			claims, err := parseDS(dsSecret, body["token"].(string))
+			if err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			var out map[string]any
+			switch r.URL.Path {
+			case "/command":
+				h.commands = append(h.commands, claims)
+				out = map[string]any{"error": 0}
+			case "/converter":
+				out = h.convert(claims)
+			}
+			_ = json.NewEncoder(w).Encode(out)
+			return
+		}
 		b, ok := h.saved[r.URL.Path]
 		if !ok {
 			http.NotFound(w, r)
@@ -175,17 +301,24 @@ func newHarness(t *testing.T) *harness {
 		_, _ = w.Write(b)
 	}))
 	t.Cleanup(h.ds.Close)
-	h.svc = New(Config{DocsURL: "https://docs.calab.test", DocsInternalURL: h.ds.URL, APIURL: "http://api.calab.test", Secret: dsSecret, URLKey: DeriveURLKey(apiSecret)}, h.store, h.sessions)
+	h.svc = New(Config{Enabled: true, DocsURL: "https://docs.calab.test", DocsInternalURL: h.ds.URL, APIURL: "http://api.calab.test", Secret: dsSecret, URLKey: DeriveURLKey(apiSecret)}, h.store, h.sessions)
 	h.svc.Now = func() time.Time { return h.now }
-	h.svc.HTTP = h.ds.Client()
+	h.svc.HTTP.Transport = h.ds.Client().Transport
+	h.svc.ConvertPoll = time.Millisecond
 	h.svc.Routes(h.mux, func(next http.Handler) http.Handler { return next })
 	return h
 }
 
-// open is GET /api/office/config as uid.
+// open is GET /api/office/config?item= as uid.
 func (h *harness) open(uid, item uuid.UUID, query string) (*httptest.ResponseRecorder, *v1.OfficeConfigResponse, map[string]any) {
 	h.t.Helper()
-	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/office/config?item="+item.String()+query, nil)
+	return h.openQ(uid, "item="+item.String()+query)
+}
+
+// openQ is GET /api/office/config?{query} as uid.
+func (h *harness) openQ(uid uuid.UUID, query string) (*httptest.ResponseRecorder, *v1.OfficeConfigResponse, map[string]any) {
+	h.t.Helper()
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/office/config?"+query, nil)
 	r = r.WithContext(auth.WithIdentity(r.Context(), auth.Identity{UserID: uid}))
 	w := httptest.NewRecorder()
 	h.mux.ServeHTTP(w, r)
@@ -211,9 +344,14 @@ func dig(m map[string]any, path ...string) any {
 	return v
 }
 
-// dsToken signs as the Document Server.
+// dsToken signs as the Document Server (exp in 5 min unless claims set one; "exp": nil = none).
 func dsToken(t *testing.T, secret []byte, claims jwt.MapClaims) string {
 	t.Helper()
+	if v, ok := claims["exp"]; !ok {
+		claims["exp"] = time.Now().Add(5 * time.Minute).Unix()
+	} else if v == nil {
+		delete(claims, "exp")
+	}
 	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(secret)
 	if err != nil {
 		t.Fatal(err)
@@ -248,10 +386,43 @@ func (h *harness) post(cfg map[string]any, body map[string]any, authz string) in
 	return out.Error
 }
 
-// edited puts a saved file on the fake Document Server and returns its URL.
+// edited puts a saved file on the fake Document Server and returns its URL (its internal
+// address; public ones are tested apart).
 func (h *harness) edited(name string, b []byte) string {
 	h.saved["/cache/"+name] = b
 	return h.ds.URL + "/cache/" + name
+}
+
+// zipOfParts builds a zip with the named entries (content: the name, or the value given).
+func zipOfParts(t testing.TB, parts map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	z := zip.NewWriter(&buf)
+	names := make([]string, 0, len(parts))
+	for n := range parts {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	if _, ok := parts["mimetype"]; ok { // ODF: mimetype first
+		names = slices.DeleteFunc(names, func(n string) bool { return n == "mimetype" })
+		names = append([]string{"mimetype"}, names...)
+	}
+	for _, n := range names {
+		w, err := z.Create(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte(parts[n]))
+	}
+	if err := z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// xlsxOf is a minimal xlsx whose workbook carries tag (different tags: different sha256).
+func xlsxOf(t testing.TB, tag string) []byte {
+	return zipOfParts(t, map[string]string{"[Content_Types].xml": "ct", "xl/workbook.xml": tag})
 }
 
 func editor(h *harness, bits perm.Bits) uuid.UUID {
@@ -320,7 +491,8 @@ func TestModeFromDiskBits(t *testing.T) {
 		{"phone", edit, false, false, true, v1.OfficeMode_OFFICE_MODE_VIEW},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			if got := Mode(Item{Bits: c.bits, Trashed: c.trashed, ReadOnly: c.ro}, c.ph); got != c.want {
+			xlsx, _ := FormatOf("a.xlsx")
+			if got := Mode(Item{Bits: c.bits, Trashed: c.trashed, ReadOnly: c.ro}, xlsx, c.ph); got != c.want {
 				t.Fatalf("got %v want %v", got, c.want)
 			}
 		})
@@ -338,9 +510,9 @@ func TestModeFromDiskBits(t *testing.T) {
 	if w, _, _ := h.open(editor(h, edit), uuid.New(), ""); w.Code != http.StatusNotFound {
 		t.Fatalf("unknown item: %d", w.Code)
 	}
-	pdf := h.store.add("scan.pdf", []byte("%PDF"))
-	if w, _, _ := h.open(editor(h, edit), pdf.ID, ""); w.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("pdf: %d, want 415", w.Code)
+	exe := h.store.add("setup.exe", []byte("MZ"))
+	if w, _, _ := h.open(editor(h, edit), exe.ID, ""); w.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("exe: %d, want 415", w.Code)
 	}
 	_, _, mob := h.open(editor(h, edit), it.ID, "&phone=1")
 	if mob["type"] != "mobile" || dig(mob, "editorConfig", "mode") != "view" {
@@ -395,10 +567,10 @@ func TestFileURL(t *testing.T) {
 // item keeps its id and name while its file, sha256 and size follow the saves.
 func TestCoEditingAndVersions(t *testing.T) {
 	h := newHarness(t)
-	it := h.store.add("ФОТ.xlsx", []byte("v1"))
+	it := h.store.add("ФОТ.xlsx", xlsxOf(t, "v1"))
 	a, b := editor(h, edit), editor(h, edit)
-	pr := &fakePresence{}
-	h.svc.Presence = pr
+	pr := &fakeAnnounce{}
+	h.svc.Announce = pr
 	_, ra, cfgA := h.open(a, it.ID, "")
 	_, rb, _ := h.open(b, it.ID, "")
 	if ra.Key != rb.Key {
@@ -406,16 +578,19 @@ func TestCoEditingAndVersions(t *testing.T) {
 	}
 	key := ra.Key
 
-	if e := h.callback(cfgA, map[string]any{"key": key, "status": 1, "users": []string{a.String(), b.String()}}); e != 0 || len(pr.got) != 2 {
-		t.Fatalf("status 1: %d %v", e, pr.got)
+	if e := h.callback(cfgA, map[string]any{"key": key, "status": 1, "users": []string{a.String(), b.String()}}); e != 0 || pr.n != 1 {
+		t.Fatalf("status 1: %d %v", e, pr.n)
+	}
+	if s, _, _ := h.sessions.Get(context.Background(), it.ID); len(s.Online) != 2 || len(s.Editors) != 2 {
+		t.Fatalf("session after status 1: %+v", s)
 	}
 
 	// Forcesave (Ctrl+S): a version now, the session goes on with the same key.
-	if e := h.callback(cfgA, map[string]any{"key": key, "status": 6, "forcesavetype": 1, "filetype": "xlsx", "url": h.edited("f1", []byte("v2-forcesave")), "users": []string{b.String()}}); e != 0 {
+	if e := h.callback(cfgA, map[string]any{"key": key, "status": 6, "forcesavetype": 1, "filetype": "xlsx", "url": h.edited("f1", xlsxOf(t, "v2-forcesave")), "users": []string{b.String()}}); e != 0 {
 		t.Fatalf("status 6 refused")
 	}
 	cur, _ := h.store.Item(context.Background(), it.ID)
-	if cur.ID != it.ID || cur.Name != it.Name || cur.FileID == it.FileID || cur.Sha256 != sum([]byte("v2-forcesave")) || cur.Size != int64(len("v2-forcesave")) {
+	if cur.ID != it.ID || cur.Name != it.Name || cur.FileID == it.FileID || cur.Sha256 != sum(xlsxOf(t, "v2-forcesave")) || cur.Size != int64(len(xlsxOf(t, "v2-forcesave"))) {
 		t.Fatalf("after forcesave: %+v", cur)
 	}
 	if s, ok, _ := h.sessions.Get(context.Background(), it.ID); !ok || s.Key != key || s.FileID != cur.FileID {
@@ -428,11 +603,11 @@ func TestCoEditingAndVersions(t *testing.T) {
 	}
 
 	// Everyone closed: status 2 → the final version, the session ends.
-	if e := h.callback(cfgA, map[string]any{"key": key, "status": 2, "filetype": "xlsx", "url": h.edited("f2", []byte("v3-final")), "users": []string{a.String()}}); e != 0 {
+	if e := h.callback(cfgA, map[string]any{"key": key, "status": 2, "filetype": "xlsx", "url": h.edited("f2", xlsxOf(t, "v3-final")), "users": []string{a.String()}}); e != 0 {
 		t.Fatalf("status 2 refused")
 	}
 	cur, _ = h.store.Item(context.Background(), it.ID)
-	if cur.Sha256 != sum([]byte("v3-final")) || len(h.store.versions[it.ID]) != 2 {
+	if cur.Sha256 != sum(xlsxOf(t, "v3-final")) || len(h.store.versions[it.ID]) != 2 {
 		t.Fatalf("after save: %+v, versions %d", cur, len(h.store.versions[it.ID]))
 	}
 	if h.store.actors[0] != b || h.store.actors[1] != a {
@@ -447,7 +622,7 @@ func TestCoEditingAndVersions(t *testing.T) {
 	}
 
 	// A stale key: a late save of the ended session is refused, nothing is stored.
-	if e := h.callback(cfgA, map[string]any{"key": key, "status": 2, "filetype": "xlsx", "url": h.edited("late", []byte("late")), "users": []string{a.String()}}); e != 1 {
+	if e := h.callback(cfgA, map[string]any{"key": key, "status": 2, "filetype": "xlsx", "url": h.edited("late", xlsxOf(t, "late")), "users": []string{a.String()}}); e != 1 {
 		t.Fatal("a stale key must be refused")
 	}
 	if cur2, _ := h.store.Item(context.Background(), it.ID); cur2.FileID != cur.FileID {
@@ -492,7 +667,7 @@ func TestCallbackStatusesWithoutSave(t *testing.T) {
 func TestCallbackRefusals(t *testing.T) {
 	setup := func(t *testing.T) (*harness, Item, uuid.UUID, string, map[string]any) {
 		h := newHarness(t)
-		it := h.store.add("a.xlsx", []byte("v1"))
+		it := h.store.add("a.xlsx", xlsxOf(t, "v1"))
 		u := editor(h, edit)
 		_, r, cfg := h.open(u, it.ID, "")
 		return h, it, u, r.Key, cfg
@@ -502,13 +677,13 @@ func TestCallbackRefusals(t *testing.T) {
 	}
 	t.Run("no token", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
-		if h.post(cfg, save(h, key, u, h.edited("x", []byte("x"))), "") != 1 {
+		if h.post(cfg, save(h, key, u, h.edited("x", xlsxOf(t, "x"))), "") != 1 {
 			t.Fatal("accepted")
 		}
 	})
 	t.Run("wrong secret", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
-		body := save(h, key, u, h.edited("x", []byte("x")))
+		body := save(h, key, u, h.edited("x", xlsxOf(t, "x")))
 		tok := dsToken(t, []byte("wrong-secret-0123456789abcdef0123"), jwt.MapClaims{"payload": body})
 		if h.post(cfg, body, "Bearer "+tok) != 1 {
 			t.Fatal("accepted")
@@ -516,14 +691,14 @@ func TestCallbackRefusals(t *testing.T) {
 	})
 	t.Run("operation download", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
-		body := save(h, key, u, h.edited("x", []byte("x")))
+		body := save(h, key, u, h.edited("x", xlsxOf(t, "x")))
 		if h.post(cfg, body, "Bearer "+dsToken(t, dsSecret, jwt.MapClaims{"payload": body, "operation": "download"})) != 1 {
 			t.Fatal("accepted")
 		}
 	})
 	t.Run("token in body (JWT_IN_BODY)", func(t *testing.T) {
 		h, it, u, key, cfg := setup(t)
-		body := save(h, key, u, h.edited("x", []byte("body-mode")))
+		body := save(h, key, u, h.edited("x", xlsxOf(t, "body-mode")))
 		signed := jwt.MapClaims{}
 		for k, v := range body {
 			signed[k] = v
@@ -532,18 +707,18 @@ func TestCallbackRefusals(t *testing.T) {
 		if h.post(cfg, body, "") != 0 {
 			t.Fatal("refused")
 		}
-		if cur, _ := h.store.Item(context.Background(), it.ID); cur.Sha256 != sum([]byte("body-mode")) {
+		if cur, _ := h.store.Item(context.Background(), it.ID); cur.Sha256 != sum(xlsxOf(t, "body-mode")) {
 			t.Fatal("not saved")
 		}
 	})
 	t.Run("the signed body wins over the raw one", func(t *testing.T) {
 		h, it, u, key, cfg := setup(t)
-		signed := save(h, key, u, h.edited("good", []byte("signed")))
-		raw := save(h, key, u, h.edited("evil", []byte("raw")))
+		signed := save(h, key, u, h.edited("good", xlsxOf(t, "signed")))
+		raw := save(h, key, u, h.edited("evil", xlsxOf(t, "raw")))
 		if h.post(cfg, raw, "Bearer "+dsToken(t, dsSecret, jwt.MapClaims{"payload": signed})) != 0 {
 			t.Fatal("refused")
 		}
-		if cur, _ := h.store.Item(context.Background(), it.ID); cur.Sha256 != sum([]byte("signed")) {
+		if cur, _ := h.store.Item(context.Background(), it.ID); cur.Sha256 != sum(xlsxOf(t, "signed")) {
 			t.Fatal("stored the unsigned body")
 		}
 	})
@@ -556,13 +731,13 @@ func TestCallbackRefusals(t *testing.T) {
 	t.Run("editor lost Правка", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
 		h.store.bits[u] = view
-		if h.callback(cfg, save(h, key, u, h.edited("x", []byte("x")))) != 1 {
+		if h.callback(cfg, save(h, key, u, h.edited("x", xlsxOf(t, "x")))) != 1 {
 			t.Fatal("accepted")
 		}
 	})
 	t.Run("no editor", func(t *testing.T) {
 		h, _, _, key, cfg := setup(t)
-		body := save(h, key, uuid.Nil, h.edited("x", []byte("x")))
+		body := save(h, key, uuid.Nil, h.edited("x", xlsxOf(t, "x")))
 		body["users"] = []string{}
 		if h.callback(cfg, body) != 1 {
 			t.Fatal("accepted")
@@ -570,7 +745,7 @@ func TestCallbackRefusals(t *testing.T) {
 	})
 	t.Run("file type changed", func(t *testing.T) {
 		h, _, u, key, cfg := setup(t)
-		body := save(h, key, u, h.edited("x", []byte("x")))
+		body := save(h, key, u, h.edited("x", xlsxOf(t, "x")))
 		body["filetype"] = "ods"
 		if h.callback(cfg, body) != 1 {
 			t.Fatal("accepted")
@@ -584,7 +759,7 @@ func TestCallbackRefusals(t *testing.T) {
 		x.FileID = other
 		h.store.items[it.ID] = x
 		h.store.mu.Unlock()
-		if h.callback(cfg, save(h, key, u, h.edited("x", []byte("x")))) != 1 {
+		if h.callback(cfg, save(h, key, u, h.edited("x", xlsxOf(t, "x")))) != 1 {
 			t.Fatal("accepted over a newer file")
 		}
 		if cur, _ := h.store.Item(context.Background(), it.ID); cur.FileID != other {
@@ -600,9 +775,9 @@ func TestCallbackRefusals(t *testing.T) {
 	})
 	t.Run("url token of another kind", func(t *testing.T) {
 		h, it, u, key, _ := setup(t)
-		fileTok, _ := signURL(h.svc.cfg.URLKey, opFile, it.ID, it.FileID, h.now.Add(time.Minute))
+		fileTok, _ := signURL(h.svc.cfg.URLKey, opFile, it.ID, it.FileID, key, h.now.Add(time.Minute))
 		cfg := map[string]any{"editorConfig": map[string]any{"callbackUrl": "http://api.calab.test/api/office/callback/" + fileTok}}
-		if h.callback(cfg, save(h, key, u, h.edited("x", []byte("x")))) != 1 {
+		if h.callback(cfg, save(h, key, u, h.edited("x", xlsxOf(t, "x")))) != 1 {
 			t.Fatal("accepted")
 		}
 	})
@@ -611,7 +786,7 @@ func TestCallbackRefusals(t *testing.T) {
 // A session left behind on an older file (the Document Server lost it) is replaced on open.
 func TestStaleSessionRestarts(t *testing.T) {
 	h := newHarness(t)
-	it := h.store.add("a.xlsx", []byte("v1"))
+	it := h.store.add("a.xlsx", xlsxOf(t, "v1"))
 	h.sessions.m[it.ID] = Session{Key: "calab-old", FileID: uuid.New()}
 	_, r, _ := h.open(editor(h, edit), it.ID, "")
 	if r.Key == "calab-old" {

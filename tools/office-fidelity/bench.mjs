@@ -6,8 +6,10 @@
 //   node tools/office-fidelity/bench.mjs --ds http://localhost:18080 --secret-file OUT/ds.env \
 //     --storage http://localhost:18091 --storage-for-ds http://onlyoffice-trial-harness:8000 --out OUT
 //
-// 1. Conversion round trip: POST {ds}/converter (JWT) xlsx→xlsx, docx→docx, pptx→pptx →
-//    OUT/convert-<name>.
+// 1. Conversion round trips: POST {ds}/converter (JWT in body and header) of every fixture into
+//    its own format → OUT/convert-<name>; and the legacy path of «Сохранить как» (ADR-0143
+//    «Форматы»): xlsx → xls → xlsx, docx → doc → docx, pptx → ppt → pptx → OUT/legacy-<name>
+//    (compare.py against the original shows what the legacy format loses).
 // 2. The editor through the Calab host page (infra/office/calab-editor.html, mounted into the
 //    Document Server's web-apps), framed by a parent page like the Calab client. Per type, in a
 //    fresh browser context (cold cache): download size from the Document Server, time to «ready»,
@@ -95,9 +97,9 @@ await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
 
 // ---------------------------------------------------------------- 1. conversion round trip
 
-async function convert(name) {
+async function convert(name, to, out = `convert-${name}`) {
   const ext = name.split('.').pop();
-  const body = { async: false, filetype: ext, outputtype: ext, key: `bench-${randomBytes(6).toString('hex')}`, title: name, url: `${STORAGE_FOR_DS}/files/${encodeURIComponent(name)}` };
+  const body = { async: false, filetype: ext, outputtype: to ?? ext, key: `bench-${randomBytes(6).toString('hex')}`, title: name, url: `${STORAGE_FOR_DS}/files/${encodeURIComponent(name)}` };
   const tok = sign({ ...body, operation: 'converter' });
   const t0 = Date.now();
   const r = await fetch(`${DS}/converter`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify({ ...body, token: tok }) });
@@ -110,7 +112,7 @@ async function convert(name) {
   }
   if (!j.endConvert || !j.fileUrl) return { name, error: j.error ?? j };
   const u = new URL(j.fileUrl);
-  const file = join(OUT, `convert-${name}`);
+  const file = join(OUT, out);
   writeFileSync(file, Buffer.from(await (await fetch(`${DS}${u.pathname}${u.search}`)).arrayBuffer()));
   return { name, file, ms: Date.now() - t0 };
 }
@@ -270,7 +272,17 @@ const FILES = ['vacations.xlsx', 'contract.docx', 'deck.pptx'];
 const report = { ds: DS, at: new Date().toISOString(), convert: [], editor: [], shots: [] };
 const browser = await chromium.launch({ args: ['--enable-precise-memory-info'] });
 try {
-  if (ONLY.includes('convert')) for (const n of FILES) report.convert.push(await convert(n).catch((e) => ({ name: n, error: e.message })));
+  if (ONLY.includes('convert')) {
+    for (const n of [...FILES, 'staff.csv']) report.convert.push(await convert(n).catch((e) => ({ name: n, error: e.message })));
+    // The legacy path: the Document Server writes the legacy file (into OUT, so the storage stub
+    // serves it), then «Сохранить как» converts it back to OOXML → OUT/legacy-<name>.
+    for (const [n, legacy] of [['vacations.xlsx', 'xls'], ['contract.docx', 'doc'], ['deck.pptx', 'ppt']]) {
+      const base = n.replace(/\.[^.]+$/, '');
+      const old = await convert(n, legacy, `${base}.${legacy}`).catch((e) => ({ name: n, error: e.message }));
+      if (old.error) { report.convert.push(old); continue; }
+      report.convert.push(await convert(`${base}.${legacy}`, n.split('.').pop(), `legacy-${n}`).catch((e) => ({ name: `${base}.${legacy}`, error: e.message })));
+    }
+  }
   log('convert', JSON.stringify(report.convert));
   if (ONLY.includes('editor')) for (const n of FILES) report.editor.push(await measure(browser, n).catch((e) => ({ name: n, error: e.message })));
   if (ONLY.includes('shots')) for (const n of FILES) report.shots.push(...(await shots(browser, n).catch((e) => [{ name: n, error: e.message }])));

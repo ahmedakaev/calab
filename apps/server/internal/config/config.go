@@ -458,7 +458,7 @@ func (c *Config) Validate() error {
 	if err := c.Billing.validate(); err != nil {
 		errs = append(errs, err)
 	}
-	if err := c.Office.validate(); err != nil {
+	if err := c.Office.validate(c.JWTSecret); err != nil {
 		errs = append(errs, err)
 	}
 	if c.BotRatePerSec < 0 || c.BotRatePerSec > 10000 || c.BotMessagesPerMin < 0 || c.BotMessagesPerMin > 100000 {

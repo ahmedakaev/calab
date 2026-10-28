@@ -10,12 +10,101 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file calaba/v1/office.proto.
  */
 export const file_calaba_v1_office: GenFile = /*@__PURE__*/
-  fileDesc("ChZjYWxhYmEvdjEvb2ZmaWNlLnByb3RvEgljYWxhYmEudjEigQEKFE9mZmljZUNvbmZpZ1Jlc3BvbnNlEhAKCGRvY3NfdXJsGAEgASgJEhMKC2NvbmZpZ19qc29uGAIgASgJEiMKBG1vZGUYAyABKA4yFS5jYWxhYmEudjEuT2ZmaWNlTW9kZRILCgNrZXkYBCABKAkSEAoIaG9zdF91cmwYBSABKAkqVQoKT2ZmaWNlTW9kZRIbChdPRkZJQ0VfTU9ERV9VTlNQRUNJRklFRBAAEhQKEE9GRklDRV9NT0RFX1ZJRVcQARIUChBPRkZJQ0VfTU9ERV9FRElUEAJCmQEKDWNvbS5jYWxhYmEudjFCC09mZmljZVByb3RvUAFaNmdpdGh1Yi5jb20vY2FsYWJhL2NhbGFiYS9zZXJ2ZXIvZ2VuL2NhbGFiYS92MTtjYWxhYmF2MaICA0NYWKoCCUNhbGFiYS5WMcoCCUNhbGFiYVxWMeICFUNhbGFiYVxWMVxHUEJNZXRhZGF0YeoCCkNhbGFiYTo6VjFiBnByb3RvMw");
+  fileDesc("ChZjYWxhYmEvdjEvb2ZmaWNlLnByb3RvEgljYWxhYmEudjEijAEKDE9mZmljZUZvcm1hdBIRCglleHRlbnNpb24YASABKAkSFQoNZG9jdW1lbnRfdHlwZRgCIAEoCRIvCgpjYXBhYmlsaXR5GAMgASgOMhsuY2FsYWJhLnYxLk9mZmljZUNhcGFiaWxpdHkSEgoKY29udmVydF90bxgEIAEoCRINCgVsb3NzeRgFIAEoCCKBAQoaT2ZmaWNlQ2FwYWJpbGl0aWVzUmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIoCgdmb3JtYXRzGAIgAygLMhcuY2FsYWJhLnYxLk9mZmljZUZvcm1hdBIWCg5tYXhfc2l6ZV9ieXRlcxgDIAEoBBIQCghkb2NzX3VybBgEIAEoCSLMAQoUT2ZmaWNlQ29uZmlnUmVzcG9uc2USEAoIZG9jc191cmwYASABKAkSEwoLY29uZmlnX2pzb24YAiABKAkSIwoEbW9kZRgDIAEoDjIVLmNhbGFiYS52MS5PZmZpY2VNb2RlEgsKA2tleRgEIAEoCRIQCghob3N0X3VybBgFIAEoCRInCgZmb3JtYXQYBiABKAsyFy5jYWxhYmEudjEuT2ZmaWNlRm9ybWF0Eg8KB2l0ZW1faWQYByABKAkSDwoHZmlsZV9pZBgIIAEoCSI6ChRPZmZpY2VDb252ZXJ0UmVxdWVzdBIPCgdmaWxlX2lkGAEgASgJEhEKCXBhcmVudF9pZBgCIAEoCSpVCgpPZmZpY2VNb2RlEhsKF09GRklDRV9NT0RFX1VOU1BFQ0lGSUVEEAASFAoQT0ZGSUNFX01PREVfVklFVxABEhQKEE9GRklDRV9NT0RFX0VESVQQAiqMAQoQT2ZmaWNlQ2FwYWJpbGl0eRIhCh1PRkZJQ0VfQ0FQQUJJTElUWV9VTlNQRUNJRklFRBAAEhoKFk9GRklDRV9DQVBBQklMSVRZX0VESVQQARIaChZPRkZJQ0VfQ0FQQUJJTElUWV9WSUVXEAISHQoZT0ZGSUNFX0NBUEFCSUxJVFlfQ09OVkVSVBADQpkBCg1jb20uY2FsYWJhLnYxQgtPZmZpY2VQcm90b1ABWjZnaXRodWIuY29tL2NhbGFiYS9jYWxhYmEvc2VydmVyL2dlbi9jYWxhYmEvdjE7Y2FsYWJhdjGiAgNDWFiqAglDYWxhYmEuVjHKAglDYWxhYmFcVjHiAhVDYWxhYmFcVjFcR1BCTWV0YWRhdGHqAgpDYWxhYmE6OlYxYgZwcm90bzM");
 
 /**
- * GET /api/office/config?item={diskItemId}&theme=dark|light&phone=0|1: the editor of one Disk
- * file. 404 when the caller has no DISK_VIEW on it (or the feature is off), 415 for a type the
- * editor does not open (xlsx, docx in v1).
+ * One extension of the map.
+ *
+ * @generated from message calaba.v1.OfficeFormat
+ */
+export type OfficeFormat = Message<"calaba.v1.OfficeFormat"> & {
+  /**
+   * lower case, without the dot
+   *
+   * @generated from field: string extension = 1;
+   */
+  extension: string;
+
+  /**
+   * the Document Server's documentType: word, cell, slide, pdf
+   *
+   * @generated from field: string document_type = 2;
+   */
+  documentType: string;
+
+  /**
+   * @generated from field: calaba.v1.OfficeCapability capability = 3;
+   */
+  capability: OfficeCapability;
+
+  /**
+   * CONVERT: the extension «Сохранить как» produces (docx, xlsx, pptx)
+   *
+   * @generated from field: string convert_to = 4;
+   */
+  convertTo: string;
+
+  /**
+   * EDIT in a format that is not OOXML (odt, ods, odp, rtf, csv, txt): the Document Server saves
+   * it back in the same format but may drop what that format cannot hold (its «lossy-edit»).
+   *
+   * @generated from field: bool lossy = 5;
+   */
+  lossy: boolean;
+};
+
+/**
+ * Describes the message calaba.v1.OfficeFormat.
+ * Use `create(OfficeFormatSchema)` to create a new message.
+ */
+export const OfficeFormatSchema: GenMessage<OfficeFormat> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_office, 0);
+
+/**
+ * GET /api/office/capabilities: whether the editor is on and the format map.
+ *
+ * @generated from message calaba.v1.OfficeCapabilitiesResponse
+ */
+export type OfficeCapabilitiesResponse = Message<"calaba.v1.OfficeCapabilitiesResponse"> & {
+  /**
+   * false: OFFICE_ENABLED is off; formats is empty then
+   *
+   * @generated from field: bool enabled = 1;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: repeated calaba.v1.OfficeFormat formats = 2;
+   */
+  formats: OfficeFormat[];
+
+  /**
+   * files above this do not open (OFFICE_MAX_SIZE_MB)
+   *
+   * @generated from field: uint64 max_size_bytes = 3;
+   */
+  maxSizeBytes: bigint;
+
+  /**
+   * the Document Server origin (the frame's postMessage target)
+   *
+   * @generated from field: string docs_url = 4;
+   */
+  docsUrl: string;
+};
+
+/**
+ * Describes the message calaba.v1.OfficeCapabilitiesResponse.
+ * Use `create(OfficeCapabilitiesResponseSchema)` to create a new message.
+ */
+export const OfficeCapabilitiesResponseSchema: GenMessage<OfficeCapabilitiesResponse> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_office, 1);
+
+/**
+ * GET /api/office/config?item={diskItemId}|file={fileId}&theme=dark|light&phone=0|1&lang=ru: the
+ * editor of one Disk file (item) or of an attachment (file: a chat or task file, always view).
+ * 404 when the caller cannot read it (or the feature is off), 415 for a format without an
+ * editor, 413 above max_size_bytes, 429 over the rate limit.
  *
  * @generated from message calaba.v1.OfficeConfigResponse
  */
@@ -55,6 +144,27 @@ export type OfficeConfigResponse = Message<"calaba.v1.OfficeConfigResponse"> & {
    * @generated from field: string host_url = 5;
    */
   hostUrl: string;
+
+  /**
+   * the opened file's entry of the map
+   *
+   * @generated from field: calaba.v1.OfficeFormat format = 6;
+   */
+  format?: OfficeFormat | undefined;
+
+  /**
+   * the Disk item (empty for an attachment)
+   *
+   * @generated from field: string item_id = 7;
+   */
+  itemId: string;
+
+  /**
+   * the file opened: the item's current file, or the attachment
+   *
+   * @generated from field: string file_id = 8;
+   */
+  fileId: string;
 };
 
 /**
@@ -62,7 +172,37 @@ export type OfficeConfigResponse = Message<"calaba.v1.OfficeConfigResponse"> & {
  * Use `create(OfficeConfigResponseSchema)` to create a new message.
  */
 export const OfficeConfigResponseSchema: GenMessage<OfficeConfigResponse> = /*@__PURE__*/
-  messageDesc(file_calaba_v1_office, 0);
+  messageDesc(file_calaba_v1_office, 2);
+
+/**
+ * «Сохранить как docx/xlsx/pptx» of a format with convert_to (CONVERT): the Document Server
+ * converts the file; the result is a NEW Disk item with its own id, the source is never written.
+ * POST /api/disk/items/{id}/office/convert (no body): next to the item, DISK_VIEW on it and
+ * DISK_WRITE on its folder. POST /api/workspaces/{id}/office/convert (this body): an attachment the
+ * caller may read into folder parent_id of the workspace (DISK_WRITE there). 201 DiskItemResponse.
+ *
+ * @generated from message calaba.v1.OfficeConvertRequest
+ */
+export type OfficeConvertRequest = Message<"calaba.v1.OfficeConvertRequest"> & {
+  /**
+   * @generated from field: string file_id = 1;
+   */
+  fileId: string;
+
+  /**
+   * empty = the root
+   *
+   * @generated from field: string parent_id = 2;
+   */
+  parentId: string;
+};
+
+/**
+ * Describes the message calaba.v1.OfficeConvertRequest.
+ * Use `create(OfficeConvertRequestSchema)` to create a new message.
+ */
+export const OfficeConvertRequestSchema: GenMessage<OfficeConvertRequest> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_office, 3);
 
 /**
  * @generated from enum calaba.v1.OfficeMode
@@ -74,14 +214,14 @@ export enum OfficeMode {
   UNSPECIFIED = 0,
 
   /**
-   * DISK_VIEW only, a trashed item, a read-only workspace, the phone
+   * DISK_VIEW only, a view-only or legacy format, an attachment, trash, read-only workspace, phone
    *
    * @generated from enum value: OFFICE_MODE_VIEW = 1;
    */
   VIEW = 1,
 
   /**
-   * DISK_VIEW | DISK_WRITE on the item
+   * DISK_VIEW | DISK_WRITE on the item and a format edited in place
    *
    * @generated from enum value: OFFICE_MODE_EDIT = 2;
    */
@@ -93,4 +233,47 @@ export enum OfficeMode {
  */
 export const OfficeModeSchema: GenEnum<OfficeMode> = /*@__PURE__*/
   enumDesc(file_calaba_v1_office, 0);
+
+/**
+ * What the editor does with a format: the server's one map (ADR-0143 «Форматы»); the client
+ * asks GET /api/office/capabilities and never keeps a list of its own.
+ *
+ * @generated from enum calaba.v1.OfficeCapability
+ */
+export enum OfficeCapability {
+  /**
+   * no editor: opens as before
+   *
+   * @generated from enum value: OFFICE_CAPABILITY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * edited in place: every save is a new version of the same item
+   *
+   * @generated from enum value: OFFICE_CAPABILITY_EDIT = 1;
+   */
+  EDIT = 1,
+
+  /**
+   * view only (pdf)
+   *
+   * @generated from enum value: OFFICE_CAPABILITY_VIEW = 2;
+   */
+  VIEW = 2,
+
+  /**
+   * A legacy format (doc, xls, ppt): opens read-only; «Сохранить как <convert_to>»
+   * (POST /api/office/convert) makes a NEW item next to it, the original is never written.
+   *
+   * @generated from enum value: OFFICE_CAPABILITY_CONVERT = 3;
+   */
+  CONVERT = 3,
+}
+
+/**
+ * Describes the enum calaba.v1.OfficeCapability.
+ */
+export const OfficeCapabilitySchema: GenEnum<OfficeCapability> = /*@__PURE__*/
+  enumDesc(file_calaba_v1_office, 1);
 

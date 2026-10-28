@@ -155,6 +155,20 @@ def pptx_snapshot(path):
     return {"size": [cm(prs.slide_width), cm(prs.slide_height)], "layouts": [l.name for l in prs.slide_layouts], "slides": slides}
 
 
+def csv_snapshot(path):
+    import csv
+
+    raw = Path(path).read_bytes()
+    text = raw.decode("utf-8-sig")
+    dialect = csv.Sniffer().sniff(text.splitlines()[0], delimiters=";,\t")
+    return {"delimiter": dialect.delimiter, "bom": raw.startswith(b"\xef\xbb\xbf"),
+            "rows": [{"cells": r} for r in csv.reader(text.splitlines(keepends=True), dialect)]}
+
+
+SNAPSHOTS = {".xlsx": xlsx_snapshot, ".xls": xlsx_snapshot, ".docx": docx_snapshot, ".doc": docx_snapshot,
+             ".pptx": pptx_snapshot, ".ppt": pptx_snapshot, ".csv": csv_snapshot}
+
+
 def diff(a, b, path=""):
     out = []
     if isinstance(a, dict) and isinstance(b, dict):
@@ -186,8 +200,9 @@ def main(argv):
         print(__doc__)
         return 2
     before, after = Path(argv[1]), Path(argv[2])
-    kind = before.suffix.lower()
-    snap = {".xlsx": xlsx_snapshot, ".docx": docx_snapshot, ".pptx": pptx_snapshot}.get(kind)
+    # A legacy round trip (xlsx → xls → xlsx, …) compares two OOXML files: the snapshot is the
+    # original's format.
+    snap = SNAPSHOTS.get(before.suffix.lower())
     if snap is None:
         print(f"unsupported: {before}")
         return 2

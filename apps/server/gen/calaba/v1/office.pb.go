@@ -25,8 +25,8 @@ type OfficeMode int32
 
 const (
 	OfficeMode_OFFICE_MODE_UNSPECIFIED OfficeMode = 0
-	OfficeMode_OFFICE_MODE_VIEW        OfficeMode = 1 // DISK_VIEW only, a trashed item, a read-only workspace, the phone
-	OfficeMode_OFFICE_MODE_EDIT        OfficeMode = 2 // DISK_VIEW | DISK_WRITE on the item
+	OfficeMode_OFFICE_MODE_VIEW        OfficeMode = 1 // DISK_VIEW only, a view-only or legacy format, an attachment, trash, read-only workspace, phone
+	OfficeMode_OFFICE_MODE_EDIT        OfficeMode = 2 // DISK_VIEW | DISK_WRITE on the item and a format edited in place
 )
 
 // Enum value maps for OfficeMode.
@@ -70,9 +70,214 @@ func (OfficeMode) EnumDescriptor() ([]byte, []int) {
 	return file_calaba_v1_office_proto_rawDescGZIP(), []int{0}
 }
 
-// GET /api/office/config?item={diskItemId}&theme=dark|light&phone=0|1: the editor of one Disk
-// file. 404 when the caller has no DISK_VIEW on it (or the feature is off), 415 for a type the
-// editor does not open (xlsx, docx in v1).
+// What the editor does with a format: the server's one map (ADR-0143 «Форматы»); the client
+// asks GET /api/office/capabilities and never keeps a list of its own.
+type OfficeCapability int32
+
+const (
+	OfficeCapability_OFFICE_CAPABILITY_UNSPECIFIED OfficeCapability = 0 // no editor: opens as before
+	OfficeCapability_OFFICE_CAPABILITY_EDIT        OfficeCapability = 1 // edited in place: every save is a new version of the same item
+	OfficeCapability_OFFICE_CAPABILITY_VIEW        OfficeCapability = 2 // view only (pdf)
+	// A legacy format (doc, xls, ppt): opens read-only; «Сохранить как <convert_to>»
+	// (POST /api/office/convert) makes a NEW item next to it, the original is never written.
+	OfficeCapability_OFFICE_CAPABILITY_CONVERT OfficeCapability = 3
+)
+
+// Enum value maps for OfficeCapability.
+var (
+	OfficeCapability_name = map[int32]string{
+		0: "OFFICE_CAPABILITY_UNSPECIFIED",
+		1: "OFFICE_CAPABILITY_EDIT",
+		2: "OFFICE_CAPABILITY_VIEW",
+		3: "OFFICE_CAPABILITY_CONVERT",
+	}
+	OfficeCapability_value = map[string]int32{
+		"OFFICE_CAPABILITY_UNSPECIFIED": 0,
+		"OFFICE_CAPABILITY_EDIT":        1,
+		"OFFICE_CAPABILITY_VIEW":        2,
+		"OFFICE_CAPABILITY_CONVERT":     3,
+	}
+)
+
+func (x OfficeCapability) Enum() *OfficeCapability {
+	p := new(OfficeCapability)
+	*p = x
+	return p
+}
+
+func (x OfficeCapability) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OfficeCapability) Descriptor() protoreflect.EnumDescriptor {
+	return file_calaba_v1_office_proto_enumTypes[1].Descriptor()
+}
+
+func (OfficeCapability) Type() protoreflect.EnumType {
+	return &file_calaba_v1_office_proto_enumTypes[1]
+}
+
+func (x OfficeCapability) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OfficeCapability.Descriptor instead.
+func (OfficeCapability) EnumDescriptor() ([]byte, []int) {
+	return file_calaba_v1_office_proto_rawDescGZIP(), []int{1}
+}
+
+// One extension of the map.
+type OfficeFormat struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Extension    string                 `protobuf:"bytes,1,opt,name=extension,proto3" json:"extension,omitempty"`                           // lower case, without the dot
+	DocumentType string                 `protobuf:"bytes,2,opt,name=document_type,json=documentType,proto3" json:"document_type,omitempty"` // the Document Server's documentType: word, cell, slide, pdf
+	Capability   OfficeCapability       `protobuf:"varint,3,opt,name=capability,proto3,enum=calaba.v1.OfficeCapability" json:"capability,omitempty"`
+	ConvertTo    string                 `protobuf:"bytes,4,opt,name=convert_to,json=convertTo,proto3" json:"convert_to,omitempty"` // CONVERT: the extension «Сохранить как» produces (docx, xlsx, pptx)
+	// EDIT in a format that is not OOXML (odt, ods, odp, rtf, csv, txt): the Document Server saves
+	// it back in the same format but may drop what that format cannot hold (its «lossy-edit»).
+	Lossy         bool `protobuf:"varint,5,opt,name=lossy,proto3" json:"lossy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OfficeFormat) Reset() {
+	*x = OfficeFormat{}
+	mi := &file_calaba_v1_office_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfficeFormat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfficeFormat) ProtoMessage() {}
+
+func (x *OfficeFormat) ProtoReflect() protoreflect.Message {
+	mi := &file_calaba_v1_office_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfficeFormat.ProtoReflect.Descriptor instead.
+func (*OfficeFormat) Descriptor() ([]byte, []int) {
+	return file_calaba_v1_office_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *OfficeFormat) GetExtension() string {
+	if x != nil {
+		return x.Extension
+	}
+	return ""
+}
+
+func (x *OfficeFormat) GetDocumentType() string {
+	if x != nil {
+		return x.DocumentType
+	}
+	return ""
+}
+
+func (x *OfficeFormat) GetCapability() OfficeCapability {
+	if x != nil {
+		return x.Capability
+	}
+	return OfficeCapability_OFFICE_CAPABILITY_UNSPECIFIED
+}
+
+func (x *OfficeFormat) GetConvertTo() string {
+	if x != nil {
+		return x.ConvertTo
+	}
+	return ""
+}
+
+func (x *OfficeFormat) GetLossy() bool {
+	if x != nil {
+		return x.Lossy
+	}
+	return false
+}
+
+// GET /api/office/capabilities: whether the editor is on and the format map.
+type OfficeCapabilitiesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"` // false: OFFICE_ENABLED is off; formats is empty then
+	Formats       []*OfficeFormat        `protobuf:"bytes,2,rep,name=formats,proto3" json:"formats,omitempty"`
+	MaxSizeBytes  uint64                 `protobuf:"varint,3,opt,name=max_size_bytes,json=maxSizeBytes,proto3" json:"max_size_bytes,omitempty"` // files above this do not open (OFFICE_MAX_SIZE_MB)
+	DocsUrl       string                 `protobuf:"bytes,4,opt,name=docs_url,json=docsUrl,proto3" json:"docs_url,omitempty"`                   // the Document Server origin (the frame's postMessage target)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OfficeCapabilitiesResponse) Reset() {
+	*x = OfficeCapabilitiesResponse{}
+	mi := &file_calaba_v1_office_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfficeCapabilitiesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfficeCapabilitiesResponse) ProtoMessage() {}
+
+func (x *OfficeCapabilitiesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_calaba_v1_office_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfficeCapabilitiesResponse.ProtoReflect.Descriptor instead.
+func (*OfficeCapabilitiesResponse) Descriptor() ([]byte, []int) {
+	return file_calaba_v1_office_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *OfficeCapabilitiesResponse) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *OfficeCapabilitiesResponse) GetFormats() []*OfficeFormat {
+	if x != nil {
+		return x.Formats
+	}
+	return nil
+}
+
+func (x *OfficeCapabilitiesResponse) GetMaxSizeBytes() uint64 {
+	if x != nil {
+		return x.MaxSizeBytes
+	}
+	return 0
+}
+
+func (x *OfficeCapabilitiesResponse) GetDocsUrl() string {
+	if x != nil {
+		return x.DocsUrl
+	}
+	return ""
+}
+
+// GET /api/office/config?item={diskItemId}|file={fileId}&theme=dark|light&phone=0|1&lang=ru: the
+// editor of one Disk file (item) or of an attachment (file: a chat or task file, always view).
+// 404 when the caller cannot read it (or the feature is off), 415 for a format without an
+// editor, 413 above max_size_bytes, 429 over the rate limit.
 type OfficeConfigResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Origin of the Document Server for the browser (postMessage target of the host page).
@@ -86,14 +291,17 @@ type OfficeConfigResponse struct {
 	// The Calab host page on the Document Server's origin (infra/office/calab-editor.html): the
 	// client frames it on «Открыть» and removes the frame on close; the page loads the Document
 	// Server's api.js, so its JS never runs in the Calab page.
-	HostUrl       string `protobuf:"bytes,5,opt,name=host_url,json=hostUrl,proto3" json:"host_url,omitempty"`
+	HostUrl       string        `protobuf:"bytes,5,opt,name=host_url,json=hostUrl,proto3" json:"host_url,omitempty"`
+	Format        *OfficeFormat `protobuf:"bytes,6,opt,name=format,proto3" json:"format,omitempty"`               // the opened file's entry of the map
+	ItemId        string        `protobuf:"bytes,7,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"` // the Disk item (empty for an attachment)
+	FileId        string        `protobuf:"bytes,8,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"` // the file opened: the item's current file, or the attachment
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OfficeConfigResponse) Reset() {
 	*x = OfficeConfigResponse{}
-	mi := &file_calaba_v1_office_proto_msgTypes[0]
+	mi := &file_calaba_v1_office_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -105,7 +313,7 @@ func (x *OfficeConfigResponse) String() string {
 func (*OfficeConfigResponse) ProtoMessage() {}
 
 func (x *OfficeConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_calaba_v1_office_proto_msgTypes[0]
+	mi := &file_calaba_v1_office_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -118,7 +326,7 @@ func (x *OfficeConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfficeConfigResponse.ProtoReflect.Descriptor instead.
 func (*OfficeConfigResponse) Descriptor() ([]byte, []int) {
-	return file_calaba_v1_office_proto_rawDescGZIP(), []int{0}
+	return file_calaba_v1_office_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *OfficeConfigResponse) GetDocsUrl() string {
@@ -156,23 +364,126 @@ func (x *OfficeConfigResponse) GetHostUrl() string {
 	return ""
 }
 
+func (x *OfficeConfigResponse) GetFormat() *OfficeFormat {
+	if x != nil {
+		return x.Format
+	}
+	return nil
+}
+
+func (x *OfficeConfigResponse) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *OfficeConfigResponse) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+// «Сохранить как docx/xlsx/pptx» of a format with convert_to (CONVERT): the Document Server
+// converts the file; the result is a NEW Disk item with its own id, the source is never written.
+// POST /api/disk/items/{id}/office/convert (no body): next to the item, DISK_VIEW on it and
+// DISK_WRITE on its folder. POST /api/workspaces/{id}/office/convert (this body): an attachment the
+// caller may read into folder parent_id of the workspace (DISK_WRITE there). 201 DiskItemResponse.
+type OfficeConvertRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	ParentId      string                 `protobuf:"bytes,2,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"` // empty = the root
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OfficeConvertRequest) Reset() {
+	*x = OfficeConvertRequest{}
+	mi := &file_calaba_v1_office_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfficeConvertRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfficeConvertRequest) ProtoMessage() {}
+
+func (x *OfficeConvertRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_calaba_v1_office_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfficeConvertRequest.ProtoReflect.Descriptor instead.
+func (*OfficeConvertRequest) Descriptor() ([]byte, []int) {
+	return file_calaba_v1_office_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *OfficeConvertRequest) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *OfficeConvertRequest) GetParentId() string {
+	if x != nil {
+		return x.ParentId
+	}
+	return ""
+}
+
 var File_calaba_v1_office_proto protoreflect.FileDescriptor
 
 const file_calaba_v1_office_proto_rawDesc = "" +
 	"\n" +
-	"\x16calaba/v1/office.proto\x12\tcalaba.v1\"\xaa\x01\n" +
+	"\x16calaba/v1/office.proto\x12\tcalaba.v1\"\xc3\x01\n" +
+	"\fOfficeFormat\x12\x1c\n" +
+	"\textension\x18\x01 \x01(\tR\textension\x12#\n" +
+	"\rdocument_type\x18\x02 \x01(\tR\fdocumentType\x12;\n" +
+	"\n" +
+	"capability\x18\x03 \x01(\x0e2\x1b.calaba.v1.OfficeCapabilityR\n" +
+	"capability\x12\x1d\n" +
+	"\n" +
+	"convert_to\x18\x04 \x01(\tR\tconvertTo\x12\x14\n" +
+	"\x05lossy\x18\x05 \x01(\bR\x05lossy\"\xaa\x01\n" +
+	"\x1aOfficeCapabilitiesResponse\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\x121\n" +
+	"\aformats\x18\x02 \x03(\v2\x17.calaba.v1.OfficeFormatR\aformats\x12$\n" +
+	"\x0emax_size_bytes\x18\x03 \x01(\x04R\fmaxSizeBytes\x12\x19\n" +
+	"\bdocs_url\x18\x04 \x01(\tR\adocsUrl\"\x8d\x02\n" +
 	"\x14OfficeConfigResponse\x12\x19\n" +
 	"\bdocs_url\x18\x01 \x01(\tR\adocsUrl\x12\x1f\n" +
 	"\vconfig_json\x18\x02 \x01(\tR\n" +
 	"configJson\x12)\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\x15.calaba.v1.OfficeModeR\x04mode\x12\x10\n" +
 	"\x03key\x18\x04 \x01(\tR\x03key\x12\x19\n" +
-	"\bhost_url\x18\x05 \x01(\tR\ahostUrl*U\n" +
+	"\bhost_url\x18\x05 \x01(\tR\ahostUrl\x12/\n" +
+	"\x06format\x18\x06 \x01(\v2\x17.calaba.v1.OfficeFormatR\x06format\x12\x17\n" +
+	"\aitem_id\x18\a \x01(\tR\x06itemId\x12\x17\n" +
+	"\afile_id\x18\b \x01(\tR\x06fileId\"L\n" +
+	"\x14OfficeConvertRequest\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x1b\n" +
+	"\tparent_id\x18\x02 \x01(\tR\bparentId*U\n" +
 	"\n" +
 	"OfficeMode\x12\x1b\n" +
 	"\x17OFFICE_MODE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10OFFICE_MODE_VIEW\x10\x01\x12\x14\n" +
-	"\x10OFFICE_MODE_EDIT\x10\x02B\x99\x01\n" +
+	"\x10OFFICE_MODE_EDIT\x10\x02*\x8c\x01\n" +
+	"\x10OfficeCapability\x12!\n" +
+	"\x1dOFFICE_CAPABILITY_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16OFFICE_CAPABILITY_EDIT\x10\x01\x12\x1a\n" +
+	"\x16OFFICE_CAPABILITY_VIEW\x10\x02\x12\x1d\n" +
+	"\x19OFFICE_CAPABILITY_CONVERT\x10\x03B\x99\x01\n" +
 	"\rcom.calaba.v1B\vOfficeProtoP\x01Z6github.com/calaba/calaba/server/gen/calaba/v1;calabav1\xa2\x02\x03CXX\xaa\x02\tCalaba.V1\xca\x02\tCalaba\\V1\xe2\x02\x15Calaba\\V1\\GPBMetadata\xea\x02\n" +
 	"Calaba::V1b\x06proto3"
 
@@ -188,19 +499,26 @@ func file_calaba_v1_office_proto_rawDescGZIP() []byte {
 	return file_calaba_v1_office_proto_rawDescData
 }
 
-var file_calaba_v1_office_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_calaba_v1_office_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_calaba_v1_office_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_calaba_v1_office_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_calaba_v1_office_proto_goTypes = []any{
-	(OfficeMode)(0),              // 0: calaba.v1.OfficeMode
-	(*OfficeConfigResponse)(nil), // 1: calaba.v1.OfficeConfigResponse
+	(OfficeMode)(0),                    // 0: calaba.v1.OfficeMode
+	(OfficeCapability)(0),              // 1: calaba.v1.OfficeCapability
+	(*OfficeFormat)(nil),               // 2: calaba.v1.OfficeFormat
+	(*OfficeCapabilitiesResponse)(nil), // 3: calaba.v1.OfficeCapabilitiesResponse
+	(*OfficeConfigResponse)(nil),       // 4: calaba.v1.OfficeConfigResponse
+	(*OfficeConvertRequest)(nil),       // 5: calaba.v1.OfficeConvertRequest
 }
 var file_calaba_v1_office_proto_depIdxs = []int32{
-	0, // 0: calaba.v1.OfficeConfigResponse.mode:type_name -> calaba.v1.OfficeMode
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 0: calaba.v1.OfficeFormat.capability:type_name -> calaba.v1.OfficeCapability
+	2, // 1: calaba.v1.OfficeCapabilitiesResponse.formats:type_name -> calaba.v1.OfficeFormat
+	0, // 2: calaba.v1.OfficeConfigResponse.mode:type_name -> calaba.v1.OfficeMode
+	2, // 3: calaba.v1.OfficeConfigResponse.format:type_name -> calaba.v1.OfficeFormat
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_calaba_v1_office_proto_init() }
@@ -213,8 +531,8 @@ func file_calaba_v1_office_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_calaba_v1_office_proto_rawDesc), len(file_calaba_v1_office_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   1,
+			NumEnums:      2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
