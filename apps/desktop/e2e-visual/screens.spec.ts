@@ -3288,6 +3288,17 @@ test('voice-reconnecting', async ({ open, win, mock, shot }) => {
   await win.evaluate(() => (window as unknown as { __calabaVoicePhase?: (p: string) => void }).__calabaVoicePhase?.('reconnecting'));
   await expect(win.getByTestId('voice-reconnecting')).toBeVisible();
   await checkpoint(shot, 'voice-reconnecting');
+  // Back from the background: another app holds my mic (the red line in the voice panel
+  // and a toast), and the remote audio waits for a tap («Нажмите, чтобы включить звук»).
+  await win.evaluate(() => {
+    const w = window as unknown as { __calabaVoicePhase?: (p: string) => void; __calabaVoiceRecovery?: (what: string) => void };
+    w.__calabaVoicePhase?.('connected');
+    w.__calabaVoiceRecovery?.('busy');
+    w.__calabaVoiceRecovery?.('playback');
+  });
+  await expect(win.getByText('Микрофон занят другим приложением').first()).toBeVisible();
+  await expect(win.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await checkpoint(shot, 'voice-audio-recovery');
 });
 
 test('voice-member-menu', async ({ open, win, mock, shot }) => {
