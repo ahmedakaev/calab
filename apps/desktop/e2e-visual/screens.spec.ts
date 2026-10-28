@@ -1507,6 +1507,30 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
   await expect(menu.getByTestId('mic-ptt-key')).toBeVisible();
   await expect(menu.getByTestId('ptt-release-compact')).toBeVisible();
   await checkpoint(shot, 'self-mic-menu');
+  // DEV-4955 audio recovery without LiveKit: the voice panel is shown from store state alone
+  // (__calabaVoiceSeat), the three recovery signals come through the voice service's own paths.
+  await win.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await win.evaluate(([roomId, workspaceId]) => (window as unknown as { __calabaVoiceSeat?: (s: object) => void }).__calabaVoiceSeat?.({ roomId, workspaceId }), [IDS.rooms.meeting, IDS.workspaces.main]);
+  await expect(win.getByText('Голос подключён')).toBeVisible();
+  await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // no focus ring / tooltip of the mic button
+  // The link was down for 12 s: «Связь пропадала 12 с» when it is back (the page clock is fixed: move it).
+  await win.evaluate(() => (window as unknown as { __calabaVoicePhase?: (p: string) => void }).__calabaVoicePhase?.('reconnecting'));
+  await expect(win.getByTestId('voice-reconnecting')).toBeVisible();
+  await win.clock.setFixedTime(new Date(NOW.getTime() + 12_000));
+  await win.evaluate(() => {
+    const w = window as unknown as { __calabaVoicePhase?: (p: string) => void; __calabaVoiceRecovery?: (what: string) => void };
+    w.__calabaVoicePhase?.('connected');
+    w.__calabaVoiceRecovery?.('busy');
+    w.__calabaVoiceRecovery?.('playback');
+  });
+  await expect(win.getByText('Микрофон занят другим приложением').first()).toBeVisible();
+  await expect(win.getByTestId('toast').filter({ hasText: 'Связь пропадала 12 с' })).toBeVisible();
+  await expect(win.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await checkpoint(shot, 'voice-audio-recovery-seat');
+  await win.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
+  await expect(win.getByText('Вас не слышно: микрофон занят системой').first()).toBeVisible();
+  await checkpoint(shot, 'voice-audio-recovery-unheard');
 });
 
 test('workspace-menu', async ({ open, win, mock, shot }) => {
