@@ -1,5 +1,14 @@
 # Телефон: общий веб в оболочке — статус
 
+## 2026-10-28: room audio plays without a gesture (DEV-4955, #255)
+
+`mediaPlaybackRequiresUserAction` is now `false` for every build, not only with
+native call audio. A room rejoin after the app was in the background creates new
+remote `<audio>` elements with no web gesture; with the old default `play()`
+rejected with `NotAllowedError` (the same failure proven for calls on 2026-10-08)
+and the user saw others speaking without hearing them. Only the Calab origin loads
+in the WebView; local video previews stay muted. Needs a new native build.
+
 ## 2026-10-26: desktop catch-up (local, not published)
 
 The shared web host remains the supported mobile architecture; Mail is excluded
