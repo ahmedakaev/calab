@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { OFFICE_HOST_PATH, isOfficeFrameNavigation, officeOriginOf } from './officeFrame';
+import type { WebContents } from 'electron';
+import { OFFICE_HOST_PATH, isOfficeFrameNavigation, officeFrameAllowed, officeOriginOf, setOfficeFrame } from './officeFrame';
 
 const DS = 'https://docs.example.org';
 const host = `${DS}${OFFICE_HOST_PATH}`;
@@ -57,5 +58,33 @@ describe('isOfficeFrameNavigation', () => {
   it('denies everything while no editor is open (no announced origin)', () => {
     expect(isOfficeFrameNavigation({ ...top, origin: '', url: host })).toBe(false);
     expect(isOfficeFrameNavigation({ ...nested, origin: '', url: `${DS}/x` })).toBe(false);
+  });
+});
+
+describe('setOfficeFrame (the origin comes from the server, ADR-0143 §11)', () => {
+  const wc = (id: number): WebContents => ({ id, once: () => undefined }) as unknown as WebContents;
+  const frame = { parent: { parent: null, url: 'file:///app/index.html' }, url: '' };
+  it('allows the origin of the server-reported URL, and nothing after close', async () => {
+    const w = wc(1);
+    expect(await setOfficeFrame(w, true, () => Promise.resolve('https://docs.example.org/'))).toBe(DS);
+    expect(officeFrameAllowed(w, { url: host, frame })).toBe(true);
+    expect(await setOfficeFrame(w, false, () => Promise.reject(new Error('not asked')))).toBe('');
+    expect(officeFrameAllowed(w, { url: host, frame })).toBe(false);
+  });
+  it('allows nothing when the server says off, fails, or reports a URL officeOriginOf rejects', async () => {
+    const w = wc(2);
+    for (const answer of [() => Promise.resolve(''), () => Promise.reject(new Error('offline')), () => Promise.resolve('http://docs.example.org'), () => Promise.resolve(42)]) {
+      expect(await setOfficeFrame(w, true, answer)).toBe('');
+      expect(officeFrameAllowed(w, { url: host, frame })).toBe(false);
+    }
+  });
+  it('drops an answer that arrives after a newer close', async () => {
+    const w = wc(3);
+    let resolve: (v: string) => void = () => undefined;
+    const late = setOfficeFrame(w, true, () => new Promise<string>((r) => (resolve = r)));
+    await setOfficeFrame(w, false, () => Promise.resolve(''));
+    resolve(DS);
+    expect(await late).toBe('');
+    expect(officeFrameAllowed(w, { url: host, frame })).toBe(false);
   });
 });

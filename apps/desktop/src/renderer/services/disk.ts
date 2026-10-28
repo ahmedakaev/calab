@@ -2,6 +2,7 @@ import type { MessageInitShape } from '@bufbuild/protobuf';
 import { timestampFromMs } from '@bufbuild/protobuf/wkt';
 import {
   CreateDiskFolderRequestSchema,
+  CreateOfficeFileRequestSchema,
   CreateDiskLinkRequestSchema,
   DiskActivityPageSchema,
   DiskItemResponseSchema,
@@ -27,6 +28,7 @@ import {
 import { confirmAction } from '../components/Confirm';
 import { officeOpens } from '../features/disk/office/bridge';
 import { openOfficeFile } from '../features/disk/office/fileTabs';
+import type { CreateKind } from '../features/disk/office/caps';
 import { showMode } from '../features/shell/sectionNav';
 import { t } from '../i18n';
 import { ApiError, body, call, callEmpty, qs } from '../lib/api/client';
@@ -75,6 +77,9 @@ export const diskApi = {
     call('GET', `${W(ws)}/items${qs({ parent: p.parent || undefined, trashed: p.trashed ? 1 : undefined, cursor: p.cursor, sort: p.sort })}`, ListDiskItemsResponseSchema),
   get: (id: string) => call('GET', I(id), DiskItemResponseSchema),
   createFolder: (ws: string, parentId: string, name: string) => call('POST', `${W(ws)}/folders`, DiskItemResponseSchema, body(CreateDiskFolderRequestSchema, { parentId, name })),
+  /** «Создать → Документ / Таблица / Презентация» (ADR-0143): a blank file from the server's template. */
+  createOffice: (ws: string, parentId: string, extension: string, name: string, lang: string) =>
+    call('POST', `/api/workspaces/${ws}/office/create`, DiskItemResponseSchema, body(CreateOfficeFileRequestSchema, { parentId, extension, name, lang })),
   update: (id: string, init: MessageInitShape<typeof UpdateDiskItemRequestSchema>) => call('PATCH', I(id), DiskItemResponseSchema, body(UpdateDiskItemRequestSchema, init)),
   trash: (id: string) => call('POST', `${I(id)}/trash`, DiskItemResponseSchema),
   restore: (id: string) => call('POST', `${I(id)}/restore`, DiskItemResponseSchema),
@@ -247,6 +252,26 @@ export async function createFolder(ws: string, parentId: string): Promise<void> 
     useDiskUi.getState().setRenaming(r.item.id);
   } catch (e) {
     fail(e, t('disk.err.create'));
+  }
+}
+
+const NEW_NAME: Record<CreateKind, 'disk.new.docxName' | 'disk.new.xlsxName' | 'disk.new.pptxName'> = { docx: 'disk.new.docxName', xlsx: 'disk.new.xlsxName', pptx: 'disk.new.pptxName' };
+
+/**
+ * «Создать → Документ / Таблица / Презентация» (ADR-0143): a blank file from the server's template
+ * in this folder («Новый документ.docx», a taken name gets « (2)»), opened at once in the editor.
+ * The phone only views office files: the new file stays selected in the Disk with a note.
+ */
+export async function createOfficeFile(ws: string, parentId: string, ext: CreateKind): Promise<void> {
+  try {
+    const r = await diskApi.createOffice(ws, parentId, ext, t(NEW_NAME[ext]), getLocale());
+    if (!r.item) return;
+    useDisk.getState().upsert(r.item);
+    useDiskUi.getState().select(r.item.id);
+    if (useUi.getState().phone.on) toast.info(t('disk.new.phone', { name: r.item.name }));
+    else openOfficeFile({ itemId: r.item.id }, r.item.name, r.item.workspaceId);
+  } catch (e) {
+    fail(e, t('disk.new.failed'));
   }
 }
 

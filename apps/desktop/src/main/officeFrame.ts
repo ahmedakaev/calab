@@ -2,8 +2,10 @@
  * The office editor's frame (ADR-0143): the renderer shows ONLYOFFICE Docs in an `<iframe>` of our
  * host page on the Document Server's origin. The navigation guards (windows.ts, mail/frameGuard.ts)
  * cancel every foreign sub-frame, so exactly this is let through, and nothing else:
- * - the origin is the one the renderer announced from the server's config (IPC `office:frame-origin`,
- *   own pages only), kept per window while the editor dialog is open and dropped on close;
+ * - the origin is the one the server this app is logged in to reports (GET /api/office/capabilities
+ *   `docs_url`, fetched by main when the renderer opens the editor: IPC `office:frame`, own pages
+ *   only), never a URL the renderer hands over; kept per window while the editor is open and
+ *   dropped on close;
  *   `https:` (or `http:` to loopback for dev / the mock), an exact origin, never a wildcard;
  * - a frame whose parent is the app page: only the host page, by exact path;
  * - a frame whose parent is a frame of that same origin (the editor itself, its nested frames): the
@@ -62,17 +64,26 @@ export function isOfficeFrameNavigation(n: OfficeNav): boolean {
 }
 
 const origins = new Map<number, string>();
+/** Per window: the newest open / close call; an older call's answer arriving later is dropped. */
+const seqs = new Map<number, number>();
 
-/** IPC `office:frame-origin`: the editor dialog opened (url) or closed (null) in this window. */
-export function setOfficeOrigin(wc: WebContents, url: unknown): void {
+/**
+ * IPC `office:frame`: the editor opened (open) or closed in this window. On open, `docsUrl` asks
+ * the server for its Document Server URL; the origin is allowed only if it is one officeOriginOf
+ * accepts, and returned to the renderer ('' = nothing is allowed: the editor is off, or the server
+ * is unreachable).
+ */
+export async function setOfficeFrame(wc: WebContents, open: boolean, docsUrl: () => Promise<unknown>): Promise<string> {
   const id = wc.id;
-  const origin = url === null ? '' : officeOriginOf(url);
-  if (!origin) {
-    origins.delete(id);
-    return;
-  }
-  if (!origins.has(id)) wc.once('destroyed', () => origins.delete(id));
+  const seq = (seqs.get(id) ?? 0) + 1;
+  if (!seqs.has(id)) wc.once('destroyed', () => (origins.delete(id), seqs.delete(id)));
+  seqs.set(id, seq);
+  origins.delete(id);
+  if (!open) return '';
+  const origin = officeOriginOf(await docsUrl().catch(() => ''));
+  if (seqs.get(id) !== seq || !origin) return '';
   origins.set(id, origin);
+  return origin;
 }
 
 interface FrameLike {

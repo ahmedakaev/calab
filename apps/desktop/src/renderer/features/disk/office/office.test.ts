@@ -2,7 +2,24 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import HOST_JS from '../../../../../../../infra/office/calab-editor.js?raw';
-import { officeOpens, FRAME_START, connectHost, convertTarget, frameReducer, isOfficeFile, nextStatus, officeCapability, originOf, problemOf, viewOnly, type HostEvent } from './bridge';
+import { create } from '@bufbuild/protobuf';
+import { OfficeCapability, OfficeFormatSchema } from '@calaba/protocol';
+import { officeOpens, FRAME_START, connectHost, convertTarget, frameReducer, nextStatus, officeCapability, originOf, problemOf, viewOnly, type HostEvent } from './bridge';
+import { setOfficeCaps, useOfficeCaps } from './caps';
+
+/** The server's map (apps/server/internal/office/formats.go), as GET /api/office/capabilities answers it. */
+const f = (extension: string, capability: OfficeCapability, convertTo = '', lossy = false) => create(OfficeFormatSchema, { extension, capability, convertTo, lossy });
+const SERVER = {
+  enabled: true,
+  docsUrl: 'https://docs.calab.test',
+  maxSizeBytes: 100n << 20n,
+  themeDark: 'theme-calab-dark',
+  themeLight: 'default-light',
+  formats: [
+    f('docx', OfficeCapability.EDIT), f('xlsx', OfficeCapability.EDIT), f('pptx', OfficeCapability.EDIT), f('odt', OfficeCapability.EDIT, '', true),
+    f('doc', OfficeCapability.CONVERT, 'docx'), f('xls', OfficeCapability.CONVERT, 'xlsx'), f('ppt', OfficeCapability.CONVERT, 'pptx'), f('pdf', OfficeCapability.VIEW),
+  ],
+};
 
 /**
  * The office editor's two halves (ADR-0143): the Calab host page that runs on the Document
@@ -168,27 +185,29 @@ describe('bridge (client side)', () => {
   });
 
   it('files and origins', () => {
-    expect(isOfficeFile('График отпусков 2026.XLSX')).toBe(true);
-    expect(isOfficeFile('Договор.docx')).toBe(true);
-    expect(isOfficeFile('Презентация.PPTX')).toBe(true);
-    expect(isOfficeFile('old.xls')).toBe(true);
-    expect(isOfficeFile('xlsx')).toBe(false);
-    expect(isOfficeFile('notes.txt')).toBe(false);
-    expect(isOfficeFile('scan.pdf')).toBe(false);
+    setOfficeCaps(SERVER);
+    expect(officeOpens('График отпусков 2026.XLSX')).toBe(true);
+    expect(officeOpens('Договор.docx')).toBe(true);
+    expect(officeOpens('Презентация.PPTX')).toBe(true);
+    expect(officeOpens('old.xls')).toBe(true);
+    expect(officeOpens('xlsx')).toBe(false);
+    expect(officeOpens('notes.rar')).toBe(false);
     expect(originOf('https://docs.calab.test/x?y')).toBe(DOCS);
     expect(originOf('javascript:alert(1)')).toBe('');
   });
 });
 
 describe('capabilities and rules of the frame', () => {
-  it('one table: edit, convert on save, view', () => {
+  it("the server's map: edit, convert on «Сохранить как», view", () => {
+    setOfficeCaps(SERVER);
     expect(officeCapability('a.docx')).toBe('edit');
     expect(officeCapability('a.XLSX')).toBe('edit');
     expect(officeCapability('a.pptx')).toBe('edit');
     expect(officeCapability('a.doc')).toBe('convert');
     expect(officeCapability('a.ppt')).toBe('convert');
-    expect(officeCapability('a.odt')).toBe('view');
-    expect(officeCapability('a.pdf')).toBeNull();
+    expect(officeCapability('a.odt')).toBe('edit');
+    expect(officeCapability('a.pdf')).toBe('view');
+    expect(officeCapability('a.rar')).toBeNull();
     expect(officeCapability('docx')).toBeNull();
     expect(convertTarget('a.doc')).toBe('docx');
     expect(convertTarget('a.xls')).toBe('xlsx');
@@ -236,21 +255,27 @@ describe('capabilities and rules of the frame', () => {
     const conn = connectHost(parent, frame, DOCS, '{}', (e) => events.push(e));
     parent.dispatchEvent(new parent.MessageEvent('message', { data: { source: 'calab-office', type: 'event', name: 'users', data: [{ id: 1, name: 'Анна' }, { name: 5 }, null] }, origin: DOCS, source: child as unknown as Window }));
     expect(events).toEqual([{ name: 'users', names: ['Анна'] }]);
+    // The operator's themes (OFFICE_THEME_*), as the capabilities report them.
+    setOfficeCaps(SERVER);
     conn.setTheme('light');
     expect(out.at(-1)).toEqual({ source: 'calab-office', type: 'theme', theme: 'default-light' });
+    conn.setTheme('dark');
+    expect(out.at(-1)).toEqual({ source: 'calab-office', type: 'theme', theme: 'theme-calab-dark' });
   });
 });
 
 describe('entry-point visibility', () => {
-  it('«Открыть» is the editor only with the feature on and for a type in the capability table', () => {
-    vi.stubEnv('VITE_OFFICE', '');
+  it("«Открыть» is the editor only while the server's editor is on and names the extension", () => {
+    setOfficeCaps({ ...SERVER, enabled: false });
+    expect(useOfficeCaps.getState().enabled).toBe(false);
     expect(officeOpens('a.xlsx')).toBe(false);
-    vi.stubEnv('VITE_OFFICE', '1');
+    setOfficeCaps(SERVER);
     expect(officeOpens('a.xlsx')).toBe(true);
     expect(officeOpens('a.pptx')).toBe(true);
     expect(officeOpens('a.doc')).toBe(true);
-    expect(officeOpens('a.pdf')).toBe(false);
+    expect(officeOpens('a.pdf')).toBe(true);
     expect(officeOpens('a.txt')).toBe(false);
-    vi.unstubAllEnvs();
+    setOfficeCaps({ ...SERVER, enabled: false });
+    expect(officeOpens('a.xlsx')).toBe(false);
   });
 });

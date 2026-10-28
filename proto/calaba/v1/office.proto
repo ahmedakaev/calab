@@ -40,6 +40,10 @@ message OfficeCapabilitiesResponse {
   repeated OfficeFormat formats = 2;
   uint64 max_size_bytes = 3; // files above this do not open (OFFICE_MAX_SIZE_MB)
   string docs_url = 4; // the Document Server origin (the frame's postMessage target)
+  // The editor's uiTheme for the app's dark and light themes (OFFICE_THEME_DARK / _LIGHT): the
+  // open editor follows a theme switch of the app.
+  string theme_dark = 5;
+  string theme_light = 6;
 }
 
 // GET /api/office/config?item={diskItemId}|file={fileId}&theme=dark|light&phone=0|1&lang=ru: the

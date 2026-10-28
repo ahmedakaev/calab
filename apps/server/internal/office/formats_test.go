@@ -105,7 +105,7 @@ func TestCapabilities(t *testing.T) {
 		return &out
 	}
 	c := get()
-	if !c.Enabled || len(c.Formats) != len(formats) || c.DocsUrl != "https://docs.calab.test" || c.MaxSizeBytes != 100<<20 {
+	if !c.Enabled || len(c.Formats) != len(formats) || c.DocsUrl != "https://docs.calab.test" || c.MaxSizeBytes != 100<<20 || c.ThemeDark != "default-dark" || c.ThemeLight != "default-light" {
 		t.Fatalf("%v", c)
 	}
 	h.svc.cfg.Enabled = false

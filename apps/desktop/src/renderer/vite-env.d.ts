@@ -13,6 +13,4 @@ interface ImportMetaEnv {
   readonly VITE_BILLING_MOCK?: string;
   /** '1': the mail section talks to the in-memory mock (features/mail/mock; `CALABA_MAIL_MOCK=1 pnpm dev:desktop`). */
   readonly VITE_MAIL_MOCK?: string;
-  /** '1': «Открыть» of a Disk xlsx / docx opens ONLYOFFICE Docs (ADR-0143 spike; `CALABA_OFFICE=1` at build). */
-  readonly VITE_OFFICE?: string;
 }

@@ -228,9 +228,15 @@ export interface CalabaApi {
     tipShow(tip: WebAppTip): Promise<void>;
     tipHide(): Promise<void>;
   };
-  /** The office editor's frame (ADR-0143), Electron only: announces the Document Server URL to the navigation guards. */
+  /**
+   * The office editor's frame (ADR-0143), Electron only. `openFrame` makes main ask the server it is
+   * logged in to (GET /api/office/capabilities) for the Document Server origin and let exactly that
+   * origin's host page through the navigation guards; it resolves with that origin ('' = the editor
+   * is off or the server unreachable: nothing is framed). `closeFrame` drops it.
+   */
   office?: {
-    setFrameOrigin(url: string | null): Promise<void>;
+    openFrame(): Promise<string>;
+    closeFrame(): Promise<void>;
   };
   /**
    * The mail engine bridge (ADR-0088 §7), Electron only. Raw transport: the renderer uses the typed

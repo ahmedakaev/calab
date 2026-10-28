@@ -118,7 +118,8 @@ const api: CalabaApi = {
     tipHide: () => ipcRenderer.invoke(IPC.webAppTipHide),
   },
   office: {
-    setFrameOrigin: (url) => ipcRenderer.invoke(IPC.officeFrameOrigin, url),
+    openFrame: () => ipcRenderer.invoke(IPC.officeFrame, true),
+    closeFrame: () => ipcRenderer.invoke(IPC.officeFrame, false),
   },
   mail: {
     request: (call) => ipcRenderer.invoke(IPC.mailRequest, call),

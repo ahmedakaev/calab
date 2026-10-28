@@ -244,6 +244,7 @@ func (s *Service) capabilities(w http.ResponseWriter, _ *http.Request) error {
 	out := &v1.OfficeCapabilitiesResponse{Enabled: s.cfg.Enabled}
 	if s.cfg.Enabled {
 		out.Formats, out.MaxSizeBytes, out.DocsUrl = Formats(), uint64(s.cfg.MaxSize), s.cfg.DocsURL //nolint:gosec // positive
+		out.ThemeDark, out.ThemeLight = s.cfg.ThemeDark, s.cfg.ThemeLight
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	httpx.Write(w, http.StatusOK, out)

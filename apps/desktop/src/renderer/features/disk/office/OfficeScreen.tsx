@@ -1,4 +1,4 @@
-import { DiskItemResponseSchema, OfficeConfigResponseSchema, OfficeMode, type OfficeConfigResponse } from '@calaba/protocol';
+import { DiskItemResponseSchema, OfficeConfigResponseSchema, OfficeMode, type DiskItem, type OfficeConfigResponse } from '@calaba/protocol';
 import { ArrowLeft, RotateCw } from 'lucide-react';
 import { memo, useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Button, IconButton, Spinner, cx } from '../../../components/ui';
@@ -24,9 +24,16 @@ export const officeApi = {
   /** GET /api/office/config: the signed editor configuration of a Disk item or, view only, of a plain file (ADR-0143). */
   config: (src: OfficeSource, p: { theme: 'dark' | 'light'; phone: boolean; lang: string }, signal?: AbortSignal) =>
     call('GET', `/api/office/config${qs({ ...('itemId' in src ? { item: src.itemId } : { file: src.fileId }), theme: p.theme, phone: p.phone ? 1 : undefined, lang: p.lang })}`, OfficeConfigResponseSchema, undefined, signal),
-  /** A legacy file saved as a copy in the modern format: a new Disk item next to the original (ADR-0143 addendum). */
-  saveAs: (itemId: string, ext: string) => call('POST', `/api/office/save-as${qs({ item: itemId, ext })}`, DiskItemResponseSchema),
+  /** «Сохранить как» of a legacy Disk file: a NEW item next to it in the modern format (the source is never written). */
+  convertItem: (itemId: string) => call('POST', `/api/disk/items/${itemId}/office/convert`, DiskItemResponseSchema),
+  /** «Сохранить как» of a legacy attachment: a new item in folder `parentId` ('' = the root) of workspace `ws`. */
+  convertFile: (ws: string, fileId: string, parentId: string) => call('POST', `/api/workspaces/${ws}/office/convert`, DiskItemResponseSchema, { fileId, parentId }),
+  /** «Сохранить в Диск» of an attachment: an editable copy in folder `parentId` ('' = the root) of workspace `ws`. */
+  importFile: (ws: string, fileId: string, parentId: string) => call('POST', `/api/workspaces/${ws}/disk/import`, DiskItemResponseSchema, { fileId, parentId }),
 };
+
+/** A workspace the Disk lives in (not «Личные» / a guest's pseudo-workspace). */
+const diskWorkspace = (ws: string): boolean => ws !== '' && !ws.startsWith('@');
 
 /** A fresh config on mount and on every `attempt` (the retry); aborted on leaving. */
 function useOfficeConfig(src: OfficeSource, attempt: number): Load {
@@ -65,9 +72,15 @@ function EditorFrame({ cfg, title, loading, onEvent, onConn }: { cfg: OfficeConf
     if (!frame || !origin) return;
     let conn: HostConnection | null = null;
     let live = true;
-    // Electron: main lets exactly this origin's host page through its navigation guards (main/officeFrame.ts).
-    void (platform.office?.setFrameOrigin(origin) ?? Promise.resolve()).then(() => {
+    // Electron: main asks the server it is logged in to for the Document Server origin and lets
+    // exactly that origin's host page through its navigation guards (main/officeFrame.ts); a config
+    // pointing anywhere else is not framed. The web has its own CSP (frame-src).
+    void (platform.office ? platform.office.openFrame() : Promise.resolve(origin)).then((allowed) => {
       if (!live) return;
+      if (allowed !== origin) {
+        onEvent({ name: 'error', code: 'origin' });
+        return;
+      }
       conn = connectHost(window, frame, origin, cfg.configJson, onEvent);
       onConn(conn);
       frame.src = cfg.hostUrl;
@@ -80,7 +93,7 @@ function EditorFrame({ cfg, title, loading, onEvent, onConn }: { cfg: OfficeConf
       mo.disconnect();
       onConn(null);
       conn?.close();
-      void platform.office?.setFrameOrigin(null);
+      void platform.office?.closeFrame();
     };
   }, [cfg, origin, onEvent, onConn]);
   useEffect(() => {
@@ -122,8 +135,14 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
 
   const cap = officeCapability(name) ?? 'view';
   const view = load.kind === 'ready' ? viewOnly(cap, load.cfg.mode === OfficeMode.EDIT, phone) : true;
-  const convert = !view && cap === 'convert' ? convertTarget(name) : '';
   const itemId = tab.itemId ?? '';
+  const fileId = tab.fileId ?? '';
+  // A legacy format (doc, xls, ppt) opens read-only: «Сохранить как» makes a modern copy. An
+  // attachment opens read-only: «Сохранить в Диск» makes an editable one (into the root of its
+  // workspace). The phone only views.
+  const convert = !phone && load.kind === 'ready' ? convertTarget(name) : '';
+  const attachment = !itemId && !phone && load.kind === 'ready' && diskWorkspace(tab.ws);
+  const lossy = !view && load.kind === 'ready' && load.cfg.format?.lossy ? (load.cfg.format.extension || '') : '';
 
   // The editor's own «back» (goback → requestClose) leaves the view; its save runs on the way out.
   const onEvent = useCallback((e: HostEvent) => {
@@ -168,19 +187,24 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
     dispatch({ name: 'reset' });
     setAttempt((n) => n + 1);
   };
-  const saveAs = (): void => {
+  // Both make a NEW Disk item and open it as its own tab (the source stays as it is).
+  const copy = (run: () => Promise<{ item?: DiskItem }>, failText: string, done: boolean): void => {
     setSaving(true);
-    officeApi.saveAs(itemId, convert).then(
+    run().then(
       (r) => {
         setSaving(false);
-        if (r.item) openOfficeFile({ itemId: r.item.id }, r.item.name, r.item.workspaceId);
+        if (!r.item) return;
+        if (done) toast.success(t('office.import.done', { name: r.item.name }));
+        openOfficeFile({ itemId: r.item.id }, r.item.name, r.item.workspaceId);
       },
       (e: unknown) => {
         setSaving(false);
-        toast.fail(e, t('office.saveAs.failed'));
+        toast.fail(e, failText);
       },
     );
   };
+  const saveAs = (): void => copy(() => (itemId ? officeApi.convertItem(itemId) : officeApi.convertFile(tab.ws, fileId, '')), t('office.saveAs.failed'), false);
+  const saveToDisk = (): void => copy(() => officeApi.importFile(tab.ws, fileId, ''), t('office.import.failed'), true);
 
   const failed = load.kind === 'error' || state.status === 'error';
   const message =
@@ -222,13 +246,28 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
           </span>
         </div>
       ) : null}
-      {/* A legacy format (doc, xls, ppt): changes are saved as a copy in the modern one. */}
-      {convert ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-caption text-muted" data-testid="office-convert-notice">
-          <span>{t('office.convert', { ext: convert })}</span>
-          <Button variant="secondary" size="sm" onClick={saveAs} disabled={saving} data-testid="office-save-as">
-            {t('office.saveAs', { ext: convert })}
-          </Button>
+      {/* A legacy format or an attachment: view only, with the way to an editable copy. */}
+      {convert || attachment ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-caption text-muted" data-testid={convert ? 'office-convert-notice' : 'office-attachment-notice'}>
+          <span className="min-w-0">{convert ? t('office.convert', { ext: convert }) : t('office.attachment')}</span>
+          <span className="flex shrink-0 gap-2">
+            {attachment ? (
+              <Button variant="secondary" size="sm" onClick={saveToDisk} disabled={saving} data-testid="office-import">
+                {t('office.import')}
+              </Button>
+            ) : null}
+            {convert && (itemId || attachment) ? (
+              <Button variant="secondary" size="sm" onClick={saveAs} disabled={saving} data-testid="office-save-as">
+                {t('office.saveAs', { ext: convert })}
+              </Button>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
+      {/* odt, ods, odp, rtf, csv, txt are saved back in their own format (the Document Server's lossy-edit). */}
+      {lossy ? (
+        <div className="shrink-0 border-b border-line px-3 py-1.5 text-caption text-muted" data-testid="office-lossy-notice">
+          {t('office.lossy', { ext: lossy })}
         </div>
       ) : null}
       <div className="relative min-h-0 flex-1">
@@ -251,6 +290,9 @@ function OfficeView({ tab }: { tab: TaskTab }): ReactNode {
           </span>
         ) : null}
       </div>
+      {/* The bottom island (mute, the self panel) stays over the shell in a call: the editor ends
+          above it, its status bar never under the island (docs/08 «Нижний островок», like the mail list). */}
+      {phone ? null : <div aria-hidden className="shrink-0" style={{ height: 'calc(var(--island-height, -12px) + 12px)' }} data-testid="office-island-spacer" />}
     </div>
   );
 }

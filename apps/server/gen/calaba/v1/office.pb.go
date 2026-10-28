@@ -207,11 +207,15 @@ func (x *OfficeFormat) GetLossy() bool {
 
 // GET /api/office/capabilities: whether the editor is on and the format map.
 type OfficeCapabilitiesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"` // false: OFFICE_ENABLED is off; formats is empty then
-	Formats       []*OfficeFormat        `protobuf:"bytes,2,rep,name=formats,proto3" json:"formats,omitempty"`
-	MaxSizeBytes  uint64                 `protobuf:"varint,3,opt,name=max_size_bytes,json=maxSizeBytes,proto3" json:"max_size_bytes,omitempty"` // files above this do not open (OFFICE_MAX_SIZE_MB)
-	DocsUrl       string                 `protobuf:"bytes,4,opt,name=docs_url,json=docsUrl,proto3" json:"docs_url,omitempty"`                   // the Document Server origin (the frame's postMessage target)
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Enabled      bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"` // false: OFFICE_ENABLED is off; formats is empty then
+	Formats      []*OfficeFormat        `protobuf:"bytes,2,rep,name=formats,proto3" json:"formats,omitempty"`
+	MaxSizeBytes uint64                 `protobuf:"varint,3,opt,name=max_size_bytes,json=maxSizeBytes,proto3" json:"max_size_bytes,omitempty"` // files above this do not open (OFFICE_MAX_SIZE_MB)
+	DocsUrl      string                 `protobuf:"bytes,4,opt,name=docs_url,json=docsUrl,proto3" json:"docs_url,omitempty"`                   // the Document Server origin (the frame's postMessage target)
+	// The editor's uiTheme for the app's dark and light themes (OFFICE_THEME_DARK / _LIGHT): the
+	// open editor follows a theme switch of the app.
+	ThemeDark     string `protobuf:"bytes,5,opt,name=theme_dark,json=themeDark,proto3" json:"theme_dark,omitempty"`
+	ThemeLight    string `protobuf:"bytes,6,opt,name=theme_light,json=themeLight,proto3" json:"theme_light,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -270,6 +274,20 @@ func (x *OfficeCapabilitiesResponse) GetMaxSizeBytes() uint64 {
 func (x *OfficeCapabilitiesResponse) GetDocsUrl() string {
 	if x != nil {
 		return x.DocsUrl
+	}
+	return ""
+}
+
+func (x *OfficeCapabilitiesResponse) GetThemeDark() string {
+	if x != nil {
+		return x.ThemeDark
+	}
+	return ""
+}
+
+func (x *OfficeCapabilitiesResponse) GetThemeLight() string {
+	if x != nil {
+		return x.ThemeLight
 	}
 	return ""
 }
@@ -531,12 +549,16 @@ const file_calaba_v1_office_proto_rawDesc = "" +
 	"capability\x12\x1d\n" +
 	"\n" +
 	"convert_to\x18\x04 \x01(\tR\tconvertTo\x12\x14\n" +
-	"\x05lossy\x18\x05 \x01(\bR\x05lossy\"\xaa\x01\n" +
+	"\x05lossy\x18\x05 \x01(\bR\x05lossy\"\xea\x01\n" +
 	"\x1aOfficeCapabilitiesResponse\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x121\n" +
 	"\aformats\x18\x02 \x03(\v2\x17.calaba.v1.OfficeFormatR\aformats\x12$\n" +
 	"\x0emax_size_bytes\x18\x03 \x01(\x04R\fmaxSizeBytes\x12\x19\n" +
-	"\bdocs_url\x18\x04 \x01(\tR\adocsUrl\"\x8d\x02\n" +
+	"\bdocs_url\x18\x04 \x01(\tR\adocsUrl\x12\x1d\n" +
+	"\n" +
+	"theme_dark\x18\x05 \x01(\tR\tthemeDark\x12\x1f\n" +
+	"\vtheme_light\x18\x06 \x01(\tR\n" +
+	"themeLight\"\x8d\x02\n" +
 	"\x14OfficeConfigResponse\x12\x19\n" +
 	"\bdocs_url\x18\x01 \x01(\tR\adocsUrl\x12\x1f\n" +
 	"\vconfig_json\x18\x02 \x01(\tR\n" +

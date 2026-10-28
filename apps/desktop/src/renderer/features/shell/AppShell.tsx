@@ -278,8 +278,8 @@ function ShellLayout(): ReactNode {
             <Welcome />
           </div>
         )}
-        {/* One island on every screen with the rail (owner 23.10); not over a web app's native view, nor over an opened office file (it would cover the editor's status bar; ADR-0143). */}
-        {ready && !fileShown && !(canvas && canvasFolded && !mailOn && !wiki) && (mailOn || home || (hasWs && wsId && !appId)) ? <BottomIsland column={mailOn ? 'mail' : wiki ? 'wiki' : canvas ? 'canvas' : 'sidebar'} /> : null}
+        {/* One island on every screen with the rail (owner 23.10), an opened office file too (its view keeps a strip of island height under the editor, ADR-0143); not over a web app's native view. */}
+        {ready && (fileShown || !(canvas && canvasFolded && !mailOn && !wiki)) && (mailOn || home || (hasWs && wsId && !appId)) ? <BottomIsland column={fileShown ? 'sidebar' : mailOn ? 'mail' : wiki ? 'wiki' : canvas ? 'canvas' : 'sidebar'} /> : null}
         {ready ? <CreateTaskDialog /> : null}
         {ready ? <SmartTaskDialog /> : null}
       </div>

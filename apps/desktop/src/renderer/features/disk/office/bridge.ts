@@ -6,35 +6,11 @@
  * the editor ran (no idle cost — CLAUDE.md «Производительность»).
  */
 
+import { officeCapability, useOfficeCaps, type OfficeCap } from './caps';
+
 export type OfficeStatus = 'loading' | 'saved' | 'saving' | 'error';
 
-/** What the editor can do with a file type: edit and save in place, only view, or edit and save as a copy in the new format. */
-export type OfficeCap = 'edit' | 'view' | 'convert';
-
-/**
- * The ONE place that knows which extensions open in the editor. Until the server reports a
- * capability per extension in the config endpoint (ADR-0143 addendum), this small table stands in;
- * the e2e mock fills the same shape. Nothing else in the client switches on extensions.
- */
-const CAPS: Record<string, OfficeCap> = {
-  docx: 'edit', xlsx: 'edit', pptx: 'edit',
-  doc: 'convert', xls: 'convert', ppt: 'convert',
-  odt: 'view', ods: 'view', odp: 'view', rtf: 'view',
-};
-
-/** The modern format a legacy file is saved as (`convert`). */
-const CONVERT_TO: Record<string, string> = { doc: 'docx', xls: 'xlsx', ppt: 'pptx' };
-
-const extOf = (name: string): string => name.slice(name.lastIndexOf('.') + 1).toLowerCase();
-
-export function officeCapability(name: string): OfficeCap | null {
-  return name.includes('.') ? (CAPS[extOf(name)] ?? null) : null;
-}
-
-/** `docx` for «Старый.doc»; '' when the file is not saved as a copy. */
-export function convertTarget(name: string): string {
-  return CONVERT_TO[extOf(name)] ?? '';
-}
+export { convertTarget, officeCapability, type OfficeCap } from './caps';
 
 /** The frame is view-only: the phone always (ADR-0143 §10), a view-only type, or the server's mode. */
 export function viewOnly(cap: OfficeCap, serverEdit: boolean, phone: boolean): boolean {
@@ -171,7 +147,8 @@ export function connectHost(win: Window, frame: HTMLIFrameElement, docsOrigin: s
       frame.contentWindow?.postMessage({ source: SRC, type: 'save' }, docsOrigin);
     },
     setTheme(theme) {
-      frame.contentWindow?.postMessage({ source: SRC, type: 'theme', theme: theme === 'light' ? 'default-light' : 'default-dark' }, docsOrigin);
+      const caps = useOfficeCaps.getState();
+      frame.contentWindow?.postMessage({ source: SRC, type: 'theme', theme: theme === 'light' ? caps.themeLight || 'default-light' : caps.themeDark || 'default-dark' }, docsOrigin);
     },
     close() {
       win.removeEventListener('message', listener);
@@ -180,20 +157,7 @@ export function connectHost(win: Window, frame: HTMLIFrameElement, docsOrigin: s
   };
 }
 
-/** «Открыть» opens the editor for this file: the feature is on and the type is in the capability table. */
+/** «Открыть» opens the editor for this file: the server's capabilities name its extension (and the editor is on). */
 export function officeOpens(name: string): boolean {
-  return officeEnabled() && isOfficeFile(name);
-}
-
-/** Files the editor opens (any extension of the capability table). */
-export function isOfficeFile(name: string): boolean {
   return officeCapability(name) !== null;
-}
-
-/**
- * The spike's switch (off by default): a build with CALABA_OFFICE=1 (electron-vite) or VITE_OFFICE=1 (web). The full implementation
- * reads the server's OFFICE_ENABLED instead (ADR-0143 «Остаётся»).
- */
-export function officeEnabled(): boolean {
-  return import.meta.env.VITE_OFFICE === '1';
 }

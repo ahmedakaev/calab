@@ -171,8 +171,8 @@ export const IPC = {
   mailEvent: 'mail:event',
 
   // ---- office editor (ADR-0143) ----
-  /** renderer → main: the Document Server URL whose host page may be framed (null = the editor closed). */
-  officeFrameOrigin: 'office:frame-origin',
+  /** renderer → main: true = the editor opens (main asks the server for the Document Server origin and returns it), false = it closed. */
+  officeFrame: 'office:frame',
 } as const;
 
 /** ◀ ▶ ⟳ of the navigation strip. */
