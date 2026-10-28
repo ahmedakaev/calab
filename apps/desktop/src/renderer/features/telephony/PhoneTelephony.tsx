@@ -1,21 +1,23 @@
-import { Grid3x3, Phone } from 'lucide-react';
+import { Grid3x3, Phone, Settings } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Bar } from '../../components/Bar';
 import { CreateButton } from '../../components/CreateButton';
 import { HeaderIcon } from '../../components/PhoneHeader';
-import { Segmented } from '../../components/ui';
+import { IconButton, Segmented } from '../../components/ui';
 import { t, useLocale } from '../../i18n';
 import { openTab } from '../../services/phoneNav';
 import { usePersonalCallOn } from '../../stores/sipOutbound';
 import { useTelContacts } from '../../stores/telContacts';
 import { useTelephonyUi } from '../../stores/telephonyUi';
 import { useVoice } from '../../stores/voice';
-import { useHasExtensions, usePlaceCalls, useTelephonyVisible } from './access';
+import { useHasExtensions, useMayManageTelephony, usePlaceCalls, useTelephonyConnected, useTelephonyVisible } from './access';
 import { ContactSearch, ContactsList } from './contacts/ContactsList';
 import { editContact, openDial } from './contacts/data';
 import { ImportDialog } from './contacts/ImportDialog';
 import { JournalList } from './Recents';
 import { FilterButton, FilterCard, FilterChips, SearchField, setFilter } from './RecentsFilters';
+import { NotConnected } from './settings/Connection';
+import { pushTelSettings } from './settings/pages';
 
 /**
  * «Телефония» on the phone (ADR-0137 §7 — the owner's priority: one hand, actions at the thumb,
@@ -24,6 +26,8 @@ import { FilterButton, FilterCard, FilterChips, SearchField, setFilter } from '.
  * iOS Contacts; the journal's funnel at its right end → a centred card, the set filters as chips),
  * and the FAB «Набор» at the thumb over the list. A journal row's tap calls back; ⓘ opens the
  * detail (a pushed screen); a contact's tap opens its card.
+ * ⚙ in the header (MANAGE_INTEGRATIONS) pushes the station's settings list (T5); before telephony
+ * is connected the root is the empty state «Подключите SIP-провайдера» with its one action.
  */
 type PhoneSegment = 'all' | 'missed' | 'contacts';
 
@@ -37,6 +41,8 @@ export function PhoneTelephony({ workspaceId }: { workspaceId: string }): ReactN
   // «Контакты» is the section's contacts page (stores/telephonyUi `page`); the other two are the journal's segment.
   const segment = useTelephonyUi((s): PhoneSegment => (s.page === 'contacts' ? 'contacts' : s.filter.segment));
   const [filters, setFilters] = useState(false);
+  const manage = useMayManageTelephony(workspaceId);
+  const connected = useTelephonyConnected(workspaceId);
   if (!visible) return null;
   const pick = (v: PhoneSegment): void => {
     if (v === 'contacts') {
@@ -46,13 +52,31 @@ export function PhoneTelephony({ workspaceId }: { workspaceId: string }): ReactN
     useTelephonyUi.getState().setPage('recents');
     setFilter({ segment: v });
   };
+  const header = (
+    <Bar>
+      <HeaderIcon icon={Phone} />
+      <h1 className="min-w-0 flex-1 truncate text-headline font-semibold">{t('tel.section')}</h1>
+      {manage ? (
+        <IconButton tip={false} label={t('tset.title')} onClick={() => pushTelSettings('list')} bar data-testid="tel-settings-open">
+          <Settings className="size-5" aria-hidden />
+        </IconButton>
+      ) : null}
+      {connected ? <CreateButton label={t('telc.newTitle')} tip={false} onClick={() => editContact('')} data-testid="tel-create" /> : null}
+    </Bar>
+  );
+  if (!connected) {
+    return (
+      <section className="mat-content flex min-h-0 flex-1 flex-col" data-testid="phone-telephony">
+        {header}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <NotConnected onStart={() => pushTelSettings('connection')} />
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="mat-content relative flex min-h-0 flex-1 flex-col" data-testid="phone-telephony">
-      <Bar>
-        <HeaderIcon icon={Phone} />
-        <h1 className="min-w-0 flex-1 truncate text-headline font-semibold">{t('tel.section')}</h1>
-        <CreateButton label={t('telc.newTitle')} tip={false} onClick={() => editContact('')} data-testid="tel-create" />
-      </Bar>
+      {header}
       <div className="shrink-0 px-3 pb-2 pt-1">
         <Segmented
           value={segment}

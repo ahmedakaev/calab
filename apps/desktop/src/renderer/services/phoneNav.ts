@@ -154,6 +154,7 @@ function closeFlag(s: PhoneScreen, next: PhoneScreen | undefined): void {
     case 'wiki':
     case 'canvas':
     case 'telCall':
+    case 'telSettings':
     case 'telContact':
     case 'telDial':
       break;

@@ -1,5 +1,6 @@
 import { WorkspaceRole } from '@calaba/protocol';
 import { can, workspacePerms } from '../../lib/permissions';
+import { planHas } from '../../lib/plan';
 import { telephonyVisible } from '../../lib/telephonyAccess';
 import { myUserId, useSession } from '../../stores/session';
 import { rolesOf, useWorkspaces, type WorkspaceEntry } from '../../stores/workspaces';
@@ -12,8 +13,10 @@ import { rolesOf, useWorkspaces, type WorkspaceEntry } from '../../stores/worksp
 const NONE = { visible: false, viewJournals: false, placeCalls: false, manage: false };
 
 function rights(e: WorkspaceEntry | undefined, me: string): { visible: boolean; viewJournals: boolean; placeCalls: boolean; manage: boolean } {
-  // Cheap until telephony is connected: no permission math for the workspaces without it.
-  if (!e?.ws.sipEnabled) return NONE;
+  // Cheap until telephony is connected or on the plan: no permission math for the workspaces without it.
+  if (!e) return NONE;
+  const plan = planHas(e.ws.plan, 'telephony');
+  if (!e.ws.sipEnabled && !plan) return NONE;
   const bits = workspacePerms(rolesOf(e, me));
   const r = { placeCalls: can(bits, 'PLACE_CALLS'), viewJournals: can(bits, 'VIEW_JOURNALS'), manage: can(bits, 'MANAGE_INTEGRATIONS') };
   const visible = telephonyVisible({
@@ -23,6 +26,7 @@ function rights(e: WorkspaceEntry | undefined, me: string): { visible: boolean; 
     extension: e.members[me]?.extension ?? '',
     viewJournals: r.viewJournals,
     manageIntegrations: r.manage,
+    planTelephony: plan,
   });
   return { visible, ...r };
 }
@@ -43,6 +47,11 @@ export function useMayReadAll(ws: string): boolean {
 export function useMayManageTelephony(ws: string): boolean {
   const me = useSession((s) => s.me?.user?.id ?? '');
   return useWorkspaces((s) => rights(s.byId[ws], me).manage);
+}
+
+/** Telephony is connected (Workspace.sip_enabled): the journal and calling make sense; else the administrator sets it up. */
+export function useTelephonyConnected(ws: string): boolean {
+  return useWorkspaces((s) => !!s.byId[ws]?.ws.sipEnabled);
 }
 
 /** «Позвонить» over the trunk (ADR-0137 §3): PLACE_CALLS of the workspace (the server checks the rest). */

@@ -2,26 +2,27 @@ import { create } from '@bufbuild/protobuf';
 import { GetSipSettingsResponseSchema, type SipSettings } from '@calaba/protocol';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode } from 'react';
-import { Card, Switch } from '../../components/ui';
-import { t } from '../../i18n';
-import { api } from '../../lib/api/endpoints';
-import { reportPlanError } from '../../services/plan';
-import { toast } from '../../stores/toasts';
+import { Card, Switch } from '../../../components/ui';
+import { t } from '../../../i18n';
+import { api } from '../../../lib/api/endpoints';
+import { reportPlanError } from '../../../services/plan';
+import { toast } from '../../../stores/toasts';
+import { sipSettingsKey } from './Connection';
 
 /*
- * Settings tab → «Запись звонков» (ADR-0131, CBF-81; MANAGE_INTEGRATIONS): two switches, each
+ * «Телефония → Настройки → Запись звонков» (ADR-0131, CBF-81; MANAGE_INTEGRATIONS): two switches, each
  * saved at once (PUT …/sip/recording). The recordings go to the Disk (phone_recordings, by day)
  * for the workspace owner; the caller is warned by the voice menu's «Предупреждение о записи».
  * Off until the provider is saved; a server without the egress keeps the switches (a note says so).
  */
 
-export function RecordingCard({ workspaceId, settings, settingsKey }: { workspaceId: string; settings: SipSettings; settingsKey: readonly unknown[] }): ReactNode {
+export function RecordingCard({ workspaceId, settings }: { workspaceId: string; settings: SipSettings }): ReactNode {
   const qc = useQueryClient();
   const saved = !!settings.updatedAt;
   const save = useMutation({
     mutationFn: (v: { recordInbound: boolean; recordOutbound: boolean }) => api.sip.saveRecording(workspaceId, v),
     onSuccess: (r) => {
-      if (r.settings) qc.setQueryData(settingsKey, create(GetSipSettingsResponseSchema, { settings: r.settings }));
+      if (r.settings) qc.setQueryData(sipSettingsKey(workspaceId), create(GetSipSettingsResponseSchema, { settings: r.settings }));
       toast.info(t('pbx.saved'));
     },
     onError: (e) => {
