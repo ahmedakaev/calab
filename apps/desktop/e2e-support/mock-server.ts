@@ -55,6 +55,12 @@ import {
   ListTasksResponseSchema,
   MyTasksResponseSchema,
   SearchTasksResponseSchema,
+  CreateSavedTaskSearchRequestSchema,
+  ListSavedTaskSearchesResponseSchema,
+  SavedTaskSearchResponseSchema,
+  SavedTaskSearchSchema,
+  UpdateSavedTaskSearchRequestSchema,
+  type SavedTaskSearch,
   SetAssigneesRequestSchema,
   SetTaskApproversRequestSchema,
   SetBoardPermissionsRequestSchema,
@@ -1390,6 +1396,9 @@ class MockImpl {
   private readonly calls = new Map<string, Call>();
   private readonly userCall = new Map<string, string>();
   private callSeq = 0;
+  /** Saved task searches (ADR-0139): "workspace|user" → searches. */
+  private readonly savedSearches = new Map<string, SavedTaskSearch[]>();
+  private savedSearchSeq = 1;
   /** Meetings (ADR-0038) by id; cancelled ones stay (cancelled_at). */
   private readonly calEvents = new Map<string, CalEventRec>();
   /** ADR-0104: comments per event id, oldest first. */
@@ -8554,7 +8563,55 @@ class MockImpl {
       sendMsg(c.res, 200, MyTasksResponseSchema, { tasks: b().mine(q(c, 'workspace_id'), me, q(c, 'scope') || 'assigned', q(c, 'open') === '1'), nextCursor: '' });
     });
     this.boardRoute('GET', '/api/workspaces/:id/tasks/search', (c, me) => {
+      // The ADR-0139 search (archive, board, filter, sort, cursor, key_task); a plain ⌘K / picker call as before.
+      if (['archived', 'board_id', 'filter', 'sort', 'cursor'].some((k) => c.url.searchParams.has(k)) || !q(c, 'q')) {
+        const r = b().find(c.params[0] ?? '', me, {
+          q: q(c, 'q'),
+          state: q(c, 'state'),
+          archived: q(c, 'archived'),
+          boardId: q(c, 'board_id'),
+          filter: filterOf(c),
+          sort: q(c, 'sort'),
+          cursor: q(c, 'cursor'),
+          limit: Number(q(c, 'limit')) || 20,
+          nowMs: timestampMs(this.callNow()),
+        });
+        sendMsg(c.res, 200, SearchTasksResponseSchema, r);
+        return;
+      }
       sendMsg(c.res, 200, SearchTasksResponseSchema, { tasks: b().search(c.params[0] ?? '', me, q(c, 'q'), Number(q(c, 'limit')) || 20) });
+    });
+    // Saved task searches (ADR-0139): per workspace and person, in memory.
+    const savedKey = (ws: string, me: string): string => `${ws}|${me}`;
+    this.boardRoute('GET', '/api/workspaces/:id/task-searches', (c, me) => {
+      sendMsg(c.res, 200, ListSavedTaskSearchesResponseSchema, { searches: this.savedSearches.get(savedKey(c.params[0] ?? '', me)) ?? [] });
+    });
+    this.boardRoute('POST', '/api/workspaces/:id/task-searches', (c, me) => {
+      const req = parseBody(c, CreateSavedTaskSearchRequestSchema);
+      const name = req.name.trim();
+      if (!name || name.length > 60) throw invalid('name', 'name must be 1..60 characters');
+      const k = savedKey(c.params[0] ?? '', me);
+      const list = this.savedSearches.get(k) ?? [];
+      const s = create(SavedTaskSearchSchema, { id: `ts-${this.savedSearchSeq++}`, name, ...(req.query ? { query: req.query } : {}), position: list.length });
+      this.savedSearches.set(k, [...list, s]);
+      sendMsg(c.res, 201, SavedTaskSearchResponseSchema, { search: s });
+    });
+    this.boardRoute('PATCH', '/api/workspaces/:id/task-searches/:sid', (c, me) => {
+      const req = parseBody(c, UpdateSavedTaskSearchRequestSchema);
+      const k = savedKey(c.params[0] ?? '', me);
+      const list = this.savedSearches.get(k) ?? [];
+      const cur = list.find((x) => x.id === c.params[1]);
+      if (!cur) throw notFound('search not found');
+      const next = create(SavedTaskSearchSchema, { ...cur, ...(req.name !== undefined ? { name: req.name.trim() } : {}), ...(req.query ? { query: req.query } : {}) });
+      this.savedSearches.set(k, list.map((x) => (x.id === cur.id ? next : x)));
+      sendMsg(c.res, 200, SavedTaskSearchResponseSchema, { search: next });
+    });
+    this.boardRoute('DELETE', '/api/workspaces/:id/task-searches/:sid', (c, me) => {
+      const k = savedKey(c.params[0] ?? '', me);
+      const list = this.savedSearches.get(k) ?? [];
+      if (!list.some((x) => x.id === c.params[1])) throw notFound('search not found');
+      this.savedSearches.set(k, list.filter((x) => x.id !== c.params[1]));
+      noContent(c.res);
     });
     // Test control: an update of a task by another user (TASK_UPDATE fan-out as the server would).
     this.route('POST', '/__mock/task', (c) => {
