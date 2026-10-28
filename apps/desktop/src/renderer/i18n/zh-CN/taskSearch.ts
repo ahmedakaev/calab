@@ -2,6 +2,7 @@
 export const zhTaskSearch = {
   'boards.f.board': '看板',
   'ts.tab': '任务',
+  'ts.tabSearch': '搜索',
   'ts.tabAll': '全部',
   'ts.tabs': '搜索内容',
   'ts.placeholder': '键、标题、描述或评论',

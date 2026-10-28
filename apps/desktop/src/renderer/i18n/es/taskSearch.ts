@@ -2,6 +2,7 @@
 export const esTaskSearch = {
   'boards.f.board': 'Tablero',
   'ts.tab': 'Tareas',
+  'ts.tabSearch': 'Buscar',
   'ts.tabAll': 'Todo',
   'ts.tabs': 'Qué buscar',
   'ts.placeholder': 'Clave, título, descripción o comentario',

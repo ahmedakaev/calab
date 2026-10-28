@@ -4,7 +4,7 @@ import { timestampMs } from '@bufbuild/protobuf/wkt';
 import { ArrowDown, ArrowUp, Bookmark, CornerDownLeft, ListFilter, Search } from 'lucide-react';
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Choice } from '../../components/Choice';
-import { Button, Input, Spinner, cx } from '../../components/ui';
+import { Button, IconButton, Input, Spinner, cx } from '../../components/ui';
 import { t, type MessageKey } from '../../i18n';
 import { ageOf } from '../../lib/boards/age';
 import { EMPTY_FILTER, activeConds, type FilterState } from '../../lib/boards/filter';
@@ -207,7 +207,7 @@ export const TaskSearch = forwardRef<
   return (
     <div className="@container flex min-h-0 flex-1 flex-col" data-testid={`task-search-${variant}`}>
       <SearchBar workspaceId={workspaceId} boardId={boardId} query={query} onQuery={onQuery} variant={variant} busy={busy} />
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto" role="listbox" aria-label={t('ts.results')} aria-busy={busy || undefined} data-testid="task-search-list">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto" aria-busy={busy || undefined} data-testid="task-search-list">
         {!enabled ? (
           <p className="px-6 py-10 text-center text-body text-muted" data-testid="task-search-hint">
             {t('ts.hint')}
@@ -224,8 +224,9 @@ export const TaskSearch = forwardRef<
           </p>
         ) : (
           <>
-            {keyTask ? <KeyRow task={keyTask} selected={cur === 0 && variant === 'dialog'} onPick={pick} onHover={() => setSel(0)} /> : null}
             {mobile ? null : <HeaderRow sorting={sorting} onSort={onSort} showBoard={showBoard} />}
+            <div id={`task-search-${variant}-list`} role="listbox" aria-label={t('ts.results')}>
+            {keyTask ? <KeyRow task={keyTask} selected={cur === 0 && variant === 'dialog'} onPick={pick} onHover={() => setSel(0)} /> : null}
             {rows.map((id, i) => (
               <ResultRow
                 key={id}
@@ -242,6 +243,7 @@ export const TaskSearch = forwardRef<
                 onHover={setSel}
               />
             ))}
+            </div>
             <div ref={sentinel} className="h-px" aria-hidden />
             {loadingMore ? (
               <div className="grid h-10 place-items-center">
@@ -307,7 +309,7 @@ function SearchBar({ workspaceId, boardId, query, onQuery, variant, busy }: { wo
                 </button>
               </Popover.Trigger>
             </FilterPopover>
-            <ConditionChips board={board} workspaceId={workspaceId} filter={query.filter} setFilter={setFilter} className="contents" />
+            <ConditionChips board={board} workspaceId={workspaceId} filter={query.filter} setFilter={setFilter} className="contents" reset={false} />
           </>
         ) : null}
         <span className="flex-1" />
@@ -345,13 +347,12 @@ function SaveButton({ workspaceId, query }: { workspaceId: string; query: TaskQu
   return (
     <Popover.Root open={open} onOpenChange={setOpen} modal={false}>
       <Popover.Trigger asChild>
-        <button type="button" className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-control text-muted hover:bg-hover hover:text-fg data-[state=open]:bg-active mobile:tap-h" data-testid="task-search-save">
-          <Bookmark className="size-3.5" aria-hidden />
-          {t('ts.save')}
-        </button>
+        <IconButton size="sm" label={t('ts.saveAction')} className="shrink-0 data-[state=open]:bg-active" data-testid="task-search-save">
+          <Bookmark className="size-4" aria-hidden />
+        </IconButton>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content align="end" sideOffset={4} collisionPadding={8} onKeyDown={(e) => e.stopPropagation()} className="mat-popover anim-in z-[var(--z-modal-popover)] flex w-[280px] flex-col gap-2 rounded-[var(--radius-card)] p-3" data-testid="task-search-save-menu">
+        <Popover.Content align="end" sideOffset={4} collisionPadding={8} onKeyDown={(e) => e.stopPropagation()} onCloseAutoFocus={(e) => e.preventDefault()} className="mat-popover anim-in z-[var(--z-modal-popover)] flex w-[280px] flex-col gap-2 rounded-[var(--radius-card)] p-3" data-testid="task-search-save-menu">
           {active ? (
             <Button
               variant="secondary"
@@ -392,8 +393,8 @@ function SaveButton({ workspaceId, query }: { workspaceId: string; query: TaskQu
 
 // ------------------------------------------------------------------ rows
 
-const GRID = 'grid grid-cols-[72px_minmax(0,1fr)_128px_56px_64px] @[720px]:grid-cols-[72px_minmax(0,1fr)_128px_132px_56px_64px] items-center gap-x-3 px-3';
-const GRID_NO_BOARD = 'grid grid-cols-[72px_minmax(0,1fr)_128px_56px_64px] items-center gap-x-3 px-3';
+const GRID = 'grid grid-cols-[64px_minmax(0,1fr)_120px_92px_76px] @[720px]:grid-cols-[64px_minmax(0,1fr)_120px_132px_92px_76px] items-center gap-x-3 px-3';
+const GRID_NO_BOARD = 'grid grid-cols-[64px_minmax(0,1fr)_120px_92px_76px] items-center gap-x-3 px-3';
 
 const COLS: ReadonlyArray<{ col: SortColumn; label: MessageKey; board?: boolean; end?: boolean }> = [
   { col: 'key', label: 'ts.col.key' },
@@ -436,7 +437,7 @@ const KeyRow = memo(function KeyRow({ task, selected, onPick, onHover }: { task:
       aria-selected={selected}
       onClick={() => onPick(task.id)}
       onMouseMove={selected ? undefined : onHover}
-      className={cx('mx-1.5 my-1 flex h-9 cursor-default items-center gap-2 rounded-[var(--radius-row)] px-2.5 text-body hover:bg-hover mobile:h-12', selected && 'bg-active')}
+      className={cx('mx-1.5 my-1 flex h-9 cursor-default items-center gap-2 rounded-[var(--radius-row)] px-2.5 text-body hover:bg-hover mobile:h-12', selected && 'bg-hover')}
       data-testid="task-search-key"
     >
       <CornerDownLeft className="size-4 shrink-0 text-muted" aria-hidden />
@@ -528,8 +529,11 @@ const ResultRow = memo(function ResultRow({
             <Words text={task.key} q={q} />
           </span>
           {showBoard ? (
-            <span className="min-w-0 truncate">
-              {boardEmoji || '📋'} {boardName}
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="shrink-0 text-[12px] leading-none" aria-hidden>
+                {boardEmoji || '📋'}
+              </span>
+              <span className="truncate">{boardName}</span>
             </span>
           ) : null}
           <span className="flex-1" />
@@ -554,7 +558,7 @@ const ResultRow = memo(function ResultRow({
       aria-selected={selected}
       onClick={() => onPick(id)}
       onMouseMove={selected ? undefined : () => onHover(index)}
-      className={cx(showBoard ? GRID : GRID_NO_BOARD, 'min-h-9 cursor-default border-b border-line py-1.5 text-body hover:bg-hover', selected && 'bg-active')}
+      className={cx(showBoard ? GRID : GRID_NO_BOARD, 'min-h-9 cursor-default border-b border-line py-1.5 text-body hover:bg-hover', selected && 'bg-hover [&_mark]:text-fg [&_mark]:underline')}
       data-testid="task-search-row"
       data-archived={archived || undefined}
     >
@@ -572,12 +576,15 @@ const ResultRow = memo(function ResultRow({
       </span>
       {statusCell}
       {showBoard ? (
-        <span className="hidden min-w-0 truncate text-muted @[720px]:block">
-          {boardEmoji || '📋'} {boardName}
+        <span className="hidden min-w-0 items-center gap-1.5 text-muted @[720px]:flex">
+          <span className="w-4 shrink-0 text-center text-[13px] leading-none" aria-hidden>
+            {boardEmoji || '📋'}
+          </span>
+          <span className="truncate">{boardName}</span>
         </span>
       ) : null}
       <span className="flex min-w-0 items-center">{task.assignees.length ? <AssigneeStack workspaceId={workspaceId} assignees={task.assignees} /> : null}</span>
-      <span className="truncate text-right text-caption tabular-nums text-faint">{age ? t(age.key, { n: age.n }) : ''}</span>
+      <span className="truncate text-right text-caption tabular-nums text-muted">{age ? t(age.key, { n: age.n }) : ''}</span>
     </div>
   );
 });
@@ -614,26 +621,49 @@ export function TaskSearchPage({ workspaceId }: { workspaceId: string }): ReactN
  */
 export function BoardSearchField({ boardId, phone = false }: { boardId: string; phone?: boolean }): ReactNode {
   const value = useTaskSearch((s) => s.boardText[boardId] ?? '');
+  // A narrow header (the 960 px window) shows the 32 px icon; a click or text opens the field.
+  const [opened, setOpened] = useState(false);
+  const open = phone || opened || value !== '';
+  const input = useRef<HTMLInputElement>(null);
   return (
-    <div className={cx('min-w-0', phone ? 'w-[148px] shrink-0' : 'w-[148px] shrink focus-within:w-[220px] @[720px]:w-[180px]')} data-testid="board-search">
-      <Input
-        icon={<Search />}
-        type="search"
-        value={value}
-        maxLength={200}
-        onChange={(e) => useTaskSearch.getState().setBoardText(boardId, e.target.value)}
-        onKeyDown={(e) => {
-          e.stopPropagation(); // board hotkeys (C, F, 1–3…) stay out of the field
-          if (e.key === 'Escape' && value) {
-            e.preventDefault();
-            useTaskSearch.getState().setBoardText(boardId, '');
-          }
-        }}
-        placeholder={t('ts.boardPlaceholder')}
-        aria-label={t('ts.boardSearch')}
-        data-testid="board-search-input"
-      />
-    </div>
+    <>
+      {open ? null : (
+        <IconButton
+          bar
+          label={t('ts.boardSearch')}
+          className="@[880px]:hidden"
+          onClick={() => {
+            setOpened(true);
+            window.requestAnimationFrame(() => input.current?.focus());
+          }}
+          data-testid="board-search-open"
+        >
+          <Search className="size-[18px]" aria-hidden />
+        </IconButton>
+      )}
+      <div className={cx('min-w-0 shrink-0', phone ? 'w-[148px]' : 'w-[180px]', !open && 'hidden @[880px]:block')} data-testid="board-search">
+        <Input
+          ref={input}
+          icon={<Search />}
+          type="search"
+          value={value}
+          maxLength={200}
+          onChange={(e) => useTaskSearch.getState().setBoardText(boardId, e.target.value)}
+          onBlur={() => setOpened(false)}
+          onKeyDown={(e) => {
+            e.stopPropagation(); // board hotkeys (C, F, 1–3…) stay out of the field
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              useTaskSearch.getState().setBoardText(boardId, '');
+              e.currentTarget.blur();
+            }
+          }}
+          placeholder={t('ts.boardPlaceholder')}
+          aria-label={t('ts.boardSearch')}
+          data-testid="board-search-input"
+        />
+      </div>
+    </>
   );
 }
 

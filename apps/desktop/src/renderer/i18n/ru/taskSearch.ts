@@ -2,6 +2,7 @@
 export const ruTaskSearch = {
   'boards.f.board': 'Доска',
   'ts.tab': 'Задачи',
+  'ts.tabSearch': 'Поиск',
   'ts.tabAll': 'Всё',
   'ts.tabs': 'Что искать',
   'ts.placeholder': 'Ключ, название, описание или комментарий',

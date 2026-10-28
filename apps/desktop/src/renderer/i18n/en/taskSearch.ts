@@ -2,6 +2,7 @@
 export const enTaskSearch = {
   'boards.f.board': 'Board',
   'ts.tab': 'Tasks',
+  'ts.tabSearch': 'Search',
   'ts.tabAll': 'All',
   'ts.tabs': 'What to search',
   'ts.placeholder': 'Key, title, description or comment',

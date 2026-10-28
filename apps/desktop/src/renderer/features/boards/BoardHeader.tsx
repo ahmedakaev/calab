@@ -18,6 +18,7 @@ import { myUserId } from '../../stores/session';
 import { menuBox, menuItem, menuLabel, menuSeparator } from '../shell/menu';
 import { FilterButton } from './FilterBar';
 import { BoardSearchField } from './TaskSearch';
+import { useTaskSearch } from '../../stores/taskSearch';
 import { exportCsv } from './exportCsv';
 import { hasBit, settingsEntryTab, CREATE_TASKS, MANAGE_BOARD } from './model';
 import { useDisabledFeatures, useFeatureOn, useMatchCtx, useViewKind } from './useBoardView';
@@ -45,6 +46,7 @@ export function BoardHeader({ boardId, workspaceId }: { boardId: string; workspa
   const perms = useBoards((s) => s.boards[boardId]?.permissions);
   const manage = hasBit(perms, MANAGE_BOARD);
   const mobile = useMobile();
+  const searching = useTaskSearch((s) => !!s.boardText[boardId]?.trim());
   // Phone: the view choice and «Отображение» live in «…» (owner 07.10); the popover is anchored under the header.
   const [displayOpen, setDisplayOpen] = useState(false);
   return (
@@ -68,9 +70,14 @@ export function BoardHeader({ boardId, workspaceId }: { boardId: string; workspa
           <>
             <BoardSearchField boardId={boardId} />
             <FilterButton boardId={boardId} workspaceId={workspaceId} bar />
-            <SortMenu boardId={boardId} />
-            <DisplayMenu boardId={boardId} />
-            <ViewSwitch boardId={boardId} />
+            {/* While searching the board shows the search's list: the view's sort, display and kind wait. */}
+            {searching ? null : (
+              <>
+                <SortMenu boardId={boardId} />
+                <DisplayMenu boardId={boardId} />
+                <ViewSwitch boardId={boardId} />
+              </>
+            )}
           </>
         )}
         {/* Phone: «…» then the accent «+» in the corner (the universal CreateButton); desktop: «+ Задача», then «…». */}

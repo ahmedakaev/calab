@@ -382,7 +382,7 @@ export function QuickSwitcher({ onClose, initialQuery = '' }: { onClose: () => v
               onKeyDown={onKey}
               role="combobox"
               aria-expanded
-              aria-controls="quick-switcher-list"
+              aria-controls={tasksMode ? 'task-search-dialog-list' : 'quick-switcher-list'}
               aria-activedescendant={!tasksMode && items[cur] ? `qs-${items[cur].id}` : undefined}
               placeholder={tasksMode ? t('ts.placeholder') : t('search.placeholder')}
               aria-label={tasksMode ? t('ts.placeholder') : t('search.placeholder')}
@@ -405,7 +405,8 @@ export function QuickSwitcher({ onClose, initialQuery = '' }: { onClose: () => v
             ) : null}
           </div>
           {activeWs && !author ? (
-            <div role="tablist" aria-label={t('ts.tabs')} className="flex shrink-0 items-center gap-1 border-b border-line px-3 py-1.5" data-testid="search-mode">
+            <div className="flex shrink-0 items-center gap-1 border-b border-line px-3 py-1.5">
+              <div role="tablist" aria-label={t('ts.tabs')} className="flex items-center gap-1" data-testid="search-mode">
               {(['tasks', 'all'] as const).map((m) => (
                 <button
                   key={m}
@@ -419,6 +420,7 @@ export function QuickSwitcher({ onClose, initialQuery = '' }: { onClose: () => v
                   {m === 'tasks' ? t('ts.tab') : t('ts.tabAll')}
                 </button>
               ))}
+              </div>
               {tasksMode ? (
                 <>
                   <span className="flex-1" />

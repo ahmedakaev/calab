@@ -428,7 +428,26 @@ export function FilterChips({ boardId, workspaceId }: { boardId: string; workspa
 }
 
 /** Condition chips of any filter value (the board's, a rule's «Если» block); `children` after them. */
-export function ConditionChips({ board, workspaceId, filter, setFilter, className, noMe = false, children }: { board: Board | undefined; workspaceId: string; filter: FilterState; setFilter: (f: FilterState) => void; className?: string; noMe?: boolean; children?: ReactNode }): ReactNode {
+export function ConditionChips({
+  board,
+  workspaceId,
+  filter,
+  setFilter,
+  className,
+  noMe = false,
+  reset = true,
+  children,
+}: {
+  board: Board | undefined;
+  workspaceId: string;
+  filter: FilterState;
+  setFilter: (f: FilterState) => void;
+  className?: string;
+  noMe?: boolean;
+  /** Its own «Сбросить» (the task search has one for all its conditions). */
+  reset?: boolean;
+  children?: ReactNode;
+}): ReactNode {
   const today = useToday();
   return (
     <div className={cx('flex min-w-0 flex-wrap items-center gap-1.5', className)} data-testid="filter-chips">
@@ -446,7 +465,7 @@ export function ConditionChips({ board, workspaceId, filter, setFilter, classNam
           {filter.any ? t('boards.anyCond') : t('boards.allConds')}
         </button>
       ) : null}
-      {filter.conds.length > 0 ? (
+      {reset && filter.conds.length > 0 ? (
         <button type="button" onClick={() => setFilter({ conds: [], any: false })} className="h-6 rounded-full px-2 text-caption text-muted hover:bg-hover hover:text-fg" data-testid="filter-reset">
           {t('common.reset')}
         </button>

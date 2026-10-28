@@ -166,7 +166,7 @@ function MyTasks({ workspaceId }: { workspaceId: string }): ReactNode {
     if (v !== 'all') useTaskSearch.getState().setActiveSaved(workspaceId, '');
   }, [workspaceId]);
   const tabs = useMemo(
-    (): Array<{ value: MyTab; label: string }> => [{ value: 'unread', label: unread ? t('boards.unreadTabN', { n: unread }) : t('boards.unreadTab') }, ...SCOPES.map((s) => ({ value: s.value, label: t(s.label) })), { value: 'all', label: t('boards.allTasks') }],
+    (): Array<{ value: MyTab; label: string }> => [{ value: 'unread', label: unread ? t('boards.unreadTabN', { n: unread }) : t('boards.unreadTab') }, ...SCOPES.map((s) => ({ value: s.value, label: t(s.label) })), { value: 'all', label: t('ts.tabSearch') }],
     [unread],
   );
   return (
