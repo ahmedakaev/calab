@@ -2334,7 +2334,7 @@ Stand with a real provider (telephony on, a Caller ID), member A with `PLACE_CAL
 5. Answered call: «Клавиатура» → press 1 2 #; the second phone (or an IVR you call) hears / receives the tones. If not — record it in docs/12 (DTMF line).
 6. «Набор»: type «101» → «Имя · вн. 101», call → internal call; long press «0» → «+»; paste «Тел.: 8 (916) 123-45-67» → «8 916 123-45-67». Member without `PLACE_CALLS`: the note, the call button only for internal numbers.
 
-## Notifications lead to the source; «Упоминания» with task events (ADR-0140, #99)
+## Notifications lead to the source; «Упоминания» with task events (ADR-0141, #99)
 
 macOS desktop build, two workspaces, member B in both; A mentions and assigns B.
 

@@ -162,7 +162,7 @@ describe('new message sound (docs/09 P1 #13, item 22)', () => {
   });
 });
 
-describe('system notification of a message (ADR-0140, #99)', () => {
+describe('system notification of a message (ADR-0141, #99)', () => {
   it('the title starts with the source: room, then author; a DM is its author', () => {
     expect(messageNoticeTitle('Борис', { name: 'общий', type: RoomType.TEXT }, false)).toBe('#общий · Борис');
     expect(messageNoticeTitle('Борис', { name: 'Планёрка', type: RoomType.VOICE }, false)).toBe('«Планёрка» · Борис');

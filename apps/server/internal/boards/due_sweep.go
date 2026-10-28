@@ -75,7 +75,7 @@ func (s *Service) DeliverDueNotices(ctx context.Context, loc *time.Location) (in
 		if _, err := guarded.PurgeTaskDueNotices(ctx); err != nil {
 			return err
 		}
-		// The inbox's task notice history keeps NoticeLogRetention (ADR-0140).
+		// The inbox's task notice history keeps NoticeLogRetention (ADR-0141).
 		_, err := guarded.PruneTaskNoticeLog(ctx, s.Now().Add(-NoticeLogRetention))
 		return err
 	}); err != nil {

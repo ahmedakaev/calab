@@ -8091,7 +8091,7 @@ type TaskNotice struct {
 	DueOn string `protobuf:"bytes,8,opt,name=due_on,json=dueOn,proto3" json:"due_on,omitempty"`
 	// DUE_SOON: 1 = due tomorrow, 0 = due today; OVERDUE: the days past due, negative (-1).
 	DaysLeft int32 `protobuf:"varint,9,opt,name=days_left,json=daysLeft,proto3" json:"days_left,omitempty"`
-	// The notice's id in the recipient's notice history (ADR-0140, GET /api/me/task-notices):
+	// The notice's id in the recipient's notice history (ADR-0141, GET /api/me/task-notices):
 	// uuidv7, time-ordered. Empty from an older server.
 	Id            string `protobuf:"bytes,10,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -8198,7 +8198,7 @@ func (x *TaskNotice) GetId() string {
 	return ""
 }
 
-// One entry of GET /api/me/task-notices (ADR-0140): a task notice the caller got, with the
+// One entry of GET /api/me/task-notices (ADR-0141): a task notice the caller got, with the
 // task as it is named now. Only tasks the caller still sees are listed.
 type TaskNoticeEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`

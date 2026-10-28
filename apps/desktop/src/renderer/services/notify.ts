@@ -110,7 +110,7 @@ export function onIncomingMessage(m: Message, workspaceId: string, visible: bool
 }
 
 /**
- * The title of a message's system notification (ADR-0140): the source first — macOS cuts a long
+ * The title of a message's system notification (ADR-0141): the source first — macOS cuts a long
  * title at its end — then the author: «#общий · Борис», ««Планёрка» · Борис» for a voice room; with
  * more than one workspace, its name after the room: «#общий (Команда) · Борис». A DM is titled
  * with its author alone (the chat is them).

@@ -4192,7 +4192,7 @@ export type TaskNotice = Message<"calaba.v1.TaskNotice"> & {
   daysLeft: number;
 
   /**
-   * The notice's id in the recipient's notice history (ADR-0140, GET /api/me/task-notices):
+   * The notice's id in the recipient's notice history (ADR-0141, GET /api/me/task-notices):
    * uuidv7, time-ordered. Empty from an older server.
    *
    * @generated from field: string id = 10;
@@ -4208,7 +4208,7 @@ export const TaskNoticeSchema: GenMessage<TaskNotice> = /*@__PURE__*/
   messageDesc(file_calaba_v1_boards, 87);
 
 /**
- * One entry of GET /api/me/task-notices (ADR-0140): a task notice the caller got, with the
+ * One entry of GET /api/me/task-notices (ADR-0141): a task notice the caller got, with the
  * task as it is named now. Only tasks the caller still sees are listed.
  *
  * @generated from message calaba.v1.TaskNoticeEntry

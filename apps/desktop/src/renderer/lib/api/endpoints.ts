@@ -302,7 +302,7 @@ export const api = {
     /** Messages mentioning me in rooms I can view, newest first (cursor `before`, limit ≤ 100). */
     mentions: (p: { limit?: number; before?: string; workspace_id?: string }, signal?: AbortSignal) =>
       call('GET', `/api/me/mentions${qs(p)}`, ListMessagesResponseSchema, undefined, signal),
-    /** My task notices (ADR-0140), newest first, of tasks I see now (cursor `before`, limit ≤ 100). */
+    /** My task notices (ADR-0141), newest first, of tasks I see now (cursor `before`, limit ≤ 100). */
     taskNotices: (p: { limit?: number; before?: string }, signal?: AbortSignal) =>
       call('GET', `/api/me/task-notices${qs(p)}`, ListTaskNoticesResponseSchema, undefined, signal),
   },

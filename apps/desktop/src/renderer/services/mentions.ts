@@ -11,7 +11,7 @@ import { t } from '../i18n';
 const PAGE = 30;
 
 /**
- * Mentions inbox history (ADR-0140): GET /api/me/mentions and GET /api/me/task-notices, side by
+ * Mentions inbox history (ADR-0141): GET /api/me/mentions and GET /api/me/task-notices, side by
  * side. Without `older` it fetches the newest page of each (merged with what is known, so live
  * items and history never duplicate); `older` pages on whichever list has more.
  */

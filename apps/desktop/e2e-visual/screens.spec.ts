@@ -1394,7 +1394,7 @@ test('room-notify-menu', async ({ open, win, mock, shot }) => {
   await checkpoint(shot, 'room-notify-menu');
 });
 
-// «Упоминания» (ADR-0140, #99): chat mentions and task events together, newest first, each with
+// «Упоминания» (ADR-0141, #99): chat mentions and task events together, newest first, each with
 // its source (room · workspace, KEY · title); unread ones carry a dot.
 test('inbox-popover', async ({ open, win, mock, shot }) => {
   await open();

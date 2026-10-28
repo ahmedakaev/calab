@@ -16,10 +16,10 @@ import (
 	"github.com/calaba/calaba/server/internal/perm"
 )
 
-// NoticeLogRetention is how long the inbox keeps a task notice (ADR-0140).
+// NoticeLogRetention is how long the inbox keeps a task notice (ADR-0141).
 const NoticeLogRetention = 90 * 24 * time.Hour
 
-// logNotice writes a notice the user is about to get into their notice history (ADR-0140) and
+// logNotice writes a notice the user is about to get into their notice history (ADR-0141) and
 // returns its id ("" when it could not be written: the live notice still goes out).
 func (s *Service) logNotice(ctx context.Context, taskID uuid.UUID, n notice, tn *v1.TaskNotice) string {
 	id, err := uuid.NewV7()
@@ -44,7 +44,7 @@ func (s *Service) logNotice(ctx context.Context, taskID uuid.UUID, n notice, tn 
 	return id.String()
 }
 
-// listNotices: GET /api/me/task-notices?before=&limit= — the caller's task notices (ADR-0140),
+// listNotices: GET /api/me/task-notices?before=&limit= — the caller's task notices (ADR-0141),
 // newest first, of tasks the caller still sees, with the task's current key and title.
 func (s *Service) listNotices(w http.ResponseWriter, r *http.Request) error {
 	p, err := messages.ParsePage(r)

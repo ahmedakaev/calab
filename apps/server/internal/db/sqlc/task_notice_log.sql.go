@@ -32,7 +32,7 @@ type InsertTaskNoticeParams struct {
 	DaysLeft    int32
 }
 
-// One notified user of a task change (ADR-0140).
+// One notified user of a task change (ADR-0141).
 func (q *Queries) InsertTaskNotice(ctx context.Context, arg InsertTaskNoticeParams) error {
 	_, err := q.db.Exec(ctx, insertTaskNotice,
 		arg.ID,

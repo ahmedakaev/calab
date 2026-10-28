@@ -42,7 +42,7 @@ describe('loadMentions (review N7)', () => {
   });
 });
 
-describe('loadMentions (ADR-0140)', () => {
+describe('loadMentions (ADR-0141)', () => {
   it('loads chat mentions and task notices side by side', async () => {
     api.mentions.mockResolvedValue({ messages: [m('04')], hasMore: false });
     api.taskNotices.mockResolvedValue({ entries: [n('05')], hasMore: true });

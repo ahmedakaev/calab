@@ -8,7 +8,7 @@ import (
 	v1 "github.com/calaba/calaba/server/gen/calaba/v1"
 )
 
-// TestTaskNoticeLog (ADR-0140): a notice the server sends is kept in the recipient's history
+// TestTaskNoticeLog (ADR-0141): a notice the server sends is kept in the recipient's history
 // with the live notice's id; the list is the recipient's own, newest first, paged, with the
 // task's current key and title, and hides tasks the recipient no longer sees.
 func TestTaskNoticeLog(t *testing.T) {

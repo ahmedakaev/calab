@@ -7,7 +7,7 @@ import { inboxRows } from './inboxUnread';
 const mention = (id: string) => create(MessageSchema, { id, roomId: 'a' });
 const notice = (id: string, taskId: string) => create(TaskNoticeEntrySchema, { id, taskId });
 
-describe('inboxRows (ADR-0140)', () => {
+describe('inboxRows (ADR-0141)', () => {
   it('interleaves mentions and task notices by id, newest first; only the newest notice of a task is latest', () => {
     const rows = inboxRows([mention('06'), mention('02')], [notice('05', 't1'), notice('04', 't2'), notice('03', 't1')]);
     expect(rows.map((r) => r.id)).toEqual(['06', '05', '04', '03', '02']);
@@ -17,7 +17,7 @@ describe('inboxRows (ADR-0140)', () => {
   });
 });
 
-describe('useInbox task notices (ADR-0140)', () => {
+describe('useInbox task notices (ADR-0141)', () => {
   beforeEach(() => useInbox.getState().reset());
 
   it('history and live notices merge without duplicates, newest first; «has more» follows the oldest page', () => {

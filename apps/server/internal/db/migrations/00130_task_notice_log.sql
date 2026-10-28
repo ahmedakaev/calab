@@ -1,4 +1,4 @@
--- The notice history of a user (ADR-0140): every task notice the server sent a user (TaskUpdate
+-- The notice history of a user (ADR-0141): every task notice the server sent a user (TaskUpdate
 -- with a notice, ADR-0042 §4 / ADR-0089), so the «Упоминания» inbox lists task events next to the
 -- chat mentions. Written after the change commits (boards.sendNotices), one row per recipient.
 --

@@ -362,7 +362,7 @@ describe('boards 2.0 mock (ADR-0058)', () => {
   });
 });
 
-describe('task notice history (ADR-0140)', () => {
+describe('task notice history (ADR-0141)', () => {
   it('a comment mention lands in the mentioned user’s GET /api/me/task-notices', async () => {
     const token = await login();
     const t = server.boards.taskByKey('CAL-3');

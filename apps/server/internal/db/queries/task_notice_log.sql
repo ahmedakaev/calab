@@ -1,5 +1,5 @@
 -- name: InsertTaskNotice :exec
--- One notified user of a task change (ADR-0140).
+-- One notified user of a task change (ADR-0141).
 INSERT INTO task_notice_log (id, user_id, task_id, kind, actor_id, message_id, text, rule_id, re_requested, due_on, days_left)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT DO NOTHING;

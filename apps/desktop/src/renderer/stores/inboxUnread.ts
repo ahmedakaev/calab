@@ -50,7 +50,7 @@ export function inboxBadgeCount(
   return total;
 }
 
-/** A row of the inbox (ADR-0140): a chat mention or a task notice; `latest`: the newest notice of its task. */
+/** A row of the inbox (ADR-0141): a chat mention or a task notice; `latest`: the newest notice of its task. */
 export interface InboxRow {
   id: string;
   m?: Message;

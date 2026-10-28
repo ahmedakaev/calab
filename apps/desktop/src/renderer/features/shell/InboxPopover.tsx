@@ -30,7 +30,7 @@ function markReadUpTo(roomId: string, messageId: string): void {
 }
 
 /**
- * Mentions inbox (docs/09 #1, ADR-0140): chat mentions (GET /api/me/mentions, all workspaces) and
+ * Mentions inbox (docs/09 #1, ADR-0141): chat mentions (GET /api/me/mentions, all workspaces) and
  * task notices (GET /api/me/task-notices), merged with the live ones, newest first. Read items
  * stay listed; unread ones carry a dot. The badge counts unread mentions: «read» is the room's
  * read marker being at or after the mention (stores/inboxUnread.ts); unread tasks are counted by
@@ -217,7 +217,7 @@ const InboxItem = memo(function InboxItem({ m }: { m: Message }): ReactNode {
 const NO_TASK: Pick<Task, 'approvers' | 'priority'> = { approvers: [], priority: TaskPriority.NONE };
 
 /**
- * A task notice (ADR-0140): who, the task (key · title — the source) and what happened. Unread
+ * A task notice (ADR-0141): who, the task (key · title — the source) and what happened. Unread
  * while the task is in «Непрочитанное», marked on its newest notice only.
  */
 const NoticeItem = memo(function NoticeItem({ e, latest }: { e: TaskNoticeEntry; latest: boolean }): ReactNode {

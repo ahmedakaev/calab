@@ -556,7 +556,7 @@ export class BoardsMock {
     });
   }
 
-  /** Task notices as the server keeps them (ADR-0140): one row per recipient. */
+  /** Task notices as the server keeps them (ADR-0141): one row per recipient. */
   private readonly noticeLog: Array<{ id: string; user: string; taskId: string; notice: MessageInitShape<typeof TaskNoticeSchema>; at: Timestamp }> = [];
 
   private noticeSeq = 0;
@@ -572,7 +572,7 @@ export class BoardsMock {
     return id;
   }
 
-  /** GET /me/task-notices (ADR-0140): mine, newest first, of tasks I see now, with the current key and title. */
+  /** GET /me/task-notices (ADR-0141): mine, newest first, of tasks I see now, with the current key and title. */
   notices(userId: string, before: string, limit: number): MessageInitShape<typeof ListTaskNoticesResponseSchema> {
     const all = this.noticeLog
       .filter((l) => l.user === userId && (!before || l.id < before))

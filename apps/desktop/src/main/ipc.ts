@@ -339,7 +339,7 @@ export function registerIpc(): void {
     }
   });
 
-  // A notification click (ADR-0140): window.focus() in the page neither shows a window the close
+  // A notification click (ADR-0141): window.focus() in the page neither shows a window the close
   // button hid nor restores a minimized one. Only the main window asks.
   handle(IPC.appShowWindow, (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);

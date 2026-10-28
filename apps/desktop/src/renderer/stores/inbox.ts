@@ -2,14 +2,14 @@ import type { Message, TaskNoticeEntry } from '@calaba/protocol';
 import { create } from 'zustand';
 
 /**
- * Mentions inbox (title bar «Упоминания», ADR-0140): chat mentions — history from
+ * Mentions inbox (title bar «Упоминания», ADR-0141): chat mentions — history from
  * GET /api/me/mentions merged with the ones that arrive live over the gateway — and task notices —
  * GET /api/me/task-notices merged with the live TASK_UPDATE notices. Each list newest first,
  * unique by id (uuidv7: the two interleave by id).
  */
 interface InboxState {
   items: Message[];
-  /** Task notices (ADR-0140). */
+  /** Task notices (ADR-0141). */
   notices: TaskNoticeEntry[];
   /** History was fetched at least once (the first open shows a spinner until then). */
   loaded: boolean;

@@ -103,7 +103,7 @@ export interface CalabaApi {
     attention(): void;
     /**
      * Bring the main window to the front: restore it when minimized, show it when the close button
-     * hid it (the app lives in the tray), focus it. A system notification click (ADR-0140).
+     * hid it (the app lives in the tray), focus it. A system notification click (ADR-0141).
      */
     showWindow(): void;
     /** The app badge: mentions + unread DM messages (0 clears it). */

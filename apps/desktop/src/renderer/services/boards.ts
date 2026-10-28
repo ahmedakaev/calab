@@ -245,7 +245,7 @@ function rememberNotice(u: TaskUpdate): void {
 }
 
 /**
- * A live task notice into the «Упоминания» inbox (ADR-0140), as the history lists it. A notice
+ * A live task notice into the «Упоминания» inbox (ADR-0141), as the history lists it. A notice
  * without an id comes from an older server, which keeps no history: it stays out, so the list
  * never shows what a reload would lose.
  */

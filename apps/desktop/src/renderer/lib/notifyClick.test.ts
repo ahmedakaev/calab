@@ -5,7 +5,7 @@ vi.mock('../platform', () => ({ platform: { app: { showWindow } } }));
 
 const { toSource } = await import('./notifyClick');
 
-describe('toSource (ADR-0140)', () => {
+describe('toSource (ADR-0141)', () => {
   it('brings the window to the front before it leads to the source', () => {
     const calls: string[] = [];
     toSource(
