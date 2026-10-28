@@ -674,6 +674,7 @@ export function Modal({
   nonModal = false,
   keepOpen,
   full = false,
+  fullWidth = false,
   focusOnPhone = false,
 }: {
   open: boolean;
@@ -711,6 +712,8 @@ export function Modal({
    * desktop, the whole screen on a phone (above the keyboard). The body is a flex column.
    */
   full?: boolean;
+  /** With `full`: the whole window less the margin, not the 1000 px column (a spreadsheet / slides editor). */
+  fullWidth?: boolean;
   /** Phone: still focus `initialFocus` on open (the user asked to write, like «Ответить»). */
   focusOnPhone?: boolean;
 }): ReactNode {
@@ -755,7 +758,7 @@ export function Modal({
             'mat-sheet anim-in fixed left-1/2 top-1/2 z-[var(--z-modal)] flex -translate-x-1/2 -translate-y-1/2 flex-col rounded-[var(--radius-panel)] text-body focus:outline-none',
             full
               ? // Editor: the window less a margin; a phone gets the whole screen (the height follows the keyboard).
-                'h-[calc(100vh-48px)] w-[calc(100vw-48px)] max-w-[1000px] mobile:left-0 mobile:top-0 mobile:h-(--app-height) mobile:w-screen mobile:max-w-none mobile:translate-x-0 mobile:translate-y-0 mobile:rounded-none mobile:pt-(--safe-top) mobile:pb-(--safe-bottom)'
+                cx('h-[calc(100vh-48px)] w-[calc(100vw-48px)]', fullWidth ? '' : 'max-w-[1000px]') + ' mobile:left-0 mobile:top-0 mobile:h-(--app-height) mobile:w-screen mobile:max-w-none mobile:translate-x-0 mobile:translate-y-0 mobile:rounded-none mobile:pt-(--safe-top) mobile:pb-(--safe-bottom)'
               : cx('max-h-[calc(100vh-92px)] w-[calc(100vw-32px)]', wide ? 'max-w-[880px]' : medium ? 'max-w-[560px]' : 'max-w-[440px]'),
             nonModal && 'no-drag shadow-[var(--shadow-popover)]',
             // Phone (owner 07.10): a centred card above the keyboard, buttons full width (app/styles.css).

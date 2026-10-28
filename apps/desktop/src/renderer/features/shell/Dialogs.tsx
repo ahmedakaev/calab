@@ -179,7 +179,7 @@ export function Dialogs(): ReactNode {
       case 'office':
         node = (
           <Suspense fallback={null}>
-            <OfficeEditor key={d.itemId} itemId={d.itemId} name={d.name} onClose={close} />
+            <OfficeEditor key={'itemId' in d.source ? d.source.itemId : d.source.fileId} source={d.source} name={d.name} onClose={close} />
           </Suspense>
         );
         break;
