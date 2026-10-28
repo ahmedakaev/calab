@@ -137,6 +137,12 @@ class FakeRoom {
   /** ConnectionState (names proxy: the enum key). */
   state = 'Connected';
   engine = {};
+  /** Autoplay allowed (Room.canPlaybackAudio); startAudio() is the tap's unlock. */
+  canPlaybackAudio = true;
+  startAudio = vi.fn(() => {
+    this.canPlaybackAudio = true;
+    return Promise.resolve();
+  });
   localParticipant = {
     identity: 'u1:mine',
     permissions: undefined as undefined | { canPublish: boolean; canPublishSources: number[] },
@@ -235,6 +241,14 @@ interface FakePipeline {
   isDucked: boolean;
   setDuck: ReturnType<typeof vi.fn>;
   setDenoise: ReturnType<typeof vi.fn>;
+  /** Capture health: tests flip `ctx` / `muted` and fire onMute / onContextState. */
+  ctx: string;
+  muted: boolean;
+  reportAt: number | null;
+  health: () => { ctx: string; ended: boolean; muted: boolean; reportAgeMs: number | null };
+  resumeContext: ReturnType<typeof vi.fn>;
+  onMute?: (muted: boolean) => void;
+  onContextState?: (state: string) => void;
   onEnded?: () => void;
   /** The worklet's 20 ms level / VAD reports (tests feed speech and silence through it). */
   onReport?: (r: { rms: number; vad: number }) => void;
@@ -243,10 +257,18 @@ interface FakePipeline {
 const gone = new Set<string>();
 const pipelines: FakePipeline[] = [];
 let gate: Promise<void> | null = null; // when set, MicPipeline.start waits for it
+/** MicPipeline.start calls, and an error the next one throws (the system holds the device). */
+const micStarts = vi.hoisted(() => ({ n: 0, failNext: null as Error | null }));
 vi.mock('../lib/media/micPipeline', () => ({
   MicPipeline: {
-    start: vi.fn(async (opts: { deviceId: string | null; rnnoise: boolean; musician?: boolean; duckable?: boolean; onEnded?: () => void; onReport?: (r: { rms: number; vad: number }) => void }) => {
+    start: vi.fn(async (opts: { deviceId: string | null; rnnoise: boolean; musician?: boolean; duckable?: boolean; onEnded?: () => void; onReport?: (r: { rms: number; vad: number }) => void; onMute?: (muted: boolean) => void; onContextState?: (state: string) => void }) => {
+      micStarts.n++;
       if (gate) await gate;
+      if (micStarts.failNext) {
+        const e = micStarts.failNext;
+        micStarts.failNext = null;
+        throw e;
+      }
       if (opts.deviceId && gone.has(opts.deviceId)) throw Object.assign(new Error('gone'), { name: 'OverconstrainedError' });
       const track = new FakeTrack();
       const p: FakePipeline = {
@@ -260,7 +282,17 @@ vi.mock('../lib/media/micPipeline', () => ({
         isDucked: false,
         setDuck: vi.fn(),
         setDenoise: vi.fn(),
+        ctx: 'running',
+        muted: false,
+        reportAt: null,
+        health: () => ({ ctx: p.ctx, ended: track.readyState === 'ended', muted: p.muted, reportAgeMs: p.reportAt === null ? null : Date.now() - p.reportAt }),
+        resumeContext: vi.fn(() => {
+          if (p.ctx !== 'closed') p.ctx = 'running';
+          return Promise.resolve(p.ctx === 'running');
+        }),
         stop: vi.fn(() => track.stop()),
+        ...(opts.onMute ? { onMute: opts.onMute } : {}),
+        ...(opts.onContextState ? { onContextState: opts.onContextState } : {}),
         ...(opts.onEnded ? { onEnded: opts.onEnded } : {}),
         ...(opts.onReport ? { onReport: opts.onReport } : {}),
       };
@@ -291,7 +323,8 @@ const phone = vi.hoisted(() => ({ on: false }));
 vi.mock('../lib/mobile', () => ({ isMobileNow: () => phone.on }));
 vi.mock('../lib/sounds', () => ({ playSound: (name: string) => playSound(name) }));
 const pushToast = vi.hoisted(() => vi.fn());
-vi.mock('../stores/toasts', () => ({ toast: { info: vi.fn(), error: vi.fn() }, useToasts: { getState: () => ({ push: pushToast }) } }));
+const dismissToast = vi.hoisted(() => vi.fn());
+vi.mock('../stores/toasts', () => ({ toast: { info: vi.fn(), error: vi.fn() }, useToasts: { getState: () => ({ items: [], push: pushToast, dismiss: dismissToast }) } }));
 const announce = vi.fn();
 vi.mock('./deviceToast', () => ({ announceDeviceSwitch: (...a: unknown[]) => void announce(...a) }));
 const reportMediaError = vi.fn(() => ({ text: 'err', action: null }));
@@ -333,6 +366,8 @@ beforeEach(async () => {
   nativeHost.audio = undefined;
   pipelines.length = 0;
   gate = null;
+  micStarts.n = 0;
+  micStarts.failNext = null;
   gone.clear();
   joinVoice.mockClear();
   leaveVoice.mockReset();
@@ -2838,5 +2873,161 @@ describe('one mic view for the panel, my row and the island (#96)', () => {
     expect(await view()).toMatchObject({ muted: false, glyph: 'ptt-idle' });
     expect(track()?.isMuted).toBe(false);
     await voice.leave();
+  });
+});
+
+describe('the page away and back', () => {
+  const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+  const doc = document as unknown as { hidden?: boolean };
+  const setHidden = (hidden: boolean): void => {
+    doc.hidden = hidden;
+    for (const fn of docListeners.get('visibilitychange') ?? []) fn({});
+  };
+  const toasts = async (kind: 'info' | 'error'): Promise<string[]> => {
+    const { toast } = await import('../stores/toasts');
+    return vi.mocked(toast[kind]).mock.calls.map((c) => c[0]);
+  };
+  const reconnecting = (room: FakeRoom): void => {
+    room.state = 'Reconnecting';
+    room.emit('ConnectionStateChanged', 'Reconnecting');
+  };
+  beforeEach(async () => {
+    const { toast } = await import('../stores/toasts');
+    vi.mocked(toast.error).mockClear();
+    pushToast.mockClear();
+  });
+  afterEach(() => {
+    doc.hidden = false;
+    (navigator as unknown as { userAgent: string }).userAgent = 'test';
+  });
+
+  it('back after a long hide with LiveKit still reconnecting: rejoins at once; no cue while hidden; the outage is told', async () => {
+    await voice.join('A', 'ws');
+    const a = FakeRoom.all[0];
+    if (!a) throw new Error('no room');
+    playSound.mockClear();
+    setHidden(true);
+    reconnecting(a);
+    expect(playSound).not.toHaveBeenCalled(); // a hidden web page: no «disconnect»
+    await vi.advanceTimersByTimeAsync(25_000);
+    joinVoice.mockClear();
+    setHidden(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(joinVoice.mock.calls).toEqual([['A']]); // not after the 5 s / 30 s timers
+    expect(useVoice.getState()).toMatchObject({ roomId: 'A', phase: 'connected' });
+    expect(playSound.mock.calls).toEqual([['reconnect']]);
+    expect(await toasts('info')).toContain('Связь пропадала 25 с');
+  });
+
+  it('a short hide: LiveKit’s own resume gets the visible grace (15 s) before the seat check rejoins', async () => {
+    await voice.join('A', 'ws');
+    const a = FakeRoom.all[0];
+    if (!a) throw new Error('no room');
+    setHidden(true);
+    reconnecting(a);
+    await vi.advanceTimersByTimeAsync(3_000);
+    joinVoice.mockClear();
+    setHidden(false);
+    await vi.advanceTimersByTimeAsync(14_000);
+    expect(joinVoice).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_500); // the grace + the cycle's first 1 s
+    expect(joinVoice.mock.calls).toEqual([['A']]);
+  });
+
+  it('autoplay refused: «Нажмите, чтобы включить звук»; the tap runs room.startAudio()', async () => {
+    await voice.join('A', 'ws');
+    const a = FakeRoom.all[0];
+    if (!a) throw new Error('no room');
+    a.canPlaybackAudio = false;
+    a.emit('AudioPlaybackStatusChanged', false);
+    expect(pushToast).toHaveBeenCalledTimes(1);
+    const [kind, text, action] = pushToast.mock.calls[0] as [string, string, { label: string; run: () => void }];
+    expect([kind, text, action.label]).toEqual(['info', 'Нажмите, чтобы включить звук', 'Включить звук']);
+    action.run();
+    expect(a.startAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it('a subscribed mic without a track is resubscribed (at most twice), never a rejoin', async () => {
+    await voice.join('A', 'ws');
+    const a = FakeRoom.all[0];
+    if (!a) throw new Error('no room');
+    const pub = { source: 'microphone', trackSid: 'TR_b', kind: 'audio', isMuted: false, isDesired: true, track: undefined, setSubscribed: vi.fn(), setEnabled: () => undefined };
+    a.remoteParticipants.set('u2:b', { identity: 'u2:b', trackPublications: new Map([['TR_b', pub]]), getTrackPublication: (s: string) => (s === 'microphone' ? pub : undefined) });
+    joinVoice.mockClear();
+    a.emit('Reconnected');
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(pub.setSubscribed.mock.calls).toEqual([[false]]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(pub.setSubscribed.mock.calls).toEqual([[false], [true]]);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(pub.setSubscribed.mock.calls).toEqual([[false], [true], [false], [true]]);
+    expect(joinVoice).not.toHaveBeenCalled();
+  });
+
+  it('another app holds the mic: «Микрофон занят…», one rebuild after ~2 s visible, «Вас не слышно…» when it fails', async () => {
+    await voice.join('A', 'ws');
+    const p = pipelines[0];
+    if (!p) throw new Error('no pipeline');
+    p.muted = true;
+    p.onMute?.(true);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(useVoice.getState()).toMatchObject({ micError: 'Микрофон занят другим приложением', phase: 'connected' });
+    micStarts.failNext = Object.assign(new Error('could not start audio source'), { name: 'NotReadableError' });
+    await vi.advanceTimersByTimeAsync(600);
+    expect(micStarts.n).toBe(2);
+    expect(useVoice.getState().micError).toBe('Вас не слышно: микрофон занят системой');
+    expect(await toasts('error')).toEqual(['Вас не слышно: микрофон занят системой']);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(micStarts.n).toBe(2); // one rebuild per episode
+  });
+
+  it('the app lets the mic go: the busy state clears, the context resumes, no rebuild', async () => {
+    await voice.join('A', 'ws');
+    const p = pipelines[0];
+    if (!p) throw new Error('no pipeline');
+    p.muted = true;
+    p.onMute?.(true);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(useVoice.getState().micError).toBe('Микрофон занят другим приложением');
+    p.muted = false;
+    p.onMute?.(false);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(useVoice.getState().micError).toBeNull();
+    expect(p.resumeContext).toHaveBeenCalled();
+    expect(micStarts.n).toBe(1);
+  });
+
+  it('a suspended capture context (an interruption) is resumed, not rebuilt', async () => {
+    await voice.join('A', 'ws');
+    const p = pipelines[0];
+    if (!p) throw new Error('no pipeline');
+    p.ctx = 'interrupted';
+    p.onContextState?.('interrupted');
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(p.resumeContext).toHaveBeenCalled();
+    expect(p.ctx).toBe('running');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(pipelines).toHaveLength(1);
+  });
+
+  it('a hidden iPhone page never restarts the capture: the ended track is rebuilt once visible', async () => {
+    (navigator as unknown as { userAgent: string }).userAgent = IPHONE_UA;
+    vi.resetModules();
+    docListeners.clear();
+    ({ voice } = await import('./voice'));
+    ({ useVoice } = await import('../stores/voice'));
+    voice.init();
+    await voice.join('A', 'ws');
+    const p = pipelines.at(-1);
+    if (!p) throw new Error('no pipeline');
+    const starts = micStarts.n;
+    setHidden(true);
+    p.track.stop();
+    p.onEnded?.();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(micStarts.n).toBe(starts);
+    setHidden(false);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(micStarts.n).toBe(starts + 1);
   });
 });

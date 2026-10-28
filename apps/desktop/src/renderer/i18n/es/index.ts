@@ -402,6 +402,11 @@ export const es: Dict = {
   // voice
   'voice.connecting': 'Conectando…',
   'voice.reconnecting': 'Reconectando…',
+  'voice.audioBlocked': 'Toca para activar el sonido',
+  'voice.audioBlockedAction': 'Activar sonido',
+  'voice.micBusy': 'Otra aplicación está usando el micrófono',
+  'voice.micUnheard': 'No se te oye: el sistema está usando el micrófono',
+  'voice.linkWasDown': 'Se perdió la conexión durante {s} s',
   'voice.connected': 'Voz conectada',
   'voice.blocked': 'Voz no disponible',
   'voice.quality': 'Calidad de conexión · latencia {rtt} ms · pérdida {loss}%',

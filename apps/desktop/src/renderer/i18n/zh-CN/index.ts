@@ -402,6 +402,11 @@ export const zhCN: Dict = {
   // voice
   'voice.connecting': '连接中…',
   'voice.reconnecting': '重新连接中…',
+  'voice.audioBlocked': '点按以开启声音',
+  'voice.audioBlockedAction': '开启声音',
+  'voice.micBusy': '麦克风正被其他应用使用',
+  'voice.micUnheard': '别人听不到你：麦克风被系统占用',
+  'voice.linkWasDown': '连接中断了 {s} 秒',
   'voice.connected': '语音已连接',
   'voice.blocked': '语音不可用',
   'voice.quality': '连接质量 · 延迟{rtt}毫秒 · 丢包{loss}%',
