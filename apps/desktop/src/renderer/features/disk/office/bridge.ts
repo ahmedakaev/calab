@@ -8,15 +8,77 @@
 
 export type OfficeStatus = 'loading' | 'saved' | 'saving' | 'error';
 
+/** What the editor can do with a file type: edit and save in place, only view, or edit and save as a copy in the new format. */
+export type OfficeCap = 'edit' | 'view' | 'convert';
+
+/**
+ * The ONE place that knows which extensions open in the editor. Until the server reports a
+ * capability per extension in the config endpoint (ADR-0143 addendum), this small table stands in;
+ * the e2e mock fills the same shape. Nothing else in the client switches on extensions.
+ */
+const CAPS: Record<string, OfficeCap> = {
+  docx: 'edit', xlsx: 'edit', pptx: 'edit',
+  doc: 'convert', xls: 'convert', ppt: 'convert',
+  odt: 'view', ods: 'view', odp: 'view', rtf: 'view',
+};
+
+/** The modern format a legacy file is saved as (`convert`). */
+const CONVERT_TO: Record<string, string> = { doc: 'docx', xls: 'xlsx', ppt: 'pptx' };
+
+const extOf = (name: string): string => name.slice(name.lastIndexOf('.') + 1).toLowerCase();
+
+export function officeCapability(name: string): OfficeCap | null {
+  return name.includes('.') ? (CAPS[extOf(name)] ?? null) : null;
+}
+
+/** `docx` for «Старый.doc»; '' when the file is not saved as a copy. */
+export function convertTarget(name: string): string {
+  return CONVERT_TO[extOf(name)] ?? '';
+}
+
+/** The frame is view-only: the phone always (ADR-0143 §10), a view-only type, or the server's mode. */
+export function viewOnly(cap: OfficeCap, serverEdit: boolean, phone: boolean): boolean {
+  return phone || cap === 'view' || !serverEdit;
+}
+
+/** Why the frame shows an error: the Document Server cannot be reached, the config's token was refused, anything else. */
+export type OfficeProblem = 'unreachable' | 'token' | 'other';
+
+export function problemOf(code: string): OfficeProblem {
+  if (code === 'api-load' || code === 'api-missing' || code === 'timeout') return 'unreachable';
+  // -20: the security token was refused (expired or not formed correctly); the cure is a fresh config.
+  if (code === '-20' || code === '-18') return 'token';
+  return 'other';
+}
+
 export type HostEvent =
   | { name: 'ready' }
   | { name: 'state'; dirty: boolean }
   | { name: 'error'; code: string }
   | { name: 'warning' }
+  | { name: 'users'; names: string[] }
   | { name: 'requestClose' }
   | { name: 'closed' };
 
 const SRC = 'calab-office';
+
+/** The frame's state: the status, why it failed, who else is in the file. */
+export interface FrameState {
+  status: OfficeStatus;
+  problem: OfficeProblem | null;
+  others: string[];
+}
+
+export const FRAME_START: FrameState = { status: 'loading', problem: null, others: [] };
+
+/** One event of the host page applied to the frame's state (pure: the status machine, unit-tested). */
+export function frameReducer(prev: FrameState, e: HostEvent | { name: 'reset' }): FrameState {
+  if (e.name === 'reset') return FRAME_START;
+  if (e.name === 'users') return { ...prev, others: e.names };
+  const status = nextStatus(prev.status, e);
+  if (status === prev.status && e.name !== 'error') return prev;
+  return { ...prev, status, problem: e.name === 'error' && prev.status !== 'error' ? problemOf(e.code) : prev.problem };
+}
 
 /** The frame's status after an event of the host page. */
 export function nextStatus(prev: OfficeStatus, e: HostEvent): OfficeStatus {
@@ -56,6 +118,10 @@ function parse(data: unknown): HostEvent | 'hello' | null {
       return { name: m.name };
     case 'state':
       return { name: 'state', dirty: m.data === true };
+    case 'users': {
+      const names = Array.isArray(m.data) ? m.data.map((u: unknown) => (u && typeof u === 'object' ? (u as { name?: unknown }).name : null)).filter((n): n is string => typeof n === 'string' && n !== '').slice(0, 20) : [];
+      return { name: 'users', names };
+    }
     case 'error': {
       const code = m.data && typeof m.data === 'object' ? (m.data as { code?: unknown }).code : undefined;
       return { name: 'error', code: typeof code === 'number' || typeof code === 'string' ? String(code) : '' };
@@ -68,6 +134,10 @@ function parse(data: unknown): HostEvent | 'hello' | null {
 export interface HostConnection {
   /** Asks the host page to destroy the editor and stops listening (the caller removes the frame). */
   close(): void;
+  /** Asks the editor to save now (a forced save, when this editor version has one): the file is being left. */
+  save(): void;
+  /** The app's theme changed while the editor is open (the host applies it when the editor supports that). */
+  setTheme(theme: 'dark' | 'light'): void;
 }
 
 /**
@@ -97,6 +167,12 @@ export function connectHost(win: Window, frame: HTMLIFrameElement, docsOrigin: s
   };
   win.addEventListener('message', listener);
   return {
+    save() {
+      frame.contentWindow?.postMessage({ source: SRC, type: 'save' }, docsOrigin);
+    },
+    setTheme(theme) {
+      frame.contentWindow?.postMessage({ source: SRC, type: 'theme', theme: theme === 'light' ? 'default-light' : 'default-dark' }, docsOrigin);
+    },
     close() {
       win.removeEventListener('message', listener);
       frame.contentWindow?.postMessage({ source: SRC, type: 'close' }, docsOrigin);
@@ -104,9 +180,14 @@ export function connectHost(win: Window, frame: HTMLIFrameElement, docsOrigin: s
   };
 }
 
-/** Disk files the editor opens (ADR-0143 v1: xlsx and docx). */
+/** «Открыть» opens the editor for this file: the feature is on and the type is in the capability table. */
+export function officeOpens(name: string): boolean {
+  return officeEnabled() && isOfficeFile(name);
+}
+
+/** Files the editor opens (any extension of the capability table). */
 export function isOfficeFile(name: string): boolean {
-  return /\.(xlsx|docx)$/i.test(name);
+  return officeCapability(name) !== null;
 }
 
 /**

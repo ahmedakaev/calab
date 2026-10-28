@@ -25,7 +25,8 @@ import {
   WorkspaceRole,
 } from '@calaba/protocol';
 import { confirmAction } from '../components/Confirm';
-import { isOfficeFile, officeEnabled } from '../features/disk/office/bridge';
+import { officeOpens } from '../features/disk/office/bridge';
+import { openOfficeFile } from '../features/disk/office/fileTabs';
 import { showMode } from '../features/shell/sectionNav';
 import { t } from '../i18n';
 import { ApiError, body, call, callEmpty, qs } from '../lib/api/client';
@@ -463,9 +464,9 @@ export function openItem(item: DiskItem, siblings: readonly string[] = []): void
     useDiskUi.getState().openDialog({ kind: 'preview', itemId: item.id });
     return;
   }
-  // xlsx / docx in ONLYOFFICE Docs (ADR-0143, spike: off unless the build sets VITE_OFFICE=1).
-  if (officeEnabled() && isOfficeFile(item.name)) {
-    useUi.getState().openDialog({ kind: 'office', itemId: item.id, name: item.name });
+  // Office files in ONLYOFFICE Docs (ADR-0143; off unless the feature is on).
+  if (officeOpens(item.name)) {
+    openOfficeFile({ itemId: item.id }, item.name, item.workspaceId);
     return;
   }
   // A PDF opens in the PDF viewer (ADR-0103), like a task attachment.
@@ -520,7 +521,7 @@ export function openPhoneDisk(screen: Extract<PhoneScreen, { kind: 'disk' }>): v
 
 /** The viewer of a file that has one in the app: a picture, a video, a PDF (as «Открыть»). */
 function hasViewer(item: DiskItem): boolean {
-  return previewKind(item.file, useUi.getState().phone.on) !== 'card';
+  return previewKind(item.file, useUi.getState().phone.on) !== 'card' || officeOpens(item.name);
 }
 
 /**
@@ -529,7 +530,9 @@ function hasViewer(item: DiskItem): boolean {
  */
 export function quickLook(item: DiskItem, siblings: readonly string[] = []): void {
   if (isFolder(item) || item.trashedAt) return;
-  openItem(item, siblings);
+  // Space is a glance: an editor (a whole Document Server session) is «Открыть», not a preview.
+  if (officeOpens(item.name)) openFileCard(item.id);
+  else openItem(item, siblings);
 }
 
 /**

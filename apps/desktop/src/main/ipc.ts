@@ -62,6 +62,7 @@ import { parseAppId, parseBounds } from './webAppPolicy';
 import { openLink } from './ownLink';
 import { getMainWindow, isOwnPage, isShown, showMainWindow } from './windows';
 import { mailRequest } from './mail';
+import { setOfficeOrigin } from './officeFrame';
 
 const VISUAL_TEST = process.env['CALABA_VISUAL_TEST'] === '1';
 const VISUAL_VIBRANCY = process.env['CALABA_VISUAL_VIBRANCY'] === '1';
@@ -470,6 +471,7 @@ export function registerIpc(): void {
     hideTip();
   });
   // ---- mail (ADR-0088 §7): validated and relayed to the engine utilityProcess ----
+  handle(IPC.officeFrameOrigin, (e, a) => setOfficeOrigin(e.sender, a === null ? null : str(a, 2048)));
   handle(IPC.mailRequest, (_e, a) => mailRequest(a));
   handle(IPC.systemOpenPrivacySettings, (_e, pane) => {
     if (process.platform === 'win32') {

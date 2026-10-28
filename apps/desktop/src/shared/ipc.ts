@@ -169,6 +169,10 @@ export const IPC = {
   mailRequest: 'mail:request',
   /** main → renderer: a MailEvent. */
   mailEvent: 'mail:event',
+
+  // ---- office editor (ADR-0143) ----
+  /** renderer → main: the Document Server URL whose host page may be framed (null = the editor closed). */
+  officeFrameOrigin: 'office:frame-origin',
 } as const;
 
 /** ◀ ▶ ⟳ of the navigation strip. */

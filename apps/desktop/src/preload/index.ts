@@ -117,6 +117,9 @@ const api: CalabaApi = {
     tipShow: (tip) => ipcRenderer.invoke(IPC.webAppTipShow, tip),
     tipHide: () => ipcRenderer.invoke(IPC.webAppTipHide),
   },
+  office: {
+    setFrameOrigin: (url) => ipcRenderer.invoke(IPC.officeFrameOrigin, url),
+  },
   mail: {
     request: (call) => ipcRenderer.invoke(IPC.mailRequest, call),
     onEvent: (cb) => on(IPC.mailEvent, cb),

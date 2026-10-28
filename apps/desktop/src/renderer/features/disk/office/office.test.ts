@@ -2,7 +2,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import HOST_JS from '../../../../../../../infra/office/calab-editor.js?raw';
-import { connectHost, isOfficeFile, nextStatus, originOf, type HostEvent } from './bridge';
+import { officeOpens, FRAME_START, connectHost, convertTarget, frameReducer, isOfficeFile, nextStatus, officeCapability, originOf, problemOf, viewOnly, type HostEvent } from './bridge';
 
 /**
  * The office editor's two halves (ADR-0143): the Calab host page that runs on the Document
@@ -170,9 +170,87 @@ describe('bridge (client side)', () => {
   it('files and origins', () => {
     expect(isOfficeFile('График отпусков 2026.XLSX')).toBe(true);
     expect(isOfficeFile('Договор.docx')).toBe(true);
-    expect(isOfficeFile('old.xls')).toBe(false);
+    expect(isOfficeFile('Презентация.PPTX')).toBe(true);
+    expect(isOfficeFile('old.xls')).toBe(true);
+    expect(isOfficeFile('xlsx')).toBe(false);
+    expect(isOfficeFile('notes.txt')).toBe(false);
     expect(isOfficeFile('scan.pdf')).toBe(false);
     expect(originOf('https://docs.calab.test/x?y')).toBe(DOCS);
     expect(originOf('javascript:alert(1)')).toBe('');
+  });
+});
+
+describe('capabilities and rules of the frame', () => {
+  it('one table: edit, convert on save, view', () => {
+    expect(officeCapability('a.docx')).toBe('edit');
+    expect(officeCapability('a.XLSX')).toBe('edit');
+    expect(officeCapability('a.pptx')).toBe('edit');
+    expect(officeCapability('a.doc')).toBe('convert');
+    expect(officeCapability('a.ppt')).toBe('convert');
+    expect(officeCapability('a.odt')).toBe('view');
+    expect(officeCapability('a.pdf')).toBeNull();
+    expect(officeCapability('docx')).toBeNull();
+    expect(convertTarget('a.doc')).toBe('docx');
+    expect(convertTarget('a.xls')).toBe('xlsx');
+    expect(convertTarget('a.ppt')).toBe('pptx');
+    expect(convertTarget('a.docx')).toBe('');
+  });
+
+  it('phone view only, whatever the server says; a view type or a view mode views', () => {
+    expect(viewOnly('edit', true, false)).toBe(false);
+    expect(viewOnly('edit', true, true)).toBe(true);
+    expect(viewOnly('edit', false, false)).toBe(true);
+    expect(viewOnly('view', true, false)).toBe(true);
+    expect(viewOnly('convert', true, false)).toBe(false);
+    expect(viewOnly('convert', true, true)).toBe(true);
+  });
+
+  it('status machine: loading → saved ⇄ saving, a sticky error with its cause, reset by a retry, co-editors', () => {
+    let s = FRAME_START;
+    s = frameReducer(s, { name: 'ready' });
+    expect(s.status).toBe('saved');
+    s = frameReducer(s, { name: 'state', dirty: true });
+    expect(s.status).toBe('saving');
+    s = frameReducer(s, { name: 'users', names: ['Анна'] });
+    expect(s.others).toEqual(['Анна']);
+    expect(s.status).toBe('saving');
+    s = frameReducer(s, { name: 'state', dirty: false });
+    expect(s.status).toBe('saved');
+    s = frameReducer(s, { name: 'error', code: '-20' });
+    expect(s).toMatchObject({ status: 'error', problem: 'token' });
+    expect(frameReducer(s, { name: 'error', code: 'api-load' }).problem).toBe('token');
+    expect(frameReducer(s, { name: 'state', dirty: false }).status).toBe('error');
+    expect(frameReducer(s, { name: 'reset' })).toEqual(FRAME_START);
+    expect(frameReducer(FRAME_START, { name: 'error', code: 'timeout' }).problem).toBe('unreachable');
+    expect(problemOf('api-missing')).toBe('unreachable');
+    expect(problemOf('-4')).toBe('other');
+  });
+
+  it('the bridge relays the co-editors and the theme', () => {
+    const { parent, frame, child } = pair();
+    const out: unknown[] = [];
+    vi.spyOn(child, 'postMessage').mockImplementation((m: unknown) => {
+      out.push(m);
+    });
+    const events: HostEvent[] = [];
+    const conn = connectHost(parent, frame, DOCS, '{}', (e) => events.push(e));
+    parent.dispatchEvent(new parent.MessageEvent('message', { data: { source: 'calab-office', type: 'event', name: 'users', data: [{ id: 1, name: 'Анна' }, { name: 5 }, null] }, origin: DOCS, source: child as unknown as Window }));
+    expect(events).toEqual([{ name: 'users', names: ['Анна'] }]);
+    conn.setTheme('light');
+    expect(out.at(-1)).toEqual({ source: 'calab-office', type: 'theme', theme: 'default-light' });
+  });
+});
+
+describe('entry-point visibility', () => {
+  it('«Открыть» is the editor only with the feature on and for a type in the capability table', () => {
+    vi.stubEnv('VITE_OFFICE', '');
+    expect(officeOpens('a.xlsx')).toBe(false);
+    vi.stubEnv('VITE_OFFICE', '1');
+    expect(officeOpens('a.xlsx')).toBe(true);
+    expect(officeOpens('a.pptx')).toBe(true);
+    expect(officeOpens('a.doc')).toBe(true);
+    expect(officeOpens('a.pdf')).toBe(false);
+    expect(officeOpens('a.txt')).toBe(false);
+    vi.unstubAllEnvs();
   });
 });
