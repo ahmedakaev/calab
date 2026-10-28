@@ -7,7 +7,7 @@ import { FREE_PLAN_LIMITS, defaultSettings, mockPdf, ts } from '../e2e-support/f
 import { CODE_FIXTURE, IDS, MOCK_GPTUNNEL_CODE, MOCK_GPTUNNEL_WEB, PASSWORD, RECORDING_FIXTURE, slowWebpAnimation, type MockServer } from '../e2e-support/mock-server';
 import { encodePng } from '../e2e-support/png';
 import { expect, test } from './app';
-import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, settle } from './harness';
+import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
 import { DAY, seedDay } from './calendarWeb';
 import { startPublisher } from './publisher';
 
@@ -184,6 +184,7 @@ const KEY = new Set([
   'boards-task-comments-days',
   'boards-task-history',
   'boards-list',
+  'boards-labels-overflow',
   'boards-filter',
   'boards-settings',
   // Status colour and icon pickers (ADR-0093).
@@ -4431,6 +4432,58 @@ test('boards-list', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('archive-empty')).toBeVisible();
   await win.getByTestId('archive-back').click();
   await expect(rows.filter({ hasText: 'CAL-2' })).toHaveCount(1);
+});
+
+/**
+ * Labels past the card width collapse into «+N» (docs/08 «Лейблы»): one row (CAL-1), two rows
+ * (CAL-2), the group on CAL-4; the hover list; the same in the list view and the task panel.
+ */
+test('boards-labels-overflow', async ({ open, win, mock, shot }) => {
+  await open();
+  seedLabelOverflow(mock);
+  await mainWindow(win, mock);
+  await boardsMode(win, mock);
+  const card = (key: string): Locator => win.getByTestId('task-card').filter({ hasText: key });
+  await expect(card('CAL-4').getByTestId('labels-more')).toBeVisible();
+  await expect(card('CAL-1').getByTestId('labels-more')).toHaveCount(0);
+  await expect(card('CAL-2').getByTestId('labels-more')).toHaveCount(0);
+  await checkpoint(shot, 'boards-labels-card');
+  await card('CAL-4').getByTestId('labels-more').scrollIntoViewIfNeeded();
+  await checkpoint(shot, 'boards-labels-card-group');
+  // Hover opens the hidden labels and leaving closes them; Enter on the focused pill opens them, Esc closes.
+  const more = card('CAL-4').getByTestId('labels-more');
+  const list = win.getByTestId('labels-more-list');
+  await more.hover();
+  await expect(list).toBeVisible();
+  await win.mouse.move(0, 0);
+  await expect(list).toHaveCount(0);
+  await more.focus();
+  await win.keyboard.press('Enter');
+  await expect(list).toBeVisible();
+  await expect(list.getByTestId('label-pill')).toHaveCount(6);
+  await checkpoint(shot, 'boards-labels-more', { axe: false });
+  await win.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await expect(win.getByTestId('kanban')).toBeVisible(); // the board's own Esc did not fire
+
+  // The task panel: the labels row with the «+» after them; the group opens the same list.
+  await card('CAL-4').getByTestId('card-title').click();
+  const panel = win.getByTestId('task-panel');
+  await expect(panel.getByTestId('prop-labels')).toBeVisible();
+  await expect(panel.getByTestId('labels-more')).toBeVisible();
+  await checkpoint(shot, 'boards-labels-task');
+  await panel.getByTestId('labels-more').click();
+  await expect(list).toBeVisible();
+  await checkpoint(shot, 'boards-labels-task-more', { axe: false });
+  await win.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await win.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+
+  // The list view: one row of labels, the rest in «+N».
+  await win.getByTestId('view-list').click();
+  await expect(win.getByTestId('list-row').filter({ hasText: 'CAL-4' }).getByTestId('labels-more')).toBeVisible();
+  await checkpoint(shot, 'boards-labels-list', { axe: false });
 });
 
 /** «Фильтр» open over a filtered board: a label condition, the field list. */

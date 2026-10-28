@@ -5,7 +5,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { AiState, FormerMemberReason, Plan, RecordingStatus, WorkspaceRole } from '@calaba/protocol';
 import { ts } from '../e2e-support/fixtures';
 import { CANVAS_PUBLIC_CODE, CODE_FIXTURE, IDS, MOCK_GPTUNNEL_WEB, WIKI_PUBLIC_CODE, startMockServer, type MockServer } from '../e2e-support/mock-server';
-import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, settle } from './harness';
+import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
 import { seedDay } from './calendarWeb';
 
 /**
@@ -1192,6 +1192,35 @@ test('m-boards-kanban', async ({ page }) => {
   await expect(page.getByTestId('task-context-menu')).toBeVisible();
   await expectMenuCard(page, 'm-task-card-menu');
   await expect(page.getByTestId('task-panel')).toHaveCount(0);
+});
+
+// Labels past the card width collapse into «+N» (docs/08 «Лейблы»); a tap opens the hidden ones, the task panel does the same.
+test('m-boards-labels', async ({ page }) => {
+  mock.setClock(NOW.getTime());
+  seedLabelOverflow(mock);
+  await signedIn(page);
+  await tab(page, 'boards');
+  await page.getByTestId('phone-boards').getByTestId('board-row').filter({ hasText: 'Разработка' }).getByRole('button').first().tap();
+  await page.getByTestId('board-more').tap();
+  await page.getByTestId('view-kanban').tap();
+  const kanban = page.getByTestId('kanban');
+  const card = kanban.getByTestId('task-card').filter({ hasText: 'CAL-4' });
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.getByTestId('labels-more')).toBeVisible();
+  await checkpoint(page, 'm-boards-labels');
+  // The card is one touch target (.tap-inert): its «+N» does not catch the tap, the task panel's does.
+  await card.getByTestId('card-title').tap();
+  const panel = page.getByTestId('task-panel');
+  await expect(panel.getByTestId('prop-labels')).toBeVisible();
+  await panel.getByTestId('prop-labels').scrollIntoViewIfNeeded();
+  await expect(panel.getByTestId('labels-more')).toBeVisible();
+  await checkpoint(page, 'm-boards-labels-task');
+  await panel.getByTestId('labels-more').tap();
+  await expect(page.getByTestId('labels-more-list')).toBeVisible();
+  await expect(page.getByTestId('labels-more-list').getByTestId('label-pill')).toHaveCount(await page.getByTestId('labels-more-list').getByTestId('label-pill').count());
+  await checkpoint(page, 'm-boards-labels-more', { snapshot: false });
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('labels-more-list')).toHaveCount(0);
 });
 
 // The status colour picker on a phone (ADR-0093): the shared menu runtime centres it as a card.
