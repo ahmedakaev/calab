@@ -322,9 +322,21 @@ const playSound = vi.fn((_name: string) => undefined);
 const phone = vi.hoisted(() => ({ on: false }));
 vi.mock('../lib/mobile', () => ({ isMobileNow: () => phone.on }));
 vi.mock('../lib/sounds', () => ({ playSound: (name: string) => playSound(name) }));
-const pushToast = vi.hoisted(() => vi.fn());
-const dismissToast = vi.hoisted(() => vi.fn());
-vi.mock('../stores/toasts', () => ({ toast: { info: vi.fn(), error: vi.fn() }, useToasts: { getState: () => ({ items: [], push: pushToast, dismiss: dismissToast }) } }));
+/** The toast store stand-in: what is on screen (ids), so «raised once while shown» can be told. */
+const shown = vi.hoisted(() => ({ ids: [] as number[], next: 1 }));
+const pushToast = vi.hoisted(() =>
+  vi.fn((..._a: unknown[]) => {
+    const id = shown.next++;
+    shown.ids.push(id);
+    return id;
+  }),
+);
+const dismissToast = vi.hoisted(() =>
+  vi.fn((id: number) => {
+    shown.ids = shown.ids.filter((x) => x !== id);
+  }),
+);
+vi.mock('../stores/toasts', () => ({ toast: { info: vi.fn(), error: vi.fn() }, useToasts: { getState: () => ({ items: shown.ids.map((id) => ({ id })), push: pushToast, dismiss: dismissToast }) } }));
 const announce = vi.fn();
 vi.mock('./deviceToast', () => ({ announceDeviceSwitch: (...a: unknown[]) => void announce(...a) }));
 const reportMediaError = vi.fn(() => ({ text: 'err', action: null }));
@@ -379,6 +391,9 @@ beforeEach(async () => {
   deviceList = [];
   announce.mockClear();
   playSound.mockClear();
+  shown.ids = [];
+  pushToast.mockClear();
+  dismissToast.mockClear();
   docListeners.clear();
   ({ voice } = await import('./voice'));
   ({ useVoice } = await import('../stores/voice'));
@@ -2883,8 +2898,6 @@ describe('the page away and back', () => {
     doc.hidden = hidden;
     for (const fn of docListeners.get('visibilitychange') ?? []) fn({});
   };
-  /** The recovery toasts go through the store's push (services/recoveryToasts): kind, text. */
-  const pushedTexts = (kind: string): string[] => pushToast.mock.calls.filter((c) => c[0] === kind).map((c) => c[1] as string);
   const reconnecting = (room: FakeRoom): void => {
     room.state = 'Reconnecting';
     room.emit('ConnectionStateChanged', 'Reconnecting');
@@ -2899,7 +2912,7 @@ describe('the page away and back', () => {
     (navigator as unknown as { userAgent: string }).userAgent = 'test';
   });
 
-  it('back after a long hide with LiveKit still reconnecting: rejoins at once; no cue while hidden; the outage is told', async () => {
+  it('back after a long hide with LiveKit still reconnecting: rejoins at once; no cue while hidden; no outage toast', async () => {
     await voice.join('A', 'ws');
     const a = FakeRoom.all[0];
     if (!a) throw new Error('no room');
@@ -2914,7 +2927,7 @@ describe('the page away and back', () => {
     expect(joinVoice.mock.calls).toEqual([['A']]); // not after the 5 s / 30 s timers
     expect(useVoice.getState()).toMatchObject({ roomId: 'A', phase: 'connected' });
     expect(playSound.mock.calls).toEqual([['reconnect']]);
-    expect(pushedTexts('info')).toContain('Связь пропадала 25 с');
+    expect(pushToast).not.toHaveBeenCalled(); // the outage is only logged
   });
 
   it('a short hide: LiveKit’s own resume gets the visible grace (15 s) before the seat check rejoins', async () => {
@@ -2945,6 +2958,34 @@ describe('the page away and back', () => {
     expect(a.startAudio).toHaveBeenCalledTimes(1);
   });
 
+  it('the sound prompt is raised once while it is on screen, closed when playback is possible, raised again if refused again', async () => {
+    await voice.join('A', 'ws');
+    const a = FakeRoom.all[0];
+    if (!a) throw new Error('no room');
+    a.canPlaybackAudio = false;
+    a.emit('AudioPlaybackStatusChanged', false);
+    a.emit('AudioPlaybackStatusChanged', false);
+    expect(pushToast).toHaveBeenCalledTimes(1);
+    a.canPlaybackAudio = true;
+    a.emit('AudioPlaybackStatusChanged', true);
+    expect(dismissToast).toHaveBeenCalledTimes(1);
+    expect(shown.ids).toEqual([]);
+    a.canPlaybackAudio = false;
+    a.emit('AudioPlaybackStatusChanged', false);
+    expect(pushToast).toHaveBeenCalledTimes(2);
+  });
+
+  it('the sound prompt is never held back by other toasts on screen', async () => {
+    await voice.join('A', 'ws');
+    const a = FakeRoom.all[0];
+    if (!a) throw new Error('no room');
+    shown.ids.push(900, 901, 902); // somebody else’s toasts
+    a.canPlaybackAudio = false;
+    a.emit('AudioPlaybackStatusChanged', false);
+    expect(pushToast).toHaveBeenCalledTimes(1);
+    expect(pushToast.mock.calls[0]?.[1]).toBe('Нажмите, чтобы включить звук');
+  });
+
   it('a subscribed mic without a track is resubscribed (at most twice), never a rejoin', async () => {
     await voice.join('A', 'ws');
     const a = FakeRoom.all[0];
@@ -2962,7 +3003,7 @@ describe('the page away and back', () => {
     expect(joinVoice).not.toHaveBeenCalled();
   });
 
-  it('another app holds the mic: «Микрофон занят…», one rebuild after ~2 s visible, «Вас не слышно…» when it fails', async () => {
+  it('another app holds the mic: the line «Микрофон занят…», one rebuild after ~2 s visible, «Вас не слышно…» when it fails; no toast', async () => {
     await voice.join('A', 'ws');
     const p = pipelines[0];
     if (!p) throw new Error('no pipeline');
@@ -2974,8 +3015,8 @@ describe('the page away and back', () => {
     await vi.advanceTimersByTimeAsync(600);
     expect(micStarts.n).toBe(2);
     expect(useVoice.getState().micError).toBe('Вас не слышно: микрофон занят системой');
-    expect(pushedTexts('warning')).toEqual(['Микрофон занят другим приложением']); // a warning, like the red panel line
-    expect(pushedTexts('error')).toEqual(['Вас не слышно: микрофон занят системой']);
+    expect(useVoice.getState().micTrouble).toBe('unheard'); // the strip's status
+    expect(pushToast).not.toHaveBeenCalled(); // the line is enough
     await vi.advanceTimersByTimeAsync(30_000);
     expect(micStarts.n).toBe(2); // one rebuild per episode
   });

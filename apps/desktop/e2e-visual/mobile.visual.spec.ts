@@ -714,32 +714,28 @@ test('m-home', async ({ page }) => {
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('phone-tabbar')).toBeVisible();
   // DEV-4955 audio recovery without LiveKit: «in voice» by store state (__calabaVoiceSeat), the
-  // recovery signals through the voice service's own paths: the strip above the tab bar and three toasts.
+  // recovery signals through the voice service's own paths: the strip above the tab bar and the sound prompt.
   const seat = (phase: 'connected' | 'reconnecting'): Promise<void> =>
     page.evaluate(([roomId, workspaceId, ph]) => (window as unknown as { __calabaVoiceSeat?: (s: object) => void }).__calabaVoiceSeat?.({ roomId, workspaceId, phase: ph }), [IDS.rooms.call, IDS.workspaces.main, phase] as const);
   await seat('connected');
   const strip = page.getByTestId('mobile-voice-strip');
   await expect(strip).toBeVisible();
-  await seat('reconnecting');
-  await page.clock.setFixedTime(new Date(NOW.getTime() + 12_000));
-  await seat('connected');
   await page.evaluate(() => {
     const w = window as unknown as { __calabaVoiceRecovery?: (what: string) => void };
     w.__calabaVoiceRecovery?.('busy');
     w.__calabaVoiceRecovery?.('playback');
   });
-  // One recovery toast at a time (the outage notice, the mic and the sound prompt used to stack):
-  // the mic-busy warning wins, the strip says it too.
+  // The mic state is the strip's line only; the refused sound is the one toast, with its action.
   await expect(page.getByTestId('toast')).toHaveCount(1);
-  await expect(page.getByTestId('toast').filter({ hasText: 'Микрофон занят другим приложением' })).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await expect(page.getByTestId('toast').getByRole('button', { name: 'Включить звук' })).toBeVisible();
   await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Микрофон занят');
   // Two lines at this width: the room name gives way instead of a cramped third line.
   await expect(strip.getByTestId('mobile-voice-label')).toHaveCount(0);
   await checkpoint(page, 'm-voice-recovery');
   await page.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
-  await expect(page.getByTestId('toast').filter({ hasText: 'Вас не слышно: микрофон занят системой' })).toBeVisible();
-  await expect(page.getByTestId('toast')).toHaveCount(1);
   await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Вас не слышно');
+  await expect(page.getByTestId('toast')).toHaveCount(1); // no mic toast
   await checkpoint(page, 'm-voice-recovery-unheard');
 });
 

@@ -19,8 +19,6 @@ export const LONG_HIDE_MS = 20_000;
 export const VISIBLE_SETTLE_MS = 2_000;
 /** «Нажмите, чтобы включить звук» stays this long (offered again by the next event while still refused). */
 export const PLAYBACK_PROMPT_MS = 2 * 60_000;
-/** «Связь пропадала N с» only for an outage longer than this. */
-export const OUTAGE_TOAST_MIN_MS = 10_000;
 /** A subscribed mic gets its <audio> within this; checked after it. */
 export const AUDIO_SETTLE_MS = 3_000;
 /** Resubscriptions of one mic publication per connection (setSubscribed false → true), never a rejoin. */
@@ -91,11 +89,6 @@ export function afterVisible(v: VisibleView): VisibleVerdict {
 export function seatGraceMs(v: { visible: boolean; reconnectingVisibleMs: number; hiddenGraceMs: number }): number {
   if (!v.visible) return v.hiddenGraceMs;
   return Math.max(0, VISIBLE_RESUME_MS - v.reconnectingVisibleMs);
-}
-
-/** The outage worth telling about, in whole seconds, or null. */
-export function outageSeconds(downMs: number): number | null {
-  return downMs > OUTAGE_TOAST_MIN_MS ? Math.round(downMs / 1000) : null;
 }
 
 /** One remote mic publication as the audio check sees it. */

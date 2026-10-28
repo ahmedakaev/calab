@@ -407,7 +407,6 @@ export const ru = {
   'voice.micUnheard': 'Вас не слышно: микрофон занят системой',
   'voice.micBusyShort': 'Микрофон занят',
   'voice.micUnheardShort': 'Вас не слышно',
-  'voice.linkWasDown': 'Связь пропадала {s} с',
   'voice.connected': 'Голос подключён',
   'voice.blocked': 'Голос недоступен',
   'voice.quality': 'Качество связи · задержка {rtt} мс · потери {loss} %',

@@ -8,7 +8,6 @@ import {
   audioFixes,
   captureWaitsForVisible,
   micFix,
-  outageSeconds,
   seatGraceMs,
   type MicPubView,
   type MicView,
@@ -69,14 +68,6 @@ describe('seatGraceMs', () => {
 
   it('hidden: the old grace, unchanged', () => {
     expect(seatGraceMs({ visible: false, reconnectingVisibleMs: 0, hiddenGraceMs: 5_000 })).toBe(5_000);
-  });
-});
-
-describe('outageSeconds', () => {
-  it('only an outage over 10 s, rounded', () => {
-    expect(outageSeconds(10_000)).toBeNull();
-    expect(outageSeconds(10_400)).toBe(10);
-    expect(outageSeconds(42_600)).toBe(43);
   });
 });
 

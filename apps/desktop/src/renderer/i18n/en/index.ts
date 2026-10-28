@@ -408,7 +408,6 @@ export const en: Dict = {
   'voice.micUnheard': 'No one can hear you: the system is holding the microphone',
   'voice.micBusyShort': 'Microphone in use',
   'voice.micUnheardShort': 'No one hears you',
-  'voice.linkWasDown': 'The connection was lost for {s} s',
   'voice.connected': 'Voice connected',
   'voice.blocked': 'Voice unavailable',
   'voice.quality': 'Connection quality · latency {rtt} ms · loss {loss}%',

@@ -62,7 +62,6 @@ import { roomClosedToast } from './roomClosed';
 import { prefs, usePrefs, type Prefs } from '../stores/prefs';
 import { useSession } from '../stores/session';
 import { toast, useToasts } from '../stores/toasts';
-import { recoveryToasts } from './recoveryToasts';
 import { memberName, rolesOf, useWorkspaces } from '../stores/workspaces';
 import { setVoice, useVoice, type RemoteCamera, type RemoteStream, type StreamQuality, type VoiceLink, type VoicePhase } from '../stores/voice';
 import { platform } from '../platform';
@@ -86,7 +85,6 @@ import {
   audioFixes,
   captureWaitsForVisible,
   micFix,
-  outageSeconds,
   seatGraceMs,
   type MicPubView,
 } from '../lib/voiceRecovery';
@@ -506,7 +504,7 @@ class VoiceEngine {
     this.takenOverRoom = null;
     this.stuckRetries = 0;
     this.resumedJoin = opts.resumed === true;
-    this.linkDownAt = null; // a new room: no «Связь пропадала» for the old one
+    this.linkDownAt = null; // a new room: not the old one's outage clock
     // «Войти и смотреть» (ADR-0066 §3): the call view opens as soon as the cameras are known.
     this.videoOnJoin = opts.video === true ? roomId : null;
     // The chat follows the voice (issue #127): a user join shows the room's own chat, so a message
@@ -3386,7 +3384,7 @@ class VoiceEngine {
   private visibleAt = Date.now();
   /** Date.now() when the LiveKit room went Reconnecting; null while it is not. */
   private lkReconnectingSince: number | null = null;
-  /** Date.now() when my link went down (phase connected → reconnecting): «Связь пропадала N с» on its return. */
+  /** Date.now() when my link went down (phase connected → reconnecting): logged on its return. */
   private linkDownAt: number | null = null;
   private settleTimer: number | null = null;
   private audioCheckTimer: number | null = null;
@@ -3486,7 +3484,7 @@ class VoiceEngine {
     this.afterLinkBack('pageshow');
   }
 
-  /** The voice link's outage (connected → reconnecting → connected) longer than 10 s is told once it is back. */
+  /** The voice link's outage (connected → reconnecting → connected) is logged once it is back; no toast (DEV-4955). */
   private onPhaseChange(phase: VoicePhase, was: VoicePhase): void {
     if (phase === 'reconnecting' && was === 'connected') {
       this.linkDownAt ??= Date.now();
@@ -3496,8 +3494,6 @@ class VoiceEngine {
       const ms = Date.now() - this.linkDownAt;
       this.linkDownAt = null;
       log.info(`voice: link back after ${Math.round(ms / 1000)} s`);
-      const s = outageSeconds(ms);
-      if (s !== null) recoveryToasts.raise('outage', 'info', t('voice.linkWasDown', { s }));
       return;
     }
     if (phase === 'idle' || phase === 'blocked') this.linkDownAt = null;
@@ -3563,13 +3559,18 @@ class VoiceEngine {
     if (!document.hidden) this.offerPlayback(); // hidden: offered when the page is back (replayAudio)
   }
 
+  /** «Нажмите, чтобы включить звук» — a plain toast, raised once while it is on screen, never held back by another toast. */
+  private playbackToast: number | null = null;
+
   private offerPlayback(): void {
-    if (recoveryToasts.isShown('playback')) return;
-    recoveryToasts.raise('playback', 'info', t('voice.audioBlocked'), { label: t('voice.audioBlockedAction'), run: () => this.enablePlayback() }, PLAYBACK_PROMPT_MS);
+    const { items, push } = useToasts.getState();
+    if (this.playbackToast !== null && items.some((x) => x.id === this.playbackToast)) return;
+    this.playbackToast = push('info', t('voice.audioBlocked'), { label: t('voice.audioBlockedAction'), run: () => this.enablePlayback() }, PLAYBACK_PROMPT_MS);
   }
 
   private closePlaybackPrompt(): void {
-    recoveryToasts.close('playback');
+    if (this.playbackToast !== null) useToasts.getState().dismiss(this.playbackToast);
+    this.playbackToast = null;
   }
 
   /**
@@ -3743,7 +3744,7 @@ class VoiceEngine {
     this.applyTransmit();
   }
 
-  /** «Микрофон занят другим приложением» / «Вас не слышно: микрофон занят системой» (micError and a toast), or neither. */
+  /** «Микрофон занят другим приложением» / «Вас не слышно: микрофон занят системой» (micError and the strip status), or neither. */
   private setMicTrouble(kind: 'busy' | 'unheard' | null): void {
     if (kind === this.micTrouble) return;
     const textOf = (k: 'busy' | 'unheard'): string => t(k === 'busy' ? 'voice.micBusy' : 'voice.micUnheard');
@@ -3751,15 +3752,13 @@ class VoiceEngine {
     this.micTrouble = kind;
     setVoice({ micTrouble: kind });
     if (!kind) {
-      if (was) recoveryToasts.close(was);
       // Only our own text: a device / permission error written meanwhile stays.
       if (was && useVoice.getState().micError === textOf(was)) setVoice({ micError: null, micErrorAction: null });
       return;
     }
     const text = textOf(kind);
     log.info(`voice: mic trouble shown: ${kind}`);
-    setVoice({ micError: text, micErrorAction: null });
-    recoveryToasts.raise(kind, kind === 'busy' ? 'warning' : 'error', text);
+    setVoice({ micError: text, micErrorAction: null }); // the line in the panel / the phone strip is enough, no toast
   }
 
   // ------------------------------------------------------------ stats / quality

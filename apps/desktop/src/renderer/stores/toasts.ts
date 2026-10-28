@@ -35,7 +35,6 @@ export const useToasts = create<ToastState>()((set, get) => ({
 export const toast = {
   info: (text: string): void => void useToasts.getState().push('info', text),
   success: (text: string): void => void useToasts.getState().push('success', text),
-  warning: (text: string): void => void useToasts.getState().push('warning', text),
   /** A ready human text (already mapped). */
   error: (text: string, action?: ToastAction): void => void useToasts.getState().push('error', text, action),
   /**

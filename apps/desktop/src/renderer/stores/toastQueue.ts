@@ -7,7 +7,7 @@ export interface ToastAction {
 
 export interface Toast {
   id: number;
-  kind: 'info' | 'error' | 'success' | 'warning';
+  kind: 'info' | 'error' | 'success';
   text: string;
   action?: ToastAction;
   /** How many times the same toast was raised in a row («×3»). */
