@@ -129,6 +129,7 @@ import {
   ListBirthdaysResponseSchema,
   ListMemberBirthdaysResponseSchema,
   ListMembersResponseSchema,
+  ListMessageReadersResponseSchema,
   ListMessagesResponseSchema,
   ListReactionUsersResponseSchema,
   MoveMemberRequestSchema,
@@ -677,8 +678,12 @@ export const api = {
     /** «Переслать» (ADR-0033): a copy of the message in `toRoomId`, by the caller, with `forward`. */
     forward: (roomId: string, id: string, toRoomId: string) =>
       call('POST', `/api/rooms/${roomId}/messages/${id}/forward`, ForwardMessageResponseSchema, body(ForwardMessageRequestSchema, { toRoomId })),
-    markRead: (roomId: string, messageId: string) =>
-      callEmpty('PUT', `/api/rooms/${roomId}/read`, body(UpdateReadStateRequestSchema, { messageId })),
+    /** `seen` (ADR-0140): the message was on screen — moves the seen marker behind ✓✓ too. */
+    markRead: (roomId: string, messageId: string, seen = false) =>
+      callEmpty('PUT', `/api/rooms/${roomId}/read`, body(UpdateReadStateRequestSchema, { messageId, seen })),
+    /** «Прочитали» (ADR-0140): who saw my message and when — the author only. */
+    readers: (roomId: string, id: string, signal?: AbortSignal) =>
+      call('GET', `/api/rooms/${roomId}/messages/${id}/readers`, ListMessageReadersResponseSchema, undefined, signal),
     /** Full-text search in one room (newest first, cursor `before`). */
     searchRoom: (roomId: string, p: { q: string; before?: string; limit?: number }, signal?: AbortSignal) =>
       call('GET', `/api/rooms/${roomId}/messages${qs(p)}`, ListMessagesResponseSchema, undefined, signal),

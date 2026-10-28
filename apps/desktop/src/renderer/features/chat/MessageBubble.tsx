@@ -1,7 +1,6 @@
-import { RoomType, type FileMeta, type Message, type PermissionBits } from '@calaba/protocol';
-import { useRooms } from '../../stores/rooms';
+import { type FileMeta, type Message, type PermissionBits } from '@calaba/protocol';
 import * as ContextMenu from '../../components/radix/context-menu';
-import { AlertCircle, Check, CheckCheck, Clock3, Download, FileText, RotateCw } from 'lucide-react';
+import { AlertCircle, Clock3, Download, FileText, RotateCw } from 'lucide-react';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent, type ReactNode, type SyntheticEvent } from 'react';
 import { Avatar } from '../../components/Avatar';
 import { MediaImg } from '../../components/MediaImg';
@@ -17,7 +16,7 @@ import { openAttachment } from '../../services/files';
 import { can } from '../../lib/permissions';
 import { retrySend, setEmbedsHidden, toggleReaction } from '../../services/chat';
 import { messageById, useMessages, type ChatMessage, type PendingUpload } from '../../stores/messages';
-import { useReadReceipt } from '../../stores/readReceipts';
+import { Ticks } from './ReadReceipts';
 import { useSession } from '../../stores/session';
 import { useUi } from '../../stores/ui';
 import { memberName, useFormerInfo, useResolveUnknown, useWorkspaces } from '../../stores/workspaces';
@@ -423,7 +422,7 @@ function Bubble({
   const voiceOnly = rows.length === 1 && !!rows[0] && isVoice(rows[0]) && c.status === 'sent' && !hasText && !images.length && !videos.length && !m.reactions.length;
   const width = images.length ? imageBoxWidth(images) : videos.length ? VIDEO_WIDTH : undefined;
 
-  const metaNode = <MetaInfo c={c} own={own} />;
+  const metaNode = <MetaInfo c={c} own={own} workspaceId={workspaceId} />;
   const tail = meta.last && !sticker;
 
   const radius = bubbleRadius(own, meta.first, meta.last, tail);
@@ -568,7 +567,7 @@ function Bubble({
           ) : null}
         </div>
       </ContextMenu.Trigger>
-      <MessageMenu c={c} own={own} roomId={roomId} perms={perms} image={menuImage} />
+      <MessageMenu c={c} own={own} roomId={roomId} workspaceId={workspaceId} perms={perms} image={menuImage} />
     </ContextMenu.Root>
   );
 }
@@ -795,7 +794,7 @@ export function Tail({ own }: { own: boolean }): ReactNode {
   );
 }
 
-function MetaInfo({ c, own }: { c: ChatMessage; own: boolean }): ReactNode {
+function MetaInfo({ c, own, workspaceId }: { c: ChatMessage; own: boolean; workspaceId: string }): ReactNode {
   return (
     <TimeMeta at={toDate(c.msg.createdAt)} edited={!!c.msg.editedAt}>
       {own ? (
@@ -804,27 +803,10 @@ function MetaInfo({ c, own }: { c: ChatMessage; own: boolean }): ReactNode {
         ) : c.status === 'failed' ? (
           <AlertCircle className="size-3.5 text-danger" aria-label={t('chat.failed')} />
         ) : (
-          <Ticks roomId={c.msg.roomId} messageId={c.msg.id} />
+          <Ticks roomId={c.msg.roomId} messageId={c.msg.id} workspaceId={workspaceId} />
         )
       ) : null}
     </TimeMeta>
-  );
-}
-
-/**
- * docs/08 «Галочки» (docs/09 #92): ✓ — the server has the message, ✓✓ — someone else read it
- * (the DM peer / another member). A leaf with a boolean selector: a READ_RECEIPT re-renders
- * only the ticks it flips, not the bubble or the feed.
- */
-function Ticks({ roomId, messageId }: { roomId: string; messageId: string }): ReactNode {
-  const read = useReadReceipt(roomId, messageId);
-  // A notes shelf (ADR-0039) has no readers: no ticks at all.
-  const shelf = useRooms((s) => s.byId[roomId]?.type === RoomType.NOTES);
-  if (shelf) return null;
-  return read ? (
-    <CheckCheck className="size-4" aria-label={t('chat.statusRead')} />
-  ) : (
-    <Check className="size-4" aria-label={t('chat.statusSent')} />
   );
 }
 
