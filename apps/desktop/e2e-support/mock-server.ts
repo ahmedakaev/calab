@@ -984,6 +984,8 @@ export interface MockServer {
   readonly boards: BoardsMock;
   /** Disk (ADR-0094, mock-disk.ts): the live items, rights and links (marketing scenes rename the fixture). */
   readonly disk: DiskMock;
+  /** The office editor's mock fault (ADR-0143): '' | 'config' | 'token' | 'stuck'. */
+  setOfficeFault(fault: '' | 'config' | 'token' | 'stuck'): void;
   /** Wiki (ADR-0096, mock-wiki.ts): the live pages, documents and sync sockets (marketing scenes replace the fixture). */
   readonly wiki: WikiMock;
   /** Canvas (ADR-0126, mock-canvas.ts): the live tree, documents and sync sockets. */
@@ -1084,6 +1086,9 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     },
     get disk() {
       return impl.disk;
+    },
+    setOfficeFault: (f) => {
+      impl.officeFault = f;
     },
     get wiki() {
       return impl.wiki;
@@ -1432,6 +1437,8 @@ class MockImpl {
   boards: BoardsMock;
   /** Disk (ADR-0094); rebuilt with the state. */
   disk: DiskMock;
+  /** The office editor's mock fault (ADR-0143): '' none, 'config' (the config call fails), 'token' (the stub editor errors with a refused token), 'stuck' (never saves). */
+  officeFault = '';
   /** Wiki (ADR-0096); rebuilt with the state. */
   wiki: WikiMock;
   /** The wiki sync sockets (snapshots up to 2 MiB: not the gateway's 64 KiB limit). */
@@ -1535,6 +1542,7 @@ class MockImpl {
   }
 
   reset(scenario: Scenario): void {
+    this.officeFault = '';
     for (const t of this.timers) clearTimeout(t);
     this.aiState.clear();
     this.timers.clear();
@@ -8888,20 +8896,35 @@ class MockImpl {
     // GET /api/office/config (ADR-0143): the editor of an xlsx / docx; the «Document Server» is the
     // mock itself (host page + STUB api.js), the config is unsigned (the stub checks nothing).
     this.diskRoute('GET', '/api/office/config', (c, me) => {
-      const it = d().one(q(c, 'item'), me);
-      const ext = /\.(xlsx|docx)$/i.exec(it.name)?.[1]?.toLowerCase();
-      if (!ext) throw new HttpError(415, ErrorCode.VALIDATION, 'this file type does not open in the editor');
-      const edit = (it.myBits & DISK_BITS.WRITE) !== 0n && q(c, 'phone') !== '1';
+      if (this.officeFault === 'config') throw new HttpError(500, ErrorCode.INTERNAL, 'office is down');
+      // A Disk item (rights by the Disk bits), or a plain attachment (`file`, view only: no versions, ADR-0143 §7).
+      const fileId = q(c, 'file');
+      const it = fileId ? undefined : d().one(q(c, 'item'), me);
+      const name = it?.name ?? this.state.files.get(fileId)?.meta.name ?? '';
+      const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? '';
+      const documentType = /^(xlsx|xls|ods)$/.test(ext) ? 'cell' : /^(pptx|ppt|odp)$/.test(ext) ? 'slide' : /^(docx|doc|odt|rtf)$/.test(ext) ? 'word' : '';
+      if (!documentType) throw new HttpError(415, ErrorCode.VALIDATION, 'this file type does not open in the editor');
+      const phone = q(c, 'phone') === '1';
+      const edit = !!it && (it.myBits & DISK_BITS.WRITE) !== 0n && !phone && !/^(odt|ods|odp|rtf)$/.test(ext);
       const origin = `http://${c.req.headers.host ?? '127.0.0.1'}`;
-      const key = `calab-mock-${it.id}`;
+      const key = `calab-mock-${it?.id ?? fileId}`;
       const config = {
-        type: q(c, 'phone') === '1' ? 'mobile' : 'desktop',
-        documentType: ext === 'xlsx' ? 'cell' : 'word',
-        document: { fileType: ext, key, title: it.name, url: `${origin}/__office/file`, permissions: { edit } },
-        editorConfig: { mode: edit ? 'edit' : 'view', lang: 'ru', customization: { uiTheme: q(c, 'theme') === 'light' ? 'default-light' : 'default-dark', compactHeader: true, toolbarHideFileName: true } },
+        type: phone ? 'mobile' : 'desktop',
+        documentType,
+        document: { fileType: ext, key, title: name, url: `${origin}/__office/file`, permissions: { edit } },
+        editorConfig: { mode: edit ? 'edit' : 'view', lang: q(c, 'lang') || 'ru', customization: { uiTheme: q(c, 'theme') === 'light' ? 'default-light' : 'default-dark', compactHeader: true, toolbarHideFileName: true }, calabStub: { fault: this.officeFault } },
         token: 'mock',
       };
       sendMsg(c.res, 200, OfficeConfigResponseSchema, { docsUrl: origin, hostUrl: `${origin}/web-apps/apps/calab/calab-editor.html`, configJson: JSON.stringify(config), mode: edit ? OfficeMode.EDIT : OfficeMode.VIEW, key });
+    });
+    // POST /api/office/save-as (ADR-0143 addendum): a legacy file saved as a copy in the modern format, next to the original.
+    this.diskRoute('POST', '/api/office/save-as', (c, me) => {
+      const it = d().one(q(c, 'item'), me);
+      const ext = q(c, 'ext');
+      if (!it.file || !/^(docx|xlsx|pptx)$/.test(ext)) throw new HttpError(422, ErrorCode.VALIDATION, 'bad target');
+      const name = it.name.replace(/\.[^.]+$/, `.${ext}`);
+      const copy = d().put({ workspaceId: it.workspaceId, parentId: it.parentId, kind: DiskItemKind.FILE, name, ownerId: me, file: { ...it.file, name } });
+      sendMsg(c.res, 200, DiskItemResponseSchema, { item: copy });
     });
     this.diskRoute('GET', '/api/workspaces/:id/disk/items', (c, me) => {
       const r = d().list(p0(c), me, { parent: q(c, 'parent'), trashed: q(c, 'trashed') === '1' || q(c, 'trashed') === 'true', sort: q(c, 'sort'), cursor: q(c, 'cursor'), limit: Number(q(c, 'limit')) || 0 });

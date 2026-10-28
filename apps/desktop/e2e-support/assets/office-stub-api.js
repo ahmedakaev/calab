@@ -18,6 +18,7 @@
     var c = (config.editorConfig && config.editorConfig.customization) || {};
     var t = THEMES[c.uiTheme] || THEMES['default-dark'];
     var cell = config.documentType === 'cell';
+    var slide = config.documentType === 'slide';
     var edit = config.editorConfig && config.editorConfig.mode === 'edit';
     root.innerHTML = '';
     var wrap = el('div', 'display:flex;flex-direction:column;height:100%;font:12px/1.4 Arial,sans-serif;background:' + t.bg + ';color:' + t.fg);
@@ -32,7 +33,19 @@
       wrap.appendChild(tools);
     }
     var body = el('div', 'flex:1;overflow:hidden;position:relative;background:' + (cell ? t.cell : t.bg));
-    if (cell) {
+    if (slide) {
+      var deck = el('div', 'display:flex;height:100%');
+      var thumbs = el('div', 'width:120px;padding:10px;display:flex;flex-direction:column;gap:10px;background:' + t.tab + ';border-right:1px solid ' + t.line);
+      for (var n = 1; n <= 5; n++) thumbs.appendChild(el('div', 'height:58px;border-radius:3px;background:#fff;color:#222;font-size:9px;padding:4px;outline:' + (n === 1 ? '2px solid ' + t.accent : '1px solid ' + t.line), String(n)));
+      var stage = el('div', 'flex:1;display:grid;place-items:center;background:' + t.bg);
+      var slideEl = el('div', 'width:min(560px,90%);aspect-ratio:16/9;background:#fff;color:#222;padding:32px 40px;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;flex-direction:column;justify-content:center');
+      slideEl.appendChild(el('div', 'font:bold 26px Arial;color:#2a6ad6', 'Calab: питч'));
+      slideEl.appendChild(el('div', 'font:16px Arial;margin-top:10px;color:#555', 'Голос и задачи в одном окне'));
+      stage.appendChild(slideEl);
+      deck.appendChild(thumbs);
+      deck.appendChild(stage);
+      body.appendChild(deck);
+    } else if (cell) {
       var fx = el('div', 'height:24px;display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:1px solid ' + t.line + ';color:' + t.muted, 'B3   fx   =СУММ(B2:B9)');
       body.appendChild(fx);
       var grid = el('table', 'border-collapse:collapse;table-layout:fixed');
@@ -56,15 +69,24 @@
       body.appendChild(page);
     }
     wrap.appendChild(body);
-    var foot = el('div', 'height:24px;display:flex;align-items:center;gap:12px;padding:0 12px;background:' + t.tab + ';border-top:1px solid ' + t.line + ';color:' + t.muted, cell ? 'Лист1   Лист2' : 'Страница 1 из 3');
+    var foot = el('div', 'height:24px;display:flex;align-items:center;gap:12px;padding:0 12px;background:' + t.tab + ';border-top:1px solid ' + t.line + ';color:' + t.muted, cell ? 'Лист1   Лист2' : slide ? 'Слайд 1 из 5' : 'Страница 1 из 3');
     foot.appendChild(el('span', 'margin-left:auto;color:#d33;font-weight:bold', 'STUB — не ONLYOFFICE'));
     wrap.appendChild(foot);
     root.appendChild(wrap);
     var ev = config.events || {};
+    var fault = (config.editorConfig && config.editorConfig.calabStub && config.editorConfig.calabStub.fault) || '';
     setTimeout(function () {
       if (ev.onAppReady) ev.onAppReady();
       if (ev.onDocumentStateChange) ev.onDocumentStateChange({ data: false });
+      if (fault === 'token' && ev.onError) ev.onError({ data: { errorCode: -20, errorDescription: 'token' } });
     }, 30);
+    // A click in edit mode is an edit: unsaved until the autosave (never with the 'stuck' fault).
+    if (edit) {
+      body.addEventListener('click', function () {
+        if (ev.onDocumentStateChange) ev.onDocumentStateChange({ data: true });
+        if (fault !== 'stuck') setTimeout(function () { if (ev.onDocumentStateChange) ev.onDocumentStateChange({ data: false }); }, 2500);
+      });
+    }
   }
   DocEditor.prototype.destroyEditor = function () {};
   win.DocsAPI = { DocEditor: DocEditor };
