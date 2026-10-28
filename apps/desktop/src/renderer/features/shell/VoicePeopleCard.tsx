@@ -308,11 +308,14 @@ const VoicePersonRow = memo(function VoicePersonRow({ workspaceId, userId, self 
           title={lost ? t('call.connectionLost') : onPhone ? t('call.onPhone') : undefined}
           className={cx(
             'flex h-14 w-full min-w-0 select-none items-center gap-3 rounded-[var(--radius-row)] px-2 text-left transition-colors duration-[var(--motion-fast)] active:bg-hover',
-            (onPhone || lost) && 'opacity-50',
+            onPhone && 'opacity-50',
           )}
         >
-          <Avatar userId={userId} name={name} fileId={fileId || undefined} size={40} speaking={talking} connecting={connecting} />
-          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          {/* A lost seat dims only the person: the «Нет связи» caption stays at full contrast. */}
+          <span className={cx('flex shrink-0', lost && 'opacity-50')}>
+            <Avatar userId={userId} name={name} fileId={fileId || undefined} size={40} speaking={talking} connecting={connecting} />
+          </span>
+          <span className={cx('flex min-w-0 flex-1 items-center gap-1.5', lost && 'opacity-50')}>
             <span className={cx('min-w-0 truncate text-list font-medium leading-5', roleTextClass(role, 'role', look))} style={roleTextStyle(role, 'role', look)}>
               {name}
             </span>
@@ -326,7 +329,7 @@ const VoicePersonRow = memo(function VoicePersonRow({ workspaceId, userId, self 
             {!v ? null : self ? (
               <SelfVoiceStateIcons onPhone={onPhone} />
             ) : (
-              <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} pttIdle={v.ptt && !talking} onPhone={onPhone} connectionLost={lost} />
+              <VoiceStateIcons muted={v.muted} deafened={v.deafened} serverMuted={v.serverMuted} pttIdle={v.ptt && !talking} onPhone={onPhone} connectionLost={lost} lostCaption />
             )}
           </span>
         </button>

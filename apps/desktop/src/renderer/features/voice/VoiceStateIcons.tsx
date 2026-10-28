@@ -35,6 +35,7 @@ export function VoiceStateIcons({
   pttIdle = false,
   onPhone = false,
   connectionLost = false,
+  lostCaption = false,
   className,
 }: {
   muted: boolean;
@@ -46,13 +47,15 @@ export function VoiceStateIcons({
   onPhone?: boolean;
   /** The seat is kept after a lost connection (ADR-0144, VoiceState.connection_lost). */
   connectionLost?: boolean;
+  /** With `connectionLost`: a visible «Нет связи» beside the icon, for rows that have room for a status. */
+  lostCaption?: boolean;
   className?: string;
 }): ReactNode {
   return (
     <>
       {voiceStateIcons(muted, deafened, serverMuted, pttIdle, onPhone, connectionLost).map((k) =>
         k === 'connection-lost' ? (
-          <ConnectionLostIcon key={k} className={className} />
+          <ConnectionLostIcon key={k} className={className} caption={lostCaption} />
         ) : k === 'on-phone' ? (
           <OnPhoneIcon key={k} className={className} />
         ) : k === 'deafened' ? (
@@ -80,11 +83,21 @@ export function OnPhoneIcon({ className }: { className?: string }): ReactNode {
   );
 }
 
-/** «Нет связи» (ADR-0144): the seat is kept while the device reconnects; the tooltip is native. */
-export function ConnectionLostIcon({ className }: { className?: string }): ReactNode {
+/**
+ * «Нет связи» (ADR-0144): the seat is kept while the device reconnects. Icon + native tooltip; with
+ * `caption` the words are visible too (a phone card row, the members column), in the secondary
+ * text colour, never dimmed. A leaf with no subscriptions.
+ */
+export function ConnectionLostIcon({ className, caption = false }: { className?: string; caption?: boolean }): ReactNode {
+  const label = t('call.connectionLost');
   return (
-    <span className="inline-flex shrink-0" title={t('call.connectionLost')}>
-      <WifiOff className={cx('size-4 shrink-0 text-muted', className)} aria-label={t('call.connectionLost')} role="img" data-voice-icon="connection-lost" />
+    <span className="inline-flex shrink-0 items-center gap-1" title={label}>
+      <WifiOff className={cx('size-4 shrink-0 text-muted', className)} aria-label={caption ? undefined : label} aria-hidden={caption || undefined} role={caption ? undefined : 'img'} data-voice-icon="connection-lost" />
+      {caption ? (
+        <span className="whitespace-nowrap text-caption text-muted" data-testid="connection-lost-caption">
+          {label}
+        </span>
+      ) : null}
     </span>
   );
 }
