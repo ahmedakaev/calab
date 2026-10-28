@@ -300,7 +300,7 @@ function SearchBar({ workspaceId, boardId, query, onQuery, variant, busy }: { wo
               <Popover.Trigger asChild>
                 <button
                   type="button"
-                  className="relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-line px-2.5 text-control text-muted hover:bg-hover hover:text-fg data-[state=open]:bg-active data-[state=open]:text-fg mobile:tap-h"
+                  className="relative inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-line px-2.5 text-control text-muted hover:bg-hover hover:text-fg data-[state=open]:bg-active data-[state=open]:text-fg tap-hit mobile:h-9 mobile:border-transparent mobile:bg-hover mobile:px-3 mobile:font-medium mobile:text-fg"
                   data-testid="task-search-filter"
                 >
                   <ListFilter className="size-3.5" aria-hidden />

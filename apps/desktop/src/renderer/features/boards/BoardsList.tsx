@@ -36,6 +36,7 @@ import { menuBox, menuItem, menuSeparator } from '../shell/menu';
 import { hasBit, settingsEntryTab, MANAGE_BOARD } from './model';
 import { useFeatureOn } from './useBoardView';
 import { SavedSearchRows } from './SavedSearches';
+import { useTaskSearch } from '../../stores/taskSearch';
 
 /**
  * The room column in boards mode (ADR-0042 §5, ADR-0058 §1): «Мои задачи» on top, the
@@ -375,7 +376,9 @@ function openMyTasks(workspaceId: string): void {
 }
 
 function MyTasksRow({ workspaceId }: { workspaceId: string }): ReactNode {
-  const active = useBoardsUi((s) => s.boardOf[workspaceId] === MY_TASKS);
+  // An open saved search (a row under this one) takes the highlight (ADR-0139).
+  const saved = useTaskSearch((s) => !!s.activeSaved[workspaceId]);
+  const active = useBoardsUi((s) => s.boardOf[workspaceId] === MY_TASKS) && !saved;
   const unread = useBoards((s) => unreadCount(s, workspaceId));
   return (
     <button
