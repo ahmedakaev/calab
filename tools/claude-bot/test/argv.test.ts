@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assistArgv, leadArgv } from '../src/argv.js';
+import { assistArgv, leadArgv, wakeArgv } from '../src/argv.js';
 import { buildChatPrompt } from '../src/chat.js';
 import { resultFromStream } from '../src/claude.js';
 import { childEnv, parseEnvFile } from '../src/config.js';
@@ -78,6 +78,90 @@ describe('assistArgv', () => {
   it('takes the chat on stdin: no positional prompt after the variadic tool lists', () => {
     const last = a.at(-1) ?? '';
     expect(last.startsWith('Read(') || last.startsWith('Glob(') || last.startsWith('Grep(')).toBe(true);
+  });
+});
+
+const HANDOFF = '/opt/homebrew/bin/node /Users/mac/.calab-claude-bot/app/handoff.mjs';
+const INBOX = '/Users/mac/.calab-claude-bot/inbox';
+
+describe('assistArgv with the handoff writer', () => {
+  const plain = assistArgv({ systemPrompt: 'SYS', bugboard: BUGBOARD, home: '/Users/mac', ownerRepo: '/Users/mac/Documents/Calaba' });
+  const a = assistArgv({ systemPrompt: 'SYS', bugboard: BUGBOARD, home: '/Users/mac', ownerRepo: '/Users/mac/Documents/Calaba', handoff: HANDOFF, inboxDir: INBOX });
+
+  it('adds exactly `handoff add` and nothing else', () => {
+    const before = flagValues(plain, '--allowedTools');
+    expect(flagValues(a, '--allowedTools')).toEqual([...before, `Bash(${HANDOFF} add:*)`]);
+  });
+
+  it('keeps every deny and also denies reading the inbox (tickets, other requests)', () => {
+    const before = flagValues(plain, '--disallowedTools');
+    const after = flagValues(a, '--disallowedTools');
+    for (const d of before) expect(after).toContain(d);
+    for (const t of ['Read', 'Grep', 'Glob']) expect(after).toContain(`${t}(/${INBOX}/**)`);
+    expect(after).toHaveLength(before.length + 3);
+  });
+});
+
+describe('wakeArgv', () => {
+  const a = wakeArgv({
+    model: 'opus',
+    bugboard: BUGBOARD,
+    handoff: HANDOFF,
+    ghRepo: 'itrcz/calab',
+    home: '/Users/mac',
+    ownerRepo: '/Users/mac/Documents/Calaba',
+    inboxDir: INBOX,
+    maxBudgetUsd: 5,
+  });
+  const allowed = flagValues(a, '--allowedTools');
+  const denied = flagValues(a, '--disallowedTools');
+
+  it('never bypasses permissions and loads no settings or MCP; the prompt goes on stdin', () => {
+    expect(flag(a, '--model')).toBe('opus');
+    expect(flag(a, '--permission-mode')).toBe('dontAsk');
+    expect(flag(a, '--permission-prompts')).toBe('none');
+    expect(a.join(' ')).not.toMatch(/bypassPermissions|dangerously/);
+    for (const f of ['--safe-mode', '--strict-mcp-config', '--setting-sources=', '--disable-slash-commands', '--no-session-persistence']) expect(a).toContain(f);
+    expect(flag(a, '--tools')).toBe('Read,Grep,Glob,Bash');
+    expect(flag(a, '--max-budget-usd')).toBe('5');
+    expect(a.at(-1)?.startsWith('Glob(')).toBe(true);
+  });
+
+  it('allows exactly: repo reads, read-only gh + comments, triage on the board, the handoff writer', () => {
+    expect(allowed).toEqual([
+      'Read(./**)',
+      'Grep(./**)',
+      'Glob(./**)',
+      'Bash(gh pr view:*)',
+      'Bash(gh pr list:*)',
+      'Bash(gh pr diff:*)',
+      'Bash(gh pr checks:*)',
+      'Bash(gh issue view:*)',
+      'Bash(gh issue list:*)',
+      'Bash(gh run list:*)',
+      'Bash(gh run view:*)',
+      'Bash(gh pr comment:*)',
+      'Bash(gh issue comment:*)',
+      'Bash(gh api repos/itrcz/calab/:*)',
+      ...['list', 'show', 'author', 'comment', 'create', 'label', 'priority', 'status', 'ask-owner'].map((v) => `Bash(python3 ${BUGBOARD} ${v}:*)`),
+      `Bash(${HANDOFF} add:*)`,
+      `Bash(${HANDOFF} reply:*)`,
+      `Bash(${HANDOFF} chat:*)`,
+    ]);
+    // nothing general: no bare Bash, no git, no merge/close/edit, no Write/Edit/web
+    for (const t of allowed) {
+      expect(t).not.toMatch(/^Bash\((\*|git|gh pr (merge|close|edit|review|checkout|create)|gh issue (close|edit|delete)|gh repo|gh secret|python3 \S+ (assign|\*)|node )/);
+      expect(t).not.toMatch(/^(Write|Edit|MultiEdit|WebFetch|WebSearch|Agent|Task)\b/);
+    }
+  });
+
+  it('denies writing, the web, git push, gh api writes, posting local files, and secret paths', () => {
+    for (const t of ['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Agent', 'Task', 'Bash(git push:*)']) expect(denied).toContain(t);
+    for (const t of ['-X*', '--method*', '-f*', '-F*', '--field*', '--raw-field*', '--input*']) expect(denied).toContain(`Bash(gh api * ${t})`);
+    for (const t of ['Bash(gh * --body-file*)', 'Bash(gh * -F *)', 'Bash(gh * --delete-last*)', 'Bash(gh * --edit-last*)']) expect(denied).toContain(t);
+    for (const p of ['./.env*', './**/.env*', '~/.calab-tools/**', '~/.claude/**', '~/.ssh/**', '~/Library/**', '//Users/mac/Documents/Calaba/**', `/${INBOX}/**`]) {
+      for (const t of ['Read', 'Grep', 'Glob']) expect(denied).toContain(`${t}(${p})`);
+    }
   });
 });
 
