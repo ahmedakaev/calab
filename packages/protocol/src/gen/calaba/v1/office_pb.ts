@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file calaba/v1/office.proto.
  */
 export const file_calaba_v1_office: GenFile = /*@__PURE__*/
-  fileDesc("ChZjYWxhYmEvdjEvb2ZmaWNlLnByb3RvEgljYWxhYmEudjEijAEKDE9mZmljZUZvcm1hdBIRCglleHRlbnNpb24YASABKAkSFQoNZG9jdW1lbnRfdHlwZRgCIAEoCRIvCgpjYXBhYmlsaXR5GAMgASgOMhsuY2FsYWJhLnYxLk9mZmljZUNhcGFiaWxpdHkSEgoKY29udmVydF90bxgEIAEoCRINCgVsb3NzeRgFIAEoCCKBAQoaT2ZmaWNlQ2FwYWJpbGl0aWVzUmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIoCgdmb3JtYXRzGAIgAygLMhcuY2FsYWJhLnYxLk9mZmljZUZvcm1hdBIWCg5tYXhfc2l6ZV9ieXRlcxgDIAEoBBIQCghkb2NzX3VybBgEIAEoCSLMAQoUT2ZmaWNlQ29uZmlnUmVzcG9uc2USEAoIZG9jc191cmwYASABKAkSEwoLY29uZmlnX2pzb24YAiABKAkSIwoEbW9kZRgDIAEoDjIVLmNhbGFiYS52MS5PZmZpY2VNb2RlEgsKA2tleRgEIAEoCRIQCghob3N0X3VybBgFIAEoCRInCgZmb3JtYXQYBiABKAsyFy5jYWxhYmEudjEuT2ZmaWNlRm9ybWF0Eg8KB2l0ZW1faWQYByABKAkSDwoHZmlsZV9pZBgIIAEoCSI6ChRPZmZpY2VDb252ZXJ0UmVxdWVzdBIPCgdmaWxlX2lkGAEgASgJEhEKCXBhcmVudF9pZBgCIAEoCSpVCgpPZmZpY2VNb2RlEhsKF09GRklDRV9NT0RFX1VOU1BFQ0lGSUVEEAASFAoQT0ZGSUNFX01PREVfVklFVxABEhQKEE9GRklDRV9NT0RFX0VESVQQAiqMAQoQT2ZmaWNlQ2FwYWJpbGl0eRIhCh1PRkZJQ0VfQ0FQQUJJTElUWV9VTlNQRUNJRklFRBAAEhoKFk9GRklDRV9DQVBBQklMSVRZX0VESVQQARIaChZPRkZJQ0VfQ0FQQUJJTElUWV9WSUVXEAISHQoZT0ZGSUNFX0NBUEFCSUxJVFlfQ09OVkVSVBADQpkBCg1jb20uY2FsYWJhLnYxQgtPZmZpY2VQcm90b1ABWjZnaXRodWIuY29tL2NhbGFiYS9jYWxhYmEvc2VydmVyL2dlbi9jYWxhYmEvdjE7Y2FsYWJhdjGiAgNDWFiqAglDYWxhYmEuVjHKAglDYWxhYmFcVjHiAhVDYWxhYmFcVjFcR1BCTWV0YWRhdGHqAgpDYWxhYmE6OlYxYgZwcm90bzM");
+  fileDesc("ChZjYWxhYmEvdjEvb2ZmaWNlLnByb3RvEgljYWxhYmEudjEijAEKDE9mZmljZUZvcm1hdBIRCglleHRlbnNpb24YASABKAkSFQoNZG9jdW1lbnRfdHlwZRgCIAEoCRIvCgpjYXBhYmlsaXR5GAMgASgOMhsuY2FsYWJhLnYxLk9mZmljZUNhcGFiaWxpdHkSEgoKY29udmVydF90bxgEIAEoCRINCgVsb3NzeRgFIAEoCCKBAQoaT2ZmaWNlQ2FwYWJpbGl0aWVzUmVzcG9uc2USDwoHZW5hYmxlZBgBIAEoCBIoCgdmb3JtYXRzGAIgAygLMhcuY2FsYWJhLnYxLk9mZmljZUZvcm1hdBIWCg5tYXhfc2l6ZV9ieXRlcxgDIAEoBBIQCghkb2NzX3VybBgEIAEoCSLMAQoUT2ZmaWNlQ29uZmlnUmVzcG9uc2USEAoIZG9jc191cmwYASABKAkSEwoLY29uZmlnX2pzb24YAiABKAkSIwoEbW9kZRgDIAEoDjIVLmNhbGFiYS52MS5PZmZpY2VNb2RlEgsKA2tleRgEIAEoCRIQCghob3N0X3VybBgFIAEoCRInCgZmb3JtYXQYBiABKAsyFy5jYWxhYmEudjEuT2ZmaWNlRm9ybWF0Eg8KB2l0ZW1faWQYByABKAkSDwoHZmlsZV9pZBgIIAEoCSI6ChRPZmZpY2VDb252ZXJ0UmVxdWVzdBIPCgdmaWxlX2lkGAEgASgJEhEKCXBhcmVudF9pZBgCIAEoCSJbChdDcmVhdGVPZmZpY2VGaWxlUmVxdWVzdBIRCglwYXJlbnRfaWQYASABKAkSEQoJZXh0ZW5zaW9uGAIgASgJEgwKBG5hbWUYAyABKAkSDAoEbGFuZxgEIAEoCSpVCgpPZmZpY2VNb2RlEhsKF09GRklDRV9NT0RFX1VOU1BFQ0lGSUVEEAASFAoQT0ZGSUNFX01PREVfVklFVxABEhQKEE9GRklDRV9NT0RFX0VESVQQAiqMAQoQT2ZmaWNlQ2FwYWJpbGl0eRIhCh1PRkZJQ0VfQ0FQQUJJTElUWV9VTlNQRUNJRklFRBAAEhoKFk9GRklDRV9DQVBBQklMSVRZX0VESVQQARIaChZPRkZJQ0VfQ0FQQUJJTElUWV9WSUVXEAISHQoZT0ZGSUNFX0NBUEFCSUxJVFlfQ09OVkVSVBADQpkBCg1jb20uY2FsYWJhLnYxQgtPZmZpY2VQcm90b1ABWjZnaXRodWIuY29tL2NhbGFiYS9jYWxhYmEvc2VydmVyL2dlbi9jYWxhYmEvdjE7Y2FsYWJhdjGiAgNDWFiqAglDYWxhYmEuVjHKAglDYWxhYmFcVjHiAhVDYWxhYmFcVjFcR1BCTWV0YWRhdGHqAgpDYWxhYmE6OlYxYgZwcm90bzM");
 
 /**
  * One extension of the map.
@@ -203,6 +203,53 @@ export type OfficeConvertRequest = Message<"calaba.v1.OfficeConvertRequest"> & {
  */
 export const OfficeConvertRequestSchema: GenMessage<OfficeConvertRequest> = /*@__PURE__*/
   messageDesc(file_calaba_v1_office, 3);
+
+/**
+ * «Создать» in the Disk (ADR-0143): a blank document, spreadsheet or presentation from the
+ * server's templates, filed like an upload (quota, DISK_WRITE on the folder, the journal's
+ * «upload», a taken name gets « (2)»). POST /api/workspaces/{id}/office/create → 201
+ * DiskItemResponse. 404 while the editor is off.
+ *
+ * @generated from message calaba.v1.CreateOfficeFileRequest
+ */
+export type CreateOfficeFileRequest = Message<"calaba.v1.CreateOfficeFileRequest"> & {
+  /**
+   * empty = the root
+   *
+   * @generated from field: string parent_id = 1;
+   */
+  parentId: string;
+
+  /**
+   * docx, xlsx or pptx
+   *
+   * @generated from field: string extension = 2;
+   */
+  extension: string;
+
+  /**
+   * Without the extension; empty = «Новый документ» / «Новая таблица» / «Новая презентация»
+   * in lang. The server adds the extension.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * The app language (ru, en, es, zh): the template's text language (the editor's spell check
+   * of new text) and the sheet name. Empty or unknown = ru.
+   *
+   * @generated from field: string lang = 4;
+   */
+  lang: string;
+};
+
+/**
+ * Describes the message calaba.v1.CreateOfficeFileRequest.
+ * Use `create(CreateOfficeFileRequestSchema)` to create a new message.
+ */
+export const CreateOfficeFileRequestSchema: GenMessage<CreateOfficeFileRequest> = /*@__PURE__*/
+  messageDesc(file_calaba_v1_office, 4);
 
 /**
  * @generated from enum calaba.v1.OfficeMode

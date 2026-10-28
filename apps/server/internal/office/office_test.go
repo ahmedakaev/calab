@@ -463,6 +463,19 @@ func TestConfigSignedAndShaped(t *testing.T) {
 	if dig(cfg, "editorConfig", "customization", "uiTheme") != "default-light" {
 		t.Fatal("theme")
 	}
+	// What the frame in the shell needs (ADR-0143 §14): the editor's own compact header with the
+	// name, «Открыть расположение файла» raising onRequestClose, the language and its region.
+	if dig(cfg, "editorConfig", "customization", "compactHeader") != true || dig(cfg, "editorConfig", "customization", "toolbarHideFileName") != false ||
+		dig(cfg, "editorConfig", "customization", "goback", "requestClose") != true || dig(cfg, "editorConfig", "lang") != "ru" || dig(cfg, "editorConfig", "region") != "ru-RU" {
+		t.Fatalf("customization %v", dig(cfg, "editorConfig"))
+	}
+	if _, _, en := h.open(u, it.ID, "&lang=en"); dig(en, "editorConfig", "lang") != "en" || dig(en, "editorConfig", "region") != "en-US" || dig(en, "editorConfig", "customization", "uiTheme") != "default-dark" {
+		t.Fatalf("lang=en %v", dig(en, "editorConfig"))
+	}
+	// The phone has its own back bar: no goback.
+	if _, _, ph := h.open(u, it.ID, "&phone=1"); dig(ph, "editorConfig", "customization", "goback") != nil || ph["type"] != "mobile" {
+		t.Fatalf("phone %v", ph)
+	}
 	if dig(cfg, "document", "permissions", "edit") != true || dig(cfg, "document", "fileType") != "xlsx" {
 		t.Fatal("permissions")
 	}

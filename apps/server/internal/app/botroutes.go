@@ -472,6 +472,7 @@ var botRouteGroups = []botRouteGroup{
 		"GET /api/office/config",
 		"POST /api/disk/items/{id}/office/convert",
 		"POST /api/workspaces/{id}/office/convert",
+		"POST /api/workspaces/{id}/office/create",
 	}},
 	{access: botDeny, why: "ADR-0139: saved task searches are a person's left-panel filters in the app; a bot searches with GET …/tasks/search directly", routes: []string{
 		"GET /api/workspaces/{id}/task-searches",

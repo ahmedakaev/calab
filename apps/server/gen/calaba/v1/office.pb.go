@@ -442,6 +442,82 @@ func (x *OfficeConvertRequest) GetParentId() string {
 	return ""
 }
 
+// «Создать» in the Disk (ADR-0143): a blank document, spreadsheet or presentation from the
+// server's templates, filed like an upload (quota, DISK_WRITE on the folder, the journal's
+// «upload», a taken name gets « (2)»). POST /api/workspaces/{id}/office/create → 201
+// DiskItemResponse. 404 while the editor is off.
+type CreateOfficeFileRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ParentId  string                 `protobuf:"bytes,1,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"` // empty = the root
+	Extension string                 `protobuf:"bytes,2,opt,name=extension,proto3" json:"extension,omitempty"`               // docx, xlsx or pptx
+	// Without the extension; empty = «Новый документ» / «Новая таблица» / «Новая презентация»
+	// in lang. The server adds the extension.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// The app language (ru, en, es, zh): the template's text language (the editor's spell check
+	// of new text) and the sheet name. Empty or unknown = ru.
+	Lang          string `protobuf:"bytes,4,opt,name=lang,proto3" json:"lang,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateOfficeFileRequest) Reset() {
+	*x = CreateOfficeFileRequest{}
+	mi := &file_calaba_v1_office_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateOfficeFileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateOfficeFileRequest) ProtoMessage() {}
+
+func (x *CreateOfficeFileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_calaba_v1_office_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateOfficeFileRequest.ProtoReflect.Descriptor instead.
+func (*CreateOfficeFileRequest) Descriptor() ([]byte, []int) {
+	return file_calaba_v1_office_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreateOfficeFileRequest) GetParentId() string {
+	if x != nil {
+		return x.ParentId
+	}
+	return ""
+}
+
+func (x *CreateOfficeFileRequest) GetExtension() string {
+	if x != nil {
+		return x.Extension
+	}
+	return ""
+}
+
+func (x *CreateOfficeFileRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateOfficeFileRequest) GetLang() string {
+	if x != nil {
+		return x.Lang
+	}
+	return ""
+}
+
 var File_calaba_v1_office_proto protoreflect.FileDescriptor
 
 const file_calaba_v1_office_proto_rawDesc = "" +
@@ -473,7 +549,12 @@ const file_calaba_v1_office_proto_rawDesc = "" +
 	"\afile_id\x18\b \x01(\tR\x06fileId\"L\n" +
 	"\x14OfficeConvertRequest\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x1b\n" +
-	"\tparent_id\x18\x02 \x01(\tR\bparentId*U\n" +
+	"\tparent_id\x18\x02 \x01(\tR\bparentId\"|\n" +
+	"\x17CreateOfficeFileRequest\x12\x1b\n" +
+	"\tparent_id\x18\x01 \x01(\tR\bparentId\x12\x1c\n" +
+	"\textension\x18\x02 \x01(\tR\textension\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04lang\x18\x04 \x01(\tR\x04lang*U\n" +
 	"\n" +
 	"OfficeMode\x12\x1b\n" +
 	"\x17OFFICE_MODE_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -500,7 +581,7 @@ func file_calaba_v1_office_proto_rawDescGZIP() []byte {
 }
 
 var file_calaba_v1_office_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_calaba_v1_office_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_calaba_v1_office_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_calaba_v1_office_proto_goTypes = []any{
 	(OfficeMode)(0),                    // 0: calaba.v1.OfficeMode
 	(OfficeCapability)(0),              // 1: calaba.v1.OfficeCapability
@@ -508,6 +589,7 @@ var file_calaba_v1_office_proto_goTypes = []any{
 	(*OfficeCapabilitiesResponse)(nil), // 3: calaba.v1.OfficeCapabilitiesResponse
 	(*OfficeConfigResponse)(nil),       // 4: calaba.v1.OfficeConfigResponse
 	(*OfficeConvertRequest)(nil),       // 5: calaba.v1.OfficeConvertRequest
+	(*CreateOfficeFileRequest)(nil),    // 6: calaba.v1.CreateOfficeFileRequest
 }
 var file_calaba_v1_office_proto_depIdxs = []int32{
 	1, // 0: calaba.v1.OfficeFormat.capability:type_name -> calaba.v1.OfficeCapability
@@ -532,7 +614,7 @@ func file_calaba_v1_office_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_calaba_v1_office_proto_rawDesc), len(file_calaba_v1_office_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -224,6 +224,7 @@ func (s *Service) Routes(mux httpx.Router, wrap func(http.Handler) http.Handler)
 	h("GET /api/office/config", s.on(s.config))
 	h("POST /api/disk/items/{id}/office/convert", s.on(s.convertItem))
 	h("POST /api/workspaces/{id}/office/convert", s.on(s.convertFile))
+	h("POST /api/workspaces/{id}/office/create", s.on(s.createFile))
 	mux.Handle("GET /api/office/file/{token}", httpx.HandlerFunc(s.on(s.file)))
 	mux.Handle("POST /api/office/callback/{token}", http.HandlerFunc(s.callback))
 }

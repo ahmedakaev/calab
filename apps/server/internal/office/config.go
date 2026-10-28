@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -211,6 +212,17 @@ func (s *Service) openFile(r *http.Request, raw string) (opening, error) {
 		fileURL: s.cfg.APIURL + "/api/office/file/" + tok, fileID: f.ID}, nil
 }
 
+// regionOf is the editor's region (the format of dates, numbers and currency) of an app
+// language: the language's own region for the app's four, the language itself otherwise.
+func regionOf(code string) string {
+	switch l := strings.ToLower(code); {
+	case l == "ru" || l == "en" || l == "es" || l == "zh" || strings.HasPrefix(l, "zh-"):
+		return langOf(l).tag
+	default:
+		return code
+	}
+}
+
 // sign makes the signed editor configuration of op for uid.
 func (s *Service) sign(op opening, uid uuid.UUID, name string, light, phone bool, lang string) (*v1.OfficeConfigResponse, error) {
 	edit := op.mode == v1.OfficeMode_OFFICE_MODE_EDIT
@@ -228,27 +240,37 @@ func (s *Service) sign(op opening, uid uuid.UUID, name string, light, phone bool
 	if phone {
 		editorType = "mobile"
 	}
+	customization := map[string]any{
+		// Free in Community Edition (not license-gated in web-apps); see ADR-0143 §Вид. The editor
+		// draws its own header (compact: name, save state, co-editors); the Calab shell has none.
+		"uiTheme":             theme,
+		"compactHeader":       true,
+		"compactToolbar":      false,
+		"toolbarHideFileName": false,
+		"hideRightMenu":       true,
+		"autosave":            true,
+		"forcesave":           true, // Ctrl+S / «Сохранить» → status 6 → a version now
+		"help":                false,
+		"feedback":            false,
+		"plugins":             false,
+		"close":               map[string]any{"visible": false},
+		"zoom":                100,
+		"unit":                "cm",
+	}
+	if !phone {
+		// «Открыть расположение файла» raises onRequestClose in the host page: the client leaves
+		// the file view (the phone has its own back bar). The label is the editor's own, in lang.
+		customization["goback"] = map[string]any{"requestClose": true}
+	}
 	editorConfig := map[string]any{
-		"mode":      editorMode,
-		"lang":      lang,
-		"coEditing": map[string]any{"mode": "fast", "change": false},
-		"user":      map[string]any{"id": uid.String(), "name": name},
-		"customization": map[string]any{
-			// Free in Community Edition (not license-gated in web-apps); see ADR-0143 §Вид.
-			"uiTheme":             theme,
-			"compactHeader":       true,
-			"compactToolbar":      false,
-			"toolbarHideFileName": true, // the Calab frame shows the name
-			"hideRightMenu":       true,
-			"autosave":            true,
-			"forcesave":           true, // Ctrl+S / «Сохранить» → status 6 → a version now
-			"help":                false,
-			"feedback":            false,
-			"plugins":             false,
-			"close":               map[string]any{"visible": false},
-			"zoom":                100,
-			"unit":                "cm",
-		},
+		"mode": editorMode,
+		"lang": lang,
+		// Dates, numbers and currency as the app language writes them (the trial: DD.MM.YYYY
+		// showed as 01,07,2026 without it).
+		"region":        regionOf(lang),
+		"coEditing":     map[string]any{"mode": "fast", "change": false},
+		"user":          map[string]any{"id": uid.String(), "name": name},
+		"customization": customization,
 	}
 	if op.callback != "" {
 		editorConfig["callbackUrl"] = op.callback

@@ -551,6 +551,7 @@ var identityRoutes = map[string]identityScope{
 	"GET /api/office/config":                   scopeOffice,
 	"POST /api/disk/items/{id}/office/convert": scopeDiskItem,
 	"POST /api/workspaces/{id}/office/convert": scopeWorkspace,
+	"POST /api/workspaces/{id}/office/create":  scopeWorkspace,
 	"GET /api/office/file/{token}":             scopePublic,
 	"POST /api/office/callback/{token}":        scopePublic,
 	// Wiki (ADR-0096 §8). The sync socket authenticates in-band (the token frame, like the

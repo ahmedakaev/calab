@@ -73,3 +73,18 @@ message OfficeConvertRequest {
   string file_id = 1;
   string parent_id = 2; // empty = the root
 }
+
+// «Создать» in the Disk (ADR-0143): a blank document, spreadsheet or presentation from the
+// server's templates, filed like an upload (quota, DISK_WRITE on the folder, the journal's
+// «upload», a taken name gets « (2)»). POST /api/workspaces/{id}/office/create → 201
+// DiskItemResponse. 404 while the editor is off.
+message CreateOfficeFileRequest {
+  string parent_id = 1; // empty = the root
+  string extension = 2; // docx, xlsx or pptx
+  // Without the extension; empty = «Новый документ» / «Новая таблица» / «Новая презентация»
+  // in lang. The server adds the extension.
+  string name = 3;
+  // The app language (ru, en, es, zh): the template's text language (the editor's spell check
+  // of new text) and the sheet name. Empty or unknown = ru.
+  string lang = 4;
+}
