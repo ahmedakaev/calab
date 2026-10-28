@@ -17,8 +17,7 @@ enum OfficeMode {
 // file. 404 when the caller has no DISK_VIEW on it (or the feature is off), 415 for a type the
 // editor does not open (xlsx, docx in v1).
 message OfficeConfigResponse {
-  // Origin of the Document Server for the browser; the client loads
-  // {docs_url}/web-apps/apps/api/documents/api.js on «Открыть» only.
+  // Origin of the Document Server for the browser (postMessage target of the host page).
   string docs_url = 1;
   // The DocsAPI.DocEditor configuration as JSON, with its "token" (HS256 over the rest, the
   // Document Server's JWT secret). Passed to the editor as is: the client never edits it.
@@ -26,4 +25,8 @@ message OfficeConfigResponse {
   OfficeMode mode = 3;
   // The co-editing key: the same for everyone who opens the item until its session ends.
   string key = 4;
+  // The Calab host page on the Document Server's origin (infra/office/calab-editor.html): the
+  // client frames it on «Открыть» and removes the frame on close; the page loads the Document
+  // Server's api.js, so its JS never runs in the Calab page.
+  string host_url = 5;
 }

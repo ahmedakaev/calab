@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file calaba/v1/office.proto.
  */
 export const file_calaba_v1_office: GenFile = /*@__PURE__*/
-  fileDesc("ChZjYWxhYmEvdjEvb2ZmaWNlLnByb3RvEgljYWxhYmEudjEibwoUT2ZmaWNlQ29uZmlnUmVzcG9uc2USEAoIZG9jc191cmwYASABKAkSEwoLY29uZmlnX2pzb24YAiABKAkSIwoEbW9kZRgDIAEoDjIVLmNhbGFiYS52MS5PZmZpY2VNb2RlEgsKA2tleRgEIAEoCSpVCgpPZmZpY2VNb2RlEhsKF09GRklDRV9NT0RFX1VOU1BFQ0lGSUVEEAASFAoQT0ZGSUNFX01PREVfVklFVxABEhQKEE9GRklDRV9NT0RFX0VESVQQAkKZAQoNY29tLmNhbGFiYS52MUILT2ZmaWNlUHJvdG9QAVo2Z2l0aHViLmNvbS9jYWxhYmEvY2FsYWJhL3NlcnZlci9nZW4vY2FsYWJhL3YxO2NhbGFiYXYxogIDQ1hYqgIJQ2FsYWJhLlYxygIJQ2FsYWJhXFYx4gIVQ2FsYWJhXFYxXEdQQk1ldGFkYXRh6gIKQ2FsYWJhOjpWMWIGcHJvdG8z");
+  fileDesc("ChZjYWxhYmEvdjEvb2ZmaWNlLnByb3RvEgljYWxhYmEudjEigQEKFE9mZmljZUNvbmZpZ1Jlc3BvbnNlEhAKCGRvY3NfdXJsGAEgASgJEhMKC2NvbmZpZ19qc29uGAIgASgJEiMKBG1vZGUYAyABKA4yFS5jYWxhYmEudjEuT2ZmaWNlTW9kZRILCgNrZXkYBCABKAkSEAoIaG9zdF91cmwYBSABKAkqVQoKT2ZmaWNlTW9kZRIbChdPRkZJQ0VfTU9ERV9VTlNQRUNJRklFRBAAEhQKEE9GRklDRV9NT0RFX1ZJRVcQARIUChBPRkZJQ0VfTU9ERV9FRElUEAJCmQEKDWNvbS5jYWxhYmEudjFCC09mZmljZVByb3RvUAFaNmdpdGh1Yi5jb20vY2FsYWJhL2NhbGFiYS9zZXJ2ZXIvZ2VuL2NhbGFiYS92MTtjYWxhYmF2MaICA0NYWKoCCUNhbGFiYS5WMcoCCUNhbGFiYVxWMeICFUNhbGFiYVxWMVxHUEJNZXRhZGF0YeoCCkNhbGFiYTo6VjFiBnByb3RvMw");
 
 /**
  * GET /api/office/config?item={diskItemId}&theme=dark|light&phone=0|1: the editor of one Disk
@@ -21,8 +21,7 @@ export const file_calaba_v1_office: GenFile = /*@__PURE__*/
  */
 export type OfficeConfigResponse = Message<"calaba.v1.OfficeConfigResponse"> & {
   /**
-   * Origin of the Document Server for the browser; the client loads
-   * {docs_url}/web-apps/apps/api/documents/api.js on «Открыть» only.
+   * Origin of the Document Server for the browser (postMessage target of the host page).
    *
    * @generated from field: string docs_url = 1;
    */
@@ -47,6 +46,15 @@ export type OfficeConfigResponse = Message<"calaba.v1.OfficeConfigResponse"> & {
    * @generated from field: string key = 4;
    */
   key: string;
+
+  /**
+   * The Calab host page on the Document Server's origin (infra/office/calab-editor.html): the
+   * client frames it on «Открыть» and removes the frame on close; the page loads the Document
+   * Server's api.js, so its JS never runs in the Calab page.
+   *
+   * @generated from field: string host_url = 5;
+   */
+  hostUrl: string;
 };
 
 /**

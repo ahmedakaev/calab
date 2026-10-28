@@ -16,6 +16,10 @@ import (
 	"github.com/calaba/calaba/server/internal/perm"
 )
 
+// HostPath is where the Calab host page (infra/office/calab-editor.html) is served on the
+// Document Server's origin.
+const HostPath = "/calab/calab-editor.html"
+
 // docKind is the Document Server's fileType and documentType of a name ("" = not opened here).
 func docKind(name string) (fileType, documentType string) {
 	switch strings.ToLower(strings.TrimPrefix(path.Ext(name), ".")) {
@@ -168,5 +172,5 @@ func (s *Service) Build(r *http.Request, it Item, uid uuid.UUID, name string, li
 	if err != nil {
 		return nil, err
 	}
-	return &v1.OfficeConfigResponse{DocsUrl: s.cfg.DocsURL, ConfigJson: string(raw), Mode: mode, Key: sess.Key}, nil
+	return &v1.OfficeConfigResponse{DocsUrl: s.cfg.DocsURL, HostUrl: s.cfg.DocsURL + HostPath, ConfigJson: string(raw), Mode: mode, Key: sess.Key}, nil
 }

@@ -175,4 +175,10 @@ export const zhDisk: DictShape<typeof ruDisk> = {
   'disk.view.failed': '无法打开文件',
   'disk.view.empty': '文件为空',
   'disk.view.rowsCapped': '仅显示前 {n} 行，其余请下载文件查看。',
+  'office.loading': '正在打开编辑器',
+  'office.saving': '正在保存…',
+  'office.saved': '更改已保存',
+  'office.view': '仅查看',
+  'office.failed': '无法打开编辑器',
+  'office.unsupported': '此文件无法在编辑器中打开',
 };

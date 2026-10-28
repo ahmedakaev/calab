@@ -175,4 +175,10 @@ export const esDisk: DictShape<typeof ruDisk> = {
   'disk.view.failed': 'No se pudo abrir el archivo',
   'disk.view.empty': 'El archivo está vacío',
   'disk.view.rowsCapped': 'Se muestran las primeras {n} filas. El resto, en el archivo descargado.',
+  'office.loading': 'Abriendo el editor',
+  'office.saving': 'Guardando…',
+  'office.saved': 'Cambios guardados',
+  'office.view': 'Solo lectura',
+  'office.failed': 'No se pudo abrir el editor',
+  'office.unsupported': 'Este archivo no se abre en el editor',
 };

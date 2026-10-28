@@ -25,6 +25,7 @@ import {
   WorkspaceRole,
 } from '@calaba/protocol';
 import { confirmAction } from '../components/Confirm';
+import { isOfficeFile, officeEnabled } from '../features/disk/office/bridge';
 import { showMode } from '../features/shell/sectionNav';
 import { t } from '../i18n';
 import { ApiError, body, call, callEmpty, qs } from '../lib/api/client';
@@ -460,6 +461,11 @@ export function openItem(item: DiskItem, siblings: readonly string[] = []): void
   }
   if (kind === 'video') {
     useDiskUi.getState().openDialog({ kind: 'preview', itemId: item.id });
+    return;
+  }
+  // xlsx / docx in ONLYOFFICE Docs (ADR-0143, spike: off unless the build sets VITE_OFFICE=1).
+  if (officeEnabled() && isOfficeFile(item.name)) {
+    useUi.getState().openDialog({ kind: 'office', itemId: item.id, name: item.name });
     return;
   }
   // A PDF opens in the PDF viewer (ADR-0103), like a task attachment.

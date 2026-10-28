@@ -75,15 +75,18 @@ func (OfficeMode) EnumDescriptor() ([]byte, []int) {
 // editor does not open (xlsx, docx in v1).
 type OfficeConfigResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Origin of the Document Server for the browser; the client loads
-	// {docs_url}/web-apps/apps/api/documents/api.js on «Открыть» only.
+	// Origin of the Document Server for the browser (postMessage target of the host page).
 	DocsUrl string `protobuf:"bytes,1,opt,name=docs_url,json=docsUrl,proto3" json:"docs_url,omitempty"`
 	// The DocsAPI.DocEditor configuration as JSON, with its "token" (HS256 over the rest, the
 	// Document Server's JWT secret). Passed to the editor as is: the client never edits it.
 	ConfigJson string     `protobuf:"bytes,2,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
 	Mode       OfficeMode `protobuf:"varint,3,opt,name=mode,proto3,enum=calaba.v1.OfficeMode" json:"mode,omitempty"`
 	// The co-editing key: the same for everyone who opens the item until its session ends.
-	Key           string `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	Key string `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	// The Calab host page on the Document Server's origin (infra/office/calab-editor.html): the
+	// client frames it on «Открыть» and removes the frame on close; the page loads the Document
+	// Server's api.js, so its JS never runs in the Calab page.
+	HostUrl       string `protobuf:"bytes,5,opt,name=host_url,json=hostUrl,proto3" json:"host_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -146,17 +149,25 @@ func (x *OfficeConfigResponse) GetKey() string {
 	return ""
 }
 
+func (x *OfficeConfigResponse) GetHostUrl() string {
+	if x != nil {
+		return x.HostUrl
+	}
+	return ""
+}
+
 var File_calaba_v1_office_proto protoreflect.FileDescriptor
 
 const file_calaba_v1_office_proto_rawDesc = "" +
 	"\n" +
-	"\x16calaba/v1/office.proto\x12\tcalaba.v1\"\x8f\x01\n" +
+	"\x16calaba/v1/office.proto\x12\tcalaba.v1\"\xaa\x01\n" +
 	"\x14OfficeConfigResponse\x12\x19\n" +
 	"\bdocs_url\x18\x01 \x01(\tR\adocsUrl\x12\x1f\n" +
 	"\vconfig_json\x18\x02 \x01(\tR\n" +
 	"configJson\x12)\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\x15.calaba.v1.OfficeModeR\x04mode\x12\x10\n" +
-	"\x03key\x18\x04 \x01(\tR\x03key*U\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\x12\x19\n" +
+	"\bhost_url\x18\x05 \x01(\tR\ahostUrl*U\n" +
 	"\n" +
 	"OfficeMode\x12\x1b\n" +
 	"\x17OFFICE_MODE_UNSPECIFIED\x10\x00\x12\x14\n" +
