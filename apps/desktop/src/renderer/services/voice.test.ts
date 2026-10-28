@@ -900,7 +900,7 @@ describe('VoiceEngine', () => {
     expect(useVoice.getState().link.attempts).toBe(0);
   });
 
-  it('a connect that keeps failing backs off 1/2/4/8/16 s and ends with the «lost» toast (#255)', async () => {
+  it('a connect that keeps failing backs off 1/2/4/8 s, then 15 s, for 90 s, ends with the «lost» toast and frees the seat (#255)', async () => {
     await voice.join('A', 'ws');
     const { toast } = await import('../stores/toasts');
     vi.mocked(toast.error).mockClear();
@@ -909,15 +909,17 @@ describe('VoiceEngine', () => {
     await settle();
     // Rejoin attempts so far (the first /join was the user's).
     const attempts = (): number => joinVoice.mock.calls.length - 1;
-    const steps: [number, number][] = [[999, 0], [1, 1], [1_999, 1], [1, 2], [3_999, 2], [1, 3], [7_999, 3], [1, 4], [15_999, 4], [1, 5]];
+    // Attempts at 1, 3, 7, 15, 30, 45, 60, 75 and 90 s; then the cycle gives up (90 s, ADR-0144 hold).
+    const steps: [number, number][] = [[999, 0], [1, 1], [1_999, 1], [1, 2], [3_999, 2], [1, 3], [7_999, 3], [1, 4], [14_999, 4], [1, 5], [14_999, 5], [1, 6], [14_999, 6], [1, 7], [14_999, 7], [1, 8], [14_999, 8], [1, 9]];
     for (const [ms, n] of steps) {
       await vi.advanceTimersByTimeAsync(ms);
       expect(attempts()).toBe(n);
     }
     expect(vi.mocked(toast.error).mock.calls.map((c) => c[0])).toEqual(['Не удалось вернуться в голосовую комнату']);
     expect(useVoice.getState()).toMatchObject({ phase: 'idle', roomId: null });
+    expect(leaveVoice).toHaveBeenCalledWith('A');
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(attempts()).toBe(5);
+    expect(attempts()).toBe(9);
   });
 
   it('the CSP blocking the LiveKit host: phase «blocked», the cycle stops, «Повторить» joins again', async () => {

@@ -137,6 +137,14 @@ const SEAT_SELF_GRACE_MS = 3000;
  * a moderator's (docs/05 «Несколько устройств»).
  */
 const REMOVED_GRACE_MS = 500;
+/**
+ * Rejoin backoff (#255): 1, 2, 4, 8 s, then at most 15 s apart; at least 5 attempts and 90 s — the
+ * server's default seat hold after a drop (VOICE_LOST_GRACE 60 s, removed by the next 30 s
+ * reconcile, ADR-0144) — before «Не удалось вернуться в голосовую комнату».
+ */
+const REJOIN_MIN_ATTEMPTS = 5;
+const REJOIN_MAX_BACKOFF_MS = 15_000;
+const REJOIN_GIVE_UP_MS = 90_000;
 /** `devicechange` comes in bursts while the OS switches the output: re-bind the elements once it settles (#255). */
 const REBIND_SETTLE_MS = 400;
 /**
@@ -862,10 +870,12 @@ class VoiceEngine {
   private intentSeq = 0;
 
   /**
-   * Rejoin after an unexpected disconnect: 1 s, 2 s, 4 s … up to 5 attempts (`now`: the first one
-   * at once). The seat (room id,
-   * phase 'reconnecting') stays in the store for the whole cycle: the voice panel keeps its
-   * state and open menus instead of remounting on every attempt.
+   * Rejoin after an unexpected disconnect: 1 s, 2 s, 4 s, 8 s, then every 15 s (`now`: the first one
+   * at once), for at least 5 attempts and REJOIN_GIVE_UP_MS — as long as the server holds a dropped
+   * seat (ADR-0144), so a metro tunnel or a Wi-Fi ↔ LTE switch does not end the call while the
+   * others still see «Нет связи». The network coming back wakes the next attempt at once. The seat
+   * (room id, phase 'reconnecting') stays in the store for the whole cycle: the voice panel keeps
+   * its state and open menus instead of remounting on every attempt.
    */
   private async rejoin(seatRoom?: string, seatWs?: string, now = false): Promise<void> {
     const roomId = seatRoom ?? this.roomId;
@@ -881,13 +891,14 @@ class VoiceEngine {
     this.rejoinRoomId = roomId;
     try {
       await this.teardown(false, true);
-      for (let attempt = 0; attempt < 5; attempt++) {
+      const started = Date.now();
+      for (let attempt = 0; attempt < REJOIN_MIN_ATTEMPTS || Date.now() - started < REJOIN_GIVE_UP_MS; attempt++) {
         if (gen !== this.rejoinGen) return; // the user left or switched meanwhile
         setVoice({ roomId, workspaceId: wsId, phase: 'reconnecting', serverMuted });
         // The backoff ends early when the gateway is back (the network is): checkSeat wakes it.
         await new Promise<void>((r) => {
           // `now`: the page is back after a long hide — the first attempt without the 1 s wait.
-          const timer = setTimeout(r, now && attempt === 0 ? 0 : 1000 * 2 ** attempt);
+          const timer = setTimeout(r, now && attempt === 0 ? 0 : Math.min(1000 * 2 ** attempt, REJOIN_MAX_BACKOFF_MS));
           this.rejoinWake = () => {
             clearTimeout(timer);
             r();
@@ -905,6 +916,9 @@ class VoiceEngine {
         }
       }
       toast.error(t('mediaErr.voice.lost'));
+      // Gave up: release the held seat now (best effort, offline it just expires on the server),
+      // so the others do not keep seeing «Нет связи» for someone who is out. A call ends by itself.
+      if (wsId !== '') this.sendLeave(roomId);
       await this.teardown(false);
     } finally {
       if (this.rejoinGen === gen) this.rejoinRoomId = null;
