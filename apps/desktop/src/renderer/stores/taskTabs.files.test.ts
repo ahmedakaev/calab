@@ -44,7 +44,7 @@ describe('file tabs share the strip with the task tabs (ADR-0143)', () => {
 });
 
 describe('file view state (the editor lives only while its view does)', () => {
-  const reset = (): void => useTaskTabs.setState({ tabs: [], cur: null, fileActive: null, fileMounted: null, fileMark: {}, fileClosing: null });
+  const reset = (): void => void useTaskTabs.setState({ tabs: [], cur: null, fileActive: null, fileMounted: null, fileMark: {}, fileClosing: null });
   afterEach(reset);
 
   it('open mounts the editor and shows the tab; leaving hides the view but keeps the editor until it is gone', () => {
