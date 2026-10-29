@@ -3173,9 +3173,10 @@ class VoiceEngine {
       }
       this.screen = share;
       this.viewers.set(share.video.sid ?? '', new Set());
-      // Whole screen: the annotation overlay may cover it (ADR-0028); a window: preview only.
+      // Whole screen: the annotation overlay may cover it (ADR-0028); a window: preview only. An
+      // empty display id (Windows, issue #102) still goes: main resolves a single display itself.
       const src = opts.source;
-      annot.presenting(share.video.sid ?? null, src.id.startsWith('screen:') && src.displayId ? { sourceId: src.id, displayId: src.displayId } : null);
+      annot.presenting(share.video.sid ?? null, src.id.startsWith('screen:') ? { sourceId: src.id, displayId: src.displayId ?? '' } : null);
       const audio = share.audioProblem
         ? reportMediaError(share.audioProblem.raw, 'streamAudio', share.audioProblem.code === 'no-loopback' ? 'no-loopback' : undefined)
         : null;
