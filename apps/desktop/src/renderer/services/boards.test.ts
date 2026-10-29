@@ -17,12 +17,14 @@ const update = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 const search = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 vi.mock('./boardsApi', () => ({ boardsApi: { tasks: { update: (...a: unknown[]) => update(...a), search: (...a: unknown[]) => search(...a) } } }));
 
-const { duplicateStatusId, applyBoardEvent, moveTask, updateTask, gateText, applySnapshotBoards, noticeText, searchAllTasks, ALL_TASKS_LIMIT } = await import('./boards');
+const { openTaskAnywhere, duplicateStatusId, applyBoardEvent, moveTask, updateTask, gateText, applySnapshotBoards, noticeText, searchAllTasks, ALL_TASKS_LIMIT } = await import('./boards');
 const { t } = await import('../i18n');
 const { memberName } = await import('../stores/workspaces');
 const { useBoards, workspaceBoards } = await import('../stores/boards');
 const { useBoardsUi, MY_TASKS } = await import('../stores/boardsUi');
 const { toast } = await import('../stores/toasts');
+const { useMailUi } = await import('../stores/mailUi');
+const { useUi } = await import('../stores/ui');
 const { ApiError } = await import('../lib/api/client');
 
 const task = (id: string, statusId: string, position: number, p: MessageInitShape<typeof TaskSchema> = {}): Task =>
@@ -284,5 +286,25 @@ describe('«Дублировать» status (CBF #103)', () => {
   });
   it('an unknown status (board not loaded) is kept as is', () => {
     expect(duplicateStatusId(src('zzz'), [])).toBe('zzz');
+  });
+});
+
+describe('openTaskAnywhere from the mail (#104)', () => {
+  beforeEach(() => {
+    useBoards.getState().reset();
+    useUi.setState({ activeWorkspaceId: 'w1' });
+    useBoardsUi.setState({ active: true, taskId: null });
+    useMailUi.setState({ active: true });
+  });
+  it('closes the mail over the already active boards and opens the task', () => {
+    openTaskAnywhere({ id: 't1', workspaceId: 'w1', boardId: 'b1' });
+    expect(useMailUi.getState().active).toBe(false);
+    expect(useBoardsUi.getState().active).toBe(true);
+    expect(useBoardsUi.getState().taskId).toBe('t1');
+  });
+  it('does the same for a task of another workspace', () => {
+    openTaskAnywhere({ id: 't2', workspaceId: 'w2', boardId: 'b9' });
+    expect(useMailUi.getState().active).toBe(false);
+    expect(useBoardsUi.getState().taskId).toBe('t2');
   });
 });
