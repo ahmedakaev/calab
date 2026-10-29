@@ -2,7 +2,7 @@ import { ROTATE_CURSOR, dist, hitHandleRot, resizeCursorAt, rotateHandlePoint, t
 import { isConnector } from '../../../lib/canvas/types';
 import type { CanvasEngine, Tool } from './engine';
 import {
-  CreateGesture, DrawGesture, ERASER_PX, EndpointGesture, EraseGesture, MarqueeGesture, MoveGesture, PanGesture, PinchGesture, ResizeGesture, RotateGesture, TOUCH_SLOP_PX, TapPanGesture, WireGesture,
+  CreateGesture, DrawGesture, EndpointGesture, EraseGesture, MarqueeGesture, MoveGesture, PanGesture, PinchGesture, ResizeGesture, RotateGesture, TOUCH_SLOP_PX, TapPanGesture, WireGesture,
   type Mods,
 } from './gestures';
 import { HANDLE_PX, ROTATE_OFFSET_PX, TOUCH_HIT_PX, TOUCH_ROTATE_OFFSET_PX, type SelFrame } from './overlay';
@@ -37,14 +37,23 @@ const TOUCH_PICK_PX = 10;
  * Returns the detach function. Camera input (wheel, pinch, Safari gestures) is queued on the engine and
  * applied once per frame; nothing here owns a timer or a frame of its own.
  */
-/** The eraser's cursor: a ring of its radius, so what it will take is plain to see. */
-const ERASER_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='${2 * ERASER_PX + 4}' height='${2 * ERASER_PX + 4}'><circle cx='${ERASER_PX + 2}' cy='${ERASER_PX + 2}' r='${ERASER_PX}' fill='white' fill-opacity='0.6' stroke='black' stroke-width='1.5'/></svg>`,
-)}") ${ERASER_PX + 2} ${ERASER_PX + 2}, crosshair`;
+/** The eraser's cursor: a ring of its radius, so what it will take is plain to see (one string per size). */
+const eraserCursors = new Map<number, string>();
+function eraserCursor(r: number): string {
+  let c = eraserCursors.get(r);
+  if (!c) {
+    const s = 2 * r + 4;
+    c = `url("data:image/svg+xml,${encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='${s}' height='${s}'><circle cx='${r + 2}' cy='${r + 2}' r='${r}' fill='white' fill-opacity='0.6' stroke='black' stroke-width='1.5'/></svg>`,
+    )}") ${r + 2} ${r + 2}, crosshair`;
+    eraserCursors.set(r, c);
+  }
+  return c;
+}
 
 /** The canvas cursor while a tool is armed: an I-beam for text (as in every editor), a ring for the eraser, a crosshair for the other creators. */
-export function toolCursor(t: Tool): string {
-  return t === 'select' ? '' : t === 'text' ? 'text' : t === 'eraser' ? ERASER_CURSOR : 'crosshair';
+export function toolCursor(t: Tool, eraserPx: number): string {
+  return t === 'select' ? '' : t === 'text' ? 'text' : t === 'eraser' ? eraserCursor(eraserPx) : 'crosshair';
 }
 
 export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): () => void {
@@ -83,11 +92,11 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
 
   const idleCursor = (): string => {
     if (spaceDown) return 'grab';
-    return toolCursor(engine.tool);
+    return toolCursor(engine.tool, engine.eraserPx);
   };
 
   const hoverCursor = (w: Point): string => {
-    if (engine.tool !== 'select') return toolCursor(engine.tool);
+    if (engine.tool !== 'select') return toolCursor(engine.tool, engine.eraserPx);
     if (engine.readOnly) return 'grab';
     if (rotateHandleAt(w)) return ROTATE_CURSOR;
     const g = resizeHandleAt(w);

@@ -14,6 +14,7 @@ import { TemplatesMenu } from './Templates';
 import { TimerButton } from './Timer';
 import type { TimerStore } from './timerStore';
 import { VoteButton } from './Vote';
+import { ERASER_SIZES } from '../../../lib/canvas/ink';
 import { PEN_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, TOOL_DEFS } from './model';
 import { Swatch, colorLabel, inkWidthItems } from './PropsPanel';
 import { STICKY_BODY, STICKY_FOLD, StickyIcon } from './StickyIcon';
@@ -69,9 +70,10 @@ function usePinnedTool(engine: CanvasEngine, pinned: Tool | null, release: () =>
  * A tool button. With a `flyout` (the sticky's colors, the shapes, the line kinds) a click both arms the tool and
  * opens its options beside it, as in Miro; the canvas keeps the focus, so a click on it closes the panel and creates.
  * A keyboard click moves the focus into the panel instead. The panel closes once the tool is released.
+ * `stay` (the pencil): drawing does not close it — only the tool button again, Esc or another tool.
  */
 function ToolButton({
-  tool, icon, active, pinned, onPick, onPin, focusCanvas, flyout, flyoutLabel, flyoutTestId,
+  tool, icon, active, pinned, onPick, onPin, focusCanvas, flyout, flyoutLabel, flyoutTestId, stay,
 }: {
   /** The eraser has no button of its own: it lives in the pencil's panel. */
   tool: Exclude<Tool, 'eraser'>;
@@ -84,6 +86,7 @@ function ToolButton({
   flyout?: ReactNode;
   flyoutLabel?: string;
   flyoutTestId?: string;
+  stay?: boolean;
 }): ReactNode {
   const [open, setOpen] = useState(false);
   const byKeyboard = useRef(false);
@@ -105,7 +108,8 @@ function ToolButton({
         focusCanvas();
         if (!flyout) return;
         byKeyboard.current = e.detail === 0;
-        setOpen(true);
+        // A panel that stays is put away by its own button.
+        setOpen(!(stay && open));
       }}
       onDoubleClick={() => onPin(tool)}
       aria-haspopup={flyout ? 'dialog' : undefined}
@@ -137,6 +141,9 @@ function ToolButton({
               onCloseAutoFocus={(e) => {
                 e.preventDefault();
                 focusCanvas();
+              }}
+              onInteractOutside={(e) => {
+                if (stay) e.preventDefault();
               }}
               data-testid={flyoutTestId}
             >
@@ -172,6 +179,8 @@ function FlyoutOption({ label, selected, onPick, testId, className, keep, childr
   return keep ? button : <Popover.Close asChild>{button}</Popover.Close>;
 }
 
+const ERASER_LABELS = ['canvasBoard.ink.eraserS', 'canvasBoard.ink.eraserM', 'canvasBoard.ink.eraserL'] as const;
+
 const INK_KINDS = [
   { id: 'pen', Icon: Pencil, label: 'canvasBoard.ink.pen' },
   { id: 'marker', Icon: Highlighter, label: 'canvasBoard.ink.marker' },
@@ -187,6 +196,7 @@ function InkPanel({ engine, palette }: { engine: CanvasEngine; palette: CanvasPa
   const marker = useEngineValue(engine, (s) => s.inkMarker);
   const color = useEngineValue(engine, (s) => s.inkColor);
   const width = useEngineValue(engine, (s) => s.inkWidth);
+  const eraser = useEngineValue(engine, (s) => s.eraserPx);
   const kind = tool === 'eraser' ? 'eraser' : marker ? 'marker' : 'pen';
   return (
     <div className="flex w-[13.5rem] flex-col gap-2" data-testid="canvas-ink-panel">
@@ -212,7 +222,15 @@ function InkPanel({ engine, palette }: { engine: CanvasEngine; palette: CanvasPa
           </FlyoutOption>
         ))}
       </div>
-      {kind === 'eraser' ? null : (
+      {kind === 'eraser' ? (
+        <div role="group" aria-label={t('canvasBoard.ink.eraserSize')} className="grid grid-cols-3 gap-1">
+          {ERASER_SIZES.map((px, i) => (
+            <FlyoutOption key={px} keep label={t(ERASER_LABELS[i] ?? 'canvasBoard.ink.eraserM')} selected={px === eraser} onPick={() => engine.setEraserPx(px)} testId={`canvas-eraser-size-${px}`} className="grid h-9 place-items-center">
+              <span aria-hidden className="rounded-full border-[1.5px] border-current" style={{ width: Math.min(28, px * 1.1 + 4), height: Math.min(28, px * 1.1 + 4) }} />
+            </FlyoutOption>
+          ))}
+        </div>
+      ) : (
         <>
           <div role="group" aria-label={t('canvasBoard.props.color')} className="grid grid-cols-8 gap-0.5">
             {PEN_COLORS.map((tok) => {
@@ -385,6 +403,7 @@ export const Toolbar = memo(function Toolbar({ engine, timer, palette, focusCanv
         pinned={false}
         flyoutLabel={t('canvasBoard.tool.pen')}
         flyoutTestId="canvas-ink-menu"
+        stay
         flyout={<InkPanel engine={engine} palette={palette} />}
       />
       <ToolButton {...common} tool="comment" icon={<MessageSquarePlus className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'comment'} pinned={false} />

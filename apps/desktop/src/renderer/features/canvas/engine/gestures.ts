@@ -1,7 +1,7 @@
 import { pinchStep, type Camera } from '../../../lib/canvas/camera';
 import { duplicate } from '../../../lib/canvas/clipboard';
 import type { CanvasDoc } from '../../../lib/canvas/doc';
-import { INK_EPS_PX, INK_RAW_MAX, inkFromStroke, inkDistance, tailRect } from '../../../lib/canvas/ink';
+import { INK_EPS_PX, INK_RAW_MAX, cutInk, inkFromStroke, tailRect } from '../../../lib/canvas/ink';
 import type { LiveLayer } from '../../../lib/canvas/live';
 import {
   ROT_STEP, angleToward, boundsOf, dist, mapRect, normRot, rectCenter, rectFromPoints, rectInflate, resizeRect, resizeRotated, rotatePoint, snapAngle, snapTo,
@@ -12,7 +12,7 @@ import type { Scene } from '../../../lib/canvas/scene';
 import { snapMove, snapResizePoint, type SnapOptions } from '../../../lib/canvas/snap';
 import {
   DEFAULTS, aabb, isBound, isBox, isConnector,
-  type BoxRec, type ConnectorRec, type Endpoint, type ObjectPatch, type RouteKind, type ShapeKind,
+  type BoxRec, type ConnectorRec, type Endpoint, type ObjectInit, type ObjectPatch, type RouteKind, type ShapeKind,
 } from '../../../lib/canvas/types';
 import type { InkPreview, OverlayState } from './overlay';
 
@@ -60,6 +60,8 @@ export interface Core {
   readonly touch?: boolean;
   /** The pen's color, width and kind. */
   readonly inkStyle: InkStyle;
+  /** The eraser's radius, screen px. */
+  readonly eraserPx: number;
   /** Shows the stroke in progress (null: none); `dirty` is the world rect that changed since the last call (null: all of it). */
   previewInk(ink: InkPreview | null, dirty: Rect | null): void;
   /** A create was refused by the document (the object or state limit): said to the user, not swallowed. */
@@ -759,13 +761,11 @@ export class DrawGesture implements Gesture {
 
 // ── eraser ──────────────────────────────────────────────────────────────────
 
-/** The eraser's radius, screen px (its cursor is a circle of this size). */
-export const ERASER_PX = 8;
-
 /**
- * Removes the freehand strokes the pointer passes over (v1: whole strokes, no other kinds, locked ones stay). Each hit is
- * deleted at once, so everyone sees the erasing; the whole drag is one undo step and Esc takes it back. Fast moves are
- * sampled every eraser radius, so a quick swipe does not jump over a thin line.
+ * Erases the part of freehand strokes under the pointer's disc (`Core.eraserPx`): a stroke it crosses is replaced by
+ * the pieces left on either side (a stroke wholly covered goes; other kinds and locked strokes stay). Each cut lands at
+ * once, so everyone sees the erasing; the whole drag is one undo step and Esc takes it back. Fast moves are sampled
+ * every half radius, so a quick swipe leaves no bridges.
  */
 export class EraseGesture implements Gesture {
   readonly kind = 'erase';
@@ -784,12 +784,28 @@ export class EraseGesture implements Gesture {
   }
 
   private at(p: Point): void {
-    const r = this.core.px(ERASER_PX);
+    const r = this.core.px(this.core.eraserPx);
     const hits: string[] = [];
+    const pieces: { init: ObjectInit }[] = [];
     for (const o of this.core.scene.query({ x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r })) {
       if (o.kind !== 'ink' || o.locked || this.erased.has(o.id)) continue;
-      const q = o.rot ? rotatePoint(p, rectCenter(o), -o.rot) : p;
-      if (inkDistance({ x: q.x - o.x, y: q.y - o.y }, o.points) <= r + o.strokeWidth / 2) hits.push(o.id);
+      const center = rectCenter(o);
+      const q = o.rot ? rotatePoint(p, center, -o.rot) : p;
+      const rr = r + o.strokeWidth / 2;
+      const runs = cutInk(o.points, { x: q.x - o.x, y: q.y - o.y }, rr, Math.max(rr / 4, this.core.px(1)));
+      if (!runs) continue;
+      hits.push(o.id);
+      for (const run of runs) {
+        const world: number[] = [];
+        for (let i = 0; i + 1 < run.length; i += 2) {
+          const wp = { x: o.x + (run[i] ?? 0), y: o.y + (run[i + 1] ?? 0) };
+          const v = o.rot ? rotatePoint(wp, center, o.rot) : wp;
+          world.push(v.x, v.y);
+        }
+        // A tiny tolerance: drops only the points the cut inserted on straight segments, the drawn line stays as it was.
+        const shape = inkFromStroke(world, 0.01);
+        if (shape) pieces.push({ init: { kind: 'ink', ...shape, stroke: o.stroke, strokeWidth: o.strokeWidth, ...(o.marker ? { marker: true } : {}) } });
+      }
     }
     if (hits.length === 0) return;
     if (!this.began) {
@@ -799,10 +815,11 @@ export class EraseGesture implements Gesture {
     for (const id of hits) this.erased.add(id);
     // Connectors never glue to a stroke (`glueAt`); should one end point at it anyway, it stays where it was.
     this.core.doc.remove(hits, (c, end) => this.core.scene.pointOf(c, end));
+    if (pieces.length) this.core.doc.createMany(pieces);
   }
 
   move(w: Point): void {
-    const step = this.core.px(ERASER_PX);
+    const step = this.core.px(this.core.eraserPx) / 2;
     const d = dist(this.last, w);
     const n = Math.min(64, Math.floor(d / step));
     for (let i = 1; i <= n; i++) this.at({ x: this.last.x + ((w.x - this.last.x) * i) / (n + 1), y: this.last.y + ((w.y - this.last.y) * i) / (n + 1) });

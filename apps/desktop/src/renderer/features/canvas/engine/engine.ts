@@ -12,7 +12,7 @@ import { contentRect } from '../../../lib/canvas/shapes';
 import { buildTemplate, type TemplateId, type TemplateText } from '../../../lib/canvas/templates';
 import { LABEL_SIZE, TextLayouter, boxFontSize, estimateMeasure, fontOf, type MeasureFn } from '../../../lib/canvas/textLayout';
 import { connectorMidpoint } from '../../../lib/canvas/route';
-import { INK_MAX_WIDTH, INK_MIN_WIDTH, MARKER_WIDTHS, PEN_WIDTHS } from '../../../lib/canvas/ink';
+import { ERASER_SIZES, INK_MAX_WIDTH, INK_MIN_WIDTH, MARKER_WIDTHS, PEN_WIDTHS } from '../../../lib/canvas/ink';
 import { LiveLayer } from '../../../lib/canvas/live';
 import {
   DEFAULTS, MAX_OBJECTS, aabb, hasText, isConnector,
@@ -57,6 +57,8 @@ export interface EngineState {
   /** Color (a palette token) and width of the pen tool's current kind. */
   readonly inkColor: string;
   readonly inkWidth: number;
+  /** The eraser's radius, screen px (`ERASER_SIZES`). */
+  readonly eraserPx: number;
   /** Rounded zoom, percent. */
   readonly zoomPct: number;
   readonly canUndo: boolean;
@@ -128,7 +130,7 @@ export interface EngineOptions {
   cancelRaf?: (id: number) => void;
 }
 
-const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'inkMarker', 'inkColor', 'inkWidth', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
+const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'inkMarker', 'inkColor', 'inkWidth', 'eraserPx', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
 const LOCAL_AWARENESS_MS = 50;
 /** Gestures that follow their pointer when the camera moves under it, and pan the view at its edge. */
 const FOLLOW_KINDS: ReadonlySet<Gesture['kind']> = new Set(['marquee', 'move', 'resize']);
@@ -218,6 +220,7 @@ export class CanvasEngine implements Core {
   private multi_ = false;
   private shape_: ShapeKind = 'rect';
   private sticky_: string = DEFAULTS.stickyColor;
+  private eraser_: number = ERASER_SIZES[1] ?? 12;
   /** The pen's and the marker's color and width, each kept for the session; `marker_` picks which one the pen tool uses. */
   private readonly pens = { pen: { color: DEFAULTS.inkStroke, width: PEN_WIDTHS[1] ?? 4 }, marker: { color: 'yellow', width: MARKER_WIDTHS[1] ?? 20 } };
   private marker_ = false;
@@ -367,6 +370,7 @@ export class CanvasEngine implements Core {
       inkMarker: this.marker_,
       inkColor: this.pen.color,
       inkWidth: this.pen.width,
+      eraserPx: this.eraser_,
       zoomPct: Math.round(this.cam.scale * 100),
       canUndo: this.doc.undo.undoStack.length > 0,
       canRedo: this.doc.undo.redoStack.length > 0,
@@ -414,6 +418,10 @@ export class CanvasEngine implements Core {
 
   private get pen(): { color: string; width: number } {
     return this.marker_ ? this.pens.marker : this.pens.pen;
+  }
+
+  get eraserPx(): number {
+    return this.eraser_;
   }
 
   get inkStyle(): InkStyle {
@@ -662,7 +670,7 @@ export class CanvasEngine implements Core {
   setTool(t: Tool): void {
     if (t === this.tool_) return;
     this.tool_ = t;
-    this.canvas.style.cursor = toolCursor(t);
+    this.canvas.style.cursor = toolCursor(t, this.eraser_);
     this.sync();
   }
 
@@ -735,6 +743,14 @@ export class CanvasEngine implements Core {
     const pen = this.pen;
     if (p.color !== undefined) pen.color = p.color;
     if (p.width !== undefined && Number.isFinite(p.width)) pen.width = Math.min(INK_MAX_WIDTH, Math.max(INK_MIN_WIDTH, p.width));
+    this.sync();
+  }
+
+  /** The eraser's size (screen px radius), kept for the session; its ring cursor follows. */
+  setEraserPx(px: number): void {
+    if (!Number.isFinite(px) || px === this.eraser_) return;
+    this.eraser_ = Math.min(64, Math.max(2, px));
+    if (this.tool_ === 'eraser') this.canvas.style.cursor = toolCursor('eraser', this.eraser_);
     this.sync();
   }
 

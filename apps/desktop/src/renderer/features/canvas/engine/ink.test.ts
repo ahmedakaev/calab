@@ -18,7 +18,7 @@ function core(style: InkStyle = { color: 'blue', width: 4, marker: false }) {
   const previews: { ink: InkPreview | null; dirty: Rect | null }[] = [];
   const refused = vi.fn();
   const c = {
-    doc, scene, inkStyle: style,
+    doc, scene, inkStyle: style, eraserPx: 8,
     px: (n: number) => n,
     previewInk: (ink: InkPreview | null, dirty: Rect | null) => previews.push({ ink: ink ? { ...ink, points: [...ink.points] } : null, dirty }),
     refuseCreate: refused,
@@ -91,6 +91,21 @@ describe('EraseGesture', () => {
     return { t, a: a ?? '', b: b ?? '', locked: locked ?? '', sticky: sticky ?? '' };
   };
 
+  it('cuts the part under its disc: a line crossed in the middle leaves its two ends', () => {
+    const { t, a } = setup();
+    const g = new EraseGesture(t.core, { x: 50, y: -20 });
+    g.end({ x: 50, y: 20 });
+    expect(g.removed.has(a)).toBe(true);
+    const left = t.scene.query({ x: -1, y: -5, w: 102, h: 10 }).filter((o) => o.kind === 'ink');
+    expect(left).toHaveLength(2);
+    const spans = left.map((o) => [o.x, o.x + o.w]).sort((p, q) => (p[0] ?? 0) - (q[0] ?? 0));
+    // Radius 8 + half the width 2: the cut is 50 ± 10.
+    expect(spans[0]?.[0]).toBeCloseTo(0);
+    expect(spans[0]?.[1]).toBeGreaterThan(38);
+    expect(spans[0]?.[1]).toBeLessThan(41);
+    expect(spans[1]?.[0]).toBeGreaterThan(59);
+    expect(spans[1]?.[1]).toBeCloseTo(100);
+  });
   it('removes the strokes it passes over, not other kinds nor locked strokes, in one undo step', () => {
     const { t, a, b, locked, sticky } = setup();
     const steps = t.doc.undo.undoStack.length;
@@ -99,7 +114,9 @@ describe('EraseGesture', () => {
     g.move({ x: 50, y: 260 });
     g.move({ x: 350, y: 50 });
     g.end({ x: 350, y: 60 });
-    expect([...g.removed].sort()).toEqual([a, b].sort());
+    // The originals, and the pieces later samples of the same drag cut again.
+    expect(g.removed.has(a) && g.removed.has(b)).toBe(true);
+    expect(g.removed.has(locked) || g.removed.has(sticky)).toBe(false);
     expect(t.scene.has(locked)).toBe(true);
     expect(t.scene.has(sticky)).toBe(true);
     expect(t.doc.undo.undoStack.length).toBe(steps + 1);

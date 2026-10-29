@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import { describe, expect, it } from 'vitest';
 import { parse, serialize, toInits } from './clipboard';
 import { CanvasDoc } from './doc';
-import { INK_MAX_POINTS, fitInk, inkDistance, inkFromStroke, isDot, simplify, tailRect, traceInk } from './ink';
+import { INK_MAX_POINTS, cutInk, fitInk, inkDistance, inkFromStroke, isDot, simplify, tailRect, traceInk } from './ink';
 import { Scene, visualBounds } from './scene';
 import { ids, makeDoc } from './testing';
 import { TextLayouter } from './textLayout';
@@ -14,6 +14,27 @@ const ink = (s: Scene, id: string): InkRec => {
   if (o?.kind !== 'ink') throw new Error(`${id} is not a stroke`);
   return o;
 };
+
+describe('cutInk', () => {
+  const line = [0, 0, 100, 0];
+  it('misses: null; a hit in the middle: the two runs outside the disc', () => {
+    expect(cutInk(line, { x: 50, y: 20 }, 10, 2)).toBeNull();
+    const runs = cutInk(line, { x: 50, y: 0 }, 10, 2) ?? [];
+    expect(runs).toHaveLength(2);
+    expect(runs[0]?.[0]).toBe(0);
+    // The cut follows the disc's edge to within one step.
+    expect(runs[0]?.[runs[0].length - 2]).toBeGreaterThanOrEqual(38);
+    expect(runs[0]?.[runs[0].length - 2]).toBeLessThan(40);
+    expect(runs[1]?.[0]).toBeGreaterThan(60);
+    expect(runs[1]?.[0]).toBeLessThanOrEqual(62);
+    expect(runs[1]?.[runs[1].length - 2]).toBe(100);
+  });
+  it('an end bitten off leaves one run; a stroke inside the disc or a dot leaves nothing', () => {
+    expect(cutInk(line, { x: 100, y: 0 }, 10, 2)).toHaveLength(1);
+    expect(cutInk([0, 0, 5, 0], { x: 2, y: 0 }, 10, 1)).toEqual([]);
+    expect(cutInk([3, 3, 3, 3], { x: 3, y: 4 }, 2, 1)).toEqual([]);
+  });
+});
 
 describe('simplify (Ramer–Douglas–Peucker)', () => {
   it('drops points on a straight run and keeps the corners', () => {

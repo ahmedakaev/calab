@@ -19,6 +19,8 @@ export const MARKER_ALPHA = 0.4;
 /** Pen and marker widths the tool offers (world units). */
 export const PEN_WIDTHS: readonly number[] = [2, 4, 8];
 export const MARKER_WIDTHS: readonly number[] = [12, 20, 32];
+/** Eraser radii the tool offers, screen px (its cursor is a ring of that size). */
+export const ERASER_SIZES: readonly number[] = [6, 12, 24];
 
 // `+ 0` folds a rounded -0 into 0.
 const round2 = (v: number): number => Math.round(v * 2) / 2 + 0;
@@ -187,4 +189,35 @@ export function tailRect(pts: readonly number[], count: number, pad: number): Re
   const from = Math.max(0, pts.length - 2 * count);
   const b = pointsBounds(pts.slice(from));
   return { x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad };
+}
+
+/**
+ * What an eraser disc (center `c` and radius `r`, relative to the stroke's corner; `r` already includes half the
+ * stroke's width) leaves of a stroke: segments near the disc are subdivided every `step` so the cut follows its edge,
+ * points inside are dropped and the rest split into runs of two or more points. Null when the disc misses the line,
+ * [] when nothing is left (a dot, or a stroke wholly inside).
+ */
+export function cutInk(pts: readonly number[], c: Point, r: number, step: number): number[][] | null {
+  if (inkDistance(c, pts) > r) return null;
+  if (pts.length < 4 || isDot(pts)) return [];
+  const runs: number[][] = [];
+  let cur: number[] = [];
+  const visit = (x: number, y: number): void => {
+    if (Math.hypot(x - c.x, y - c.y) > r) {
+      cur.push(x, y);
+      return;
+    }
+    if (cur.length >= 4) runs.push(cur);
+    cur = [];
+  };
+  visit(pts[0] ?? 0, pts[1] ?? 0);
+  const s = Math.max(step, 0.01);
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    const a = { x: pts[i] ?? 0, y: pts[i + 1] ?? 0 };
+    const b = { x: pts[i + 2] ?? 0, y: pts[i + 3] ?? 0 };
+    const n = distToSegment(c, a, b) <= r + s ? Math.min(512, Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / s))) : 1;
+    for (let k = 1; k <= n; k++) visit(a.x + ((b.x - a.x) * k) / n, a.y + ((b.y - a.y) * k) / n);
+  }
+  if (cur.length >= 4) runs.push(cur);
+  return runs;
 }
