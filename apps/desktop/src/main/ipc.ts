@@ -60,7 +60,7 @@ import { hideTip, showTip } from './tipOverlay';
 import { parseTipPayload } from './tipOverlayPolicy';
 import { appViewShown, forgetApp, hideApp, navigateApp, openApp, openAppExternal, setAppBounds } from './webApps';
 import { parseAppId, parseBounds } from './webAppPolicy';
-import { openLink } from './ownLink';
+import { APP_ORIGINS, openLink } from './ownLink';
 import { getMainWindow, isOwnPage, isShown, showMainWindow } from './windows';
 import { mailRequest } from './mail';
 import { setOfficeFrame } from './officeFrame';
@@ -243,6 +243,7 @@ export function registerIpc(): void {
     // app.getLocale() follows --lang (tests pin it to ru); the system list covers languages
     // Chromium has no UI pack for (ADR-0022: kk, be → ru; the app ships only our packs).
     locales: systemLocales(app.getLocale(), app.getPreferredSystemLanguages(), app.commandLine.hasSwitch('lang')),
+    appOrigins: [...APP_ORIGINS],
   }));
   handle(IPC.appSetStrings, (_e, a) => {
     const s = parseMainStrings(a);
