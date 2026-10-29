@@ -233,12 +233,13 @@ export interface CalabaApi {
    * logged in to (GET /api/office/capabilities) for the Document Server origin and let exactly that
    * origin's host page through the navigation guards; it resolves with that origin ('' = the editor
    * is off or the server unreachable: nothing is framed). `closeFrame` drops it. `warm` has main
-   * download the editor's files into the HTTP cache once per Document Server version (main/officeWarm.ts).
+   * download editors' files into the HTTP cache once per Document Server version (main/officeWarm.ts):
+   * `disk` with the documentTypes of the open folder's files, `ready` for the editors opened before.
    */
   office?: {
     openFrame(): Promise<string>;
     closeFrame(): Promise<void>;
-    warm(reason: 'disk' | 'ready'): Promise<void>;
+    warm(reason: 'disk' | 'ready', kinds?: ('word' | 'cell' | 'slide')[]): Promise<void>;
   };
   /**
    * The mail engine bridge (ADR-0088 §7), Electron only. Raw transport: the renderer uses the typed

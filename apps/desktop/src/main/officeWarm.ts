@@ -1,18 +1,20 @@
 /**
  * Warms the office editor's files in the HTTP cache (ADR-0143) so the first open of a document is
  * not a download. The editor is ~12 MB of JS, wasm and CSS behind a requirejs waterfall (app.js asks
- * for its controllers one by one): on a slow or far link the first open takes 10–30 s, a cached one
- * a few seconds. Requests made here through the default session land in the same cache entries the
- * editor's frame reads (proven on Electron 44: the frame gets them `fromCache`).
+ * for its controllers one by one): on a slow or far link the first open takes 10–30 s. Requests made
+ * here through the default session land in the same cache entries the editor's frame reads (proven
+ * on Electron 44: the frame gets them `fromCache`).
  *
- * - When: the renderer asks on entering the Disk (`disk`) and at READY (`ready`, only for someone who
- *   has opened the editor before, after a pause). Once per Document Server version: the version is
- *   the `<x.y.z>-<hash>` prefix of every editor URL, read from the unversioned api.js.
- * - What: SEED, the files the three editors load (officeAssets.json, recorded by tools/office-assets.cjs),
- *   plus the paths the editor actually loaded here (learned from the frame's requests, kept relative to
- *   the version so they survive an upgrade that renames a few). Most of the time is the requirejs
- *   waterfall of ~200 small files, not the big ones: warming only the heavy files saved 25 %, all of
- *   them 90 % (spreadsheet editor on a 0.35 MB/s link: 13.6 s → 1.2 s).
+ * - Which editors: only those the person is about to need. Entering a Disk folder warms the editors
+ *   of the files in it (`disk`, kinds from the renderer: a folder of .xlsx warms the spreadsheet
+ *   editor only); READY warms, after a pause, the editors this person has opened before (`ready`).
+ *   Someone who never opens documents downloads nothing.
+ * - Once per Document Server version and editor: the version is the `<x.y.z>-<hash>` prefix of every
+ *   editor URL, read from the unversioned api.js (at most once per RECHECK_MS).
+ * - What: the editor's files from officeAssets.json (recorded by tools/office-assets.cjs) plus the
+ *   paths the frame actually loaded here (kept relative to the version, so an upgrade that renames a
+ *   few is learned). The time is the waterfall of ~200 small files, not the big ones: warming the 25
+ *   heaviest saved 25 %, all of them 98 % (spreadsheet editor on a 0.35 MB/s link: 33 s → 0.6 s).
  * - Cost: network only, PARALLEL requests at a time; nothing is parsed or run.
  */
 import { app, session } from 'electron';
@@ -32,24 +34,36 @@ const PARALLEL = 6;
 const RECHECK_MS = 30 * 60_000;
 const READY_DELAY_MS = 60_000;
 
-/** The three editors' files, merged in turn so each editor's first files come first (its waterfall needs them first). */
+/** The Document Server's documentType of an editor (OfficeFormat.document_type). */
+export type OfficeKind = 'word' | 'cell' | 'slide';
+export const OFFICE_KINDS: readonly OfficeKind[] = ['word', 'cell', 'slide'];
+const KIND_OF: readonly [OfficeKind, RegExp][] = [
+  ['word', /^(web-apps\/apps\/documenteditor|sdkjs\/word)\//],
+  ['cell', /^(web-apps\/apps\/spreadsheeteditor|sdkjs\/cell)\//],
+  ['slide', /^(web-apps\/apps\/presentationeditor|sdkjs\/slide)\//],
+];
+
+/** The editor a path belongs to, null for the files they share. */
+export function kindOfPath(p: string): OfficeKind | null {
+  return KIND_OF.find(([, re]) => re.test(p))?.[0] ?? null;
+}
+
+/** Lists merged in turn, each path once: each editor's first files come first (its waterfall needs them first). */
 export function mergeInTurn(lists: readonly (readonly string[])[]): string[] {
   const out = new Set<string>();
-  for (let i = 0; i < Math.max(...lists.map((l) => l.length)); i++) for (const l of lists) if (i < l.length) out.add(l[i] as string);
+  for (let i = 0; i < Math.max(0, ...lists.map((l) => l.length)); i++) for (const l of lists) if (i < l.length) out.add(l[i] as string);
   return [...out];
 }
 
-export const SEED: readonly string[] = mergeInTurn([assets.word, assets.cell, assets.slide]);
-
 export interface WarmState {
   origin: string;
-  /** The version last warmed completely enough ('' = never). */
-  warmed: string;
+  /** Per editor, the version last warmed completely enough. */
+  warmed: Partial<Record<OfficeKind, string>>;
   /** Paths the editor loaded, relative to the version root. */
   paths: string[];
 }
 
-const EMPTY: WarmState = { origin: '', warmed: '', paths: [] };
+const empty = (): WarmState => ({ origin: '', warmed: {}, paths: [] });
 
 /** The Document Server version named in api.js, '' when it names none. */
 export function versionOf(apiJs: string): string {
@@ -70,19 +84,34 @@ export function assetPath(url: string, origin: string): string | null {
   return m[2] + u.search;
 }
 
-/** The URLs to warm for `version`: SEED, then what was learned, each once. */
-export function warmList(origin: string, version: string, learned: readonly string[]): string[] {
-  return [...new Set([...SEED, ...learned])].map((p) => `${origin}/${version}/${p}`);
+/** The URLs to warm for these editors: their recorded files, then what was learned for them or shared, each once. */
+export function warmList(origin: string, version: string, kinds: readonly OfficeKind[], learned: readonly string[]): string[] {
+  const own = learned.filter((p) => {
+    const k = kindOfPath(p);
+    return k === null || kinds.includes(k);
+  });
+  return [...new Set([...mergeInTurn(kinds.map((k) => assets[k])), ...own])].map((p) => `${origin}/${version}/${p}`);
 }
 
-/** The state file's content, or EMPTY for anything unexpected. */
+/** The editors this person has opened here (their files were learned). */
+export function usedKinds(learned: readonly string[]): OfficeKind[] {
+  return OFFICE_KINDS.filter((k) => learned.some((p) => kindOfPath(p) === k));
+}
+
+/** The state file's content, or an empty state for anything unexpected. */
 export function parseState(raw: string): WarmState {
   try {
-    const v = JSON.parse(raw) as Partial<WarmState>;
-    if (typeof v.origin !== 'string' || typeof v.warmed !== 'string' || !Array.isArray(v.paths)) return EMPTY;
-    return { origin: v.origin, warmed: v.warmed, paths: v.paths.filter((p): p is string => typeof p === 'string').slice(0, MAX_PATHS) };
+    const v = JSON.parse(raw) as { origin?: unknown; warmed?: unknown; paths?: unknown };
+    if (typeof v.origin !== 'string' || !Array.isArray(v.paths)) return empty();
+    const warmed: WarmState['warmed'] = {};
+    if (v.warmed && typeof v.warmed === 'object')
+      for (const k of OFFICE_KINDS) {
+        const w = (v.warmed as Record<string, unknown>)[k];
+        if (typeof w === 'string') warmed[k] = w;
+      }
+    return { origin: v.origin, warmed, paths: v.paths.filter((p): p is string => typeof p === 'string').slice(0, MAX_PATHS) };
   } catch {
-    return EMPTY;
+    return empty();
   }
 }
 
@@ -101,7 +130,7 @@ export type WarmReason = 'disk' | 'ready';
 export function createWarmer(deps: WarmDeps) {
   let state: WarmState | null = null;
   let running: Promise<void> | null = null;
-  let checkedAt = -Infinity;
+  let known: { origin: string; version: string; at: number } | null = null;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   const stop = new AbortController();
   /** Entering the Disk while a READY run waits: it goes now. */
@@ -116,24 +145,34 @@ export function createWarmer(deps: WarmDeps) {
     }, 5_000);
   };
 
-  async function run(reason: WarmReason, docsUrl: () => Promise<unknown>): Promise<void> {
-    if (reason === 'ready') {
-      const s = await load();
-      if (s.paths.length === 0) return; // never opened the editor: nothing is downloaded for it
-      await deps.delay(READY_DELAY_MS, AbortSignal.any([stop.signal, hurry.signal]));
-      if (stop.signal.aborted) return;
-    }
-    if (deps.now() - checkedAt < RECHECK_MS) return;
-    checkedAt = deps.now();
+  /** The Document Server origin and its version, asked again after RECHECK_MS. */
+  async function current(docsUrl: () => Promise<unknown>): Promise<{ origin: string; version: string } | null> {
+    if (known && deps.now() - known.at < RECHECK_MS) return known.version ? known : null;
     const origin = officeOriginOf(await docsUrl().catch(() => ''));
-    if (!origin) return;
+    if (!origin) return null;
     const res = await deps.fetch(origin + API_JS, { signal: AbortSignal.any([stop.signal, AbortSignal.timeout(10_000)]) });
     const text = await res.text();
-    const version = res.ok ? versionOf(text) : '';
-    if (!version) return;
+    known = { origin, version: res.ok ? versionOf(text) : '', at: deps.now() };
+    return known.version ? known : null;
+  }
+
+  async function run(reason: WarmReason, asked: readonly OfficeKind[], docsUrl: () => Promise<unknown>): Promise<void> {
+    let kinds = asked;
+    if (reason === 'ready') {
+      kinds = usedKinds((await load()).paths);
+      if (kinds.length === 0) return; // never opened the editor here: nothing is downloaded for it
+      hurry = new AbortController();
+      await deps.delay(READY_DELAY_MS, AbortSignal.any([stop.signal, hurry.signal]));
+    }
+    if (kinds.length === 0 || stop.signal.aborted) return;
+    const at = await current(docsUrl);
+    if (!at) return;
+    const { origin, version } = at;
     const s = await load();
-    if (s.origin === origin && s.warmed === version) return;
-    const urls = warmList(origin, version, s.origin === origin ? s.paths : []);
+    const mine = s.origin === origin;
+    const todo = kinds.filter((k) => !mine || s.warmed[k] !== version);
+    if (todo.length === 0) return;
+    const urls = warmList(origin, version, todo, mine ? s.paths : []);
     const started = deps.now();
     let next = 0;
     let ok = 0;
@@ -153,37 +192,39 @@ export function createWarmer(deps: WarmDeps) {
       }
     };
     await Promise.all(Array.from({ length: PARALLEL }, worker));
-    log.info('[office] warmed the editor', { version, files: `${ok}/${urls.length}`, bytes, ms: deps.now() - started, reason });
+    log.info('[office] warmed the editor', { version, kinds: todo, files: `${ok}/${urls.length}`, bytes, ms: deps.now() - started, reason });
     if (ok * 2 < urls.length) return;
-    state = { origin, warmed: version, paths: state?.origin === origin ? state.paths : [] };
+    const now: WarmState = state?.origin === origin ? state : { origin, warmed: {}, paths: [] };
+    for (const k of todo) now.warmed[k] = version;
+    state = now;
     save();
   }
 
   return {
-    /** IPC `office:warm`: one run at a time, at most one version check per RECHECK_MS. */
-    warm(reason: WarmReason, docsUrl: () => Promise<unknown>): Promise<void> {
-      if (running) {
-        if (reason === 'disk') hurry.abort();
-        return running;
-      }
-      hurry = new AbortController();
-      running = run(reason, docsUrl)
-        .catch((e: unknown) => log.warn('[office] warming failed', e))
+    /** IPC `office:warm`: runs one after another (each skips what is warm already); the Disk cuts READY's pause short. */
+    warm(reason: WarmReason, kinds: readonly OfficeKind[], docsUrl: () => Promise<unknown>): Promise<void> {
+      if (reason === 'disk') hurry.abort();
+      const next: Promise<void> = (running ?? Promise.resolve())
+        .then(() => run(reason, kinds, docsUrl))
+        .catch((e: unknown) => {
+          log.warn('[office] warming failed', e);
+        })
         .finally(() => {
-          running = null;
+          if (running === next) running = null;
         });
-      return running;
+      running = next;
+      return next;
     },
     /** A request the editor's frame completed: remembered when it is one of its files. */
     learn(url: string, origin: string): void {
       const p = assetPath(url, origin);
       if (p === null || !state) return;
-      if (state.origin !== origin) state = { origin, warmed: '', paths: [] };
+      if (state.origin !== origin) state = { origin, warmed: {}, paths: [] };
       if (state.paths.includes(p) || state.paths.length >= MAX_PATHS) return;
       state.paths.push(p);
       save();
     },
-    /** The editor opened on `origin`: load the state so its requests can be learned. */
+    /** The editor opened: load the state so its requests can be learned. */
     async prepare(): Promise<void> {
       await load();
     },
@@ -224,8 +265,8 @@ function officeWarmer(): Warmer {
 }
 
 /** IPC `office:warm`. */
-export function warmOffice(reason: WarmReason, docsUrl: () => Promise<unknown>): Promise<void> {
-  return officeWarmer().warm(reason, docsUrl);
+export function warmOffice(reason: WarmReason, kinds: readonly OfficeKind[], docsUrl: () => Promise<unknown>): Promise<void> {
+  return officeWarmer().warm(reason, kinds, docsUrl);
 }
 
 /**

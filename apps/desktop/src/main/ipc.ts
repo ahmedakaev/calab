@@ -64,7 +64,7 @@ import { openLink } from './ownLink';
 import { getMainWindow, isOwnPage, isShown, showMainWindow } from './windows';
 import { mailRequest } from './mail';
 import { setOfficeFrame } from './officeFrame';
-import { learnOfficeFrom, warmOffice } from './officeWarm';
+import { OFFICE_KINDS, learnOfficeFrom, warmOffice, type OfficeKind } from './officeWarm';
 
 const VISUAL_TEST = process.env['CALABA_VISUAL_TEST'] === '1';
 const VISUAL_VIBRANCY = process.env['CALABA_VISUAL_VIBRANCY'] === '1';
@@ -492,7 +492,12 @@ export function registerIpc(): void {
     learnOfficeFrom(origin);
     return origin;
   });
-  handle(IPC.officeWarm, (_e, a) => (a === 'disk' || a === 'ready' ? warmOffice(a, officeDocsUrl) : undefined));
+  handle(IPC.officeWarm, (_e, a) => {
+    const { reason, kinds } = (a ?? {}) as { reason?: unknown; kinds?: unknown };
+    if (reason !== 'disk' && reason !== 'ready') return;
+    const ks = Array.isArray(kinds) ? OFFICE_KINDS.filter((k: OfficeKind) => kinds.includes(k)) : [];
+    return warmOffice(reason, ks, officeDocsUrl);
+  });
   handle(IPC.mailRequest, (_e, a) => mailRequest(a));
   handle(IPC.systemOpenPrivacySettings, (_e, pane) => {
     if (process.platform === 'win32') {

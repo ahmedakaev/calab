@@ -7,8 +7,8 @@ let inflight: Promise<void> | null = null;
 
 /**
  * GET /api/office/capabilities (ADR-0143) at every READY: the server may have turned the editor on or
- * off. A failure keeps what was known. With the editor on, Electron warms its files (main/officeWarm.ts:
- * only for someone who has opened it before, after a pause, once per Document Server version).
+ * off. A failure keeps what was known. With the editor on, Electron warms the editors this person has
+ * opened before (main/officeWarm.ts: after a pause, once per Document Server version).
  */
 export function loadOfficeCaps(): Promise<void> {
   inflight ??= call('GET', '/api/office/capabilities', OfficeCapabilitiesResponseSchema)
