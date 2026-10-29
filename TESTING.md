@@ -2335,6 +2335,16 @@ Stand with a real provider (telephony on, a Caller ID), member A with `PLACE_CAL
 5. Answered call: «Клавиатура» → press 1 2 #; the second phone (or an IVR you call) hears / receives the tones. If not — record it in docs/12 (DTMF line).
 6. «Набор»: type «101» → «Имя · вн. 101», call → internal call; long press «0» → «+»; paste «Тел.: 8 (916) 123-45-67» → «8 916 123-45-67». Member without `PLACE_CALLS`: the note, the call button only for internal numbers.
 
+## Telephony: tones and an extension in a room call (ADR-0046 addendum 29.10)
+
+Stand with a real provider, an IVR that reads back keys (or an office PBX with extensions), A and B in one voice room; A has `PLACE_CALLS`, B is a plain member.
+
+1. A: «Позвонить на номер» → «+7 495 … доб. 101» (also try «…,101» and «…;101») → Enter. The row and the «В голосе» card show «доб. 101»; no «Клавиатура» while it rings.
+2. Answer: ~2 s later the IVR / PBX receives 1 0 1 (the provider's CDR, or the PBX connects extension 101). Only the number reached the trunk (the provider's log).
+3. A: island «Клавиатура» → «Тоновый набор: +7 495 … доб. 101» → press 2 #; the IVR reacts; a soft tick per key in A's speakers only (B hears no clicks).
+4. B (no `MUTE_MEMBERS`): no «Клавиатура» anywhere; a moderator (`MUTE_MEMBERS`) has it. Phone (iPhone): the header's people stack → the line row → «Клавиатура» card.
+5. A second room with its own line: keys pressed in room 1 never reach room 2's callee. Hang up mid-extension («…,,,,9») → no more tones, no errors.
+
 ## Notifications lead to the source; «Упоминания» with task events (ADR-0141, #99)
 
 macOS desktop build, two workspaces, member B in both; A mentions and assigns B.
