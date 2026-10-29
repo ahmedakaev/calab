@@ -16,7 +16,7 @@ import { useCanvas } from '../../stores/canvas';
 import { useCanvasUi } from '../../stores/canvasUi';
 import { myUserId } from '../../stores/session';
 import { menuBox, menuItem } from '../shell/menu';
-import { ItemContextMenu, ItemRowMenu, RenameField } from './ItemMenu';
+import { ItemContextMenu, ItemEmojiPicker, ItemRowMenu, RenameField } from './ItemMenu';
 import { PrivateLock } from './PrivateLock';
 
 /**
@@ -149,8 +149,10 @@ const ChildList = memo(function ChildList({ workspaceId, parentId, depth }: { wo
   );
 });
 
-/** The icon of a row: a folder (open when expanded) or a canvas. */
-function ItemIcon({ folder, open }: { folder: boolean; open?: boolean }): ReactNode {
+/** The icon of a row: the item's emoji, else a folder (open when expanded) or a canvas. */
+function ItemIcon({ id, folder, open }: { id: string; folder: boolean; open?: boolean }): ReactNode {
+  const emoji = useCanvas((s) => s.items[id]?.emoji ?? '');
+  if (emoji) return <span className="text-[15px] leading-none">{emoji}</span>;
   const I = folder ? (open ? FolderOpen : Folder) : Shapes;
   return <I className="size-4 text-muted" strokeWidth={1.75} aria-hidden />;
 }
@@ -216,7 +218,7 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
           {renaming ? (
             <>
               <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
-                <ItemIcon folder={folder} open={expanded} />
+                <ItemIcon id={id} folder={folder} open={expanded} />
               </span>
               <RenameField itemId={id} className="h-6 flex-1" />
             </>
@@ -232,9 +234,11 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
               className="flex h-full min-w-0 flex-1 items-center gap-1 rounded-[var(--radius-row)] text-left focus-visible:outline-offset-[-2px]"
               data-testid="canvas-node-open"
             >
-              <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
-                <ItemIcon folder={folder} open={expanded} />
-              </span>
+              <ItemEmojiPicker id={id} at="tree">
+                <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
+                  <ItemIcon id={id} folder={folder} open={expanded} />
+                </span>
+              </ItemEmojiPicker>
               <span className={cx('min-w-0 flex-1 truncate', !name && 'text-muted')}>{name || t('canvas.untitled')}</span>
               <PrivateLock id={id} />
             </button>
@@ -266,7 +270,7 @@ export function DragChip({ id }: { id: string }): ReactNode {
   const folder = useCanvas((s) => s.items[id]?.kind === CanvasItemKind.FOLDER);
   return (
     <div className="mat-popover flex h-8 max-w-64 items-center gap-2 rounded-[var(--radius-row)] px-2.5 text-body shadow-[var(--shadow-popover)]">
-      <ItemIcon folder={folder} />
+      <ItemIcon id={id} folder={folder} />
       <span className="truncate">{name || t('canvas.untitled')}</span>
     </div>
   );
@@ -326,7 +330,7 @@ function SearchResults({ workspaceId, query }: { workspaceId: string; query: str
           data-testid="canvas-search-hit"
         >
           <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
-            <ItemIcon folder={false} />
+            <ItemIcon id={r.id} folder={false} />
           </span>
           <span className="min-w-0 flex-1 truncate">{r.name || t('canvas.untitled')}</span>
         </button>
@@ -362,7 +366,7 @@ const ResultRow = memo(function ResultRow({ workspaceId, id }: { workspaceId: st
       data-testid="canvas-search-row"
     >
       <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
-        <ItemIcon folder={folder} />
+        <ItemIcon id={id} folder={folder} />
       </span>
       <span className="min-w-0 flex-1 truncate">{name || t('canvas.untitled')}</span>
       <PrivateLock id={id} />
@@ -435,7 +439,7 @@ const TrashRow = memo(function TrashRow({ workspaceId, id }: { workspaceId: stri
           className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-row)] pl-2 text-left focus-visible:outline-offset-[-2px]"
         >
           <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
-            <ItemIcon folder={folder} />
+            <ItemIcon id={id} folder={folder} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate text-body">{name || t('canvas.untitled')}</span>

@@ -340,6 +340,22 @@ export async function renameItem(id: string, name: string, prevName: string): Pr
   }
 }
 
+/** Sets the item's emoji ("" = back to the icon): optimistic, as a rename. */
+export async function setItemEmoji(id: string, emoji: string): Promise<void> {
+  const prev = useCanvas.getState().items[id];
+  if (!prev || prev.emoji === emoji) return;
+  useCanvas.getState().upsert({ ...prev, emoji });
+  try {
+    const r = await canvasApi.update(id, { emoji });
+    const cur = useCanvas.getState().items[id];
+    if (r.item && cur && cur.emoji === emoji) useCanvas.getState().upsert(r.item);
+  } catch (e) {
+    const cur = useCanvas.getState().items[id];
+    if (cur) useCanvas.getState().upsert({ ...cur, emoji: prev.emoji });
+    fail(e, t('canvas.err.emoji'));
+  }
+}
+
 /** Moves an item (a tree drop, «Переместить»): optimistic, both lists refetched after. */
 export async function moveItem(id: string, parentId: string, position: number): Promise<void> {
   const { items, lists } = useCanvas.getState();
