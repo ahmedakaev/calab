@@ -2385,3 +2385,13 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - PG18 + Valkey: `go test -tags integration -count=1 -run TestBoardGit ./internal/app` — draft → «draft» rule only; ready → «MR открыт» rule; a repeated ready / approval with another body fires nothing; merge into `preprod` with filter `main` does not move the task.
 - Manually (GitLab): rules «Draft MR открыт → In Progress», «MR открыт → In Review», «MR влит» with «Целевая ветка» `main`; open a Draft MR `feature/dev-N-…`, mark it ready, approve twice, merge into `preprod`, then into `main`. Expected: In Progress → In Review → (no move) → Ready to Deploy; one journal line per approver.
 - Comment rule `Открыт MR !{pr_number}: {pr_title} {pr_url}` → the card shows the MR number, title and link; `@everyone` in the MR title notifies nobody.
+
+## Нижний островок в аватаре (ADR-0146)
+
+1. Запуск: `tools/dev-mock.sh --voice` (мок, Анна, в «Переговорке», открыт «Диск»). Ожидается: внизу слева на рейле только аватар с зелёной меткой звонка, список «Диска» идёт до низа окна.
+2. Навести на аватар. Ожидается: через долю секунды поверх контента открывается полный островок («Голос подключён» и панель «я»), аватар не сдвигается ни на пиксель.
+3. Выключить микрофон в островке, увести мышь. Ожидается: островок закрывается через ~0,25 с, на аватаре красный перечёркнутый микрофон. ⌘⇧M (mute) работает и в свёрнутом виде.
+4. Открыть ▾ у микрофона и увести мышь на меню и за него. Ожидается: пока меню открыто, островок не закрывается.
+5. Tab до аватара, Enter — открыт, Tab ходит по кнопкам островка, Esc — закрыт, фокус на аватаре.
+6. «Команда», «Доски», «Календарь», «Почта», офисный файл: в «Команде» полный островок как раньше, на остальных — аватар.
+7. Настройки → Основное → «Островок: сворачивать в аватар…» выключить. Ожидается: полный островок на всех экранах, как раньше.
