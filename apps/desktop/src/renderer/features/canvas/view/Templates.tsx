@@ -9,6 +9,7 @@ import { toast } from '../../../stores/toasts';
 import type { CanvasEngine } from '../engine';
 import { MENU_BOX, PANEL, keepFocus } from './chrome';
 import { useSyncStatus } from './StatusBanner';
+import { ToolHint } from './ToolHint';
 
 /** One icon per template (the menu, the card and the phone's «+» sheet). */
 export const TEMPLATE_ICON: Record<TemplateId, LucideIcon> = {
@@ -35,11 +36,13 @@ export const TemplatesMenu = memo(function TemplatesMenu({ engine, focusCanvas }
   const insert = useInsertTemplate(engine, focusCanvas);
   return (
     <Dropdown.Root modal={false}>
-      <Dropdown.Trigger asChild>
-        <IconButton label={t('canvasBoard.templates.menu')} onMouseDown={keepFocus} data-testid="canvas-templates-button">
-          <LayoutTemplate className="size-[18px]" strokeWidth={1.75} aria-hidden />
-        </IconButton>
-      </Dropdown.Trigger>
+      <ToolHint id="templates" title={t('canvasBoard.templates.menu')}>
+        <Dropdown.Trigger asChild>
+          <IconButton label={t('canvasBoard.templates.menu')} tip={false} onMouseDown={keepFocus} data-testid="canvas-templates-button">
+            <LayoutTemplate className="size-[18px]" strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Dropdown.Trigger>
+      </ToolHint>
       <Dropdown.Portal>
         <Dropdown.Content
           side="right"

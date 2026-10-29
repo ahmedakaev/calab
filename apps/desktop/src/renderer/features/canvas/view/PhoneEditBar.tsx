@@ -1,4 +1,5 @@
-import { MessageSquarePlus, MousePointer2, Plus, Redo2, Spline, StickyNote, Type, Undo2, Vote, Timer as TimerIcon, type LucideIcon } from 'lucide-react';
+import { MessageSquarePlus, MousePointer2, Plus, Redo2, Spline, Type, Undo2, Vote, Timer as TimerIcon, type LucideIcon } from 'lucide-react';
+import { StickyIcon } from './StickyIcon';
 import { memo, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
@@ -71,7 +72,7 @@ const HistoryBtn = memo(function HistoryBtn({ engine, redo }: { engine: CanvasEn
 
 const TOOLS: readonly { tool: Tool; Icon: LucideIcon | null }[] = [
   { tool: 'select', Icon: MousePointer2 },
-  { tool: 'sticky', Icon: StickyNote },
+  { tool: 'sticky', Icon: StickyIcon },
   { tool: 'text', Icon: Type },
   { tool: 'shape', Icon: null },
   { tool: 'connector', Icon: Spline },

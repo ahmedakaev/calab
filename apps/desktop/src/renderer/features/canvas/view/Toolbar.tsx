@@ -1,10 +1,10 @@
-import * as Dropdown from '@radix-ui/react-dropdown-menu';
-import { ChevronDown, MessageSquarePlus, MousePointer2, Redo2, StickyNote, Type, Undo2 } from 'lucide-react';
-import { memo, useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ALT, IconButton, MOD, Tip, cx } from '../../../components/ui';
+import * as Popover from '@radix-ui/react-popover';
+import { Check, MessageSquarePlus, MousePointer2, Redo2, Type, Undo2 } from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ALT, IconButton, MOD, cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
 import type { RouteKind, ShapeKind } from '../../../lib/canvas/types';
-import type { CanvasEngine, Tool } from '../engine';
+import { readableInk, resolveSticky, type CanvasEngine, type CanvasPalette, type Tool } from '../engine';
 import { ACTIVE_TOOL, DIVIDER, MENU_BOX, MENU_ITEM, PANEL, keepFocus } from './chrome';
 import { useEngineValue } from './hooks';
 import { RouteIcon } from './RouteIcon';
@@ -14,7 +14,10 @@ import { TemplatesMenu } from './Templates';
 import { TimerButton } from './Timer';
 import type { TimerStore } from './timerStore';
 import { VoteButton } from './Vote';
-import { ROUTE_DEFS, SHAPE_DEFS, TOOL_DEFS } from './model';
+import { ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, TOOL_DEFS } from './model';
+import { colorLabel } from './PropsPanel';
+import { STICKY_BODY, STICKY_FOLD, StickyIcon } from './StickyIcon';
+import { HintPalette, ToolHint } from './ToolHint';
 
 const ICON = 'size-[18px]';
 
@@ -62,8 +65,13 @@ function usePinnedTool(engine: CanvasEngine, pinned: Tool | null, release: () =>
   }, [engine, pinned, release]);
 }
 
+/**
+ * A tool button. With a `flyout` (the sticky's colors, the shapes, the line kinds) a click both arms the tool and
+ * opens its options beside it, as in Miro; the canvas keeps the focus, so a click on it closes the panel and creates.
+ * A keyboard click moves the focus into the panel instead. The panel closes once the tool is released.
+ */
 function ToolButton({
-  tool, icon, active, pinned, onPick, onPin, focusCanvas, menu,
+  tool, icon, active, pinned, onPick, onPin, focusCanvas, flyout, flyoutLabel, flyoutTestId,
 }: {
   tool: Tool;
   icon: ReactNode;
@@ -72,59 +80,137 @@ function ToolButton({
   onPick: (t: Tool) => void;
   onPin: (t: Tool) => void;
   focusCanvas: () => void;
-  menu?: ReactNode;
+  flyout?: ReactNode;
+  flyoutLabel?: string;
+  flyoutTestId?: string;
 }): ReactNode {
+  const [open, setOpen] = useState(false);
+  const byKeyboard = useRef(false);
+  // The tool was released (created, Esc, another tool): the panel goes with it — adjusted during render, not in an effect.
+  if (open && !active) setOpen(false);
   const def = TOOL_DEFS.find((d) => d.tool === tool);
   if (!def) return null;
   const label = pinned ? `${t(def.label)} — ${t('canvasBoard.tool.pinned')}` : t(def.label);
+  const shortcut = def.alt ? `${ALT}${def.key}` : def.key;
+  const button = (
+    <IconButton
+      label={label}
+      tip={false}
+      active={active}
+      className={cx(active && ACTIVE_TOOL)}
+      onMouseDown={keepFocus}
+      onClick={(e) => {
+        onPick(tool);
+        focusCanvas();
+        if (!flyout) return;
+        byKeyboard.current = e.detail === 0;
+        setOpen(true);
+      }}
+      onDoubleClick={() => onPin(tool)}
+      aria-haspopup={flyout ? 'dialog' : undefined}
+      aria-expanded={flyout ? open : undefined}
+      data-testid={`canvas-tool-${tool}`}
+      data-pinned={pinned || undefined}
+    >
+      {icon}
+    </IconButton>
+  );
   return (
     <div className="relative">
-      <IconButton
-        label={label}
-        shortcut={def.alt ? `${ALT}${def.key}` : def.key}
-        active={active}
-        className={cx(active && ACTIVE_TOOL)}
-        onMouseDown={keepFocus}
-        onClick={() => {
-          onPick(tool);
-          focusCanvas();
-        }}
-        onDoubleClick={() => onPin(tool)}
-        data-testid={`canvas-tool-${tool}`}
-        data-pinned={pinned || undefined}
-      >
-        {icon}
-      </IconButton>
+      {flyout ? (
+        <Popover.Root open={open} onOpenChange={setOpen}>
+          <ToolHint id={tool} title={label} shortcut={shortcut} suppress={open}>
+            <Popover.Anchor asChild>{button}</Popover.Anchor>
+          </ToolHint>
+          <Popover.Portal>
+            <Popover.Content
+              side="right"
+              align="start"
+              sideOffset={8}
+              collisionPadding={8}
+              className={cx(MENU_BOX, 'w-auto min-w-0 p-2')}
+              aria-label={flyoutLabel}
+              onOpenAutoFocus={(e) => {
+                if (!byKeyboard.current) e.preventDefault();
+              }}
+              onCloseAutoFocus={(e) => {
+                e.preventDefault();
+                focusCanvas();
+              }}
+              data-testid={flyoutTestId}
+            >
+              {flyout}
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      ) : (
+        <ToolHint id={tool} title={label} shortcut={shortcut}>
+          {button}
+        </ToolHint>
+      )}
       {pinned ? <span aria-hidden className="pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-accent-fg" /> : null}
-      {menu}
     </div>
   );
 }
 
-function FlyoutTrigger({ label, children }: { label: string; children: ReactNode }): ReactNode {
+/** One option of a tool's flyout: picking it closes the panel and leaves the tool armed. */
+function FlyoutOption({ label, selected, onPick, testId, className, children }: { label: string; selected: boolean; onPick: () => void; testId: string; className?: string; children: ReactNode }): ReactNode {
   return (
-    <Dropdown.Root modal={false}>
-      <Tip label={label} side="right">
-        <Dropdown.Trigger asChild>
-          <button
-            type="button"
-            aria-label={label}
-            onMouseDown={keepFocus}
-            className="absolute -right-0.5 -bottom-0.5 grid size-3.5 place-items-center rounded-full text-muted before:absolute before:-inset-1 before:content-[''] hover:text-fg"
-          >
-            <ChevronDown className="size-3" strokeWidth={2} aria-hidden />
-          </button>
-        </Dropdown.Trigger>
-      </Tip>
-      {children}
-    </Dropdown.Root>
+    <Popover.Close asChild>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={selected}
+        onMouseDown={keepFocus}
+        onClick={onPick}
+        data-testid={testId}
+        className={cx('cursor-default rounded-[var(--radius-icon)] text-fg hover:bg-hover', selected && 'bg-active', className)}
+      >
+        {children}
+      </button>
+    </Popover.Close>
   );
 }
 
-export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, workspaceId }: { engine: CanvasEngine; timer: TimerStore; focusCanvas: () => void; workspaceId: string }): ReactNode {
+/** A sticky note in one color: the swatch of the sticky tool's flyout (a note, not a dot — what will land on the canvas). */
+function StickySwatch({ bg }: { bg: string }): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" className="size-7" aria-hidden>
+      {/* The sticky tool's outline (StickyIcon), so the fold sits bottom right in both places. */}
+      <path d={STICKY_BODY} fill={bg} stroke="rgba(128,128,128,0.4)" strokeWidth={0.75} strokeLinejoin="round" />
+      <path d={`${STICKY_FOLD}Z`} fill="rgba(0,0,0,0.2)" />
+    </svg>
+  );
+}
+
+/** The sticky tool's colors: a grid of notes, the hovered color's name under it. */
+function StickyColors({ palette, value, onPick }: { palette: CanvasPalette; value: string; onPick: (c: string) => void }): ReactNode {
+  const [hot, setHot] = useState(value);
+  return (
+    <div data-testid="canvas-sticky-colors">
+      <div className="grid grid-cols-5 gap-1">
+        {STICKY_COLORS.map((tok) => {
+          const bg = resolveSticky(palette, tok).bg;
+          return (
+            <FlyoutOption key={tok} label={colorLabel(tok)} selected={tok === value} onPick={() => onPick(tok)} testId={`canvas-sticky-color-${tok}`} className="relative grid size-10 place-items-center">
+              <span className="contents" onMouseEnter={() => setHot(tok)}>
+                <StickySwatch bg={bg} />
+                {tok === value ? <Check className="absolute size-3.5" style={{ color: readableInk(bg, '#ffffff') }} strokeWidth={3} aria-hidden /> : null}
+              </span>
+            </FlyoutOption>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 truncate px-1 text-caption text-muted" aria-hidden>{colorLabel(hot)}</div>
+    </div>
+  );
+}
+
+export const Toolbar = memo(function Toolbar({ engine, timer, palette, focusCanvas, workspaceId }: { engine: CanvasEngine; timer: TimerStore; palette: CanvasPalette; focusCanvas: () => void; workspaceId: string }): ReactNode {
   useLocale();
   const tool = useEngineValue(engine, (s) => s.tool);
   const shapeKind = useEngineValue(engine, (s) => s.shapeKind);
+  const stickyColor = useEngineValue(engine, (s) => s.stickyColor);
   const [pinned, setPinned] = useState<Tool | null>(null);
   const [route, setRoute] = useState<RouteKind>(engine.connectorRoute);
   const release = useCallback(() => setPinned(null), []);
@@ -139,10 +225,6 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, works
     if (next !== 'select') setPinned(next);
   };
   const common = { onPick: pick, onPin: pin, focusCanvas };
-  const refocus = (e: Event): void => {
-    e.preventDefault();
-    focusCanvas();
-  };
 
   return (
     <div
@@ -152,8 +234,19 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, works
       data-testid="canvas-toolbar"
       className={cx(PANEL, 'absolute left-3 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-0.5')}
     >
+      <HintPalette.Provider value={palette}>
       <ToolButton {...common} tool="select" icon={<MousePointer2 className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'select'} pinned={false} />
-      <ToolButton {...common} tool="sticky" icon={<StickyNote className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'sticky'} pinned={pinned === 'sticky'} />
+      <ToolButton
+        {...common}
+        tool="sticky"
+        // The armed color shows on the tool itself.
+        icon={<StickyIcon className={ICON} strokeWidth={1.75} fill={resolveSticky(palette, stickyColor).bg} aria-hidden />}
+        active={tool === 'sticky'}
+        pinned={pinned === 'sticky'}
+        flyoutLabel={t('canvasBoard.props.color')}
+        flyoutTestId="canvas-sticky-menu"
+        flyout={<StickyColors palette={palette} value={stickyColor} onPick={(c) => engine.setStickyColor(c)} />}
+      />
       <ToolButton {...common} tool="text" icon={<Type className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'text'} pinned={pinned === 'text'} />
       <ToolButton
         {...common}
@@ -161,38 +254,17 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, works
         icon={shapeIcon(shapeKind)}
         active={tool === 'shape'}
         pinned={pinned === 'shape'}
-        menu={
-          <FlyoutTrigger label={t('canvasBoard.tool.more')}>
-            <Dropdown.Portal>
-              <Dropdown.Content
-                side="right"
-                align="start"
-                sideOffset={8}
-                className={cx(MENU_BOX, 'grid w-auto min-w-0 grid-cols-4 gap-0.5')}
-                onCloseAutoFocus={refocus}
-                data-testid="canvas-shape-menu"
-              >
-                {SHAPE_DEFS.map((d) => (
-                  <Tip key={d.kind} label={t(d.label)} side="bottom">
-                    <Dropdown.Item
-                      aria-label={t(d.label)}
-                      data-testid={`canvas-shape-${d.kind}`}
-                      className={cx(
-                        'grid size-9 cursor-default place-items-center rounded-[var(--radius-icon)] text-fg outline-none data-[highlighted]:bg-accent-strong data-[highlighted]:text-accent-fg',
-                        shapeKind === d.kind && 'bg-active',
-                      )}
-                      onSelect={() => {
-                        engine.setShapeKind(d.kind);
-                        pick('shape');
-                      }}
-                    >
-                      {shapeIcon(d.kind)}
-                    </Dropdown.Item>
-                  </Tip>
-                ))}
-              </Dropdown.Content>
-            </Dropdown.Portal>
-          </FlyoutTrigger>
+        flyoutLabel={t('canvasBoard.props.shape')}
+        flyoutTestId="canvas-shape-menu"
+        flyout={
+          <div className="flex w-52 flex-col gap-0.5">
+            {SHAPE_DEFS.map((d) => (
+              <FlyoutOption key={d.kind} label={t(d.label)} selected={shapeKind === d.kind} onPick={() => engine.setShapeKind(d.kind)} testId={`canvas-shape-${d.kind}`} className={cx(MENU_ITEM, 'w-full')}>
+                {shapeIcon(d.kind)}
+                {t(d.label)}
+              </FlyoutOption>
+            ))}
+          </div>
         }
       />
       <ToolButton
@@ -201,27 +273,27 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, works
         icon={ROUTE_ICON[route]}
         active={tool === 'connector'}
         pinned={pinned === 'connector'}
-        menu={
-          <FlyoutTrigger label={t('canvasBoard.tool.more')}>
-            <Dropdown.Portal>
-              <Dropdown.Content side="right" align="start" sideOffset={8} className={MENU_BOX} onCloseAutoFocus={refocus} data-testid="canvas-route-menu">
-                {ROUTE_DEFS.map((d) => (
-                  <Dropdown.Item
-                    key={d.route}
-                    className={cx(MENU_ITEM, route === d.route && 'font-medium')}
-                    onSelect={() => {
-                      setRoute(d.route);
-                      engine.setConnectorRoute(d.route);
-                      pick('connector');
-                    }}
-                  >
-                    {ROUTE_ICON[d.route]}
-                    {t(d.label)}
-                  </Dropdown.Item>
-                ))}
-              </Dropdown.Content>
-            </Dropdown.Portal>
-          </FlyoutTrigger>
+        flyoutLabel={t('canvasBoard.props.route')}
+        flyoutTestId="canvas-route-menu"
+        flyout={
+          <div className="flex flex-col gap-0.5">
+            {ROUTE_DEFS.map((d) => (
+              <FlyoutOption
+                key={d.route}
+                label={t(d.label)}
+                selected={route === d.route}
+                onPick={() => {
+                  setRoute(d.route);
+                  engine.setConnectorRoute(d.route);
+                }}
+                testId={`canvas-route-${d.route}`}
+                className={cx(MENU_ITEM, 'w-full')}
+              >
+                {ROUTE_ICON[d.route]}
+                {t(d.label)}
+              </FlyoutOption>
+            ))}
+          </div>
         }
       />
       <ToolButton {...common} tool="comment" icon={<MessageSquarePlus className={ICON} strokeWidth={1.75} aria-hidden />} active={tool === 'comment'} pinned={false} />
@@ -230,6 +302,7 @@ export const Toolbar = memo(function Toolbar({ engine, timer, focusCanvas, works
       <TemplatesMenu engine={engine} focusCanvas={focusCanvas} />
       <VoteButton engine={engine} focusCanvas={focusCanvas} />
       <TimerButton store={timer} focusCanvas={focusCanvas} />
+      </HintPalette.Provider>
     </div>
   );
 });

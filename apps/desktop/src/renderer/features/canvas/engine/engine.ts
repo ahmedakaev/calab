@@ -20,7 +20,7 @@ import {
 import { VOTE_DEFAULT, VoteBook, type VotePhase, type VoteSession } from '../../../lib/canvas/votes';
 import { AwarenessLayer, sameView, type PeerState, type PeerView } from './awareness';
 import type { Core, Gesture, Mods } from './gestures';
-import { attachInput } from './input';
+import { attachInput, toolCursor } from './input';
 import { ImageCache, type DecodeFn, type ImageResolver } from './images';
 import { emptyOverlay, type Outline, type OverlayState, type SelFrame } from './overlay';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
@@ -48,6 +48,8 @@ export interface EngineState {
   readonly selectionCount: number;
   readonly tool: Tool;
   readonly shapeKind: ShapeKind;
+  /** The color the sticky tool creates with (a palette token). */
+  readonly stickyColor: string;
   /** Rounded zoom, percent. */
   readonly zoomPct: number;
   readonly canUndo: boolean;
@@ -119,7 +121,7 @@ export interface EngineOptions {
   cancelRaf?: (id: number) => void;
 }
 
-const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
+const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
 const LOCAL_AWARENESS_MS = 50;
 /** Gestures that follow their pointer when the camera moves under it, and pan the view at its edge. */
 const FOLLOW_KINDS: ReadonlySet<Gesture['kind']> = new Set(['marquee', 'move', 'resize']);
@@ -134,7 +136,8 @@ const ANIM_MS = 180;
 const PHONE_FORMAT_BAR_PX = 56;
 const PHONE_TOP_BARS_PX = 64;
 
-function makeCanvasMeasure(family: () => string): MeasureFn {
+/** Text width through a 2D context (an estimate where there is no document). Also the hint pictures'. */
+export function makeCanvasMeasure(family: () => string): MeasureFn {
   if (typeof document === 'undefined') return estimateMeasure;
   const ctx = document.createElement('canvas').getContext('2d');
   if (!ctx) return estimateMeasure;
@@ -207,6 +210,7 @@ export class CanvasEngine implements Core {
   private tool_: Tool = 'select';
   private multi_ = false;
   private shape_: ShapeKind = 'rect';
+  private sticky_: string = DEFAULTS.stickyColor;
   private route_: RouteKind = 'straight';
   private pasteCount = 0;
   /** The object whose text the editor is open on. */
@@ -349,6 +353,7 @@ export class CanvasEngine implements Core {
       selectionCount: this.sel.size,
       tool: this.tool_,
       shapeKind: this.shape_,
+      stickyColor: this.sticky_,
       zoomPct: Math.round(this.cam.scale * 100),
       canUndo: this.doc.undo.undoStack.length > 0,
       canRedo: this.doc.undo.redoStack.length > 0,
@@ -384,6 +389,10 @@ export class CanvasEngine implements Core {
 
   get shapeKind(): ShapeKind {
     return this.shape_;
+  }
+
+  get stickyColor(): string {
+    return this.sticky_;
   }
 
   get connectorRoute(): RouteKind {
@@ -622,7 +631,7 @@ export class CanvasEngine implements Core {
   setTool(t: Tool): void {
     if (t === this.tool_) return;
     this.tool_ = t;
-    this.canvas.style.cursor = t === 'select' ? '' : 'crosshair';
+    this.canvas.style.cursor = toolCursor(t);
     this.sync();
   }
 
@@ -678,6 +687,11 @@ export class CanvasEngine implements Core {
 
   setShapeKind(k: ShapeKind): void {
     this.shape_ = k;
+    this.sync();
+  }
+
+  setStickyColor(c: string): void {
+    this.sticky_ = c;
     this.sync();
   }
 
@@ -1167,7 +1181,7 @@ export class CanvasEngine implements Core {
     const turn = o.rot ? { rot: o.rot, center: rectCenter(o) } : {};
     switch (o.kind) {
       case 'sticky': return { box, text: o.text, size: boxFontSize(o), color: resolveSticky(p, o.color).fg, align: 'left', vcenter: false, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
-      case 'text': return { box, text: o.text, size: o.size, color: resolveColor(p, o.color) ?? p.ink, align: 'left', vcenter: false, autoHeight: true, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
+      case 'text': return { box, text: o.text, size: o.size, color: resolveColor(p, o.color) ?? p.ink, align: 'left', vcenter: false, autoHeight: true, fontFamily: p.fontFamily, rich: true, sized: true, frame: p.accent, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
       case 'shape': return { box, text: o.text, size: boxFontSize(o), color: shapeInk(p, o.fill, o.soft), align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
     }
   }

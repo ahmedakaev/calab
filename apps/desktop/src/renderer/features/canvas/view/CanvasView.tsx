@@ -435,7 +435,7 @@ function Chrome({
     <>
       {editable ? (
         <>
-          <Toolbar engine={engine} timer={timer} focusCanvas={focusCanvas} workspaceId={workspaceId} />
+          <Toolbar engine={engine} timer={timer} palette={palette} focusCanvas={focusCanvas} workspaceId={workspaceId} />
           <HistoryBar engine={engine} focusCanvas={focusCanvas} />
           <PropsPanel engine={engine} palette={palette} focusCanvas={focusCanvas} />
           <TextFormatBar engine={engine} />

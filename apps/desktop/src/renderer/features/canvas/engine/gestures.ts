@@ -33,6 +33,7 @@ export interface Core {
   readonly liveCamera: Camera;
   readonly selection: ReadonlySet<string>;
   readonly shapeKind: ShapeKind;
+  readonly stickyColor: string;
   readonly connectorRoute: RouteKind;
   readonly gridSize: number;
   setCamera(c: Camera): void;
@@ -529,14 +530,14 @@ export class CreateGesture implements Gesture {
       const bw = Math.max(r.w, this.what === 'text' ? DEFAULTS.minTextW : DEFAULTS.minBox);
       const bh = Math.max(r.h, DEFAULTS.minBox);
       id = this.what === 'sticky'
-        ? doc.create({ kind: 'sticky', x: r.x, y: r.y, w: bw, h: bh })
+        ? doc.create({ kind: 'sticky', color: this.core.stickyColor, x: r.x, y: r.y, w: bw, h: bh })
         : this.what === 'text'
           ? doc.create({ kind: 'text', x: r.x, y: r.y, w: bw })
           : doc.create({ kind: 'shape', shape: this.core.shapeKind, x: r.x, y: r.y, w: bw, h: bh });
     } else {
       const c = this.core.gridSize && !m.mod ? { x: snapTo(this.from.x, this.core.gridSize), y: snapTo(this.from.y, this.core.gridSize) } : this.from;
       id = this.what === 'sticky'
-        ? doc.create({ kind: 'sticky', x: c.x - DEFAULTS.stickySize / 2, y: c.y - DEFAULTS.stickySize / 2 })
+        ? doc.create({ kind: 'sticky', color: this.core.stickyColor, x: c.x - DEFAULTS.stickySize / 2, y: c.y - DEFAULTS.stickySize / 2 })
         : this.what === 'text'
           ? doc.create({ kind: 'text', x: c.x - 8, y: c.y - DEFAULTS.textSize })
           : doc.create({ kind: 'shape', shape: this.core.shapeKind, x: c.x - DEFAULTS.shapeW / 2, y: c.y - DEFAULTS.shapeH / 2 });

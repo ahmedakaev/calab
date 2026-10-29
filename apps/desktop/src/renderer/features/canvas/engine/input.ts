@@ -1,6 +1,6 @@
 import { ROTATE_CURSOR, dist, hitHandleRot, resizeCursorAt, rotateHandlePoint, type HandleId, type Point } from '../../../lib/canvas/geometry';
 import { isConnector } from '../../../lib/canvas/types';
-import type { CanvasEngine } from './engine';
+import type { CanvasEngine, Tool } from './engine';
 import {
   CreateGesture, EndpointGesture, MarqueeGesture, MoveGesture, PanGesture, PinchGesture, ResizeGesture, RotateGesture, TOUCH_SLOP_PX, TapPanGesture, WireGesture,
   type Mods,
@@ -37,6 +37,11 @@ const TOUCH_PICK_PX = 10;
  * Returns the detach function. Camera input (wheel, pinch, Safari gestures) is queued on the engine and
  * applied once per frame; nothing here owns a timer or a frame of its own.
  */
+/** The canvas cursor while a tool is armed: an I-beam for text (as in every editor), a crosshair for the other creators. */
+export function toolCursor(t: Tool): string {
+  return t === 'select' ? '' : t === 'text' ? 'text' : 'crosshair';
+}
+
 export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): () => void {
   const pointers = new Map<number, Point>();
   let spaceDown = false;
@@ -73,11 +78,11 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
 
   const idleCursor = (): string => {
     if (spaceDown) return 'grab';
-    return engine.tool === 'select' ? '' : 'crosshair';
+    return toolCursor(engine.tool);
   };
 
   const hoverCursor = (w: Point): string => {
-    if (engine.tool !== 'select') return 'crosshair';
+    if (engine.tool !== 'select') return toolCursor(engine.tool);
     if (engine.readOnly) return 'grab';
     if (rotateHandleAt(w)) return ROTATE_CURSOR;
     const g = resizeHandleAt(w);
