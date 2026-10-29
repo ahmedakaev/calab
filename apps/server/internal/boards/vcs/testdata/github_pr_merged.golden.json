@@ -23,7 +23,11 @@
       "Actor": "",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": [
+        "cccccccccccccccccccccccccccccccccccccccc",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ]
     }
   },
   "Links": [
@@ -43,7 +47,11 @@
       "Actor": "octocat",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": [
+        "cccccccccccccccccccccccccccccccccccccccc",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ]
     }
   ]
 }

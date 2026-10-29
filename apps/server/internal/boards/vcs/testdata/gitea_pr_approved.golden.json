@@ -27,7 +27,8 @@
       "Once": [
         "approved:bob"
       ],
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   },
   "Links": [
@@ -51,7 +52,8 @@
       "Once": [
         "approved:bob"
       ],
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   ]
 }

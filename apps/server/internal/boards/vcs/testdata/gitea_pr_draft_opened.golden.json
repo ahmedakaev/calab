@@ -23,7 +23,8 @@
       "Actor": "alice",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   },
   "Links": [
@@ -43,7 +44,8 @@
       "Actor": "alice",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   ]
 }

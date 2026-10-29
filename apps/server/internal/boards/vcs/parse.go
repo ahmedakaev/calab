@@ -123,8 +123,10 @@ type hubPR struct {
 		User    hubUser `json:"user"`
 		Head    struct {
 			Ref string `json:"ref"`
+			SHA string `json:"sha"`
 		} `json:"head"`
-		Base struct {
+		MergeCommitSHA string `json:"merge_commit_sha"`
+		Base           struct {
 			Ref string `json:"ref"`
 		} `json:"base"`
 	} `json:"pull_request"`
@@ -183,6 +185,8 @@ func parseHubPR(provider, name string, body []byte) (*Event, error) {
 	switch {
 	case pr.Merged:
 		out.State = StateMerged
+		// GitHub fills merge_commit_sha with a test merge while the PR is open: only once merged.
+		out.SHAs = SHAs(pr.MergeCommitSHA, pr.Head.SHA)
 	case pr.State == "closed":
 		out.State = StateClosed
 	}
@@ -312,6 +316,11 @@ type labMR struct {
 		TargetBranch   string `json:"target_branch"`
 		Draft          bool   `json:"draft"`
 		WorkInProgress bool   `json:"work_in_progress"` // the name before GitLab 14 (WIP → Draft)
+		MergeCommitSHA string `json:"merge_commit_sha"`
+		SquashSHA      string `json:"squash_commit_sha"`
+		LastCommit     struct {
+			ID string `json:"id"`
+		} `json:"last_commit"`
 	} `json:"object_attributes"`
 	Changes struct {
 		Draft          *labFlagChange `json:"draft"`
@@ -404,6 +413,9 @@ func parseLabMR(body []byte) (*Event, error) {
 		}
 	default:
 		return nil, nil
+	}
+	if out.State == StateMerged {
+		out.SHAs = SHAs(a.MergeCommitSHA, a.SquashSHA, a.LastCommit.ID)
 	}
 	return &Event{Provider: GitLab, Repo: clip(p.Project.PathWithNamespace, MaxRepo), RepoURL: p.Project.WebURL, Author: out.Author, PR: out}, nil
 }

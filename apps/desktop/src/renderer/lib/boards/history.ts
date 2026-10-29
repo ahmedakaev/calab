@@ -335,6 +335,8 @@ export function describe(a: TaskActivity, ctx: HistoryCtx, now = new Date()): Hi
       return entry(a, milestonesText(f, ctx, now));
     case 'git':
       return entry(a, gitText(f));
+    case 'release': // board task #101: after {release_id, name, environment, sha, url}
+      return entry(a, t('boards.act.release', { name: clip(str(f?.['name'])), env: str(f?.['environment']) }));
     default:
       return entry(a, t('boards.act.changed'));
   }

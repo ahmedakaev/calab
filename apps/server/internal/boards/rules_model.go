@@ -294,6 +294,9 @@ func matchTrigger(t *v1.RuleTrigger, ev ruleEvent, complete func() bool) bool {
 		default:
 			return strings.TrimPrefix(want.String(), "RULE_GIT_EVENT_") == got
 		}
+	case *v1.RuleTrigger_Release_:
+		envs := k.Release.GetEnvironments()
+		return ev.kind == kindRelease && (len(envs) == 0 || slices.Contains(envs, str(ev.after, "environment")))
 	}
 	return false // scheduled triggers never match a change
 }
@@ -327,6 +330,15 @@ func gitTemplateVars(ev ruleEvent) map[string]string {
 		v[k] = untrustedLine(s)
 	}
 	return v
+}
+
+// releaseTemplateVars adds {release} of a "release" journal entry to v ("" for other events):
+// the name CI gave the release, under the rules of gitTemplateVars.
+func releaseTemplateVars(ev ruleEvent, v map[string]string) {
+	v["release"] = ""
+	if ev.kind == kindRelease {
+		v["release"] = untrustedLine(str(ev.after, "name"))
+	}
 }
 
 // untrustedLine makes text of an outside source safe for a template: control characters and

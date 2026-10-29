@@ -43,6 +43,7 @@ import {
   MAX_ACTIONS,
   MAX_BRANCH,
   MAX_BRANCHES,
+  MAX_ENVS,
   MAX_NAME,
   MAX_RULE_USERS,
   MAX_TEMPLATE,
@@ -52,6 +53,7 @@ import {
   blankAction,
   blankTrigger,
   branchesOf,
+  envsOf,
   gitHasTarget,
   moveTo,
   validateDraft,
@@ -165,7 +167,7 @@ export function RuleEditor({ board, rule, initial, readOnly, onClose }: { board:
         </Block>
 
         <Block title={t('rules.then')} testId="rule-then">
-          <Actions board={board} actions={d.actions} onChange={(actions) => set({ actions })} issueAt={issueAt} readOnly={readOnly} git={d.trigger.kind.case === 'git'} />
+          <Actions board={board} actions={d.actions} onChange={(actions) => set({ actions })} issueAt={issueAt} readOnly={readOnly} vars={d.trigger.kind.case === 'git' || d.trigger.kind.case === 'release' ? d.trigger.kind.case : null} />
           <Problem text={issueAt('actions')} />
         </Block>
       </fieldset>
@@ -304,6 +306,28 @@ function DaysInput({ value, min, max, onChange }: { value: number; min: number; 
       className="w-20"
       aria-label={t('rules.days')}
       data-testid="rule-days"
+    />
+  );
+}
+
+/** The environments of a release trigger as one line («prod, stage»); empty = any (board task #101). */
+function EnvironmentsInput({ value, onChange }: { value: readonly string[]; onChange: (v: string[]) => void }): ReactNode {
+  const [text, setText] = useState(() => value.join(', '));
+  return (
+    <Input
+      className="w-56"
+      value={text}
+      maxLength={MAX_ENVS * 34}
+      placeholder={t('rules.environmentsAny')}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(envsOf(e.target.value));
+      }}
+      aria-label={t('rules.environments')}
+      title={t('rules.environmentsHint')}
+      spellCheck={false}
+      autoCapitalize="none"
+      data-testid="rule-release-envs"
     />
   );
 }
@@ -456,6 +480,12 @@ function TriggerParams({ board, trigger, onChange }: { board: Board; trigger: Ru
           ) : null}
         </>
       );
+    case 'release':
+      return (
+        <Labeled label={t('rules.environments')}>
+          <EnvironmentsInput value={k.value.environments} onChange={(environments) => onChange(withTrigger(trigger, 'release', { environments }))} />
+        </Labeled>
+      );
     case 'dueIn':
     case 'overdue':
       return (
@@ -521,7 +551,7 @@ const ACTION_FEATURE: Partial<Record<ActionKind, BoardFeature>> = {
   createSubtasks: BoardFeature.SUBTASKS,
 };
 
-function Actions({ board, actions, onChange, issueAt, readOnly, git }: { board: Board; actions: RuleAction[]; onChange: (a: RuleAction[]) => void; issueAt: (at: IssueAt) => string | null; readOnly: boolean; git: boolean }): ReactNode {
+function Actions({ board, actions, onChange, issueAt, readOnly, vars }: { board: Board; actions: RuleAction[]; onChange: (a: RuleAction[]) => void; issueAt: (at: IssueAt) => string | null; readOnly: boolean; vars: ExtraVars }): ReactNode {
   const drag = useRef<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const offered = ACTION_KINDS.filter((k) => {
@@ -604,7 +634,7 @@ function Actions({ board, actions, onChange, issueAt, readOnly, git }: { board: 
               </button>
             )}
           </div>
-          <ActionParams board={board} action={a} git={git} onChange={(next) => onChange(actions.map((x, j) => (j === i ? next : x)))} />
+          <ActionParams board={board} action={a} vars={vars} onChange={(next) => onChange(actions.map((x, j) => (j === i ? next : x)))} />
           <Problem text={issueAt(`action:${i}`)} />
         </div>
       ))}
@@ -644,7 +674,7 @@ function withAction<K extends ActionKind>(a: RuleAction, kind: K, patch: Partial
 
 const linesOf = (s: string): string[] => s.split('\n');
 
-function ActionParams({ board, action, git, onChange }: { board: Board; action: RuleAction; git: boolean; onChange: (a: RuleAction) => void }): ReactNode {
+function ActionParams({ board, action, vars, onChange }: { board: Board; action: RuleAction; vars: ExtraVars; onChange: (a: RuleAction) => void }): ReactNode {
   const k = action.kind;
   const ws = board.workspaceId;
   switch (k.case) {
@@ -745,14 +775,14 @@ function ActionParams({ board, action, git, onChange }: { board: Board; action: 
         </>
       );
     case 'comment':
-      return <TemplateField git={git} value={k.value.template} onChange={(v) => onChange(withAction(action, 'comment', { template: v }))} />;
+      return <TemplateField vars={vars} value={k.value.template} onChange={(v) => onChange(withAction(action, 'comment', { template: v }))} />;
     case 'notifyRoom':
       return (
         <>
           <Labeled label={t('rules.room')}>
             <RoomPick workspaceId={ws} value={k.value.roomId} onPick={(id) => onChange(withAction(action, 'notifyRoom', { roomId: id }))} />
           </Labeled>
-          <TemplateField git={git} value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyRoom', { template: v }))} />
+          <TemplateField vars={vars} value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyRoom', { template: v }))} />
         </>
       );
     case 'notifyDm':
@@ -767,7 +797,7 @@ function ActionParams({ board, action, git, onChange }: { board: Board; action: 
               ))}
             </Select>
           </Labeled>
-          <TemplateField git={git} value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyDm', { template: v }))} />
+          <TemplateField vars={vars} value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyDm', { template: v }))} />
         </>
       );
     case 'createSubtasks':
@@ -777,14 +807,17 @@ function ActionParams({ board, action, git, onChange }: { board: Board; action: 
   }
 }
 
-function TemplateField({ value, onChange, git }: { value: string; onChange: (v: string) => void; git: boolean }): ReactNode {
+/** Template variables beyond the task's own: those of a Git or a release trigger (board task #101). */
+type ExtraVars = 'git' | 'release' | null;
+
+function TemplateField({ value, onChange, vars }: { value: string; onChange: (v: string) => void; vars: ExtraVars }): ReactNode {
   return (
     <div className="flex flex-col gap-1">
       <TextArea label={t('rules.text')} value={value} onChange={onChange} />
       <span className="text-caption text-faint">{t('rules.vars')}</span>
-      {git ? (
-        <span className="text-caption text-faint" data-testid="rule-git-vars">
-          {t('rules.varsGit')}
+      {vars ? (
+        <span className="text-caption text-faint" data-testid={`rule-${vars}-vars`}>
+          {t(vars === 'git' ? 'rules.varsGit' : 'rules.varsRelease')}
         </span>
       ) : null}
     </div>
