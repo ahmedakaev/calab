@@ -131,14 +131,16 @@ func (w *widgetService) agenda(out http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return httpx.Unauthenticated("invalid widget grant")
 	}
-	id, err = w.principal(r.Context(), id)
-	if err != nil {
-		return err
-	}
+	// The session ID comes from a verified signature: limit before the database is touched,
+	// so a looping or stolen grant cannot turn every request into session and user reads.
 	if w.readLimit != nil {
 		if err := w.readLimit.Take(r.Context(), id.SessionID.String()); err != nil {
 			return err
 		}
+	}
+	id, err = w.principal(r.Context(), id)
+	if err != nil {
+		return err
 	}
 	tz := r.URL.Query().Get("tz")
 	loc, err := time.LoadLocation(tz)

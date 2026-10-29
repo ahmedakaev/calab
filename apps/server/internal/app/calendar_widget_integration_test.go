@@ -149,6 +149,48 @@ func TestCalendarWidgetGrantAndRevocation(t *testing.T) {
 	}
 }
 
+// The real account flows end the grant: a password change on another device revokes this
+// session's grant at once, logout of the issuing session revokes its own.
+func TestCalendarWidgetEndsWithPasswordChangeAndLogout(t *testing.T) {
+	c := calSetup(t)
+	cleanupWidgetEvents(t, c.ws.Id)
+	email := mustEmail(t, c.bob)
+	login := func(ip string) *client {
+		cl := &client{t: t, ip: ip}
+		var l v1.LoginResponse
+		cl.must(200, "POST", "/api/auth/login", &v1.LoginRequest{Email: email, Password: "password123"}, &l)
+		cl.token = l.GetTokens().GetAccessToken()
+		return cl
+	}
+	grantOf := func(token string) string {
+		t.Helper()
+		status, g := widgetHTTP(t, token, "POST", "/api/me/calendar-widget")
+		if status != 200 {
+			t.Fatalf("grant %d %v", status, g)
+		}
+		return g["token"].(string)
+	}
+	phone := login("10.64.0.1")
+	phoneGrant := grantOf(phone.token)
+	bobGrant := grantOf(c.bob.token)
+	for _, g := range []string{phoneGrant, bobGrant} {
+		if status, _ := widgetHTTP(t, g, "GET", "/api/calendar-widget?tz=UTC"); status != 200 {
+			t.Fatalf("live grant: %d", status)
+		}
+	}
+	c.bob.must(204, "PATCH", "/api/me/password", &v1.ChangePasswordRequest{CurrentPassword: "password123", NewPassword: "newpassword1"}, nil)
+	if status, _ := widgetHTTP(t, phoneGrant, "GET", "/api/calendar-widget?tz=UTC"); status != 401 {
+		t.Fatalf("grant of a session revoked by password change survived: %d", status)
+	}
+	if status, _ := widgetHTTP(t, bobGrant, "GET", "/api/calendar-widget?tz=UTC"); status != 200 {
+		t.Fatalf("grant of the session that changed the password: %d", status)
+	}
+	c.bob.must(204, "POST", "/api/auth/logout", &v1.LogoutRequest{RefreshToken: c.bob.refresh}, nil)
+	if status, _ := widgetHTTP(t, bobGrant, "GET", "/api/calendar-widget?tz=UTC"); status != 401 {
+		t.Fatalf("grant survived logout: %d", status)
+	}
+}
+
 // A visible room is not an invitation; declined meetings and lost memberships disappear.
 func TestCalendarWidgetOwnOnlyAndMembership(t *testing.T) {
 	c := calSetup(t)
