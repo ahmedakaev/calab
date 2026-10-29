@@ -343,7 +343,7 @@ func untrustedLine(s string) string {
 	if utf8.RuneCountInString(s) > vcs.MaxTitle {
 		s = string([]rune(s)[:vcs.MaxTitle])
 	}
-	return strings.ReplaceAll(s, "@", "@⁠")
+	return strings.ReplaceAll(s, "@", "@\u2060")
 }
 
 // renderTemplate replaces {name} by vars[name] (unknown names stay as written) and cuts the

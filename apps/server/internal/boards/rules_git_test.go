@@ -70,7 +70,7 @@ func TestGitTemplateVars(t *testing.T) {
 		`"title":"DEV-1 Fix\n@everyone look @01890000-0000-7000-8000-00000000abcd\u0007","branch":"feature/dev-1","target_branch":"main","author":"jsmith"}`)
 	v := gitTemplateVars(pr)
 	out := renderTemplate("Открыт MR !{pr_number}: {pr_title} ({branch} → {target_branch}, {git_author}) {pr_url} {unknown}", v)
-	want := "Открыт MR !690: DEV-1 Fix @⁠everyone look @⁠01890000-0000-7000-8000-00000000abcd (feature/dev-1 → main, jsmith) " +
+	want := "Открыт MR !690: DEV-1 Fix @\u2060everyone look @\u206001890000-0000-7000-8000-00000000abcd (feature/dev-1 → main, jsmith) " +
 		"https://gl.example/g/r/-/merge_requests/690 {unknown}"
 	if out != want {
 		t.Fatalf("got  %q\nwant %q", out, want)
