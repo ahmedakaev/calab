@@ -1,6 +1,7 @@
 import { pinchStep, type Camera } from '../../../lib/canvas/camera';
 import { duplicate } from '../../../lib/canvas/clipboard';
 import type { CanvasDoc } from '../../../lib/canvas/doc';
+import { INK_EPS_PX, INK_RAW_MAX, inkFromStroke, inkDistance, tailRect } from '../../../lib/canvas/ink';
 import type { LiveLayer } from '../../../lib/canvas/live';
 import {
   ROT_STEP, angleToward, boundsOf, dist, mapRect, normRot, rectCenter, rectFromPoints, rectInflate, resizeRect, resizeRotated, rotatePoint, snapAngle, snapTo,
@@ -13,7 +14,14 @@ import {
   DEFAULTS, aabb, isBound, isBox, isConnector,
   type BoxRec, type ConnectorRec, type Endpoint, type ObjectPatch, type RouteKind, type ShapeKind,
 } from '../../../lib/canvas/types';
-import type { OverlayState } from './overlay';
+import type { InkPreview, OverlayState } from './overlay';
+
+/** What the pen draws with now (remembered for the session by the engine). */
+export interface InkStyle {
+  readonly color: string;
+  readonly width: number;
+  readonly marker: boolean;
+}
 
 export interface Mods {
   shift: boolean;
@@ -50,10 +58,16 @@ export interface Core {
   expandUnits(ids: Iterable<string>): string[];
   /** Touch editing (the phone): glue targets are found from further away, a finger being what it is. */
   readonly touch?: boolean;
+  /** The pen's color, width and kind. */
+  readonly inkStyle: InkStyle;
+  /** Shows the stroke in progress (null: none); `dirty` is the world rect that changed since the last call (null: all of it). */
+  previewInk(ink: InkPreview | null, dirty: Rect | null): void;
+  /** A create was refused by the document (the object or state limit): said to the user, not swallowed. */
+  refuseCreate(): void;
 }
 
 export interface Gesture {
-  readonly kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'create' | 'wire' | 'endpoint' | 'pinch' | 'tap';
+  readonly kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'create' | 'wire' | 'endpoint' | 'pinch' | 'tap' | 'draw' | 'erase';
   move(w: Point, s: Point, m: Mods): void;
   end(w: Point, s: Point, m: Mods): void;
   cancel(): void;
@@ -564,7 +578,8 @@ interface GlueTarget {
 /** Object under the pointer to glue to, with the side if the pointer is on one of its anchors. */
 export function glueAt(core: Core, w: Point, exclude?: string): GlueTarget | null {
   // By area, not by what selection picks: an unfilled frame is a target everywhere inside it (selection stays outline-only).
-  const o = core.scene.hitArea(w, core.px(core.touch ? TOUCH_GLUE_PX : GLUE_PX), (x) => isBox(x) && x.id !== exclude) ?? (core.touch ? nearestBox(core, w, exclude) : null);
+  // A freehand stroke is no target: a scribble has no sides to route to.
+  const o = core.scene.hitArea(w, core.px(core.touch ? TOUCH_GLUE_PX : GLUE_PX), (x) => isBox(x) && x.kind !== 'ink' && x.id !== exclude) ?? (core.touch ? nearestBox(core, w, exclude) : null);
   if (!o || !isBox(o)) return null;
   const anchors = SIDES.map((s) => ({ side: s, p: anchorOf(o, s) }));
   let best: { side: ConcreteSide; p: Point } | null = null;
@@ -579,7 +594,7 @@ function nearestBox(core: Core, w: Point, exclude: string | undefined): BoxRec |
   let best: BoxRec | null = null;
   let bestD = Infinity;
   for (const o of core.scene.query({ x: w.x - tol, y: w.y - tol, w: 2 * tol, h: 2 * tol })) {
-    if (!isBox(o) || o.id === exclude) continue;
+    if (!isBox(o) || o.kind === 'ink' || o.id === exclude) continue;
     const dx = Math.max(o.x - w.x, 0, w.x - (o.x + o.w));
     const dy = Math.max(o.y - w.y, 0, w.y - (o.y + o.h));
     const d = Math.hypot(dx, dy);
@@ -673,5 +688,138 @@ export class EndpointGesture implements Gesture {
 
   settle(): void {
     this.end();
+  }
+}
+
+// ── draw (pen / marker) ─────────────────────────────────────────────────────
+
+/**
+ * A freehand stroke (ADR-0127 addendum 2026-10-29). The points are collected in world units and shown by the overlay
+ * (each move repaints only the stroke's tail); the document is written once, on release: one object, one undo step.
+ * Points closer than half a screen pixel to the last one are skipped; past INK_RAW_MAX the rest of the drag is not
+ * recorded.
+ */
+export class DrawGesture implements Gesture {
+  readonly kind = 'draw';
+  private readonly pts: number[] = [];
+  private readonly style: InkStyle;
+  private done = false;
+
+  constructor(private readonly core: Core, from: Point) {
+    this.style = core.inkStyle;
+    this.pts.push(from.x, from.y);
+    core.previewInk(this.preview(), null);
+  }
+
+  private preview(): InkPreview {
+    return { points: this.pts, color: this.style.color, width: this.style.width, marker: this.style.marker };
+  }
+
+  /** World points collected so far (tests). */
+  get points(): readonly number[] {
+    return this.pts;
+  }
+
+  move(w: Point): void {
+    if (this.done || this.pts.length >= 2 * INK_RAW_MAX) return;
+    const lx = this.pts[this.pts.length - 2] ?? 0;
+    const ly = this.pts[this.pts.length - 1] ?? 0;
+    if (Math.hypot(w.x - lx, w.y - ly) < this.core.px(0.5)) return;
+    this.pts.push(w.x, w.y);
+    // One more point reshapes the path from the midpoint before the previous point on: the last three points' hull.
+    this.core.previewInk(this.preview(), tailRect(this.pts, 3, this.style.width / 2 + this.core.px(2)));
+  }
+
+  end(w: Point): void {
+    if (this.done) return;
+    this.move(w);
+    this.done = true;
+    this.core.previewInk(null, null);
+    const ink = inkFromStroke(this.pts, this.core.px(INK_EPS_PX));
+    if (!ink) return;
+    const doc = this.core.doc;
+    doc.checkpoint();
+    const id = doc.create({ kind: 'ink', ...ink, stroke: this.style.color, strokeWidth: this.style.width, ...(this.style.marker ? { marker: true } : {}) });
+    doc.checkpoint();
+    if (!id) this.core.refuseCreate();
+  }
+
+  cancel(): void {
+    this.done = true;
+    this.core.previewInk(null, null);
+  }
+
+  /** A finger's lost release: the line it drew is kept. */
+  settle(): void {
+    const x = this.pts[this.pts.length - 2] ?? 0;
+    const y = this.pts[this.pts.length - 1] ?? 0;
+    this.end({ x, y });
+  }
+}
+
+// ── eraser ──────────────────────────────────────────────────────────────────
+
+/** The eraser's radius, screen px (its cursor is a circle of this size). */
+export const ERASER_PX = 8;
+
+/**
+ * Removes the freehand strokes the pointer passes over (v1: whole strokes, no other kinds, locked ones stay). Each hit is
+ * deleted at once, so everyone sees the erasing; the whole drag is one undo step and Esc takes it back. Fast moves are
+ * sampled every eraser radius, so a quick swipe does not jump over a thin line.
+ */
+export class EraseGesture implements Gesture {
+  readonly kind = 'erase';
+  private last: Point;
+  private began = false;
+  private readonly erased = new Set<string>();
+
+  constructor(private readonly core: Core, from: Point) {
+    this.last = from;
+    this.at(from);
+  }
+
+  /** Ids deleted by this drag (tests). */
+  get removed(): ReadonlySet<string> {
+    return this.erased;
+  }
+
+  private at(p: Point): void {
+    const r = this.core.px(ERASER_PX);
+    const hits: string[] = [];
+    for (const o of this.core.scene.query({ x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r })) {
+      if (o.kind !== 'ink' || o.locked || this.erased.has(o.id)) continue;
+      const q = o.rot ? rotatePoint(p, rectCenter(o), -o.rot) : p;
+      if (inkDistance({ x: q.x - o.x, y: q.y - o.y }, o.points) <= r + o.strokeWidth / 2) hits.push(o.id);
+    }
+    if (hits.length === 0) return;
+    if (!this.began) {
+      this.began = true;
+      this.core.doc.beginGesture();
+    }
+    for (const id of hits) this.erased.add(id);
+    // Connectors never glue to a stroke (`glueAt`); should one end point at it anyway, it stays where it was.
+    this.core.doc.remove(hits, (c, end) => this.core.scene.pointOf(c, end));
+  }
+
+  move(w: Point): void {
+    const step = this.core.px(ERASER_PX);
+    const d = dist(this.last, w);
+    const n = Math.min(64, Math.floor(d / step));
+    for (let i = 1; i <= n; i++) this.at({ x: this.last.x + ((w.x - this.last.x) * i) / (n + 1), y: this.last.y + ((w.y - this.last.y) * i) / (n + 1) });
+    this.at(w);
+    this.last = w;
+  }
+
+  end(w: Point): void {
+    this.move(w);
+    if (this.began) this.core.doc.endGesture();
+  }
+
+  cancel(): void {
+    if (this.began) this.core.doc.cancelGesture();
+  }
+
+  settle(): void {
+    if (this.began) this.core.doc.endGesture();
   }
 }

@@ -1,6 +1,6 @@
-import { aabb, isConnector } from '../../../lib/canvas/types';
+import { aabb, isConnector, type InkRec } from '../../../lib/canvas/types';
 import { MAP_H, MAP_W, rectToMap, worldToMap, type MapFrame } from '../../../lib/canvas/minimap';
-import type { Rect } from '../../../lib/canvas/geometry';
+import { rectCenter, rotatePoint, type Rect } from '../../../lib/canvas/geometry';
 import type { Scene } from '../../../lib/canvas/scene';
 import { resolveColor, resolveFill, resolveSticky, type CanvasPalette } from '../engine';
 import type { Ctx2D } from '../engine/draw';
@@ -57,6 +57,10 @@ export function drawMinimap(ctx: Ctx2D, scene: Scene, palette: CanvasPalette, fr
       }
       continue;
     }
+    if (o.kind === 'ink') {
+      drawInk(ctx, o, frame, palette);
+      continue;
+    }
     const r = rectToMap(frame, aabb(o));
     if (o.kind === 'sticky') {
       ctx.globalAlpha = 1;
@@ -104,4 +108,34 @@ export function drawMinimap(ctx: Ctx2D, scene: Scene, palette: CanvasPalette, fr
   ctx.strokeStyle = palette.accent;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(v.x, v.y, v.w, v.h);
+}
+
+/** Points of a stroke the map traces at most: its shape at map size, not every sample. */
+const MAP_INK_POINTS = 24;
+
+/** A stroke: a thin line in its color through a few of its points (turned with the stroke). */
+function drawInk(ctx: Ctx2D, o: InkRec, frame: MapFrame, palette: CanvasPalette): void {
+  const p = o.points;
+  const n = Math.floor(p.length / 2);
+  if (n === 0) return;
+  const step = Math.max(1, Math.ceil(n / MAP_INK_POINTS));
+  const c = rectCenter(o);
+  const at = (i: number): { x: number; y: number } => {
+    const w = { x: o.x + (p[2 * i] ?? 0), y: o.y + (p[2 * i + 1] ?? 0) };
+    return worldToMap(frame, o.rot ? rotatePoint(w, c, o.rot) : w);
+  };
+  ctx.globalAlpha = o.marker ? 0.4 : 0.8;
+  ctx.strokeStyle = resolveColor(palette, o.stroke) ?? palette.ink;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const a = at(0);
+  ctx.moveTo(a.x, a.y);
+  for (let i = step; i < n; i += step) {
+    const b = at(i);
+    ctx.lineTo(b.x, b.y);
+  }
+  const z = at(n - 1);
+  // A dot still shows: a line of half a map pixel.
+  ctx.lineTo(z.x === a.x && z.y === a.y ? z.x + 0.5 : z.x, z.y);
+  ctx.stroke();
 }

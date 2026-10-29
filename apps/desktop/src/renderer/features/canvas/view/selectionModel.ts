@@ -16,6 +16,8 @@ export interface PanelModel {
   hasText: boolean;
   hasShape: boolean;
   hasConnector: boolean;
+  /** Freehand strokes are selected. */
+  hasInk: boolean;
   /** Every selected object is locked: nothing of the selection can be changed or deleted, only unlocked, grouped, ordered or duplicated. */
   locked: boolean;
   /** Two or more objects that are not already exactly one group. */
@@ -36,6 +38,10 @@ export interface PanelModel {
   strokeWidth?: number;
   arrow?: Arrow;
   route?: RouteKind;
+  /** The selected strokes' color, width and kind (marker or pen), where they agree. */
+  inkColor?: string;
+  inkWidth?: number;
+  inkMarker?: boolean;
 }
 
 function uniform<T>(values: readonly T[]): T | undefined {
@@ -51,12 +57,14 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
   const text = objs.flatMap((o) => (o.kind === 'text' ? [o] : []));
   const shape = objs.flatMap((o) => (o.kind === 'shape' ? [o] : []));
   const conn = objs.flatMap((o) => (o.kind === 'connector' ? [o] : []));
+  const ink = objs.flatMap((o) => (o.kind === 'ink' ? [o] : []));
   const out: PanelModel = {
     count: objs.length,
     hasSticky: sticky.length > 0,
     hasText: text.length > 0,
     hasShape: shape.length > 0,
     hasConnector: conn.length > 0,
+    hasInk: ink.length > 0,
     locked: objs.every((o) => o.locked === true),
     canGroup: objs.length >= 2 && !(firstGroup !== undefined && objs.every((o) => o.group === firstGroup) && groupSize(firstGroup) <= objs.length),
     canUngroup: objs.some((o) => o.group !== undefined),
@@ -75,11 +83,14 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
   set('strokeWidth', uniform([...shape.map((o) => o.strokeWidth), ...conn.map((o) => o.strokeWidth)]));
   set('arrow', uniform(conn.map((o) => o.arrow)));
   set('route', uniform(conn.map((o) => o.route)));
+  set('inkColor', uniform(ink.map((o) => o.stroke)));
+  set('inkWidth', uniform(ink.map((o) => o.strokeWidth)));
+  set('inkMarker', uniform(ink.map((o) => o.marker === true)));
   return out;
 }
 
 const KEYS: readonly (keyof PanelModel)[] = [
-  'count', 'hasSticky', 'hasText', 'hasShape', 'hasConnector', 'locked', 'canGroup', 'canUngroup', 'units', 'stickyColor', 'textColor', 'textSize', 'fontPx', 'shape', 'fill', 'stroke', 'strokeWidth', 'arrow', 'route',
+  'count', 'hasSticky', 'hasText', 'hasShape', 'hasConnector', 'locked', 'canGroup', 'canUngroup', 'units', 'stickyColor', 'textColor', 'textSize', 'fontPx', 'shape', 'fill', 'stroke', 'strokeWidth', 'arrow', 'route', 'hasInk', 'inkColor', 'inkWidth', 'inkMarker',
 ];
 
 export const samePanelModel = (a: PanelModel | null, b: PanelModel | null): boolean =>

@@ -12,6 +12,7 @@ import { contentRect } from '../../../lib/canvas/shapes';
 import { buildTemplate, type TemplateId, type TemplateText } from '../../../lib/canvas/templates';
 import { LABEL_SIZE, TextLayouter, boxFontSize, estimateMeasure, fontOf, type MeasureFn } from '../../../lib/canvas/textLayout';
 import { connectorMidpoint } from '../../../lib/canvas/route';
+import { INK_MAX_WIDTH, INK_MIN_WIDTH, MARKER_WIDTHS, PEN_WIDTHS } from '../../../lib/canvas/ink';
 import { LiveLayer } from '../../../lib/canvas/live';
 import {
   DEFAULTS, MAX_OBJECTS, aabb, hasText, isConnector,
@@ -19,10 +20,10 @@ import {
 } from '../../../lib/canvas/types';
 import { VOTE_DEFAULT, VoteBook, type VotePhase, type VoteSession } from '../../../lib/canvas/votes';
 import { AwarenessLayer, sameView, type PeerState, type PeerView } from './awareness';
-import type { Core, Gesture, Mods } from './gestures';
+import type { Core, Gesture, InkStyle, Mods } from './gestures';
 import { attachInput, toolCursor } from './input';
 import { ImageCache, type DecodeFn, type ImageResolver } from './images';
-import { emptyOverlay, type Outline, type OverlayState, type SelFrame } from './overlay';
+import { emptyOverlay, type InkPreview, type Outline, type OverlayState, type SelFrame } from './overlay';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import { Renderer, renderSceneTo, type FrameStats } from './renderer';
 import { selectionFrame } from './selection';
@@ -32,7 +33,8 @@ import { BADGE_MARGIN_PX, hitBadge } from './voteDraw';
 /** Why an action did nothing: a paste or ⌘D over the object (`objects`) or state (`size`) limit, a create at the limit, the clipboard denied. */
 export type RefusedWhy = 'objects' | 'size' | 'create' | 'clipboard';
 
-export type Tool = 'select' | 'sticky' | 'text' | 'shape' | 'connector' | 'comment';
+/** `pen` draws with the pen or the marker (`EngineState.inkMarker`); `eraser` removes freehand strokes (ADR-0127 addendum 2026-10-29). */
+export type Tool = 'select' | 'sticky' | 'text' | 'shape' | 'connector' | 'comment' | 'pen' | 'eraser';
 
 /** A click (tap) of the «Комментарий» tool (ADR-0127 wave 4): where, and the object under it (null = the field). */
 export interface CommentClick {
@@ -50,6 +52,11 @@ export interface EngineState {
   readonly shapeKind: ShapeKind;
   /** The color the sticky tool creates with (a palette token). */
   readonly stickyColor: string;
+  /** The pen tool draws with the marker (semi-transparent, wide) rather than the pen. */
+  readonly inkMarker: boolean;
+  /** Color (a palette token) and width of the pen tool's current kind. */
+  readonly inkColor: string;
+  readonly inkWidth: number;
   /** Rounded zoom, percent. */
   readonly zoomPct: number;
   readonly canUndo: boolean;
@@ -121,7 +128,7 @@ export interface EngineOptions {
   cancelRaf?: (id: number) => void;
 }
 
-const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
+const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'inkMarker', 'inkColor', 'inkWidth', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
 const LOCAL_AWARENESS_MS = 50;
 /** Gestures that follow their pointer when the camera moves under it, and pan the view at its edge. */
 const FOLLOW_KINDS: ReadonlySet<Gesture['kind']> = new Set(['marquee', 'move', 'resize']);
@@ -211,6 +218,9 @@ export class CanvasEngine implements Core {
   private multi_ = false;
   private shape_: ShapeKind = 'rect';
   private sticky_: string = DEFAULTS.stickyColor;
+  /** The pen's and the marker's color and width, each kept for the session; `marker_` picks which one the pen tool uses. */
+  private readonly pens = { pen: { color: DEFAULTS.inkStroke, width: PEN_WIDTHS[1] ?? 4 }, marker: { color: 'yellow', width: MARKER_WIDTHS[1] ?? 20 } };
+  private marker_ = false;
   private route_: RouteKind = 'straight';
   private pasteCount = 0;
   /** The object whose text the editor is open on. */
@@ -354,6 +364,9 @@ export class CanvasEngine implements Core {
       tool: this.tool_,
       shapeKind: this.shape_,
       stickyColor: this.sticky_,
+      inkMarker: this.marker_,
+      inkColor: this.pen.color,
+      inkWidth: this.pen.width,
       zoomPct: Math.round(this.cam.scale * 100),
       canUndo: this.doc.undo.undoStack.length > 0,
       canRedo: this.doc.undo.redoStack.length > 0,
@@ -397,6 +410,14 @@ export class CanvasEngine implements Core {
 
   get connectorRoute(): RouteKind {
     return this.route_;
+  }
+
+  private get pen(): { color: string; width: number } {
+    return this.marker_ ? this.pens.marker : this.pens.pen;
+  }
+
+  get inkStyle(): InkStyle {
+    return { color: this.pen.color, width: this.pen.width, marker: this.marker_ };
   }
 
   // ── Core (used by gestures and input) ───────────────────────────────────────
@@ -531,6 +552,16 @@ export class CanvasEngine implements Core {
   setOverlay(p: Partial<OverlayState>): void {
     this.overlay = { ...this.overlay, ...p };
     this.renderer.requestFrame();
+  }
+
+  previewInk(ink: InkPreview | null, dirty: Rect | null): void {
+    this.overlay = { ...this.overlay, ink };
+    if (dirty) this.renderer.requestOverlayRect(dirty);
+    else this.renderer.requestFrame();
+  }
+
+  refuseCreate(): void {
+    this.opts.onRefused?.('create');
   }
 
   setSelection(ids: Iterable<string>): void {
@@ -692,6 +723,18 @@ export class CanvasEngine implements Core {
 
   setStickyColor(c: string): void {
     this.sticky_ = c;
+    this.sync();
+  }
+
+  /**
+   * The pen tool's settings: `marker` switches between the pen and the marker (each keeps its own color and width), then
+   * `color` / `width` apply to the one in use. Kept for the session.
+   */
+  setInk(p: { marker?: boolean; color?: string; width?: number }): void {
+    if (p.marker !== undefined) this.marker_ = p.marker;
+    const pen = this.pen;
+    if (p.color !== undefined) pen.color = p.color;
+    if (p.width !== undefined && Number.isFinite(p.width)) pen.width = Math.min(INK_MAX_WIDTH, Math.max(INK_MIN_WIDTH, p.width));
     this.sync();
   }
 
@@ -1172,7 +1215,7 @@ export class CanvasEngine implements Core {
 
   private editSpec(o: ObjectRec): EditSpec | null {
     const p = this.palette;
-    if (o.kind === 'image') return null;
+    if (o.kind === 'image' || o.kind === 'ink') return null;
     if (isConnector(o)) {
       const m = connectorMidpoint(o);
       return { box: { x: m.x - 80, y: m.y - 12, w: 160, h: 24 }, text: o.label, size: LABEL_SIZE, color: p.ink, align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily };

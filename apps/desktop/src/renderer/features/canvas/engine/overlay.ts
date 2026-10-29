@@ -2,8 +2,8 @@ import { DEG, HANDLE_IDS, handlePoint, rectCenter, type Point, type Rect } from 
 import type { Guide } from '../../../lib/canvas/snap';
 import { traceRounded } from '../../../lib/canvas/shapes';
 import type { ConnectorRec } from '../../../lib/canvas/types';
-import type { Ctx2D } from './draw';
-import type { CanvasPalette } from './palette';
+import { strokeInk, type Ctx2D } from './draw';
+import { resolveColor, type CanvasPalette } from './palette';
 
 export const HANDLE_PX = 8;
 /** The phone's handles: drawn a little larger, hit from a 44 px zone (radius `TOUCH_HIT_PX`), the rotation handle hung further out. */
@@ -34,6 +34,14 @@ export interface SelFrame {
   cornersOnly?: boolean;
 }
 
+/** The freehand stroke in progress: world points and the pen it is drawn with (a palette token). */
+export interface InkPreview {
+  points: readonly number[];
+  color: string;
+  width: number;
+  marker: boolean;
+}
+
 /** Transient, per-gesture decoration drawn over the content layer (never part of the document). */
 export interface OverlayState {
   /** Outlines of selected boxes. */
@@ -54,12 +62,14 @@ export interface OverlayState {
   /** Touch editing: larger handles. */
   touch?: boolean;
   glue: { rect: Rect; /** Rotation of the glue target. */ rot?: number; anchors: readonly Point[]; active: Point | null } | null;
+  /** The pen's stroke while it is drawn (written to the document on release). */
+  ink?: InkPreview | null;
 }
 
 export const emptyOverlay = (): OverlayState => ({ outlines: [], connectors: [], group: null, marquee: null, guides: [], angle: null, ghost: null, wire: null, glue: null });
 
 export const overlayIsEmpty = (o: OverlayState): boolean =>
-  o.outlines.length === 0 && o.connectors.length === 0 && !o.group && !o.marquee && o.guides.length === 0 && !o.angle && !o.ghost && !o.wire && !o.glue;
+  o.outlines.length === 0 && o.connectors.length === 0 && !o.group && !o.marquee && o.guides.length === 0 && !o.angle && !o.ghost && !o.wire && !o.glue && !o.ink;
 
 /** Paints the overlay. The context carries the camera transform (world units); `scale` is the camera scale. */
 export function drawOverlay(ctx: Ctx2D, o: OverlayState, p: CanvasPalette, scale: number): void {
@@ -164,6 +174,8 @@ export function drawOverlay(ctx: Ctx2D, o: OverlayState, p: CanvasPalette, scale
   }
 
   if (o.angle) drawAngle(ctx, o.angle, p, px);
+
+  if (o.ink) strokeInk(ctx, o.ink.points, 0, 0, resolveColor(p, o.ink.color) ?? p.ink, Math.max(o.ink.width, px), o.ink.marker);
 }
 
 /** The «45°» pill: screen-sized, hung down-right of the cursor so the pointer and the handle stay visible. */

@@ -17,6 +17,8 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   { tool: 'text', key: 'T', label: 'canvasBoard.tool.text' },
   { tool: 'shape', key: 'R', label: 'canvasBoard.tool.shape' },
   { tool: 'connector', key: 'C', label: 'canvasBoard.tool.connector' },
+  { tool: 'pen', key: 'P', label: 'canvasBoard.tool.pen' },
+  { tool: 'eraser', key: 'E', label: 'canvasBoard.tool.eraser' },
   { tool: 'comment', key: 'C', alt: true, label: 'canvasBoard.tool.comment' },
 ];
 
@@ -59,6 +61,9 @@ export const FILL_PICKER: readonly string[] = [...FILL_COLORS, ...SOFT_FILL_COLO
 
 /** Text sizes (px) offered by the size field's list; any whole number in `DEFAULTS.minTextSize`..`maxTextSize` can be typed. */
 export const FONT_PRESETS: readonly number[] = [12, 14, 18, 24, 36, 48, 64, 96];
+
+/** The pen tool's colors: the ink and a few clear hues (the full list is in the properties of a drawn line). */
+export const PEN_COLORS: readonly string[] = ['stroke', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
 
 export const STROKE_WIDTHS: readonly { width: number; label: `canvasBoard.width.${'thin' | 'medium' | 'thick'}` }[] = [
   { width: 1, label: 'canvasBoard.width.thin' },

@@ -16,6 +16,8 @@ export const zhCanvasPhone: DictShape<typeof ruCanvasPhone> = {
   'canvasPhone.armed.shape': '点按画布放置形状',
   'canvasPhone.armed.connector': '从一个对象拖到另一个对象',
   'canvasPhone.armed.comment': '点击对象或画布以留下评论',
+  'canvasPhone.armed.pen': '用手指在画布上绘制',
+  'canvasPhone.armed.eraser': '用手指划过线条即可擦除',
   'canvasPhone.multi': '选择多个',
   'canvasPhone.multiHint': '点按对象进行选择',
   'canvasPhone.selected': { other: '已选 {n} 项' },

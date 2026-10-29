@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 import { rotateHandlePoint } from '../../../lib/canvas/geometry';
+import { MARKER_WIDTHS, PEN_WIDTHS } from '../../../lib/canvas/ink';
 import { Button, IconButton, MOD, cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
 import type { ArrangeOp } from '../../../lib/canvas/arrange';
@@ -296,6 +297,14 @@ function widthNode(w: number): ReactNode {
   return <svg viewBox="0 0 16 16" className={ICON} aria-hidden><rect x="2" y={8 - w / 2} width="12" height={w} rx={w / 2} fill="currentColor" /></svg>;
 }
 
+/** The pen's (or the marker's) three widths, drawn thin / medium / thick whatever their size in the world. */
+export function inkWidthItems(marker: boolean): { id: number; label: string; node: ReactNode }[] {
+  return (marker ? MARKER_WIDTHS : PEN_WIDTHS).map((w, i) => {
+    const def = STROKE_WIDTHS[i];
+    return { id: w, label: def ? t(def.label) : String(w), node: widthNode([1.5, 3, 5][i] ?? 3) };
+  });
+}
+
 const ALIGN_DEFS: readonly { op: ArrangeOp; label: Parameters<typeof t>[0]; Icon: LucideIcon }[] = [
   { op: 'left', label: 'canvasBoard.props.align.left', Icon: AlignStartVertical },
   { op: 'hcenter', label: 'canvasBoard.props.align.hcenter', Icon: AlignCenterVertical },
@@ -466,13 +475,25 @@ export const PropsPanel = memo(function PropsPanel({
       ) : null}
       {!m.locked && (m.hasShape || m.hasConnector) ? (
         <>
-          <SwatchMenu label={t('canvasBoard.props.stroke')} kind="ink" tokens={STROKE_COLORS} value={m.stroke} palette={palette} onPick={(c) => patch({ stroke: c })} focusCanvas={focusCanvas} testId="canvas-prop-stroke" />
+          <SwatchMenu label={t('canvasBoard.props.stroke')} kind="ink" tokens={STROKE_COLORS} value={m.stroke} palette={palette} onPick={(c) => patch({ stroke: c }, ['shape', 'connector'])} focusCanvas={focusCanvas} testId="canvas-prop-stroke" />
           <Seg
             label={t('canvasBoard.props.strokeWidth')}
             testId="canvas-prop-width"
             value={m.strokeWidth}
             items={STROKE_WIDTHS.map((w) => ({ id: w.width, label: t(w.label), node: widthNode(w.width) }))}
-            onPick={(strokeWidth) => patch({ strokeWidth })}
+            onPick={(strokeWidth) => patch({ strokeWidth }, ['shape', 'connector'])}
+          />
+        </>
+      ) : null}
+      {!m.locked && m.hasInk ? (
+        <>
+          <SwatchMenu label={t('canvasBoard.props.color')} kind="ink" tokens={STROKE_COLORS} value={m.inkColor} palette={palette} onPick={(c) => patch({ stroke: c }, ['ink'])} focusCanvas={focusCanvas} testId="canvas-prop-ink-color" />
+          <Seg
+            label={t('canvasBoard.props.strokeWidth')}
+            testId="canvas-prop-ink-width"
+            value={m.inkWidth}
+            items={inkWidthItems(m.inkMarker === true)}
+            onPick={(strokeWidth) => patch({ strokeWidth }, ['ink'])}
           />
         </>
       ) : null}

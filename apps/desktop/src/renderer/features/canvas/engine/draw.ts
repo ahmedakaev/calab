@@ -3,7 +3,8 @@ import { connectorEndDirection, connectorMidpoint } from '../../../lib/canvas/ro
 import { contentRect, STICKY_RADIUS, traceRounded, traceShape } from '../../../lib/canvas/shapes';
 import { F_STRIKE, type Fmt } from '../../../lib/canvas/richText';
 import { LABEL_SIZE, boxFontSize, fontOf, type TextLayout, type TextLayouter } from '../../../lib/canvas/textLayout';
-import { aabb, type ConnectorRec, type ImageRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
+import { MARKER_ALPHA, isDot, traceInk } from '../../../lib/canvas/ink';
+import { aabb, type ConnectorRec, type ImageRec, type InkRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
 import type { ImageSource } from './images';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import type { VoteBadge } from '../../../lib/canvas/votes';
@@ -124,7 +125,39 @@ function drawBody(ctx: Ctx2D, o: ObjectRec, env: DrawEnv): void {
     case 'image':
       drawPicture(ctx, o, env);
       break;
+    case 'ink':
+      drawInk(ctx, o, env);
+      break;
   }
+}
+
+/** A freehand stroke: the smoothed line with round caps and joins; a marker semi-transparent in one pass (no darker overlaps). */
+function drawInk(ctx: Ctx2D, o: InkRec, env: DrawEnv): void {
+  strokeInk(ctx, o.points, o.x, o.y, resolveColor(env.palette, o.stroke) ?? env.palette.ink, Math.max(o.strokeWidth, 1 / env.scale), o.marker === true);
+}
+
+/** Paints a stroke's points (relative to `ox, oy`); shared by the stored strokes and the live preview. */
+export function strokeInk(ctx: Ctx2D, pts: readonly number[], ox: number, oy: number, color: string, width: number, marker: boolean): void {
+  if (pts.length < 2) return;
+  const alpha = ctx.globalAlpha;
+  if (marker) ctx.globalAlpha = alpha * MARKER_ALPHA;
+  if (isDot(pts)) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(ox + (pts[0] ?? 0), oy + (pts[1] ?? 0), width / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    traceInk(ctx, pts, ox, oy);
+    ctx.stroke();
+    // The other painters never set caps: leave the default behind.
+    ctx.lineCap = 'butt';
+  }
+  ctx.globalAlpha = alpha;
 }
 
 /**

@@ -2,7 +2,7 @@ import { ROTATE_CURSOR, dist, hitHandleRot, resizeCursorAt, rotateHandlePoint, t
 import { isConnector } from '../../../lib/canvas/types';
 import type { CanvasEngine, Tool } from './engine';
 import {
-  CreateGesture, EndpointGesture, MarqueeGesture, MoveGesture, PanGesture, PinchGesture, ResizeGesture, RotateGesture, TOUCH_SLOP_PX, TapPanGesture, WireGesture,
+  CreateGesture, DrawGesture, ERASER_PX, EndpointGesture, EraseGesture, MarqueeGesture, MoveGesture, PanGesture, PinchGesture, ResizeGesture, RotateGesture, TOUCH_SLOP_PX, TapPanGesture, WireGesture,
   type Mods,
 } from './gestures';
 import { HANDLE_PX, ROTATE_OFFSET_PX, TOUCH_HIT_PX, TOUCH_ROTATE_OFFSET_PX, type SelFrame } from './overlay';
@@ -23,7 +23,7 @@ const mods = (e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey
   mod: e.ctrlKey || e.metaKey,
 });
 
-const TOOL_KEYS = { v: 1, s: 1, t: 1, r: 1, c: 1, k: 1 };
+const TOOL_KEYS = { v: 1, s: 1, t: 1, r: 1, c: 1, k: 1, p: 1, e: 1 };
 const NO_MODS: Mods = { shift: false, alt: false, mod: false };
 /** Touch editing (ADR-0127 wave 5b): a press that stays put this long on empty canvas opens the phone's menu. */
 const LONG_PRESS_MS = 500;
@@ -37,9 +37,14 @@ const TOUCH_PICK_PX = 10;
  * Returns the detach function. Camera input (wheel, pinch, Safari gestures) is queued on the engine and
  * applied once per frame; nothing here owns a timer or a frame of its own.
  */
-/** The canvas cursor while a tool is armed: an I-beam for text (as in every editor), a crosshair for the other creators. */
+/** The eraser's cursor: a ring of its radius, so what it will take is plain to see. */
+const ERASER_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='${2 * ERASER_PX + 4}' height='${2 * ERASER_PX + 4}'><circle cx='${ERASER_PX + 2}' cy='${ERASER_PX + 2}' r='${ERASER_PX}' fill='white' fill-opacity='0.6' stroke='black' stroke-width='1.5'/></svg>`,
+)}") ${ERASER_PX + 2} ${ERASER_PX + 2}, crosshair`;
+
+/** The canvas cursor while a tool is armed: an I-beam for text (as in every editor), a ring for the eraser, a crosshair for the other creators. */
 export function toolCursor(t: Tool): string {
-  return t === 'select' ? '' : t === 'text' ? 'text' : 'crosshair';
+  return t === 'select' ? '' : t === 'text' ? 'text' : t === 'eraser' ? ERASER_CURSOR : 'crosshair';
 }
 
 export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): () => void {
@@ -135,6 +140,11 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
     }
     if (tool === 'connector') {
       engine.activeGesture = new WireGesture(engine, w, s, TOUCH_SLOP_PX);
+      return;
+    }
+    if (tool === 'pen' || tool === 'eraser') {
+      engine.clearSelection();
+      engine.activeGesture = tool === 'pen' ? new DrawGesture(engine, w) : new EraseGesture(engine, w);
       return;
     }
     if (tool === 'comment') {
@@ -287,6 +297,15 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
       case 'comment':
         engine.emitCommentAt(s, w);
         return;
+      case 'pen':
+        // The frame of what was selected would sit over the drawing (and every frame would repaint it).
+        engine.clearSelection();
+        engine.activeGesture = new DrawGesture(engine, w);
+        return;
+      case 'eraser':
+        engine.clearSelection();
+        engine.activeGesture = new EraseGesture(engine, w);
+        return;
       case 'select':
         break;
     }
@@ -352,6 +371,14 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
     const g = engine.activeGesture;
     if (g) {
       const m = mods(e);
+      if ((g.kind === 'draw' || g.kind === 'erase') && typeof e.getCoalescedEvents === 'function') {
+        // The pen and the eraser take every sample the system had between two events (a fast stroke stays smooth).
+        const all = e.getCoalescedEvents();
+        for (let i = 0; i < all.length - 1; i++) {
+          const c = all[i];
+          if (c) g.move(local(c).w, local(c).s, m);
+        }
+      }
       g.move(w, s, m);
       if (downAt) engine.dragPointer(downAt, s, m, e.pointerType !== 'touch');
       return;
@@ -542,6 +569,8 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
             case 't': if (engine.readOnly) return; engine.setTool('text'); break;
             case 'r': if (engine.readOnly) return; engine.setTool('shape'); break;
             case 'c': if (engine.readOnly) return; engine.setTool('connector'); break;
+            case 'p': if (engine.readOnly) return; engine.setTool('pen'); break;
+            case 'e': if (engine.readOnly) return; engine.setTool('eraser'); break;
             // K: «Стикер из набора» — the view opens the sticker picker.
             case 'k': if (engine.readOnly) return; engine.emitStickerKey(); break;
             default: return;

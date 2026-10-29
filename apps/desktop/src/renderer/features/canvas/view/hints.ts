@@ -2,10 +2,11 @@
  * The toolbar's hint cards: one small scene per tool, drawn by the canvas's own renderer (so it matches the board
  * in both themes and needs no image files). Pure data, no React.
  */
+import { inkFromStroke } from '../../../lib/canvas/ink';
 import { buildTemplate, type TemplateText } from '../../../lib/canvas/templates';
 import type { ObjectInit } from '../../../lib/canvas/types';
 
-export const HINT_IDS = ['select', 'sticky', 'text', 'shape', 'connector', 'comment', 'sticker', 'templates', 'vote', 'timer'] as const;
+export const HINT_IDS = ['select', 'sticky', 'text', 'shape', 'connector', 'pen', 'comment', 'sticker', 'templates', 'vote', 'timer'] as const;
 export type HintId = (typeof HINT_IDS)[number];
 
 export type HintArtKey = 'idea' | 'task' | 'note' | 'title' | 'body' | 'start' | 'finish' | 'comment';
@@ -16,6 +17,14 @@ type Item = { id: string; init: ObjectInit };
 const sticky = (id: string, x: number, y: number, color: string, text: string, w = 160): Item => ({
   id, init: { kind: 'sticky', x, y, w, h: w, color, text },
 });
+
+/** A stroke through the points `f(t)`, t in [0, 1] (`n` samples), as the pen would store it. */
+function stroke(id: string, f: (t: number) => [number, number], n: number, color: string, width: number, marker = false): Item {
+  const pts: number[] = [];
+  for (let i = 0; i <= n; i++) pts.push(...f(i / n));
+  const ink = inkFromStroke(pts, 0.5) ?? { x: 0, y: 0, w: 1, h: 1, points: [0, 0, 0, 0] };
+  return { id, init: { kind: 'ink', ...ink, stroke: color, strokeWidth: width, ...(marker ? { marker: true } : {}) } };
+}
 
 /** The objects of a tool's scene, world units. `tpl` translates the template's own keys (the templates card). */
 export function hintScene(id: HintId, tr: HintText, tpl: TemplateText): Item[] {
@@ -45,6 +54,14 @@ export function hintScene(id: HintId, tr: HintText, tpl: TemplateText): Item[] {
         { id: 'a', init: { kind: 'shape', shape: 'rounded', x: 0, y: 0, w: 150, h: 80, fill: 'soft:green', stroke: 'green', text: tr('start') } },
         { id: 'b', init: { kind: 'shape', shape: 'rounded', x: 320, y: 90, w: 150, h: 80, fill: 'soft:blue', stroke: 'blue', text: tr('finish') } },
         { id: 'w', init: { kind: 'connector', from: { id: 'a', side: 'right' }, to: { id: 'b', side: 'left' }, route: 'curve', arrow: 'end', stroke: 'stroke', strokeWidth: 3 } },
+      ];
+    case 'pen':
+      return [
+        // A word underlined with the marker, a loop around it with the pen, a wave below.
+        stroke('m', (t) => [10 + 170 * t, 66 + 3 * Math.sin(t * 3)], 12, 'yellow', 22, true),
+        { id: 't', init: { kind: 'text', x: 14, y: 20, w: 200, size: 40, text: tr('idea') } },
+        stroke('o', (t) => [100 + 125 * Math.cos(-2.6 + t * 6.6), 48 + 62 * Math.sin(-2.6 + t * 6.6)], 48, 'blue', 4),
+        stroke('w', (t) => [-10 + 420 * t, 150 + 14 * Math.sin(t * Math.PI * 5)], 60, 'red', 5),
       ];
     case 'comment':
       return [

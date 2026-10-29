@@ -55,6 +55,8 @@ export interface FrameStats {
   regions: number;
   /** Objects drawn in the last frame's content passes. */
   drawn: number;
+  /** Frames that composited only a piece of the overlay (the pen's stroke). */
+  partial: number;
 }
 
 const MAX_REGIONS = 8;
@@ -74,6 +76,12 @@ export class Renderer {
   private rctx: Ctx2D | null = null;
   /** The main canvas needs a frame (content, camera, overlay); false = only the remote layer does. */
   private mainDirty = true;
+  /**
+   * Only this world rect of the overlay changed since the last frame (the pen's stroke growing): the frame composites
+   * just that part of the screen. Any other request composites everything (`compositeAll`).
+   */
+  private overlayDirty: Rect | null = null;
+  private compositeAll = true;
   private remoteDirty = true;
   /** Device-pixel box the remote layer painted last (what to clear next), and the camera it was painted for. */
   private remoteBox: Rect | null = null;
@@ -93,7 +101,7 @@ export class Renderer {
   private hiddenText: string | null = null;
   private palette: CanvasPalette;
   private readonly off: () => void;
-  readonly stats: FrameStats = { frames: 0, remote: 0, full: 0, scrolled: 0, regions: 0, drawn: 0 };
+  readonly stats: FrameStats = { frames: 0, remote: 0, full: 0, scrolled: 0, regions: 0, drawn: 0, partial: 0 };
   /** Frame callback for the owner (e.g. to keep the text editor aligned). */
   onFrame: (() => void) | null = null;
 
@@ -231,6 +239,14 @@ export class Renderer {
   /** Only the overlay/camera changed (selection, guides, pan): a frame, no content repaint beyond the scroll. */
   requestFrame(): void {
     this.mainDirty = true;
+    this.compositeAll = true;
+    this.schedule();
+  }
+
+  /** Only `r` (world) of the overlay changed: the next frame repaints just that part of the screen, unless more comes up. */
+  requestOverlayRect(r: Rect): void {
+    this.mainDirty = true;
+    this.overlayDirty = this.overlayDirty ? rectUnion(this.overlayDirty, r) : r;
     this.schedule();
   }
 
@@ -283,6 +299,10 @@ export class Renderer {
     const dirty = this.dirty;
     this.dirty = [];
     this.fullDirty = false;
+    // A frame for a piece of the overlay alone (the stroke's tail): the content stays, so only that box is composited.
+    const partial = !this.compositeAll && !full && dx === 0 && dy === 0 && dirty.length === 0 ? this.overlayDirty : null;
+    this.compositeAll = false;
+    this.overlayDirty = null;
 
     if (full) {
       this.paintDevice(cam, { x: 0, y: 0, w: W, h: H });
@@ -309,12 +329,27 @@ export class Renderer {
     // Composite: content, then overlay + remote layer (world transform).
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.drawImage(this.layer as unknown as CanvasImageSource, 0, 0);
+    if (partial) {
+      const part = this.toDeviceRegions([partial], cam, W, H)[0];
+      // Off screen: nothing to show.
+      if (!part) return;
+      this.stats.partial++;
+      c.save();
+      c.beginPath();
+      c.rect(part.x, part.y, part.w, part.h);
+      c.clip();
+      c.drawImage(this.layer as unknown as CanvasImageSource, part.x, part.y, part.w, part.h, part.x, part.y, part.w, part.h);
+    } else c.drawImage(this.layer as unknown as CanvasImageSource, 0, 0);
     c.setTransform(dpr * cam.scale, 0, 0, dpr * cam.scale, dpr * cam.tx, dpr * cam.ty);
     const ov = this.o.getOverlay();
     drawOverlay(c, ov, this.palette, cam.scale);
     if (!this.remote) this.o.awareness.draw(c, cam, this.o.scene, this.palette, (this.o.now ?? Date.now)());
     c.setTransform(1, 0, 0, 1, 0, 0);
+    if (partial) {
+      c.restore();
+      this.onFrame?.();
+      return;
+    }
     if (this.remote) {
       const rc = this.remoteCam;
       // The remote layer is in screen space: it follows the camera, and peers' selections follow the objects.
