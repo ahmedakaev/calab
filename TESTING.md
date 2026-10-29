@@ -2401,3 +2401,10 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - If nothing shows over the Windows screen: send `%APPDATA%\Calab\logs\main.log` lines `[annot]` (display mapping, `overlay shown` with bounds/visible/onTop) and the renderer line `annot: first annotation of my stream`.
 - Web presenter (and a window share anywhere): the panel says «Рисунки видны в превью вашего стрима»; while a viewer annotates — «Имя рисует на экране» + «Показать», which opens the stream's pop-out with the drawings.
 - Viewers on Windows / web see each other's and the presenter's drawings on the stream tile (unchanged path, check once).
+
+## Calab links in chat open in the app (desktop)
+1. Signed in on `app.calab.io` (and once with a session on `app.calab.ru`), post links on both hosts and `meet.gptunnel.ru`: `/t/DEV-1`, `/t/dev-1000022`, `/b/<id>`, `/r/<code>`, `/join/<code>`, `/m/<room>/<msg>`, `/dm/<id>`, `/e/<id>`, `/wiki/<id>`, `/canvas/<id>`, `/disk/<id>`, `/plans?plan=team`, and `[text](https://app.calab.ru/t/DEV-1)`.
+2. Click each: plain, Cmd/Ctrl, middle button, the link card's title, inside a quote / forward, in a plain-text letter in Mail.
+Expected: the task / board / room / wiki / Disk / meeting opens in the app (another workspace's task switches the workspace); no browser.
+3. `/download/`, `/e/<id>/rsvp`, `/c/<code>`, `https://example.org`, `https://www.calab.io/t/DEV-1` open in the browser.
+4. On a self-hosted server `https://app.calab.io/t/DEV-1` opens in the browser.
