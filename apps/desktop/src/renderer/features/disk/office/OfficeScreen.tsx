@@ -19,8 +19,8 @@ const appTheme = (): 'dark' | 'light' => (document.documentElement.dataset['them
 /** The Document Server does not say hello (unreachable, blocked): the frame gives up after this. */
 const HELLO_TIMEOUT_MS = 15_000;
 /**
- * It said hello but the document is not shown yet: the editor's JS and fonts (~150 requests, not
- * cached for a frame under a file:// page) take 10–25 s on a far link, so this budget is wider.
+ * It said hello but the document is not shown yet: on the first open the editor's JS and fonts
+ * (~12 MB, cached afterwards) take 10–30 s on a slow link, so this budget is wider.
  */
 const READY_TIMEOUT_MS = 90_000;
 /** Leaving a file with changes pending: how long the editor gets to save before the edits are kept on screen. */
