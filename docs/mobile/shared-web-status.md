@@ -15,7 +15,7 @@ Fix: the WebView now sets `applicationNameForUserAgent` to a shared marker
 closed on iOS). **Needs a new Android build** to carry the marker; the
 existing iOS build 22 is unaffected and keeps working through the bridge.
 
-## 2026-10-28: room audio plays without a gesture (DEV-4955, #255)
+## 2026-10-28: room audio plays without a gesture (#255)
 
 `mediaPlaybackRequiresUserAction` is now `false` for every build, not only with
 native call audio. A room rejoin after the app was in the background creates new
