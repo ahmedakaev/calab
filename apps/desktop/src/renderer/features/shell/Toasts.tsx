@@ -1,12 +1,12 @@
 import { CircleAlert, CircleCheck, Info } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { CloseButton, cx } from '../../components/ui';
 import { t } from '../../i18n';
 import type { DeviceSwitch } from '../../lib/deviceSwitch';
 import { announceDeviceSwitch } from '../../services/deviceToast';
 import { useSession } from '../../stores/session';
 import { isSticky, newestFirst, stackInteraction, type Toast, type ToastAction } from '../../stores/toastQueue';
-import { TOAST_EXIT_MS, TOAST_MS, useToasts } from '../../stores/toasts';
+import { TOAST_MS, useToasts } from '../../stores/toasts';
 
 declare global {
   interface Window {
@@ -86,20 +86,7 @@ export function Toasts(): ReactNode {
 const ICON = { error: CircleAlert, success: CircleCheck, info: Info } as const;
 
 function ToastItem({ toast: x, paused }: { toast: Toast; paused: boolean }): ReactNode {
-  const remove = useToasts((s) => s.dismiss);
-  const [leaving, setLeaving] = useState(false);
-  const exit = useRef(0);
-  useEffect(() => () => window.clearTimeout(exit.current), []);
-  // A short exit transition (opacity + translate), skipped with prefers-reduced-motion.
-  const dismiss = useCallback(
-    (id: number): void => {
-      if (exit.current) return;
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return remove(id);
-      setLeaving(true);
-      exit.current = window.setTimeout(() => remove(id), TOAST_EXIT_MS);
-    },
-    [remove],
-  );
+  const dismiss = useToasts((s) => s.dismiss);
   const left = useRef(x.durationMs ?? TOAST_MS);
   const sticky = isSticky(x);
 
@@ -119,7 +106,6 @@ function ToastItem({ toast: x, paused }: { toast: Toast; paused: boolean }): Rea
       role={x.kind === 'error' ? 'alert' : 'status'}
       aria-live={x.kind === 'error' ? 'assertive' : 'polite'}
       data-testid="toast"
-      data-leaving={leaving || undefined}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();

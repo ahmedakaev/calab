@@ -13,8 +13,6 @@ export type { Toast, ToastAction } from './toastQueue';
  * until closed: it asks the user to decide, so it must not vanish before they read it.
  */
 export const TOAST_MS = 6000;
-/** The exit transition of a closed toast (styles.css `.toast-card[data-leaving]`). */
-export const TOAST_EXIT_MS = 120;
 
 interface ToastState {
   items: Toast[];

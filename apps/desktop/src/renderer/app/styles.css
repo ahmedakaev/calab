@@ -945,8 +945,8 @@ body:has(.mat-sheet) [data-radix-popper-content-wrapper]:not(:has(> .tip)) {
     transform: none;
   }
 }
-/* Toast cards (top right, newest on top): enter and exit are one short opacity + translate run, only
-   while a card appears or leaves; reduced motion: none (Toasts.tsx also drops the exit wait). */
+/* Toast cards (top right, newest on top): the entry is one short opacity + translate run, only while a card
+   appears (a removal is immediate: the focus/pause lifecycle of #45 relies on it); reduced motion: none. */
 @keyframes calaba-toast-in {
   from {
     opacity: 0;
@@ -959,13 +959,6 @@ body:has(.mat-sheet) [data-radix-popper-content-wrapper]:not(:has(> .tip)) {
 }
 .toast-card {
   animation: calaba-toast-in var(--motion-fast) ease-out;
-}
-.toast-card[data-leaving] {
-  opacity: 0;
-  transform: translateY(-6px);
-  transition:
-    opacity var(--motion-fast) ease-in,
-    transform var(--motion-fast) ease-in;
 }
 @media (prefers-reduced-motion: reduce) {
   .toast-card {
