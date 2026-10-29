@@ -14,7 +14,7 @@ import (
 	"github.com/calaba/calaba/server/internal/voice"
 )
 
-// A voice seat survives an involuntary drop (ADR-0146). When LiveKit closes a device's last
+// A voice seat survives an involuntary drop (ADR-0148). When LiveKit closes a device's last
 // connection in a workspace room without the device or the server asking for it — a phone whose
 // page froze in the background, a network that went away — the seat is kept for
 // Config.LostGrace (VOICE_LOST_GRACE) and marked lost; others see «no connection» instead of a

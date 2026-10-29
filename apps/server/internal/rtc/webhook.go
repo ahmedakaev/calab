@@ -100,7 +100,7 @@ func (s *Service) HandleEvent(ctx context.Context, ev *WebhookEvent) error {
 			s.SIP.SIPRoomFinished(ctx, rid)
 		}
 		// LiveKit closes a room departure_timeout (20 s) after its last participant: seats held
-		// for a lost connection stay (ADR-0146); a /join creates the room again.
+		// for a lost connection stay (ADR-0148); a /join creates the room again.
 		return s.roomFinished(ctx, wid, rid, true)
 	}
 	p := ev.Participant
@@ -138,7 +138,7 @@ func (s *Service) HandleEvent(ctx context.Context, ev *WebhookEvent) error {
 			s.dropCameras(ctx, rid, sid, identity, live, true)
 			return nil
 		}
-		// An involuntary drop holds the seat (ADR-0146); a leave, a removal or a takeover ends it.
+		// An involuntary drop holds the seat (ADR-0148); a leave, a removal or a takeover ends it.
 		hold, kept := s.holdsSeats(wid, rid) && !explicitRelease(p.DisconnectReason), false
 		now := time.Now()
 		if err := s.update(ctx, wid, uid, sid, func(cur *voice.SessionState) *voice.SessionState {
@@ -411,7 +411,7 @@ func (s *Service) stopStreamsExcept(ctx context.Context, wid, rid uuid.UUID, ide
 
 // roomFinished clears a room that is gone: its devices' states, streams and webcams. keepHeld:
 // LiveKit closed it on its own (room_finished) — seats held for a lost connection stay until
-// their grace ends (ADR-0146); a room deleted by the app takes them too.
+// their grace ends (ADR-0148); a room deleted by the app takes them too.
 func (s *Service) roomFinished(ctx context.Context, wid, rid uuid.UUID, keepHeld bool) error {
 	states, err := s.voice.List(ctx, wid)
 	if err != nil {

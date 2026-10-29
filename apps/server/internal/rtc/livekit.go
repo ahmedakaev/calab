@@ -56,7 +56,7 @@ type Participant struct {
 	Tracks   []Track `json:"tracks"`
 	// Attributes: set on phone lines by LiveKit SIP (sip.callStatus, sip.callID; ADR-0046).
 	Attributes map[string]string `json:"attributes,omitempty"`
-	// DisconnectReason: why LiveKit closed the connection, in participant_left (ADR-0146).
+	// DisconnectReason: why LiveKit closed the connection, in participant_left (ADR-0148).
 	DisconnectReason DisconnectReason `json:"disconnectReason,omitempty"`
 }
 

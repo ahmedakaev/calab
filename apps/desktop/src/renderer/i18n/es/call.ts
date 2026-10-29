@@ -52,7 +52,7 @@ export const esCall: DictShape<typeof ruCall> = {
   'call.sipParkedLeave': 'Salir de la sala',
   'call.sipParkedAfter': 'Entrarás en la sala después de la llamada',
   'call.onPhone': 'En una llamada telefónica',
-  // a voice seat kept after a lost connection (ADR-0146)
+  // a voice seat kept after a lost connection (ADR-0148)
   'call.connectionLost': 'Sin conexión',
   // transfer of a phone call (ADR-0132)
   'call.sipTransfer': 'Transferir',

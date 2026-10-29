@@ -1336,7 +1336,7 @@ export type VoiceState = Message<"calaba.v1.VoiceState"> & {
   onPhone: boolean;
 
   /**
-   * Connection lost (ADR-0146): every device of the user in this room dropped out of LiveKit
+   * Connection lost (ADR-0148): every device of the user in this room dropped out of LiveKit
    * involuntarily (a frozen phone, a lost network) and the server keeps the seat for
    * VOICE_LOST_GRACE (60 s by default). Others show the row dimmed with «no connection», play no
    * leave cue, and no join cue when the device comes back in time. The seat still counts against

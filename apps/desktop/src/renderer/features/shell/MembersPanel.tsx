@@ -406,7 +406,7 @@ const MemberRow = memo(function MemberRow({
       </>
     );
   } else if (line.activity === 'voice' && v && !isMe && v.connectionLost) {
-    // ADR-0146: «Нет связи» takes the room name's place, the room stays in the line's tooltip —
+    // ADR-0148: «Нет связи» takes the room name's place, the room stays in the line's tooltip —
     // side by side in this one 16 px line the room name truncated to «Перегов…».
     const lost = t('call.connectionLost');
     activityLabel = roomName ? `${lost} · ${roomName}` : lost;

@@ -40,7 +40,7 @@ describe('joinLeaveCue', () => {
   });
 });
 
-describe('SeatCues (ADR-0146)', () => {
+describe('SeatCues (ADR-0148)', () => {
   it('a plain leave: the seat is already gone, or goes right after the LiveKit event', () => {
     const c = new SeatCues();
     expect(c.disconnected('a', 'gone')).toBe(true);

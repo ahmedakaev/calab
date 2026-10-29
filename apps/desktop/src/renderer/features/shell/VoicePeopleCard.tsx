@@ -11,12 +11,14 @@ import { joinOutcome } from '../../lib/voiceEntry';
 import { voice } from '../../services/voice';
 import { useRooms } from '../../stores/rooms';
 import { useSession } from '../../stores/session';
+import { useSipCalls } from '../../stores/sipCalls';
 import { toast } from '../../stores/toasts';
 import { useVoice } from '../../stores/voice';
 import { useConnectingRing, useVoiceStateOf } from '../../stores/voicePending';
 import { memberName, useRoleLook, useWorkspaces } from '../../stores/workspaces';
 import { roleTextClass, roleTextStyle } from '../people/MemberBits';
 import { MemberContextMenu } from '../people/MemberContextMenu';
+import { SipCallRow } from '../voice/Sip';
 import { MusicianIcon, SelfVoiceStateIcons, VoiceStateIcons } from '../voice/VoiceStateIcons';
 import { CallTimer } from './Sidebar';
 import { cardOrder, firstNames, stackOrder, stackSlice } from './voicePeople';
@@ -96,7 +98,7 @@ export function AvatarStack({
 function StackAvatar({ workspaceId, userId, size, ring, overlap }: { workspaceId: string; userId: string; size: number; ring: string; overlap: string }): ReactNode {
   const fileId = useWorkspaces((s) => s.users[userId]?.avatarFileId ?? '');
   const name = useWorkspaces(() => memberName(workspaceId, userId));
-  // Someone else's seat kept after a lost connection (ADR-0146): the avatar dimmed.
+  // Someone else's seat kept after a lost connection (ADR-0148): the avatar dimmed.
   const lost = useWorkspaces((s) => s.byId[workspaceId]?.voice[userId]?.connectionLost ?? false);
   const me = useSession((s) => s.me?.user?.id === userId);
   return (
@@ -220,6 +222,7 @@ function VoicePeopleCard({ workspaceId, room, perms }: { workspaceId: string; ro
   const inRoom = useVoice((s) => s.roomId === room.id);
   const join = useVoiceJoin(workspaceId, room, perms, people.length);
   const rows = useMemo(() => cardOrder(people, me), [people, me]);
+  const sipLine = useSipCalls((s) => !!s.byRoom[room.id]);
   return (
     <>
       <div className="flex h-11 shrink-0 items-center gap-1.5 px-2.5 text-list font-semibold" data-testid="voice-people-title">
@@ -231,6 +234,8 @@ function VoicePeopleCard({ workspaceId, room, perms }: { workspaceId: string; ro
         {rows.map((id) => (
           <VoicePersonRow key={id} workspaceId={workspaceId} userId={id} self={id === me} />
         ))}
+        {/* The room's phone line (ADR-0046): its number, status, «Клавиатура» and «Завершить». */}
+        {sipLine ? <SipCallRow workspaceId={workspaceId} roomId={room.id} card /> : null}
       </ul>
       <div className="px-1 pt-1.5">
         <Popover.Close asChild>
@@ -282,7 +287,7 @@ const VoicePersonRow = memo(function VoicePersonRow({ workspaceId, userId, self 
   const ref = useRef<HTMLButtonElement>(null);
   // Parked for a phone call (ADR-0133): dimmed, a handset, never the speaking ring.
   const onPhone = v?.onPhone ?? false;
-  // Someone else's seat kept after a lost connection (ADR-0146): dimmed, «нет связи».
+  // Someone else's seat kept after a lost connection (ADR-0148): dimmed, «нет связи».
   const lost = !self && (v?.connectionLost ?? false);
   const talking = speaking && !v?.muted && !connecting && !onPhone && !lost;
   // A tap opens the member menu (Radix ContextMenu opens on `contextmenu`), as the header's «…».
