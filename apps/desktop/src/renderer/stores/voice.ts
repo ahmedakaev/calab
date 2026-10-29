@@ -139,7 +139,7 @@ export interface VoiceStore {
   /** Human text (lib/media/errors.ts), never a raw error. */
   micError: string | null;
   micErrorAction: MediaErrorAction | null;
-  /** DEV-4955: the mic is held by another app / the system (services/voice setMicTrouble); the phone strip says so. */
+  /** The system muted the mic (#255, services/voice setMicTrouble): the panel header and the phone strip say so. */
   micTrouble: 'recovering' | 'unheard' | null;
   /** A moderator muted my mic (not me): shown as a red crossed mic, distinct from self-mute. */
   serverMuted: boolean;

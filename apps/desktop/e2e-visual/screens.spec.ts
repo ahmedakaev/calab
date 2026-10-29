@@ -1510,7 +1510,7 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
   await expect(menu.getByTestId('mic-ptt-key')).toBeVisible();
   await expect(menu.getByTestId('ptt-release-compact')).toBeVisible();
   await checkpoint(shot, 'self-mic-menu');
-  // DEV-4955 audio recovery without LiveKit: the voice panel is shown from store state alone
+  // Voice audio recovery (#255) without LiveKit: the voice panel is shown from store state alone
   // (__calabaVoiceSeat), the recovery signals come through the voice service's own paths.
   await win.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);

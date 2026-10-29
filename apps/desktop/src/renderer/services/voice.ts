@@ -3508,7 +3508,7 @@ class VoiceEngine {
     this.afterLinkBack('pageshow');
   }
 
-  /** The voice link's outage (connected → reconnecting → connected) is logged once it is back; no toast (DEV-4955). */
+  /** The voice link's outage (connected → reconnecting → connected) is logged once it is back; no toast (#255). */
   private onPhaseChange(phase: VoicePhase, was: VoicePhase): void {
     if (phase === 'reconnecting' && was === 'connected') {
       this.linkDownAt ??= Date.now();

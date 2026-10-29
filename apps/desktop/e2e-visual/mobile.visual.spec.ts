@@ -722,7 +722,7 @@ test('m-home', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('phone-tabbar')).toBeVisible();
-  // DEV-4955 audio recovery without LiveKit: «in voice» by store state (__calabaVoiceSeat), the
+  // Voice audio recovery (#255) without LiveKit: «in voice» by store state (__calabaVoiceSeat), the
   // recovery signals through the voice service's own paths: the strip above the tab bar and the sound prompt.
   const seat = (phase: 'connected' | 'reconnecting'): Promise<void> =>
     page.evaluate(([roomId, workspaceId, ph]) => (window as unknown as { __calabaVoiceSeat?: (s: object) => void }).__calabaVoiceSeat?.({ roomId, workspaceId, phase: ph }), [IDS.rooms.call, IDS.workspaces.main, phase] as const);
