@@ -2369,3 +2369,9 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - PG17: `go test -race -tags integration -count=1 -run '^Test(CalendarWidget|CalDAVDatePersistence|BotRouteTable)' ./internal/app` covers exact-session revocation, bot/anonymous denial, own-only/SSO policy, workday/cancelled occurrences, source DATE values and bounds.
 - `make gen` and `pnpm -F @calaba/landing gen:routes --check` must have no generated drift.
 - Native widgets and physical acceptance belong to the dependent iOS change.
+
+## Git events: draft, review, approval, target branch (ADR-0060 §4, #101 stage A)
+- `go test -race ./internal/boards/...` — golden webhooks of GitHub/GitLab/Gitea for every new event, the draft→ready flow, redelivery, target-branch globs, template variables.
+- PG18 + Valkey: `go test -tags integration -count=1 -run TestBoardGit ./internal/app` — draft → «draft» rule only; ready → «MR открыт» rule; a repeated ready / approval with another body fires nothing; merge into `preprod` with filter `main` does not move the task.
+- Manually (GitLab): rules «Draft MR открыт → In Progress», «MR открыт → In Review», «MR влит» with «Целевая ветка» `main`; open a Draft MR `feature/dev-N-…`, mark it ready, approve twice, merge into `preprod`, then into `main`. Expected: In Progress → In Review → (no move) → Ready to Deploy; one journal line per approver.
+- Comment rule `Открыт MR !{pr_number}: {pr_title} {pr_url}` → the card shows the MR number, title and link; `@everyone` in the MR title notifies nobody.
