@@ -3064,8 +3064,10 @@ func (x *Task) GetWatcherIds() []string {
 // {"from_status_id", "status_id", "approved", "quorum", "rejected"} (the "status" entry is
 // written as well). "git" (ADR-0060 §4): after {"event":
 // the RuleGitEvent name without its prefix, "kind": "branch" | "pr" | "commit", "provider",
-// "repo", "ref", "title", "url", "state", "commits": [{"sha", "title", "url"}] of a push};
-// before {"state", "title"} of a pull request that changed.
+// "repo", "ref", "title", "url", "state", "commits": [{"sha", "title", "url"}] of a push,
+// "branch", "author" (who made the event); a pull request also "target_branch", "draft",
+// "users" (reviewers added / the approver)}; before {"state", "title", "draft"} of a pull
+// request that changed.
 // Snapshots (ADR-0091): "description" — {"length", "text"} before and after; "attachments" —
 // {"file_ids", "files": [{"file_id", "name", "size", "mime"}]}; "labels" — {"label_ids",
 // "labels": [{"id", "name", "color"}]}; "milestone" — {"milestone_id", "name"}; "parent" —

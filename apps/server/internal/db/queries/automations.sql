@@ -116,11 +116,11 @@ SELECT * FROM task_git_links
 WHERE task_id = $1 AND kind = $2 AND provider = $3 AND repo = $4 AND ref = $5;
 
 -- name: UpsertTaskGitLink :one
-INSERT INTO task_git_links (task_id, kind, provider, repo, ref, title, url, state, author)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO task_git_links (task_id, kind, provider, repo, ref, title, url, state, author, draft, seen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, sqlc.arg('draft'), coalesce(sqlc.arg('seen')::text[], '{}'))
 ON CONFLICT (task_id, kind, provider, repo, ref) DO UPDATE SET title = excluded.title, url = excluded.url,
     state = excluded.state, author = CASE WHEN excluded.author = '' THEN task_git_links.author ELSE excluded.author END,
-    updated_at = now()
+    draft = excluded.draft, seen = excluded.seen, updated_at = now()
 RETURNING *;
 
 -- name: TrimTaskGitLinks :execrows

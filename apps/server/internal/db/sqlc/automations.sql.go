@@ -271,7 +271,7 @@ func (q *Queries) GetBoardRuleWorkspace(ctx context.Context, id uuid.UUID) (uuid
 }
 
 const getTaskGitLink = `-- name: GetTaskGitLink :one
-SELECT id, task_id, kind, provider, repo, ref, title, url, state, author, created_at, updated_at FROM task_git_links
+SELECT id, task_id, kind, provider, repo, ref, title, url, state, author, created_at, updated_at, draft, seen FROM task_git_links
 WHERE task_id = $1 AND kind = $2 AND provider = $3 AND repo = $4 AND ref = $5
 `
 
@@ -305,6 +305,8 @@ func (q *Queries) GetTaskGitLink(ctx context.Context, arg GetTaskGitLinkParams) 
 		&i.Author,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Draft,
+		&i.Seen,
 	)
 	return i, err
 }
@@ -507,7 +509,7 @@ func (q *Queries) ListScheduledRules(ctx context.Context) ([]BoardRule, error) {
 }
 
 const listTaskGitLinks = `-- name: ListTaskGitLinks :many
-SELECT id, task_id, kind, provider, repo, ref, title, url, state, author, created_at, updated_at FROM task_git_links WHERE task_id = $1 ORDER BY updated_at DESC, id DESC
+SELECT id, task_id, kind, provider, repo, ref, title, url, state, author, created_at, updated_at, draft, seen FROM task_git_links WHERE task_id = $1 ORDER BY updated_at DESC, id DESC
 `
 
 func (q *Queries) ListTaskGitLinks(ctx context.Context, taskID uuid.UUID) ([]TaskGitLink, error) {
@@ -532,6 +534,8 @@ func (q *Queries) ListTaskGitLinks(ctx context.Context, taskID uuid.UUID) ([]Tas
 			&i.Author,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Draft,
+			&i.Seen,
 		); err != nil {
 			return nil, err
 		}
@@ -731,12 +735,12 @@ func (q *Queries) UpsertBoardGit(ctx context.Context, arg UpsertBoardGitParams) 
 }
 
 const upsertTaskGitLink = `-- name: UpsertTaskGitLink :one
-INSERT INTO task_git_links (task_id, kind, provider, repo, ref, title, url, state, author)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO task_git_links (task_id, kind, provider, repo, ref, title, url, state, author, draft, seen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, coalesce($11::text[], '{}'))
 ON CONFLICT (task_id, kind, provider, repo, ref) DO UPDATE SET title = excluded.title, url = excluded.url,
     state = excluded.state, author = CASE WHEN excluded.author = '' THEN task_git_links.author ELSE excluded.author END,
-    updated_at = now()
-RETURNING id, task_id, kind, provider, repo, ref, title, url, state, author, created_at, updated_at
+    draft = excluded.draft, seen = excluded.seen, updated_at = now()
+RETURNING id, task_id, kind, provider, repo, ref, title, url, state, author, created_at, updated_at, draft, seen
 `
 
 type UpsertTaskGitLinkParams struct {
@@ -749,6 +753,8 @@ type UpsertTaskGitLinkParams struct {
 	Url      string
 	State    string
 	Author   string
+	Draft    bool
+	Seen     []string
 }
 
 func (q *Queries) UpsertTaskGitLink(ctx context.Context, arg UpsertTaskGitLinkParams) (TaskGitLink, error) {
@@ -762,6 +768,8 @@ func (q *Queries) UpsertTaskGitLink(ctx context.Context, arg UpsertTaskGitLinkPa
 		arg.Url,
 		arg.State,
 		arg.Author,
+		arg.Draft,
+		arg.Seen,
 	)
 	var i TaskGitLink
 	err := row.Scan(
@@ -777,6 +785,8 @@ func (q *Queries) UpsertTaskGitLink(ctx context.Context, arg UpsertTaskGitLinkPa
 		&i.Author,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Draft,
+		&i.Seen,
 	)
 	return i, err
 }

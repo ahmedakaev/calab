@@ -68,11 +68,27 @@ export const MAX_RULE_USERS = 10;
 export const GIT_EVENTS: ReadonlyArray<{ v: RuleGitEvent; label: MessageKey }> = [
   { v: RuleGitEvent.UNSPECIFIED, label: 'rules.git.any' },
   { v: RuleGitEvent.BRANCH_CREATED, label: 'rules.git.branch' },
+  { v: RuleGitEvent.PR_DRAFT_OPENED, label: 'rules.git.prDraft' },
   { v: RuleGitEvent.PR_OPENED, label: 'rules.git.prOpened' },
+  { v: RuleGitEvent.PR_READY, label: 'rules.git.prReady' },
+  { v: RuleGitEvent.PR_REVIEW_REQUESTED, label: 'rules.git.prReview' },
+  { v: RuleGitEvent.PR_APPROVED, label: 'rules.git.prApproved' },
   { v: RuleGitEvent.PR_MERGED, label: 'rules.git.prMerged' },
   { v: RuleGitEvent.PR_CLOSED, label: 'rules.git.prClosed' },
   { v: RuleGitEvent.COMMIT_PUSHED, label: 'rules.git.commit' },
 ];
+
+/** The target-branch filter of a Git trigger (board task #101): ≤ 10 names / globs of ≤ 200. */
+export const MAX_BRANCHES = 10;
+export const MAX_BRANCH = 200;
+
+/** Git events with a pull request, so a target branch (a push or a new branch has none). */
+export const gitHasTarget = (e: RuleGitEvent): boolean => e !== RuleGitEvent.BRANCH_CREATED && e !== RuleGitEvent.COMMIT_PUSHED;
+
+/** «main, release/*» → ["main", "release/*"]: commas or spaces separate, repeats dropped. */
+export function branchesOf(text: string): string[] {
+  return [...new Set(text.split(/[\s,]+/).filter(Boolean))];
+}
 
 export const ASSIGNEE_MODES: ReadonlyArray<{ v: RuleAssigneesMode; label: MessageKey }> = [
   { v: RuleAssigneesMode.SET, label: 'rules.mode.set' },
@@ -182,6 +198,9 @@ export function validateDraft(d: RuleDraft): RuleIssue[] {
   if (!tr.case) out.push({ at: 'trigger', key: 'rules.err.trigger' });
   else if ((tr.case === 'dueIn' || tr.case === 'overdue') && tr.value.days > 30) out.push({ at: 'trigger', key: 'rules.err.days' });
   else if (tr.case === 'stale' && (tr.value.days < 1 || tr.value.days > 90)) out.push({ at: 'trigger', key: 'rules.err.days' });
+  else if (tr.case === 'git' && (tr.value.targetBranches.length > MAX_BRANCHES || tr.value.targetBranches.some((b) => b.length > MAX_BRANCH))) {
+    out.push({ at: 'trigger', key: 'rules.err.branches' });
+  }
   if (d.actions.length < 1 || d.actions.length > MAX_ACTIONS) out.push({ at: 'actions', key: 'rules.err.actions' });
   d.actions.forEach((a, i) => {
     const key = actionIssue(a);

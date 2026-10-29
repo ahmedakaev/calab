@@ -28,10 +28,20 @@ type RuleGitEvent int32
 const (
 	RuleGitEvent_RULE_GIT_EVENT_UNSPECIFIED    RuleGitEvent = 0 // any of them
 	RuleGitEvent_RULE_GIT_EVENT_BRANCH_CREATED RuleGitEvent = 1
-	RuleGitEvent_RULE_GIT_EVENT_PR_OPENED      RuleGitEvent = 2 // opened or reopened
-	RuleGitEvent_RULE_GIT_EVENT_PR_MERGED      RuleGitEvent = 3
-	RuleGitEvent_RULE_GIT_EVENT_PR_CLOSED      RuleGitEvent = 4 // closed without merging
-	RuleGitEvent_RULE_GIT_EVENT_COMMIT_PUSHED  RuleGitEvent = 5
+	// Opened or reopened as ready for review, or a draft marked ready (a rule on PR_OPENED fires on
+	// PR_READY too); a draft opened is PR_DRAFT_OPENED (board task #101).
+	RuleGitEvent_RULE_GIT_EVENT_PR_OPENED     RuleGitEvent = 2
+	RuleGitEvent_RULE_GIT_EVENT_PR_MERGED     RuleGitEvent = 3
+	RuleGitEvent_RULE_GIT_EVENT_PR_CLOSED     RuleGitEvent = 4 // closed without merging
+	RuleGitEvent_RULE_GIT_EVENT_COMMIT_PUSHED RuleGitEvent = 5
+	// A draft opened or reopened (GitLab Draft / WIP, GitHub draft, Gitea draft or «WIP:» title).
+	RuleGitEvent_RULE_GIT_EVENT_PR_DRAFT_OPENED RuleGitEvent = 6
+	// A draft marked ready for review (GitLab draft true → false, GitHub ready_for_review).
+	RuleGitEvent_RULE_GIT_EVENT_PR_READY RuleGitEvent = 7
+	// A reviewer was added; once per reviewer and pull request until the request is removed.
+	RuleGitEvent_RULE_GIT_EVENT_PR_REVIEW_REQUESTED RuleGitEvent = 8
+	// A reviewer approved; once per approver and pull request until the approval is withdrawn.
+	RuleGitEvent_RULE_GIT_EVENT_PR_APPROVED RuleGitEvent = 9
 )
 
 // Enum value maps for RuleGitEvent.
@@ -43,14 +53,22 @@ var (
 		3: "RULE_GIT_EVENT_PR_MERGED",
 		4: "RULE_GIT_EVENT_PR_CLOSED",
 		5: "RULE_GIT_EVENT_COMMIT_PUSHED",
+		6: "RULE_GIT_EVENT_PR_DRAFT_OPENED",
+		7: "RULE_GIT_EVENT_PR_READY",
+		8: "RULE_GIT_EVENT_PR_REVIEW_REQUESTED",
+		9: "RULE_GIT_EVENT_PR_APPROVED",
 	}
 	RuleGitEvent_value = map[string]int32{
-		"RULE_GIT_EVENT_UNSPECIFIED":    0,
-		"RULE_GIT_EVENT_BRANCH_CREATED": 1,
-		"RULE_GIT_EVENT_PR_OPENED":      2,
-		"RULE_GIT_EVENT_PR_MERGED":      3,
-		"RULE_GIT_EVENT_PR_CLOSED":      4,
-		"RULE_GIT_EVENT_COMMIT_PUSHED":  5,
+		"RULE_GIT_EVENT_UNSPECIFIED":         0,
+		"RULE_GIT_EVENT_BRANCH_CREATED":      1,
+		"RULE_GIT_EVENT_PR_OPENED":           2,
+		"RULE_GIT_EVENT_PR_MERGED":           3,
+		"RULE_GIT_EVENT_PR_CLOSED":           4,
+		"RULE_GIT_EVENT_COMMIT_PUSHED":       5,
+		"RULE_GIT_EVENT_PR_DRAFT_OPENED":     6,
+		"RULE_GIT_EVENT_PR_READY":            7,
+		"RULE_GIT_EVENT_PR_REVIEW_REQUESTED": 8,
+		"RULE_GIT_EVENT_PR_APPROVED":         9,
 	}
 )
 
@@ -487,7 +505,10 @@ func (*RuleTrigger_Overdue_) isRuleTrigger_Kind() {}
 func (*RuleTrigger_Stale_) isRuleTrigger_Kind() {}
 
 // What a rule does. Templates (≤ 2000 characters) may use {key} {title} {status} {actor}
-// {assignees} {due} {url}; unknown names stay as written.
+// {assignees} {due} {url}; a Git trigger adds {pr_url} {pr_number} {pr_title} {branch}
+// {target_branch} {git_author} (empty for other triggers and for what an event lacks: a push has
+// no pull request; one line each, «@» of a mention token neutralised). Unknown names stay as
+// written.
 type RuleAction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Kind:
@@ -2105,11 +2126,16 @@ func (*RuleTrigger_CommentCreated) Descriptor() ([]byte, []int) {
 	return file_calaba_v1_automations_proto_rawDescGZIP(), []int{0, 7}
 }
 
+// target_branches: the pull request's target branch must match one of them, an exact name or
+// a glob («*» any characters, «/» included; «?» one): ["main"], ["release/*"]. Empty = any
+// branch; a non-empty list never matches a branch or commit event (they have no target).
+// At most 10 patterns of at most 200 characters, no spaces.
 type RuleTrigger_Git struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Event         RuleGitEvent           `protobuf:"varint,1,opt,name=event,proto3,enum=calaba.v1.RuleGitEvent" json:"event,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Event          RuleGitEvent           `protobuf:"varint,1,opt,name=event,proto3,enum=calaba.v1.RuleGitEvent" json:"event,omitempty"`
+	TargetBranches []string               `protobuf:"bytes,2,rep,name=target_branches,json=targetBranches,proto3" json:"target_branches,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RuleTrigger_Git) Reset() {
@@ -2147,6 +2173,13 @@ func (x *RuleTrigger_Git) GetEvent() RuleGitEvent {
 		return x.Event
 	}
 	return RuleGitEvent_RULE_GIT_EVENT_UNSPECIFIED
+}
+
+func (x *RuleTrigger_Git) GetTargetBranches() []string {
+	if x != nil {
+		return x.TargetBranches
+	}
+	return nil
 }
 
 // The task is due in at most `days` days (0 = today) and not finished. Needs DUE_DATE.
@@ -2948,7 +2981,7 @@ var File_calaba_v1_automations_proto protoreflect.FileDescriptor
 
 const file_calaba_v1_automations_proto_rawDesc = "" +
 	"\n" +
-	"\x1bcalaba/v1/automations.proto\x12\tcalaba.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16calaba/v1/boards.proto\"\x9b\f\n" +
+	"\x1bcalaba/v1/automations.proto\x12\tcalaba.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16calaba/v1/boards.proto\"\xc4\f\n" +
 	"\vRuleTrigger\x12G\n" +
 	"\ftask_created\x18\x01 \x01(\v2\".calaba.v1.RuleTrigger.TaskCreatedH\x00R\vtaskCreated\x12M\n" +
 	"\x0estatus_changed\x18\x02 \x01(\v2$.calaba.v1.RuleTrigger.StatusChangedH\x00R\rstatusChanged\x12S\n" +
@@ -2983,9 +3016,10 @@ const file_calaba_v1_automations_proto_rawDesc = "" +
 	"toPriority\x88\x01\x01B\x0e\n" +
 	"\f_to_priority\x1a\x14\n" +
 	"\x12ChecklistCompleted\x1a\x10\n" +
-	"\x0eCommentCreated\x1a4\n" +
+	"\x0eCommentCreated\x1a]\n" +
 	"\x03Git\x12-\n" +
-	"\x05event\x18\x01 \x01(\x0e2\x17.calaba.v1.RuleGitEventR\x05event\x1a\x1b\n" +
+	"\x05event\x18\x01 \x01(\x0e2\x17.calaba.v1.RuleGitEventR\x05event\x12'\n" +
+	"\x0ftarget_branches\x18\x02 \x03(\tR\x0etargetBranches\x1a\x1b\n" +
 	"\x05DueIn\x12\x12\n" +
 	"\x04days\x18\x01 \x01(\rR\x04days\x1a\x1d\n" +
 	"\aOverdue\x12\x12\n" +
@@ -3142,14 +3176,18 @@ const file_calaba_v1_automations_proto_rawDesc = "" +
 	"\x0fBoardRuleDelete\x12!\n" +
 	"\fworkspace_id\x18\x01 \x01(\tR\vworkspaceId\x12\x19\n" +
 	"\bboard_id\x18\x02 \x01(\tR\aboardId\x12\x17\n" +
-	"\arule_id\x18\x03 \x01(\tR\x06ruleId*\xcd\x01\n" +
+	"\arule_id\x18\x03 \x01(\tR\x06ruleId*\xd6\x02\n" +
 	"\fRuleGitEvent\x12\x1e\n" +
 	"\x1aRULE_GIT_EVENT_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dRULE_GIT_EVENT_BRANCH_CREATED\x10\x01\x12\x1c\n" +
 	"\x18RULE_GIT_EVENT_PR_OPENED\x10\x02\x12\x1c\n" +
 	"\x18RULE_GIT_EVENT_PR_MERGED\x10\x03\x12\x1c\n" +
 	"\x18RULE_GIT_EVENT_PR_CLOSED\x10\x04\x12 \n" +
-	"\x1cRULE_GIT_EVENT_COMMIT_PUSHED\x10\x05*\xb1\x01\n" +
+	"\x1cRULE_GIT_EVENT_COMMIT_PUSHED\x10\x05\x12\"\n" +
+	"\x1eRULE_GIT_EVENT_PR_DRAFT_OPENED\x10\x06\x12\x1b\n" +
+	"\x17RULE_GIT_EVENT_PR_READY\x10\a\x12&\n" +
+	"\"RULE_GIT_EVENT_PR_REVIEW_REQUESTED\x10\b\x12\x1e\n" +
+	"\x1aRULE_GIT_EVENT_PR_APPROVED\x10\t*\xb1\x01\n" +
 	"\x11RuleAssigneesMode\x12#\n" +
 	"\x1fRULE_ASSIGNEES_MODE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17RULE_ASSIGNEES_MODE_SET\x10\x01\x12\x1b\n" +

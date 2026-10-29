@@ -28,10 +28,20 @@ import "calaba/v1/boards.proto";
 enum RuleGitEvent {
   RULE_GIT_EVENT_UNSPECIFIED = 0; // any of them
   RULE_GIT_EVENT_BRANCH_CREATED = 1;
-  RULE_GIT_EVENT_PR_OPENED = 2; // opened or reopened
+  // Opened or reopened as ready for review, or a draft marked ready (a rule on PR_OPENED fires on
+  // PR_READY too); a draft opened is PR_DRAFT_OPENED (board task #101).
+  RULE_GIT_EVENT_PR_OPENED = 2;
   RULE_GIT_EVENT_PR_MERGED = 3;
   RULE_GIT_EVENT_PR_CLOSED = 4; // closed without merging
   RULE_GIT_EVENT_COMMIT_PUSHED = 5;
+  // A draft opened or reopened (GitLab Draft / WIP, GitHub draft, Gitea draft or «WIP:» title).
+  RULE_GIT_EVENT_PR_DRAFT_OPENED = 6;
+  // A draft marked ready for review (GitLab draft true → false, GitHub ready_for_review).
+  RULE_GIT_EVENT_PR_READY = 7;
+  // A reviewer was added; once per reviewer and pull request until the request is removed.
+  RULE_GIT_EVENT_PR_REVIEW_REQUESTED = 8;
+  // A reviewer approved; once per approver and pull request until the approval is withdrawn.
+  RULE_GIT_EVENT_PR_APPROVED = 9;
 }
 
 // When a rule runs. Change triggers come from the task journal of the change (the same
@@ -66,8 +76,13 @@ message RuleTrigger {
   // The last open item of the task's checklists was done: every item of every checklist is done.
   message ChecklistCompleted {}
   message CommentCreated {}
+  // target_branches: the pull request's target branch must match one of them, an exact name or
+  // a glob («*» any characters, «/» included; «?» one): ["main"], ["release/*"]. Empty = any
+  // branch; a non-empty list never matches a branch or commit event (they have no target).
+  // At most 10 patterns of at most 200 characters, no spaces.
   message Git {
     RuleGitEvent event = 1;
+    repeated string target_branches = 2;
   }
   // The task is due in at most `days` days (0 = today) and not finished. Needs DUE_DATE.
   message DueIn {
@@ -121,7 +136,10 @@ enum RuleRecipients {
 }
 
 // What a rule does. Templates (≤ 2000 characters) may use {key} {title} {status} {actor}
-// {assignees} {due} {url}; unknown names stay as written.
+// {assignees} {due} {url}; a Git trigger adds {pr_url} {pr_number} {pr_title} {branch}
+// {target_branch} {git_author} (empty for other triggers and for what an event lacks: a push has
+// no pull request; one line each, «@» of a mention token neutralised). Unknown names stay as
+// written.
 message RuleAction {
   // Through the same path as PATCH /tasks/{id}: the approval gate applies.
   message SetStatus {
