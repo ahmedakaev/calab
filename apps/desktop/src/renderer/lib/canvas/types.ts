@@ -11,7 +11,7 @@ export const MAX_SIZE = 1e5;
 /** Largest snapshot state of a canvas (ADR-0126 §3): the sync never posts a bigger one. */
 export const MAX_STATE = 4 * 1024 * 1024;
 
-export type ObjectKind = 'sticky' | 'text' | 'shape' | 'connector' | 'image';
+export type ObjectKind = 'sticky' | 'text' | 'shape' | 'connector' | 'image' | 'ink';
 export type ShapeKind =
   | 'rect' | 'ellipse' | 'diamond' | 'triangle' | 'rounded'
   | 'star' | 'hexagon' | 'parallelogram' | 'arrow' | 'bubble' | 'cylinder';
@@ -116,8 +116,22 @@ export interface ImageRec extends BaseRec {
   readonly stickerId?: string;
 }
 
-export type ObjectRec = StickyRec | TextRec | ShapeRec | ConnectorRec | ImageRec;
-export type BoxRec = StickyRec | TextRec | ShapeRec | ImageRec;
+/**
+ * A freehand stroke (ADR-0127 addendum 2026-10-29): pen or marker. The doc stores `points` relative to the frame's corner
+ * as drawn; a resized frame stretches them (lib/canvas/ink.ts `fitInk`). Builds before it skip the kind.
+ */
+export interface InkRec extends BaseRec {
+  readonly kind: 'ink';
+  /** Center line fitted to the frame, flat [x0, y0, …] relative to `x, y` (derived from the stored points and `w × h`). */
+  readonly points: readonly number[];
+  readonly stroke: string;
+  readonly strokeWidth: number;
+  /** A highlighter: drawn semi-transparent (`MARKER_ALPHA`). */
+  readonly marker?: boolean;
+}
+
+export type ObjectRec = StickyRec | TextRec | ShapeRec | ConnectorRec | ImageRec | InkRec;
+export type BoxRec = StickyRec | TextRec | ShapeRec | ImageRec | InkRec;
 /** Boxes that carry text (everything but a picture). */
 export type TextBoxRec = StickyRec | TextRec | ShapeRec;
 
@@ -157,6 +171,8 @@ export const DEFAULTS = {
   connectorStroke: 'stroke',
   /** Long side of a new picture (stickers are 512 px squares). */
   imageSize: 200,
+  inkStroke: 'stroke',
+  inkWidth: 4,
 } as const;
 
 /** A fill as the pickers and templates write it: `soft:<hue>` is the hue's soft tone. */
@@ -185,6 +201,7 @@ export type ObjectInit = InitExtras & (
   | { kind: 'shape'; shape?: ShapeKind; x: number; y: number; w?: number; h?: number; fill?: string; stroke?: string; strokeWidth?: number; text?: string }
   | { kind: 'connector'; from: Endpoint; to: Endpoint; arrow?: Arrow; route?: RouteKind; stroke?: string; strokeWidth?: number; label?: string }
   | { kind: 'image'; x: number; y: number; w?: number; h?: number; src: string; stickerId?: string }
+  | { kind: 'ink'; x: number; y: number; w?: number; h?: number; points: readonly number[]; stroke?: string; strokeWidth?: number; marker?: boolean }
 );
 
 /** Patch of plain (non-text) fields; applied only to the keys valid for the object's kind. */

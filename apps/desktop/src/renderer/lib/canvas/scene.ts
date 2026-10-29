@@ -5,6 +5,7 @@ import {
   rotatePoint, rotatedRectHitsRect, type Point, type Rect,
 } from './geometry';
 import { isValidKey } from './fracIndex';
+import { INK_MAX_WIDTH, INK_MIN_WIDTH, fitInk, inkDistance, inkPoints } from './ink';
 import { SpatialGrid } from './grid';
 import { RouteCache, connectorMidpoint, routeConnector } from './route';
 import { pointInShape } from './shapes';
@@ -51,7 +52,7 @@ export function visualBounds(o: ObjectRec): Rect {
     }
     return r;
   }
-  return rectInflate(aabb(o), o.kind === 'shape' ? o.strokeWidth : 1);
+  return rectInflate(aabb(o), o.kind === 'shape' ? o.strokeWidth : o.kind === 'ink' ? o.strokeWidth / 2 + 1 : 1);
 }
 
 function segHitsRect(ax: number, ay: number, bx: number, by: number, r: Rect): boolean {
@@ -267,6 +268,8 @@ export class Scene {
     }
     // A rotated box is tested in its own frame: the point is turned back about the center.
     const q = o.rot ? rotatePoint(p, rectCenter(o), -o.rot) : p;
+    // A stroke is picked by its line (its width counted in), never by the empty corners of its frame.
+    if (o.kind === 'ink') return inkDistance({ x: q.x - o.x, y: q.y - o.y }, o.points) <= o.strokeWidth / 2 + Math.max(tol, boxTol);
     if (o.kind !== 'shape') return rectContainsPoint(o, q, boxTol);
     if (!pointInShape(o.shape, rectInflate(o, tol), q)) return false;
     if (area || o.fill !== 'none' || o.text !== '') return pointInShape(o.shape, o, q) || distNearOutline(o, q, tol);
@@ -278,6 +281,15 @@ export class Scene {
   /** Objects touching the rect (marquee). */
   inRect(r: Rect): ObjectRec[] {
     return this.query(r).filter((o) => {
+      if (o.kind === 'ink' && !o.rot) {
+        // An unrotated stroke: by its line, so a frame across the empty part of a big scribble does not take it.
+        const p = o.points;
+        if (p.length < 4) return rectContainsPoint(r, { x: o.x + (p[0] ?? 0), y: o.y + (p[1] ?? 0) }, 0);
+        for (let i = 0; i + 3 < p.length; i += 2) {
+          if (segHitsRect(o.x + (p[i] ?? 0), o.y + (p[i + 1] ?? 0), o.x + (p[i + 2] ?? 0), o.y + (p[i + 3] ?? 0), r)) return true;
+        }
+        return false;
+      }
       if (!isConnector(o)) return rotatedRectHitsRect(o, o.rot ?? 0, r);
       for (let i = 0; i + 3 < o.points.length; i += 2) {
         if (segHitsRect(o.points[i] ?? 0, o.points[i + 1] ?? 0, o.points[i + 2] ?? 0, o.points[i + 3] ?? 0, r)) return true;
@@ -564,6 +576,18 @@ export class Scene {
           kind, id, z, x, y,
           w: num(m.get('w'), DEFAULTS.imageSize, DEFAULTS.minBox, MAX_SIZE), h: num(m.get('h'), DEFAULTS.imageSize, DEFAULTS.minBox, MAX_SIZE),
           src, ...(typeof sid === 'string' && sid.length <= 64 ? { stickerId: sid } : {}), ...this.extras(m, true),
+        };
+      }
+      case 'ink': {
+        // A stroke without sane points is not read (a newer build's variant, a broken write).
+        const raw = inkPoints(m.get('points'));
+        if (!raw) return null;
+        const w = num(m.get('w'), 1, 1, MAX_SIZE);
+        const h = num(m.get('h'), 1, 1, MAX_SIZE);
+        return {
+          kind, id, z, x, y, w, h, points: fitInk(raw, w, h),
+          stroke: color(m.get('stroke'), DEFAULTS.inkStroke), strokeWidth: num(m.get('strokeWidth'), DEFAULTS.inkWidth, INK_MIN_WIDTH, INK_MAX_WIDTH),
+          ...(m.get('marker') === true ? { marker: true } : {}), ...this.extras(m, true),
         };
       }
       default:

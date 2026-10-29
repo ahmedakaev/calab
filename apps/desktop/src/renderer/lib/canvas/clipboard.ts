@@ -1,4 +1,5 @@
 import { CanvasDoc, clampText, color, endpoint, isGroupId, isKind, isShapeKind, newId, num, type PlainObject } from './doc';
+import { INK_MAX_WIDTH, INK_MIN_WIDTH, inkPoints } from './ink';
 import { fmtFromDelta, type DeltaOp } from './richText';
 import type { Scene } from './scene';
 import { isFontToken } from './textLayout';
@@ -103,7 +104,7 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
     if (!id) continue;
     const { text, fmt } = richOf(o);
     const extras: InitExtras = {};
-    if (fmt && o.kind !== 'connector' && o.kind !== 'image') extras.fmt = fmt;
+    if (fmt && o.kind !== 'connector' && o.kind !== 'image' && o.kind !== 'ink') extras.fmt = fmt;
     if ((o.kind === 'sticky' || o.kind === 'shape') && isFontToken(o.fontSize)) extras.fontSize = o.fontSize;
     if ((o.kind === 'sticky' || o.kind === 'shape') && typeof o.fontPx === 'number') extras.fontPx = o.fontPx;
     if (o.kind !== 'connector' && typeof o.rot === 'number') extras.rot = o.rot;
@@ -150,6 +151,20 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
           },
         });
         break;
+      case 'ink': {
+        // A stroke without sane points is dropped (the doc would refuse it anyway).
+        const pts = inkPoints(o.points);
+        if (!pts) break;
+        out.push({
+          id,
+          init: {
+            kind: 'ink', x, y, w: num(o.w, 1, 1), h: num(o.h, 1, 1), points: pts,
+            stroke: color(o.stroke, DEFAULTS.inkStroke), strokeWidth: num(o.strokeWidth, DEFAULTS.inkWidth, INK_MIN_WIDTH, INK_MAX_WIDTH),
+            ...(o.marker === true ? { marker: true } : {}), ...extras,
+          },
+        });
+        break;
+      }
     }
   }
   return out;
