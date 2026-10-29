@@ -128,13 +128,13 @@ task_git_links     id uuidv7, task_id → tasks CASCADE, kind ('branch'|'pr'|'co
   не совпадает с событиями ветки/коммита. Шаблоны действий Git-правил: `{pr_url} {pr_number} {pr_title} {branch}
   {target_branch} {git_author}` (`git_author` — кто совершил событие); значения — одна строка ≤ 200 символов, `@` с
   U+2060 (тексты автоматизаций не разбираются на упоминания, а так и не будут). Для других триггеров — пусто.
-- **Релизы** (доска #101, этап B, 2026-10-29; миграция **00136**). `board_releases (id, board_id, environment
+- **Релизы** (доска #101, этап B, 2026-10-29; миграция **00136**, индексы сопоставления по SHA — **00137**). `board_releases (id, board_id, environment
   [a-z0-9._-] ≤ 32, sha — полный 40/64 hex, name ≤ 64, url, created_by, created_at, updated_at, tasks_count,
   UNIQUE (board_id, environment, sha))` и `task_releases (task_id, environment, release_id, created_at, PK (task_id,
   environment))` — задача входит в релиз окружения **один раз**. `POST /api/boards/{id}/releases {name, sha, commits[],
   url, environment = prod, task_keys[]}` — для CI с токеном бота; право — `EDIT_TASKS` доски (бот по тем же битам,
   ADR-0109; гость, чужое пространство, бот без бита на этой доске — 404/403), тариф `automations`, тело ≤ 1 МБ, `commits`
-  ≤ 5000 полных SHA, `task_keys` ≤ 500 ключей **этой** доски (иначе 422), 30 вызовов в минуту на доску, ≤ 500 задач за
+  ≤ 5000 полных SHA, `task_keys` ≤ 500 ключей **этой** доски (иначе 422), 30 вызовов в минуту на доску, ≤ 20 окружений на доску (21-е — 409), ≤ 500 задач за
   вызов (`truncated` — повторить). Идемпотентно: повтор (доска, окружение, sha) обновляет `name`/`url`, задач не
   добавляет. **Состав**: живые задачи доски, у которых связь-коммит есть в `commits ∪ {sha}` или влитый PR, чей merge-,
   squash- или head-коммит (`task_git_links.merge_shas` — из `merge_commit_sha` / `squash_commit_sha` / `last_commit` GitLab,
@@ -149,7 +149,7 @@ task_git_links     id uuidv7, task_id → tasks CASCADE, kind ('branch'|'pr'|'co
   группировка списка по последнему релизу задачи; `GET /api/boards/{id}/releases?environment=&limit=` (`VIEW_BOARD`).
 - **Обратная ссылка в GitLab** (там же, по желанию доски). `board_git.backlink` (по умолчанию выкл.),
   `api_token_enc` (sealbox `calaba/board-git-token/v1`, наружу никогда), `gitlab_url` (https-origin), `backlink_error`;
-  `PATCH /api/boards/{id}/git {backlink?, api_token? ("" — удалить), gitlab_url?}` — права как у Git-настройки. При
+  `PATCH /api/boards/{id}/git {backlink?, api_token? ("" — удалить), gitlab_url?}` — права как у Git-настройки; токен привязан к адресу: новый `gitlab_url` без нового токена стирает сохранённый. При
   **первой** привязке MR к задаче ведущим ключом (ветка, заголовок, «Fixes KEY»; не простое упоминание в описании) —
   одна заметка `Задача Calab: KEY — <title> <url>` на MR (`POST {gitlab_url}/api/v4/projects/:path/merge_requests/:iid/notes`,
   `PRIVATE-TOKEN`); метка `note:calab` в `seen` связи — повторная доставка ничего не пишет. Только MR под `gitlab_url`

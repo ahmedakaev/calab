@@ -233,7 +233,7 @@ A bot reads a board's rules (`GET /api/boards/{id}/rules`) and their run log (`G
 
 ## Releases from CI
 
-After a deploy, CI reports the release to the board: `POST /api/boards/{id}/releases` with the token of a bot that has `EDIT_TASKS` on the board. Body: `name` (a pipeline number or a short SHA, ≤ 64), `sha` (the full deployed SHA), `commits` (full SHAs, ≤ 5000), `url` (the pipeline), `environment` (`prod` by default; `[a-z0-9._-]`, ≤ 32), `taskKeys` (keys of this board's tasks, ≤ 500). Body ≤ 1 MB, 30 calls per minute per board.
+After a deploy, CI reports the release to the board: `POST /api/boards/{id}/releases` with the token of a bot that has `EDIT_TASKS` on the board. Body: `name` (a pipeline number or a short SHA, ≤ 64), `sha` (the full deployed SHA), `commits` (full SHAs, ≤ 5000), `url` (the pipeline), `environment` (`prod` by default; `[a-z0-9._-]`, ≤ 32), `taskKeys` (keys of this board's tasks, ≤ 500). Body ≤ 1 MB, 30 calls per minute per board, at most 20 environments per board (409 for the 21st).
 
 The release takes the board's live tasks whose commit or merged MR (its merge, squash or last commit) is in `commits` or equals `sha`, plus the `taskKeys`. Calab keeps no Git history: it learns «an ancestor of `sha`» only from the list CI sends — `git log <previous release>..<sha>`. A task enters a release of one environment once; repeating the call with the same environment and `sha` updates the name and link but adds no task twice. Response: `{release, created, addedKeys, unknownKeys, truncated}`; on `truncated` (more than 500 tasks) call again. Every task that enters gets a `release` journal entry, the `Task.releases` field, and runs the rules with the «Task shipped in a release» trigger (e.g. «shipped in prod → Deployed» with the condition «status = Ready to Deploy»; templates get `{release}`).
 
@@ -245,12 +245,17 @@ calab-release:
   variables:
     GIT_DEPTH: "0" # the range needs history
   script:
-    - API="$CALAB_URL/api/boards/$CALAB_BOARD/releases"
-    - PREV=$(curl -sf -H "Authorization: Bearer $CALAB_TOKEN" "$API?environment=prod&limit=1" | jq -r '.releases[0].sha // empty')
-    - RANGE=${PREV:+$PREV..}$CI_COMMIT_SHA
-    - git log --format=%H "$RANGE" | head -n 5000 | jq -R . | jq -s
-      '{name: env.CI_PIPELINE_IID, sha: env.CI_COMMIT_SHA, url: env.CI_PIPELINE_URL, environment: "prod", commits: .}' > release.json
-    - curl -sf -X POST -H "Authorization: Bearer $CALAB_TOKEN" -H "Content-Type: application/json" --data @release.json "$API"
+    - |
+      API="$CALAB_URL/api/boards/$CALAB_BOARD/releases"
+      AUTH="Authorization: Bearer $CALAB_TOKEN" # a masked CI variable; curl -s never prints it
+      PREV=$(curl -sf -H "$AUTH" "$API?environment=prod&limit=1" | jq -r '.releases[0].sha // empty')
+      git cat-file -e "$PREV^{commit}" 2>/dev/null || PREV="" # the previous release is not in this history
+      git log --format=%H -n 5000 "${PREV:+$PREV..}$CI_COMMIT_SHA" | jq -R . | jq -s \
+        '{name: env.CI_PIPELINE_IID, sha: env.CI_COMMIT_SHA, url: env.CI_PIPELINE_URL, environment: "prod", commits: .}' > release.json
+      for i in $(seq 10); do # more than 500 tasks: «truncated», call again
+        R=$(curl -sf -X POST -H "$AUTH" -H "Content-Type: application/json" --data @release.json "$API")
+        [ "$(echo "$R" | jq -r .truncated)" = true ] || break
+      done
 ```
 
 ## Gotchas

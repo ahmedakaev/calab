@@ -233,7 +233,7 @@ await bot.boards.setOrder(wsId, { boards: [{ boardId, categoryId: cat.id, positi
 
 ## Релизы из CI
 
-После деплоя CI сообщает доске релиз: `POST /api/boards/{id}/releases` с токеном бота, у которого на доске есть `EDIT_TASKS`. Тело: `name` (номер пайплайна или короткий SHA, ≤ 64), `sha` (полный SHA деплоя), `commits` (полные SHA, ≤ 5000), `url` (пайплайн), `environment` (`prod` по умолчанию; `[a-z0-9._-]`, ≤ 32), `taskKeys` (ключи задач этой доски, ≤ 500). Тело ≤ 1 МБ, 30 вызовов в минуту на доску.
+После деплоя CI сообщает доске релиз: `POST /api/boards/{id}/releases` с токеном бота, у которого на доске есть `EDIT_TASKS`. Тело: `name` (номер пайплайна или короткий SHA, ≤ 64), `sha` (полный SHA деплоя), `commits` (полные SHA, ≤ 5000), `url` (пайплайн), `environment` (`prod` по умолчанию; `[a-z0-9._-]`, ≤ 32), `taskKeys` (ключи задач этой доски, ≤ 500). Тело ≤ 1 МБ, 30 вызовов в минуту на доску, не больше 20 окружений на доску (21-е — 409).
 
 В релиз входят живые задачи доски, у которых коммит или влитый MR (его merge-, squash- или последний коммит) есть в `commits` или равен `sha`, и задачи из `taskKeys`. У Calab нет истории Git: «предок `sha`» он узнаёт только из списка, который передаёт CI, — `git log <прошлый релиз>..<sha>`. Задача входит в релиз одного окружения один раз; повтор вызова с тем же окружением и `sha` обновляет имя и ссылку, но задачи не дублирует. Ответ: `{release, created, addedKeys, unknownKeys, truncated}`; при `truncated` (больше 500 задач) вызовите ещё раз. Каждая вошедшая задача получает запись журнала `release`, поле `Task.releases` и запускает правила с триггером «Задача вошла в релиз» (например, «вошла в релиз prod → Deployed» с условием «статус = Ready to Deploy»; в шаблонах — `{release}`).
 
@@ -245,12 +245,17 @@ calab-release:
   variables:
     GIT_DEPTH: "0" # the range needs history
   script:
-    - API="$CALAB_URL/api/boards/$CALAB_BOARD/releases"
-    - PREV=$(curl -sf -H "Authorization: Bearer $CALAB_TOKEN" "$API?environment=prod&limit=1" | jq -r '.releases[0].sha // empty')
-    - RANGE=${PREV:+$PREV..}$CI_COMMIT_SHA
-    - git log --format=%H "$RANGE" | head -n 5000 | jq -R . | jq -s
-      '{name: env.CI_PIPELINE_IID, sha: env.CI_COMMIT_SHA, url: env.CI_PIPELINE_URL, environment: "prod", commits: .}' > release.json
-    - curl -sf -X POST -H "Authorization: Bearer $CALAB_TOKEN" -H "Content-Type: application/json" --data @release.json "$API"
+    - |
+      API="$CALAB_URL/api/boards/$CALAB_BOARD/releases"
+      AUTH="Authorization: Bearer $CALAB_TOKEN" # замаскированная переменная CI; curl -s её не печатает
+      PREV=$(curl -sf -H "$AUTH" "$API?environment=prod&limit=1" | jq -r '.releases[0].sha // empty')
+      git cat-file -e "$PREV^{commit}" 2>/dev/null || PREV="" # прошлого релиза нет в этой истории
+      git log --format=%H -n 5000 "${PREV:+$PREV..}$CI_COMMIT_SHA" | jq -R . | jq -s \
+        '{name: env.CI_PIPELINE_IID, sha: env.CI_COMMIT_SHA, url: env.CI_PIPELINE_URL, environment: "prod", commits: .}' > release.json
+      for i in $(seq 10); do # больше 500 задач: «truncated», вызвать ещё раз
+        R=$(curl -sf -X POST -H "$AUTH" -H "Content-Type: application/json" --data @release.json "$API")
+        [ "$(echo "$R" | jq -r .truncated)" = true ] || break
+      done
 ```
 
 ## Подводные камни
