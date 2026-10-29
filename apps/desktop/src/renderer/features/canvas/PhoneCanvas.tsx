@@ -15,6 +15,7 @@ import { phoneBack } from '../../services/phoneNav';
 import { useCanvas } from '../../stores/canvas';
 import { useCanvasUi } from '../../stores/canvasUi';
 import { CanvasViewLazy } from './lazy';
+import { PrivateLock } from './PrivateLock';
 
 /**
  * «Холст» on the phone (ADR-0126 §5, ADR-0095: a section behind «Ещё»; view by default): the tab
@@ -161,7 +162,10 @@ const ItemRow = memo(function ItemRow({ id, onOpen }: { id: string; onOpen: (id:
       <button type="button" onClick={() => onOpen(id)} className="tap-hit flex h-14 min-w-0 flex-1 items-center gap-3 text-left">
         <KindIcon folder={folder} />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-list leading-5 text-fg">{name || t('canvas.untitled')}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-list leading-5 text-fg">{name || t('canvas.untitled')}</span>
+            <PrivateLock id={id} />
+          </span>
           {!folder && updated ? <span className="truncate text-caption leading-4 text-muted">{t('canvasPhone.updated', { when: fmt.relative(new Date(updated)) })}</span> : null}
         </span>
         {folder ? <ChevronRight className="size-4 shrink-0 text-faint" aria-hidden /> : null}

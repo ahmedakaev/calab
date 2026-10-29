@@ -16,7 +16,8 @@ import { useCanvas } from '../../stores/canvas';
 import { useCanvasUi } from '../../stores/canvasUi';
 import { myUserId } from '../../stores/session';
 import { menuBox, menuItem } from '../shell/menu';
-import { ItemContextMenu, RenameField } from './ItemMenu';
+import { ItemContextMenu, ItemRowMenu, RenameField } from './ItemMenu';
+import { PrivateLock } from './PrivateLock';
 
 /**
  * The tree column of «Холст» (ADR-0126 §5, docs/08): the name filter and «+» (Новый холст / Новая
@@ -157,7 +158,7 @@ function ItemIcon({ folder, open }: { folder: boolean; open?: boolean }): ReactN
 const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceId: string; id: string; depth: number }): ReactNode {
   const name = useCanvas((s) => s.items[id]?.name ?? '');
   const folder = useCanvas((s) => s.items[id]?.kind === CanvasItemKind.FOLDER);
-  const hasChildren = useCanvas((s) => !!s.items[id]?.hasChildren || (s.lists[childKey(workspaceId, id)]?.length ?? 0) > 0);
+  const hasChildren =useCanvas((s) => !!s.items[id]?.hasChildren || (s.lists[childKey(workspaceId, id)]?.length ?? 0) > 0);
   const writable = useCanvas((s) => canWrite(s.items[id]?.myBits ?? 0n));
   const movable = useCanvas((s) => {
     const i = s.items[id];
@@ -187,7 +188,7 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
           ref={ref}
           {...drag.listeners}
           className={cx(
-            'group relative flex h-8 items-center gap-1 rounded-[var(--radius-row)] pr-1 text-body has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-inset has-[button:focus-visible]:ring-accent',
+            'group relative flex h-8 items-center gap-1 rounded-[var(--radius-row)] pr-1 text-body',
             active ? 'bg-active text-fg' : 'text-fg hover:bg-hover',
             drag.isDragging && 'opacity-40',
             zone === 'inside' && 'bg-hover ring-2 ring-inset ring-accent',
@@ -228,13 +229,14 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
                 else if (e.key === 'ArrowLeft' && folder && expanded) toggle();
               }}
               aria-current={active ? 'page' : undefined}
-              className="flex h-full min-w-0 flex-1 items-center gap-1 rounded-[var(--radius-row)] text-left outline-none"
+              className="flex h-full min-w-0 flex-1 items-center gap-1 rounded-[var(--radius-row)] text-left focus-visible:outline-offset-[-2px]"
               data-testid="canvas-node-open"
             >
               <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
                 <ItemIcon folder={folder} open={expanded} />
               </span>
               <span className={cx('min-w-0 flex-1 truncate', !name && 'text-muted')}>{name || t('canvas.untitled')}</span>
+              <PrivateLock id={id} />
             </button>
           )}
           {folder && writable && !renaming ? (
@@ -250,6 +252,7 @@ const TreeNode = memo(function TreeNode({ workspaceId, id, depth }: { workspaceI
               <Plus className="size-3.5" aria-hidden />
             </IconButton>
           ) : null}
+          {renaming ? null : <ItemRowMenu itemId={id} />}
         </div>
       </ItemContextMenu>
       {folder && expanded ? <ChildList workspaceId={workspaceId} parentId={id} depth={depth + 1} /> : null}
@@ -362,6 +365,7 @@ const ResultRow = memo(function ResultRow({ workspaceId, id }: { workspaceId: st
         <ItemIcon folder={folder} />
       </span>
       <span className="min-w-0 flex-1 truncate">{name || t('canvas.untitled')}</span>
+      <PrivateLock id={id} />
     </button>
   );
 });
@@ -428,7 +432,7 @@ const TrashRow = memo(function TrashRow({ workspaceId, id }: { workspaceId: stri
             if (!folder) useCanvasUi.getState().openItem(workspaceId, id);
           }}
           aria-current={active ? 'page' : undefined}
-          className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-row)] pl-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-row)] pl-2 text-left focus-visible:outline-offset-[-2px]"
         >
           <span className="grid size-5 shrink-0 place-items-center" aria-hidden>
             <ItemIcon folder={folder} />

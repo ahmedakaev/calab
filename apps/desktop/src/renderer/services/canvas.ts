@@ -241,6 +241,28 @@ function refetch(ws: string, keys: readonly string[]): void {
 }
 
 /**
+ * A READY after a reconnect: events missed while away are not replayed. The section on screen
+ * refetches its loaded lists and the open canvas (its my_bits); a hidden one drops its lists, which
+ * reload on the next open — the same rule as the events.
+ */
+export function resyncCanvasTree(): void {
+  const byWs = new Map<string, string[]>();
+  for (const key of Object.keys(useCanvas.getState().lists)) {
+    const ws = key.slice(0, key.indexOf('/'));
+    byWs.set(ws, [...(byWs.get(ws) ?? []), key]);
+  }
+  for (const [ws, keys] of byWs) {
+    if (!onScreen(ws)) {
+      useCanvas.getState().forgetLists(ws);
+      continue;
+    }
+    refetch(ws, keys);
+    const open = itemOf(useCanvasUi.getState(), ws);
+    if (open) void loadItem(ws, open);
+  }
+}
+
+/**
  * CANVAS_ITEM_UPSERT: applied at once. The gateway fills my_bits per recipient. With the section on
  * screen the touched lists are refetched (real positions of the siblings) only when the structure
  * changed (new, moved, trashed or restored) — a rename or a preview update costs no request. A
