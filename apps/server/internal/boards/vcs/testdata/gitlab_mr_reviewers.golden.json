@@ -29,7 +29,8 @@
       ],
       "Forget": [
         "review:old"
-      ]
+      ],
+      "SHAs": null
     }
   },
   "Links": [
@@ -55,7 +56,8 @@
       ],
       "Forget": [
         "review:old"
-      ]
+      ],
+      "SHAs": null
     }
   ]
 }

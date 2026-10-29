@@ -441,6 +441,7 @@ func (s *Service) templateVars(ctx context.Context, q *sqlc.Queries, t taskRow, 
 	key := TaskKey(t.BoardKey, t.Number)
 	actor := ev.actor
 	v := gitTemplateVars(ev)
+	releaseTemplateVars(ev, v)
 	v["key"], v["title"], v["due"], v["actor"], v["status"], v["assignees"], v["url"] = key, t.Title, DateString(t.DueOn), "", "", "", ""
 	if s.PublicURL != "" {
 		v["url"] = strings.TrimRight(s.PublicURL, "/") + "/t/" + key

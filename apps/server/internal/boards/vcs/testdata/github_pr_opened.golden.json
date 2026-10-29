@@ -23,7 +23,8 @@
       "Actor": "octocat",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   },
   "Links": [
@@ -43,7 +44,8 @@
       "Actor": "octocat",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     },
     {
       "Number": 13,
@@ -61,7 +63,8 @@
       "Actor": "octocat",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   ]
 }

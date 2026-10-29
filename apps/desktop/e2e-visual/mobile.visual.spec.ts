@@ -5,7 +5,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { AiState, FormerMemberReason, Plan, RecordingStatus, SipCallStatus, WorkspaceRole } from '@calaba/protocol';
 import { ts } from '../e2e-support/fixtures';
 import { CANVAS_PUBLIC_CODE, CODE_FIXTURE, IDS, MOCK_GPTUNNEL_WEB, WIKI_PUBLIC_CODE, startMockServer, type MockServer } from '../e2e-support/mock-server';
-import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
+import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, seedLabelOverflow, seedReleases, settle } from './harness';
 import { seedDay } from './calendarWeb';
 
 /**
@@ -1080,6 +1080,7 @@ test('m-my-tasks', async ({ page }) => {
 test('m-boards-list', async ({ page }) => {
   mock.setClock(NOW.getTime());
   seedAssigneeCounts(mock); // #92: CAL-1 / CAL-2 / CAL-4 with 1 / 2 / 5 assignees
+  seedReleases(mock); // board task #101: the task screen at the end (rows do not show them)
   await signedIn(page);
   // The «Доски» tab (ADR-0073, owner 06.10): the list of the open workspace, a board is pushed.
   await tab(page, 'boards');
@@ -1121,6 +1122,14 @@ test('m-boards-list', async ({ page }) => {
   await expect(page.getByTestId('task-context-menu')).toBeVisible();
   await expectMenuCard(page, 'm-task-menu', true);
   await expect(page.getByTestId('task-panel')).toHaveCount(0);
+  // Board task #101: the task screen's «Релиз» — one per environment, a tap opens the pipeline.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('task-context-menu')).toHaveCount(0);
+  await page.getByTestId('list-row').filter({ hasText: 'CAL-3' }).getByText('Эхо в звонке').tap();
+  const panel = page.getByTestId('task-panel');
+  await expect(panel.getByTestId('prop-release')).toHaveText(['stage · 1288', 'prod · 4929cf3']);
+  await panel.getByTestId('prop-release').last().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await checkpoint(page, 'm-boards-task-release');
 });
 
 // Owner 07.10: the create dialog has the start date (when the board's dates are on).
@@ -2824,4 +2833,17 @@ test('m-wiki-public', async ({ page }) => {
   await checkpoint(page, 'm-wiki-public-toc', { snapshot: false });
   await toc.getByTestId('wiki-public-outline-row').filter({ hasText: 'Процессы' }).tap();
   await expect(page.getByTestId('wiki-public-title')).toHaveText('Процессы');
+});
+
+// Toasts on the phone stay under the top bar (safe area), over the feed, never over the tab bar (owner, 29.10).
+test('m-toasts', async ({ page }) => {
+  await signedInRoom(page);
+  await expect(page.getByTestId('composer')).toBeVisible();
+  await page.evaluate(() => {
+    const push = (window as unknown as { __calabaToast?: (k: string, t: string) => void }).__calabaToast;
+    push?.('info', 'Ссылка-приглашение скопирована');
+    push?.('success', 'Файл сохранён в «Загрузки»');
+  });
+  await expect(page.getByTestId('toast')).toHaveCount(2);
+  await checkpoint(page, 'm-toasts', { main: true });
 });

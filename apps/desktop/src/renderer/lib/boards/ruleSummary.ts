@@ -90,6 +90,8 @@ export function triggerText(tr: RuleTrigger | undefined, ctx: SummaryCtx): strin
       const what = t(GIT[k.value.event] ?? 'rules.sum.git');
       return k.value.targetBranches.length ? t('rules.sum.gitTarget', { what, branches: k.value.targetBranches.join(', ') }) : what;
     }
+    case 'release':
+      return k.value.environments.length ? t('rules.sum.releaseEnv', { envs: k.value.environments.join(', ') }) : t('rules.sum.release');
     case 'dueIn':
       return k.value.days === 0 ? t('rules.sum.dueToday') : t('rules.sum.dueIn', { n: k.value.days });
     case 'overdue':

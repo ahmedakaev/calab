@@ -31,6 +31,11 @@ import {
   BoardCategoryResponseSchema,
   BoardWebhookPingResponseSchema,
   BoardWebhookResponseSchema,
+  BoardGitResponseSchema,
+  BoardGitSchema,
+  GitProvider,
+  SetBoardGitRequestSchema,
+  UpdateBoardGitRequestSchema,
   ListBoardRulesResponseSchema,
   ConvertChecklistItemResponseSchema,
   CreateBoardCategoryRequestSchema,
@@ -1458,6 +1463,8 @@ class MockImpl {
   private calCommentSeq = 0;
   /** Task boards (ADR-0042); rebuilt with the state. */
   boards: BoardsMock;
+  /** Board Git setups (ADR-0060 §4, board task #101): board id → setup. */
+  readonly boardGit = new Map<string, MessageShape<typeof BoardGitSchema>>();
   /** Disk (ADR-0094); rebuilt with the state. */
   disk: DiskMock;
   /** The office editor's mock fault (ADR-0143): '' none, 'config' (the config call fails), 'token' (the stub editor errors with a refused token), 'stuck' (never saves). */
@@ -8551,6 +8558,30 @@ class MockImpl {
     this.boardRoute('POST', '/api/boards/:id/webhook/ping', (c, me) => sendMsg(c.res, 200, BoardWebhookPingResponseSchema, b().pingWebhook(c.params[0] ?? '', me)));
     // ADR-0060: board rules — an empty list only (the rule editor is shot unsaved).
     this.boardRoute('GET', '/api/boards/:id/rules', (c) => sendMsg(c.res, 200, ListBoardRulesResponseSchema, { rules: [] }));
+    // ADR-0060 §4 + board task #101: the board's Git setup with the GitLab backlink (no secret checks).
+    this.boardRoute('GET', '/api/boards/:id/git', (c) => sendMsg(c.res, 200, BoardGitResponseSchema, { git: this.boardGit.get(c.params[0] ?? '') }));
+    this.boardRoute('PUT', '/api/boards/:id/git', (c, me) => {
+      const id = c.params[0] ?? '';
+      const r = parseBody(c, SetBoardGitRequestSchema);
+      const name = r.provider === GitProvider.GITLAB ? 'gitlab' : r.provider === GitProvider.GITEA ? 'gitea' : 'github';
+      const g = create(BoardGitSchema, { boardId: id, provider: r.provider, hasSecret: true, url: `https://app.calab.test/api/git/boards/${id}/${name}`, createdBy: me, createdAt: timestampFromMs(Date.now()) });
+      this.boardGit.set(id, g);
+      sendMsg(c.res, 200, BoardGitResponseSchema, { git: g, secret: r.secret || 'mock-secret-0123456789abcdefghijklmnopqrstu' });
+    });
+    this.boardRoute('PATCH', '/api/boards/:id/git', (c) => {
+      const g = this.boardGit.get(c.params[0] ?? '');
+      if (!g) throw new BoardError(404, ErrorCode.NOT_FOUND, 'not found');
+      const r = parseBody(c, UpdateBoardGitRequestSchema);
+      if (r.backlink !== undefined) g.backlink = r.backlink;
+      if (r.apiToken !== undefined) g.hasApiToken = r.apiToken !== '';
+      if (r.gitlabUrl !== undefined) g.gitlabUrl = r.gitlabUrl.replace(/\/+$/, '');
+      g.backlinkError = g.backlink && !g.hasApiToken ? 'no GitLab API token: the note was not posted' : '';
+      sendMsg(c.res, 200, BoardGitResponseSchema, { git: g });
+    });
+    this.boardRoute('DELETE', '/api/boards/:id/git', (c) => {
+      this.boardGit.delete(c.params[0] ?? '');
+      noContent(c.res);
+    });
     // ADR-0058 §2: checklists (TASK_CHECKLIST_* events, no TASK_UPDATE).
     this.boardRoute('POST', '/api/tasks/:id/checklists', (c, me) => {
       const r = parseBody(c, CreateTaskChecklistRequestSchema);
