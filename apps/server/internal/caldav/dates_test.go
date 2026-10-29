@@ -38,3 +38,47 @@ func TestBusyPreservesSourceDates(t *testing.T) {
 		t.Fatalf("batch date arrays lost alignment: %+v", params)
 	}
 }
+
+// Some zones start DST at midnight, so that calendar day has no 00:00: the all-day event must
+// still begin on its own date (at the end of the gap), not on the previous evening.
+func TestAllDayDatesWhereDSTSkipsMidnight(t *testing.T) {
+	from, to := utc("2026-02-01T00:00:00Z"), utc("2026-10-01T00:00:00Z")
+	type occ struct{ start, end string }
+	for _, c := range []struct {
+		name, zone, event string
+		want              []occ
+	}{
+		{"daily series from the gap day", "America/Santiago",
+			"DTSTART;VALUE=DATE:20260906\r\nRRULE:FREQ=DAILY;COUNT=3",
+			[]occ{{"2026-09-06", "2026-09-07"}, {"2026-09-07", "2026-09-08"}, {"2026-09-08", "2026-09-09"}}},
+		{"weekly series through the gap day", "America/Santiago",
+			"DTSTART;VALUE=DATE:20260830\r\nDTEND;VALUE=DATE:20260831\r\nRRULE:FREQ=WEEKLY;BYDAY=SU;COUNT=3",
+			[]occ{{"2026-08-30", "2026-08-31"}, {"2026-09-06", "2026-09-07"}, {"2026-09-13", "2026-09-14"}}},
+		{"excluded gap day", "America/Santiago",
+			"DTSTART;VALUE=DATE:20260905\r\nRRULE:FREQ=DAILY;COUNT=3\r\nEXDATE;VALUE=DATE:20260906",
+			[]occ{{"2026-09-05", "2026-09-06"}, {"2026-09-07", "2026-09-08"}}},
+		{"ends on the gap day", "America/Havana",
+			"DTSTART;VALUE=DATE:20260306\r\nDTEND;VALUE=DATE:20260308",
+			[]occ{{"2026-03-06", "2026-03-08"}}},
+		{"UTC+14", "Pacific/Kiritimati", "DTSTART;VALUE=DATE:20260906", []occ{{"2026-09-06", "2026-09-07"}}},
+		{"UTC-12", "Etc/GMT+12", "DTSTART;VALUE=DATE:20260906", []occ{{"2026-09-06", "2026-09-07"}}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			loc := mustLoc(t, c.zone)
+			got := BusyFromICS(ics("BEGIN:VEVENT\r\nUID:gap\r\n"+c.event+"\r\nEND:VEVENT\r\n"), from, to, loc)
+			if len(got) != len(c.want) {
+				t.Fatalf("got %d occurrences, want %d: %+v", len(got), len(c.want), got)
+			}
+			for i, b := range got {
+				if b.StartDate != c.want[i].start || b.EndDate != c.want[i].end {
+					t.Fatalf("occurrence %d: %s..%s, want %s..%s", i, b.StartDate, b.EndDate, c.want[i].start, c.want[i].end)
+				}
+				// The instants agree with the dates and the interval is not empty.
+				s, e := b.Start.In(loc), b.End.In(loc)
+				if s.Format(time.DateOnly) != b.StartDate || e.Format(time.DateOnly) != b.EndDate || !e.After(s) {
+					t.Fatalf("occurrence %d: instants %s..%s disagree with %s..%s", i, s, e, b.StartDate, b.EndDate)
+				}
+			}
+		})
+	}
+}
