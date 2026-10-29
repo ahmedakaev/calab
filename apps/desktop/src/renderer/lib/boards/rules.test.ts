@@ -8,6 +8,7 @@ import {
   blankAction,
   blankTrigger,
   branchesOf,
+  envsOf,
   gitHasTarget,
   emptyDraft,
   fromTemplate,
@@ -197,6 +198,15 @@ describe('Git target branches (board task #101)', () => {
     expect(branchesOf('main, release/*')).toEqual(['main', 'release/*']);
     expect(branchesOf(' main,,main  preprod ')).toEqual(['main', 'preprod']);
     expect(branchesOf('')).toEqual([]);
+  });
+
+  it('reads release environments in lower case and checks their form (board task #101)', () => {
+    expect(envsOf(' Prod, stage prod ')).toEqual(['prod', 'stage']);
+    const d = { ...emptyDraft(), name: 'deploy', trigger: blankTrigger('release') };
+    expect(d.trigger.kind.case === 'release' && d.trigger.kind.value.environments).toEqual(['prod']);
+    expect(validateDraft({ ...d, actions: [blankAction('archive')] })).toEqual([]);
+    const bad = create(RuleTriggerSchema, { kind: { case: 'release', value: { environments: ['pr od'] } } });
+    expect(validateDraft({ ...d, trigger: bad, actions: [blankAction('archive')] }).map((i) => i.key)).toEqual(['rules.err.environments']);
   });
 
   it('only pull request events have a target', () => {
