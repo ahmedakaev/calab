@@ -731,14 +731,14 @@ test('m-home', async ({ page }) => {
   await expect(strip).toBeVisible();
   await page.evaluate(() => {
     const w = window as unknown as { __calabaVoiceRecovery?: (what: string) => void };
-    w.__calabaVoiceRecovery?.('busy');
+    w.__calabaVoiceRecovery?.('recovering');
     w.__calabaVoiceRecovery?.('playback');
   });
   // The mic state is the strip's line only; the refused sound is the one toast, with its action.
   await expect(page.getByTestId('toast')).toHaveCount(1);
-  await expect(page.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await expect(page.getByTestId('toast').filter({ hasText: 'Вы не слышите собеседников' })).toBeVisible();
   await expect(page.getByTestId('toast').getByRole('button', { name: 'Включить звук' })).toBeVisible();
-  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Микрофон занят');
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Вас не слышно'); // yellow: being restored
   // Two lines at this width: the room name gives way instead of a cramped third line.
   await expect(strip.getByTestId('mobile-voice-label')).toHaveCount(0);
   await checkpoint(page, 'm-voice-recovery');

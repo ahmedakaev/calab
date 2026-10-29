@@ -169,7 +169,7 @@ interface GuardedRoom {
 declare global {
   interface Window {
     /** Visual tests only (CALABA_VISUAL_TEST): the «tap to turn the sound on» prompt / my mic trouble, without a real interruption. */
-    __calabaVoiceRecovery?: (what: 'playback' | 'busy' | 'unheard') => void;
+    __calabaVoiceRecovery?: (what: 'playback' | 'recovering' | 'unheard') => void;
   }
 }
 
@@ -1763,7 +1763,7 @@ class VoiceEngine {
         this.afterLinkBack('reconnected');
       })
       // Autoplay refused the remote audio (no gesture yet: a reload, the iOS shell, a page back
-      // from the background): «Нажмите, чтобы включить звук» until a tap runs room.startAudio().
+      // from the background): «Вы не слышите собеседников» until a tap runs room.startAudio().
       .on(RoomEvent.AudioPlaybackStatusChanged, () => this.onPlaybackStatus(room))
       .on(RoomEvent.TrackSubscriptionFailed, (sid) => {
         log.info(`voice: subscription to ${sid} failed`);
@@ -2544,7 +2544,8 @@ class VoiceEngine {
    * Device or RNNoise changed / device lost / the capture broken: rebuild capture, swap
    * the published track in place. 'skipped': nothing to restart, or left / replaced meanwhile.
    */
-  private restartMic(): Promise<'ok' | 'failed' | 'skipped'> {
+  /** `quiet`: the automatic mic check, whose failure the panel header reports («Вас не слышно»), not the error line. */
+  private restartMic(quiet = false): Promise<'ok' | 'failed' | 'skipped'> {
     return this.queueMic(async () => {
       const old = this.mic;
       if (!old) return 'skipped';
@@ -2581,8 +2582,10 @@ class VoiceEngine {
       } catch (err) {
         if (next && this.mic !== next) next.stop();
         log.warn('[mic] capture restart failed', err);
-        const h = humanMediaError(err, 'mic');
-        setVoice({ micError: h.text, micErrorAction: h.action });
+        if (!quiet) {
+          const h = humanMediaError(err, 'mic');
+          setVoice({ micError: h.text, micErrorAction: h.action });
+        }
         return 'failed';
       }
     });
@@ -3409,8 +3412,8 @@ class VoiceEngine {
   private micMutedAt: number | null = null;
   private micResumes = 0;
   private micRestarts = 0;
-  /** «Микрофон занят другим приложением» / «Вас не слышно…» shown (micError and a toast). */
-  private micTrouble: 'busy' | 'unheard' | null = null;
+  /** «Ждём микрофон» / «Вас не слышно» in the voice panel header and the phone strip status. */
+  private micTrouble: 'recovering' | 'unheard' | null = null;
   /** WebKit queues a hidden page's getUserMedia: the capture is never restarted there while hidden. */
   private readonly captureNeedsVisible = captureWaitsForVisible(platform.kind === 'web', typeof navigator === 'undefined' ? '' : navigator.userAgent);
 
@@ -3573,7 +3576,7 @@ class VoiceEngine {
     if (!document.hidden) this.offerPlayback(); // hidden: offered when the page is back (replayAudio)
   }
 
-  /** «Нажмите, чтобы включить звук» — a plain toast, raised once while it is on screen, never held back by another toast. */
+  /** «Вы не слышите собеседников» — a plain toast, raised once while it is on screen, never held back by another toast. */
   private playbackToast: number | null = null;
 
   private offerPlayback(): void {
@@ -3673,8 +3676,8 @@ class VoiceEngine {
 
   /**
    * The capture works (lib/voiceRecovery.micFix): the context runs, the raw track is live and not
-   * muted, the worklet reports. Muted by another app → «Микрофон занят другим приложением», not a
-   * reconnect; still muted after ~2 s visible, or ended → one rebuild; that failing → «Вас не слышно».
+   * muted, the worklet reports. Muted by the system (lock, another app, an interruption) → «Ждём
+   * микрофон», not a reconnect; still muted after ~2 s visible, or ended → one rebuild; that failing → «Вас не слышно».
    * Never a new capture while a WebKit page is hidden (it would queue until visible).
    */
   private checkMic(why: string): void {
@@ -3694,8 +3697,8 @@ class VoiceEngine {
         return;
       case 'wait':
         return;
-      case 'busy':
-        this.setMicTrouble('busy');
+      case 'muted':
+        this.setMicTrouble('recovering');
         this.scheduleMicCheck('still muted', fix.recheckMs);
         return;
       case 'resume':
@@ -3710,7 +3713,7 @@ class VoiceEngine {
       case 'restart':
         this.micRestarts++;
         log.info(`voice: restarting the mic capture (${fix.reason}, ${why})`);
-        void this.restartMic().then((r) => {
+        void this.restartMic(true).then((r) => {
           if (r === 'failed') this.setMicTrouble('unheard');
           else if (r === 'ok') {
             this.micMutedAt = null;
@@ -3758,21 +3761,16 @@ class VoiceEngine {
     this.applyTransmit();
   }
 
-  /** «Микрофон занят другим приложением» / «Вас не слышно: микрофон занят системой» (micError and the strip status), or neither. */
-  private setMicTrouble(kind: 'busy' | 'unheard' | null): void {
+  /**
+   * «Ждём микрофон» / «Вас не слышно» in place of «Голос подключён» (the panel header and the
+   * phone strip status), or neither. The cause is not known (the browser only says «muted»): it goes
+   * to the log, not on screen. Never micError: that line is for device and permission errors.
+   */
+  private setMicTrouble(kind: 'recovering' | 'unheard' | null): void {
     if (kind === this.micTrouble) return;
-    const textOf = (k: 'busy' | 'unheard'): string => t(k === 'busy' ? 'voice.micBusy' : 'voice.micUnheard');
-    const was = this.micTrouble;
     this.micTrouble = kind;
     setVoice({ micTrouble: kind });
-    if (!kind) {
-      // Only our own text: a device / permission error written meanwhile stays.
-      if (was && useVoice.getState().micError === textOf(was)) setVoice({ micError: null, micErrorAction: null });
-      return;
-    }
-    const text = textOf(kind);
-    log.info(`voice: mic trouble shown: ${kind}`);
-    setVoice({ micError: text, micErrorAction: null }); // the line in the panel / the phone strip is enough, no toast
+    if (kind) log.info(`voice: mic trouble shown: ${kind}`);
   }
 
   // ------------------------------------------------------------ stats / quality

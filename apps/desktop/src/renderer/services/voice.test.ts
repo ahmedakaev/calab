@@ -2947,7 +2947,7 @@ describe('the page away and back', () => {
     expect(joinVoice.mock.calls).toEqual([['A']]);
   });
 
-  it('autoplay refused: «Нажмите, чтобы включить звук»; the tap runs room.startAudio()', async () => {
+  it('autoplay refused: «Вы не слышите собеседников»; the tap runs room.startAudio()', async () => {
     await voice.join('A', 'ws');
     const a = FakeRoom.all[0];
     if (!a) throw new Error('no room');
@@ -2955,7 +2955,7 @@ describe('the page away and back', () => {
     a.emit('AudioPlaybackStatusChanged', false);
     expect(pushToast).toHaveBeenCalledTimes(1);
     const [kind, text, action] = pushToast.mock.calls[0] as [string, string, { label: string; run: () => void }];
-    expect([kind, text, action.label]).toEqual(['info', 'Нажмите, чтобы включить звук', 'Включить звук']);
+    expect([kind, text, action.label]).toEqual(['info', 'Вы не слышите собеседников', 'Включить звук']);
     action.run();
     expect(a.startAudio).toHaveBeenCalledTimes(1);
   });
@@ -2985,7 +2985,7 @@ describe('the page away and back', () => {
     a.canPlaybackAudio = false;
     a.emit('AudioPlaybackStatusChanged', false);
     expect(pushToast).toHaveBeenCalledTimes(1);
-    expect(pushToast.mock.calls[0]?.[1]).toBe('Нажмите, чтобы включить звук');
+    expect(pushToast.mock.calls[0]?.[1]).toBe('Вы не слышите собеседников');
   });
 
   it('a subscribed mic without a track is resubscribed (at most twice), never a rejoin', async () => {
@@ -3005,36 +3005,36 @@ describe('the page away and back', () => {
     expect(joinVoice).not.toHaveBeenCalled();
   });
 
-  it('another app holds the mic: the line «Микрофон занят…», one rebuild after ~2 s visible, «Вас не слышно…» when it fails; no toast', async () => {
+  it('the system holds the mic: «Ждём микрофон», one rebuild after ~2 s visible, «Вас не слышно» when it fails; no toast, no micError', async () => {
     await voice.join('A', 'ws');
     const p = pipelines[0];
     if (!p) throw new Error('no pipeline');
     p.muted = true;
     p.onMute?.(true);
     await vi.advanceTimersByTimeAsync(1_500);
-    expect(useVoice.getState()).toMatchObject({ micError: 'Микрофон занят другим приложением', phase: 'connected' });
+    expect(useVoice.getState()).toMatchObject({ micTrouble: 'recovering', micError: null, phase: 'connected' });
     micStarts.failNext = Object.assign(new Error('could not start audio source'), { name: 'NotReadableError' });
     await vi.advanceTimersByTimeAsync(600);
     expect(micStarts.n).toBe(2);
-    expect(useVoice.getState().micError).toBe('Вас не слышно: микрофон занят системой');
-    expect(useVoice.getState().micTrouble).toBe('unheard'); // the strip's status
+    expect(useVoice.getState().micTrouble).toBe('unheard'); // the header / strip status
+    expect(useVoice.getState().micError).toBeNull(); // that line is for device and permission errors
     expect(pushToast).not.toHaveBeenCalled(); // the line is enough
     await vi.advanceTimersByTimeAsync(30_000);
     expect(micStarts.n).toBe(2); // one rebuild per episode
   });
 
-  it('the app lets the mic go: the busy state clears, the context resumes, no rebuild', async () => {
+  it('the system lets the mic go: the trouble clears, the context resumes, no rebuild', async () => {
     await voice.join('A', 'ws');
     const p = pipelines[0];
     if (!p) throw new Error('no pipeline');
     p.muted = true;
     p.onMute?.(true);
     await vi.advanceTimersByTimeAsync(1_500);
-    expect(useVoice.getState().micError).toBe('Микрофон занят другим приложением');
+    expect(useVoice.getState().micTrouble).toBe('recovering');
     p.muted = false;
     p.onMute?.(false);
     await vi.advanceTimersByTimeAsync(1_500);
-    expect(useVoice.getState().micError).toBeNull();
+    expect(useVoice.getState().micTrouble).toBeNull();
     expect(p.resumeContext).toHaveBeenCalled();
     expect(micStarts.n).toBe(1);
   });

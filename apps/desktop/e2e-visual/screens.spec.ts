@@ -1515,19 +1515,21 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
   await win.evaluate(([roomId, workspaceId]) => (window as unknown as { __calabaVoiceSeat?: (s: object) => void }).__calabaVoiceSeat?.({ roomId, workspaceId }), [IDS.rooms.meeting, IDS.workspaces.main]);
   await expect(win.getByText('Голос подключён')).toBeVisible();
   await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // no focus ring / tooltip of the mic button
-  // The mic held by another app: a red line in the panel, no toast. The refused sound is the one toast.
+  // The system holds the mic: the panel header says so in place of «Голос подключён», no line under
+  // the buttons, no toast. The refused sound is the one toast.
   await win.evaluate(() => {
     const w = window as unknown as { __calabaVoiceRecovery?: (what: string) => void };
-    w.__calabaVoiceRecovery?.('busy');
+    w.__calabaVoiceRecovery?.('recovering');
     w.__calabaVoiceRecovery?.('playback');
   });
-  await expect(win.getByText('Микрофон занят другим приложением')).toHaveCount(1); // the panel line only
+  await expect(win.getByTestId('voice-phase')).toHaveText('Ждём микрофон');
+  await expect(win.getByRole('region', { name: 'Голосовое подключение' }).getByRole('alert')).toHaveCount(0); // no red line under the buttons
   await expect(win.getByTestId('toast')).toHaveCount(1);
-  await expect(win.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await expect(win.getByTestId('toast').filter({ hasText: 'Вы не слышите собеседников' })).toBeVisible();
   await expect(win.getByTestId('toast').getByRole('button', { name: 'Включить звук' })).toBeVisible();
   await checkpoint(shot, 'voice-audio-recovery-seat');
   await win.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
-  await expect(win.getByText('Вас не слышно: микрофон занят системой')).toHaveCount(1);
+  await expect(win.getByTestId('voice-phase')).toHaveText('Вас не слышно');
   await expect(win.getByTestId('toast')).toHaveCount(1); // still only the sound prompt
   await checkpoint(shot, 'voice-audio-recovery-unheard');
 });
@@ -3329,16 +3331,16 @@ test('voice-reconnecting', async ({ open, win, mock, shot }) => {
   await win.evaluate(() => (window as unknown as { __calabaVoicePhase?: (p: string) => void }).__calabaVoicePhase?.('reconnecting'));
   await expect(win.getByTestId('voice-reconnecting')).toBeVisible();
   await checkpoint(shot, 'voice-reconnecting');
-  // Back from the background: another app holds my mic (the red line in the voice panel
-  // and a toast), and the remote audio waits for a tap («Нажмите, чтобы включить звук»).
+  // Back from the background: the mic is being restored (the panel header) and the remote audio
+  // waits for a tap («Вы не слышите собеседников»).
   await win.evaluate(() => {
     const w = window as unknown as { __calabaVoicePhase?: (p: string) => void; __calabaVoiceRecovery?: (what: string) => void };
     w.__calabaVoicePhase?.('connected');
-    w.__calabaVoiceRecovery?.('busy');
+    w.__calabaVoiceRecovery?.('recovering');
     w.__calabaVoiceRecovery?.('playback');
   });
-  await expect(win.getByText('Микрофон занят другим приложением').first()).toBeVisible();
-  await expect(win.getByTestId('toast').filter({ hasText: 'Нажмите, чтобы включить звук' })).toBeVisible();
+  await expect(win.getByTestId('voice-phase')).toHaveText('Ждём микрофон');
+  await expect(win.getByTestId('toast').filter({ hasText: 'Вы не слышите собеседников' })).toBeVisible();
   await checkpoint(shot, 'voice-audio-recovery');
 });
 

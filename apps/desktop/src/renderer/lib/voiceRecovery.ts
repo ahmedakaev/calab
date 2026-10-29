@@ -17,7 +17,7 @@ export const VISIBLE_RESUME_MS = 15_000;
 export const LONG_HIDE_MS = 20_000;
 /** After a long hide LiveKit may still say Connected (the dead link not noticed yet): looked at once more after this. */
 export const VISIBLE_SETTLE_MS = 2_000;
-/** «Нажмите, чтобы включить звук» stays this long (offered again by the next event while still refused). */
+/** «Вы не слышите собеседников» stays this long (offered again by the next event while still refused). */
 export const PLAYBACK_PROMPT_MS = 2 * 60_000;
 /** A subscribed mic gets its <audio> within this; checked after it. */
 export const AUDIO_SETTLE_MS = 3_000;
@@ -155,10 +155,10 @@ export type MicFix =
   | { kind: 'wait' }
   /** Resume the AudioContext and look again. */
   | { kind: 'resume' }
-  /** «Микрофон занят другим приложением»; looked at again after `recheckMs`. */
-  | { kind: 'busy'; recheckMs: number }
+  /** Muted by the system: «Ждём микрофон»; looked at again after `recheckMs`. */
+  | { kind: 'muted'; recheckMs: number }
   | { kind: 'restart'; reason: 'ended' | 'closed' | 'muted' | 'suspended' | 'silent' }
-  /** The rebuild did not help: «Вас не слышно: микрофон занят системой». */
+  /** The rebuild did not help: «Вас не слышно». */
   | { kind: 'give-up' };
 
 export function micFix(v: MicView): MicFix {
@@ -169,7 +169,7 @@ export function micFix(v: MicView): MicFix {
   const restart = (reason: Extract<MicFix, { kind: 'restart' }>['reason']): MicFix => (v.restarts < MIC_RESTARTS ? { kind: 'restart', reason } : { kind: 'give-up' });
   if (v.ended) return restart('ended');
   if (v.ctx === 'closed') return restart('closed');
-  if (v.muted) return v.mutedMs >= MIC_MUTED_RESTART_MS ? restart('muted') : { kind: 'busy', recheckMs: MIC_MUTED_RESTART_MS - v.mutedMs };
+  if (v.muted) return v.mutedMs >= MIC_MUTED_RESTART_MS ? restart('muted') : { kind: 'muted', recheckMs: MIC_MUTED_RESTART_MS - v.mutedMs };
   if (v.resumes < MIC_RESUME_TRIES) return { kind: 'resume' };
   return restart(running ? 'silent' : 'suspended');
 }

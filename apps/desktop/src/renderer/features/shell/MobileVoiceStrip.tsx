@@ -81,9 +81,11 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
   if (!roomId) return null;
   const connected = phase === 'connected';
   // While the PTT button is held the status line says so (the button itself is a 40 px circle).
-  // A mic problem (#255) takes the status line; it is two lines at this width, so the room name gives way.
+  // A mic problem (#255) takes the status line, two lines at this width (the room name gives way):
+  // «Вас не слышно», yellow while the mic is being restored, red once that failed. The panel's
+  // «Ждём микрофон» does not fit this slot on a 375 px phone.
   const troubleShown = connected && !dialing && !!micTrouble && !(ptt && onAir);
-  const phaseText = dialing && (connected || phase === 'connecting') ? t('telc.call.dialing') : connected && ptt && onAir ? t('mobile.pttOn') : troubleShown ? t(micTrouble === 'busy' ? 'voice.micBusyShort' : 'voice.micUnheardShort') : connected ? t('voice.connected') : phase === 'reconnecting' ? t('voice.reconnecting') : phase === 'blocked' ? t('voice.blocked') : t('voice.connecting');
+  const phaseText = dialing && (connected || phase === 'connecting') ? t('telc.call.dialing') : connected && ptt && onAir ? t('mobile.pttOn') : troubleShown ? t('voice.micUnheard') : connected ? t('voice.connected') : phase === 'reconnecting' ? t('voice.reconnecting') : phase === 'blocked' ? t('voice.blocked') : t('voice.connecting');
   return (
     <div className={cx('shrink-0 px-4 pt-1 [.kb-open_&]:hidden', aboveTabs ? 'pb-2' : 'pb-[calc(var(--safe-bottom,0px)+8px)]')} data-testid="mobile-voice-strip">
       {/* Push-to-talk: a big hold button above the island, in the flow — the feed and the composer above it shrink by its height. */}
@@ -132,7 +134,7 @@ export function MobileVoiceStrip({ aboveTabs = false }: { aboveTabs?: boolean })
                 (line-clamp keeps the strip 56 px). A single word wider than the slot (≈ 75–90 px between the
                 avatar and five buttons: «Подключение…») is hyphenated by the document language
                 («Подклю-чение…»), not broken at an arbitrary letter. */}
-            <span className={cx('line-clamp-2 min-w-0 break-words text-[12px] font-semibold leading-[15px] [hyphens:auto]', troubleShown ? 'text-danger-text' : connected && !dialing ? 'text-ok' : 'text-warn')} data-testid="mobile-voice-status">
+            <span className={cx('line-clamp-2 min-w-0 break-words text-[12px] font-semibold leading-[15px] [hyphens:auto]', troubleShown && micTrouble === 'unheard' ? 'text-danger-text' : connected && !dialing && !troubleShown ? 'text-ok' : 'text-warn')} data-testid="mobile-voice-status">
               {phaseText}
             </span>
             {/* Recording (docs/09 #30): the red dot only — the strip has no room for the timer; a tap

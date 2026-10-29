@@ -140,7 +140,7 @@ export interface VoiceStore {
   micError: string | null;
   micErrorAction: MediaErrorAction | null;
   /** DEV-4955: the mic is held by another app / the system (services/voice setMicTrouble); the phone strip says so. */
-  micTrouble: 'busy' | 'unheard' | null;
+  micTrouble: 'recovering' | 'unheard' | null;
   /** A moderator muted my mic (not me): shown as a red crossed mic, distinct from self-mute. */
   serverMuted: boolean;
   /**

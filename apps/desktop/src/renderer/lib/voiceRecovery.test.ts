@@ -111,8 +111,8 @@ describe('micFix', () => {
     expect(micFix(mic({ canCapture: false, ctx: 'suspended' }))).toEqual({ kind: 'wait' });
   });
 
-  it('muted by the system: busy first, a restart after MIC_MUTED_RESTART_MS', () => {
-    expect(micFix(mic({ muted: true, mutedMs: 500 }))).toEqual({ kind: 'busy', recheckMs: MIC_MUTED_RESTART_MS - 500 });
+  it('muted by the system: wait first, a restart after MIC_MUTED_RESTART_MS', () => {
+    expect(micFix(mic({ muted: true, mutedMs: 500 }))).toEqual({ kind: 'muted', recheckMs: MIC_MUTED_RESTART_MS - 500 });
     expect(micFix(mic({ muted: true, mutedMs: MIC_MUTED_RESTART_MS }))).toEqual({ kind: 'restart', reason: 'muted' });
   });
 
