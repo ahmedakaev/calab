@@ -373,10 +373,10 @@ Deployment `calab-prod` с digest обоих образов в payload: API и �
   сразу через `sync.sh`/`deploy.sh` (host network, `caddy-l4`), но до прода — **только когда оператор сам переносит
   изменение** в `calab-web-config` (вручную, не автоматикой этого репо); до тех пор образ и прод расходятся.
   `Caddyfile.behind-proxy`/`sites.caddy` остаются эталоном для такого переноса и проверяются `images.yml`, но не
-  являются источником правды для прода. Хосты и адреса — env кластера:
+  являются источником правды для прода. Хосты и адреса в этом репозитории — env стенда:
   `DOMAIN`/`APP_HOST`/`LANDING_HOST`/`DOMAIN_ALT`/`DOMAIN_LEGACY`/`DOMAIN_ALIASES`/`*_HOST_ALIASES`/`RELEASES_HOST`/
-  `S3_PUBLIC_URL` — но это тоже относится к env кластерного ConfigMap/`entrypoint.sh`, которые владелец репозитория
-  не контролирует напрямую. Для universal links / App Links (DEV-4947, ниже) репозиторные
+  `S3_PUBLIC_URL`; содержимое кластерного `calab-web-config` не проверено — владеет оператор, и совпадение имён/
+  логики с этим репозиторием не предполагается. Для universal links / App Links (DEV-4947, ниже) репозиторные
   `APP_LINKS_IOS`/`APP_LINKS_ANDROID` действуют на стенде (через `infra/docker/caddy/entrypoint.sh`) и как эталон
   для образа; на проде оператор 2026-10-28 добавил `/.well-known/apple-app-site-association` и `assetlinks.json`
   в `calab-web-config` вручную, не через эти переменные.
@@ -391,17 +391,25 @@ Deployment `calab-prod` с digest обоих образов в payload: API и �
 `APP_LINKS_IOS`/`APP_LINKS_ANDROID` на `APP_HOST` (`infra/docker/.env.example`): пусто = оба пути
 404, без них https-ссылки `/t/…`, `/join/…`, `/r/…` не открывают установленное приложение напрямую.
 Team ID и bundle id — developer.apple.com → Membership и App ID приложения; package name и
-SHA-256-отпечаток(и) сертификата подписи — Play Console → Настройки → Целостность приложения, либо
-`keytool -list -v` на upload keystore. Это работает на compose-стенде (переменные читает
-`infra/docker/caddy/entrypoint.sh`) и служит эталоном для образа веба. **На проде эти переменные
-ничего не делают** — там раздаёт не этот `entrypoint.sh`, а кластерный ConfigMap `calab-web-config`
-(см. «Прод: Kubernetes» выше); оператор добавил туда оба `.well-known`-маршрута вручную 2026-10-28,
-без участия `APP_LINKS_IOS`/`APP_LINKS_ANDROID`. Runbook сборки/публикации мобильного приложения —
-[docs/mobile/release.md](mobile/release.md). Проверка после любого изменения (стенд или прод):
-`curl -sI https://app.calab.io/.well-known/apple-app-site-association` — `200` и
-`Content-Type: application/json`; Apple CDN забирает свою копию —
-`https://app-site-association.cdn-apple.com/a/v1/app.calab.io`; Google —
-`https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://app.calab.io&relation=delegate_permission/common.handle_all_urls`.
+SHA-256-отпечаток(и) — Play Console → Настройки → Целостность приложения → **App signing key**
+(с Play App Signing раздачу подписывает ключ Play, не upload-ключ разработчика: `keytool` на
+upload keystore даёт другой, неверный для `assetlinks.json` отпечаток). Это работает на
+compose-стенде (переменные читает `infra/docker/caddy/entrypoint.sh`) и служит эталоном для образа
+веба. **На проде эти переменные ничего не делают** — там раздаёт не этот `entrypoint.sh`, а
+кластерный ConfigMap `calab-web-config` (см. «Прод: Kubernetes» выше); оператор добавил туда оба
+`.well-known`-маршрута вручную 2026-10-28, без участия `APP_LINKS_IOS`/`APP_LINKS_ANDROID`. Runbook
+сборки/публикации мобильного приложения — [docs/mobile/release.md](mobile/release.md). Проверка
+после любого изменения (стенд или прод) — GET, не HEAD: `200`/`Content-Type` не доказывают, что
+тело содержит нужный appID/package, CDN и Google могут отдать `200` с пустым или устаревшим
+телом:
+```
+curl -s https://app.calab.io/.well-known/apple-app-site-association | grep -c '3KGZ3829US.dev.calab.mobile'
+curl -s https://app.calab.io/.well-known/assetlinks.json | grep -c 'dev.calab.mobile'
+curl -s https://app-site-association.cdn-apple.com/a/v1/app.calab.io | grep -c '3KGZ3829US.dev.calab.mobile'
+curl -s 'https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://app.calab.io&relation=delegate_permission/common.handle_all_urls' | grep -c 'dev.calab.mobile'
+```
+Каждая команда — `1` и более (не `0`); для `assetlinks.json` и Google-ответа дополнительно
+проверить SHA-256-отпечаток app signing key (см. выше) тем же `grep -c`.
 Редирект через ops-консоль для бот-ссылок остаётся включённым, пока universal links не подтверждены
 этими проверками на проде.
 
