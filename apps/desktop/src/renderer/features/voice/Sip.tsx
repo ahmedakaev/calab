@@ -1,13 +1,15 @@
 import * as Popover from '../../components/radix/popover';
 import { SipCallStatus } from '@calaba/protocol';
-import { Phone, PhoneOff } from 'lucide-react';
-import { memo, useEffect, useId, useState, type ReactNode } from 'react';
+import { Grid3x3, Phone, PhoneOff } from 'lucide-react';
+import { memo, useCallback, useEffect, useId, useState, type ReactNode } from 'react';
 import { Button, IconButton, Input, Tip, cx } from '../../components/ui';
 import { t } from '../../i18n';
 import { can, roomPerms } from '../../lib/permissions';
 import { planHas } from '../../lib/plan';
-import { formatPhone, isLiveStatus, maskEdit, mayDial, mayHangUp, reasonKey, statusKey, type LiveSipCall } from '../../lib/sip';
+import { extensionLabel, formatPhone, isLiveStatus, maskEdit, mayDial, mayHangUp, mayKeypad, reasonKey, statusKey, type LiveSipCall } from '../../lib/sip';
 import { hangUpSipCall, placeSipCall } from '../../services/sip';
+import { sendRoomDtmf } from '../../services/sipRoomDtmf';
+import { DtmfPad } from '../call/DtmfKeypad';
 import { useRooms } from '../../stores/rooms';
 import { useSession } from '../../stores/session';
 import { useSipCalls } from '../../stores/sipCalls';
@@ -184,10 +186,14 @@ function SipCallLine({ workspaceId, call }: { workspaceId: string; call: LiveSip
   const me = useSession((s) => s.me?.user?.id ?? '');
   const roles = useMemberRoles(workspaceId, me);
   const room = useRooms((s) => s.byId[call.roomId]);
+  const inCall = useVoice((s) => s.roomId === call.roomId && s.phase === 'connected');
   const live = isLiveStatus(call.status);
-  const canHang = live && mayHangUp({ me, startedBy: call.startedBy, muteMembers: can(roomPerms(roles, me, room), 'MUTE_MEMBERS'), live });
-  const number = formatPhone(call.number);
   const active = call.status === SipCallStatus.ACTIVE;
+  const muteMembers = live && can(roomPerms(roles, me, room), 'MUTE_MEMBERS');
+  const canHang = live && mayHangUp({ me, startedBy: call.startedBy, muteMembers, live });
+  const canKeys = mayKeypad({ me, startedBy: call.startedBy, muteMembers, active, inCall });
+  const number = formatPhone(call.number);
+  const ext = call.extension ? t('sip.row.ext', { ext: extensionLabel(call.extension) }) : '';
   return (
     <li
       className={cx('flex h-10 items-center gap-2 rounded-[var(--radius-row)] pl-8 pr-1.5 transition-colors duration-[var(--motion-fast)] hover:bg-hover', !live && 'opacity-70')}
@@ -199,11 +205,18 @@ function SipCallLine({ workspaceId, call }: { workspaceId: string; call: LiveSip
         <Phone className="size-3.5" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate text-body tabular-nums text-fg" title={number}>
+        <span className="truncate text-body tabular-nums text-fg" title={ext ? `${number} ${ext}` : number}>
           {number}
+          {ext ? (
+            <span className="text-muted" data-testid="sip-ext">
+              {' '}
+              {ext}
+            </span>
+          ) : null}
         </span>
         <SipStatusLine call={call} />
       </span>
+      {canKeys ? <SipKeypadButton roomId={call.roomId} callId={call.id} title={t('sip.keypad.for', { number: ext ? `${number} ${ext}` : number })} /> : null}
       {canHang ? (
         <IconButton
           label={t('sip.row.hangup')}
@@ -217,6 +230,38 @@ function SipCallLine({ workspaceId, call }: { workspaceId: string; call: LiveSip
         </IconButton>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * «Клавиатура» of an answered line (ADR-0046 addendum «Тональный набор»): the shared tone pad
+ * (call/DtmfKeypad DtmfPad) in a popover beside the row — on a phone the popover is a bottom
+ * sheet (`mat-popover`). The pad mounts only while open; its keys go to this one line.
+ */
+function SipKeypadButton({ roomId, callId, title }: { roomId: string; callId: string; title: string }): ReactNode {
+  const [open, setOpen] = useState(false);
+  const send = useCallback((k: string) => sendRoomDtmf(roomId, k, callId), [roomId, callId]);
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <IconButton label={t('sip.row.keypad')} size="sm" active={open} className="mobile:tap-size" data-testid="sip-keypad">
+          <Grid3x3 className="size-4" />
+        </IconButton>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side="right"
+          align="start"
+          sideOffset={8}
+          collisionPadding={16}
+          aria-label={title}
+          className="mat-popover anim-in z-[var(--z-popover)] rounded-[var(--radius-panel)] p-4"
+          data-testid="sip-keypad-popover"
+        >
+          <DtmfPad send={send} title={title} />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
