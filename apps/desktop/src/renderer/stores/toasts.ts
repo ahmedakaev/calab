@@ -7,12 +7,14 @@ import { pushToast, type Toast, type ToastAction } from './toastQueue';
 export type { Toast, ToastAction } from './toastQueue';
 
 /**
- * Toasts (docs/09 #16): opaque popovers, bottom-right, stacked, auto-hide after TOAST_MS. The timer lives
+ * Toasts (docs/09 #16): opaque popovers, top right, newest on top, auto-hide after TOAST_MS. The timer lives
  * in the view (features/shell/Toasts.tsx), which pauses it while the stack is hovered or
  * focused and while the window is hidden. An error that offers an action («Повторить») stays
  * until closed: it asks the user to decide, so it must not vanish before they read it.
  */
 export const TOAST_MS = 6000;
+/** The exit transition of a closed toast (styles.css `.toast-card[data-leaving]`). */
+export const TOAST_EXIT_MS = 120;
 
 interface ToastState {
   items: Toast[];

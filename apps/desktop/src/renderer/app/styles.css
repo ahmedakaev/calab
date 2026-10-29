@@ -945,6 +945,40 @@ body:has(.mat-sheet) [data-radix-popper-content-wrapper]:not(:has(> .tip)) {
     transform: none;
   }
 }
+/* Toast cards (top right, newest on top): enter and exit are one short opacity + translate run, only
+   while a card appears or leaves; reduced motion: none (Toasts.tsx also drops the exit wait). */
+@keyframes calaba-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast-card {
+  animation: calaba-toast-in var(--motion-fast) ease-out;
+}
+.toast-card[data-leaving] {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity var(--motion-fast) ease-in,
+    transform var(--motion-fast) ease-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-card {
+    animation: none;
+  }
+}
+/* The inbox popover (380 px, top right) opens over the toast column: the stack steps left of it. */
+@media (min-width: 769px) {
+  body:has([data-inbox-popover]) [data-toast-stack] {
+    right: calc(380px + 24px);
+    max-width: calc(100vw - var(--rail-width) - 380px - 56px);
+  }
+}
 .anim-in {
   /* Popovers, menus, tooltips, modals, toasts: 120 ms fade + scale 0.98 → 1 (docs/09 #22). */
   animation: calaba-fade-in var(--motion-fast) ease-out;
