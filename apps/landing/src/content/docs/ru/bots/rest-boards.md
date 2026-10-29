@@ -11,6 +11,7 @@ order: 7
 | видеть доску и её задачи | `VIEW_BOARD` |
 | создавать задачи; править свои и те, где бот исполнитель | `CREATE_TASKS` |
 | править, перемещать и архивировать любые задачи | `EDIT_TASKS` |
+| отметить релиз из CI (`POST …/releases`) | `EDIT_TASKS` |
 | статусы, метки, вехи, настройки, функции доски, архив доски | `MANAGE_BOARD` |
 | создать доску, категории досок | `CREATE_BOARDS` |
 | журнал доски | `MANAGE_BOARD`, `EDIT_TASKS` или `VIEW_JOURNALS` |
@@ -87,6 +88,9 @@ order: 7
 | `GET` | `/api/boards/{id}/git` | Git-связь доски, без секрета (`MANAGE_BOARD` + `MANAGE_INTEGRATIONS`) |
 | `PUT` | `/api/boards/{id}/git` | Подключить репозиторий `{provider, secret?}` → секрет один раз |
 | `DELETE` | `/api/boards/{id}/git` | Отключить репозиторий |
+| `PATCH` | `/api/boards/{id}/git` | Обратная ссылка в GitLab `{backlink?, apiToken?, gitlabUrl?}` (токен не возвращается) |
+| `POST` | `/api/boards/{id}/releases` | Релиз из CI `{name, sha, commits[], url, environment, taskKeys?}` (`EDIT_TASKS`), см. [Релизы из CI](#релизы-из-ci) |
+| `GET` | `/api/boards/{id}/releases` | Релизы доски, новые первыми (`?environment=prod&limit=`) |
 | `GET` | `/api/boards/{id}/webhook` | Вебхук доски (`MANAGE_BOARD`), см. [Вебхуки](./webhooks) |
 | `PUT` | `/api/boards/{id}/webhook` | Создать или заменить вебхук доски (+ `MANAGE_INTEGRATIONS`) |
 | `DELETE` | `/api/boards/{id}/webhook` | Удалить вебхук доски |
@@ -226,6 +230,28 @@ await bot.boards.setOrder(wsId, { boards: [{ boardId, categoryId: cat.id, positi
 ## Автоматизации
 
 Бот читает правила доски (`GET /api/boards/{id}/rules`) и журнал их запусков (`GET /api/rules/{id}/runs`), а с `MANAGE_BOARD` — создаёт, меняет, проверяет сухим прогоном и удаляет их, как человек. Правило действует от имени доски, а не автора: удалите правило, если бот больше не должен его вести. Изменения задач, которые делает бот, запускают правила доски так же, как изменения людей. Изменения, сделанные правилами, попадают в журнал с пустым `actorId` и заполненным `ruleId`.
+
+## Релизы из CI
+
+После деплоя CI сообщает доске релиз: `POST /api/boards/{id}/releases` с токеном бота, у которого на доске есть `EDIT_TASKS`. Тело: `name` (номер пайплайна или короткий SHA, ≤ 64), `sha` (полный SHA деплоя), `commits` (полные SHA, ≤ 5000), `url` (пайплайн), `environment` (`prod` по умолчанию; `[a-z0-9._-]`, ≤ 32), `taskKeys` (ключи задач этой доски, ≤ 500). Тело ≤ 1 МБ, 30 вызовов в минуту на доску.
+
+В релиз входят живые задачи доски, у которых коммит или влитый MR (его merge-, squash- или последний коммит) есть в `commits` или равен `sha`, и задачи из `taskKeys`. У Calab нет истории Git: «предок `sha`» он узнаёт только из списка, который передаёт CI, — `git log <прошлый релиз>..<sha>`. Задача входит в релиз одного окружения один раз; повтор вызова с тем же окружением и `sha` обновляет имя и ссылку, но задачи не дублирует. Ответ: `{release, created, addedKeys, unknownKeys, truncated}`; при `truncated` (больше 500 задач) вызовите ещё раз. Каждая вошедшая задача получает запись журнала `release`, поле `Task.releases` и запускает правила с триггером «Задача вошла в релиз» (например, «вошла в релиз prod → Deployed» с условием «статус = Ready to Deploy»; в шаблонах — `{release}`).
+
+```yaml
+# .gitlab-ci.yml — after the production deploy job (where `linear-release sync` used to be)
+calab-release:
+  stage: deploy
+  needs: [deploy-vk-prod-all]
+  variables:
+    GIT_DEPTH: "0" # the range needs history
+  script:
+    - API="$CALAB_URL/api/boards/$CALAB_BOARD/releases"
+    - PREV=$(curl -sf -H "Authorization: Bearer $CALAB_TOKEN" "$API?environment=prod&limit=1" | jq -r '.releases[0].sha // empty')
+    - RANGE=${PREV:+$PREV..}$CI_COMMIT_SHA
+    - git log --format=%H "$RANGE" | head -n 5000 | jq -R . | jq -s
+      '{name: env.CI_PIPELINE_IID, sha: env.CI_COMMIT_SHA, url: env.CI_PIPELINE_URL, environment: "prod", commits: .}' > release.json
+    - curl -sf -X POST -H "Authorization: Bearer $CALAB_TOKEN" -H "Content-Type: application/json" --data @release.json "$API"
+```
 
 ## Подводные камни
 

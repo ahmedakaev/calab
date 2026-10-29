@@ -2385,3 +2385,11 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - PG18 + Valkey: `go test -tags integration -count=1 -run TestBoardGit ./internal/app` — draft → «draft» rule only; ready → «MR открыт» rule; a repeated ready / approval with another body fires nothing; merge into `preprod` with filter `main` does not move the task.
 - Manually (GitLab): rules «Draft MR открыт → In Progress», «MR открыт → In Review», «MR влит» with «Целевая ветка» `main`; open a Draft MR `feature/dev-N-…`, mark it ready, approve twice, merge into `preprod`, then into `main`. Expected: In Progress → In Review → (no move) → Ready to Deploy; one journal line per approver.
 - Comment rule `Открыт MR !{pr_number}: {pr_title} {pr_url}` → the card shows the MR number, title and link; `@everyone` in the MR title notifies nobody.
+
+## Releases and the GitLab backlink (ADR-0060 §4, #101 stage B)
+- PG18 + Valkey: `go test -tags integration -count=1 -run 'TestBoardReleases|TestBoardGitBacklink' ./internal/app`.
+- Manually: a bot with `EDIT_TASKS` on DEV; rule «Задача вошла в релиз» `prod`, condition «Статус = Ready to Deploy», action → Deployed, comment `{release}`.
+- Merge an MR `feature/dev-N-…` into `main`; run the CI step of the bot docs «Релизы из CI» (`git log <prev>..<sha>`). Expected: DEV-N → Deployed, panel «Релиз: prod · <pipeline>» opens the pipeline, journal «задача вошла в релиз».
+- Repeat the same call: `created: false`, no new journal entry; `environment: stage` adds the tasks to stage without the prod rule.
+- List view → «Группировка: Релиз»; filter «Релиз» = the release / «Без релиза».
+- Git (GitLab) → «Ссылка на задачу в GitLab»: on, address + token with `api`; open an MR `feature/dev-M-…` → one note «Задача Calab: DEV-M — …»; redeliver → no second note; a bare mention in an MR description → none; a bad token → status names the `api` scope.
