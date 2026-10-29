@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 import { rotateHandlePoint } from '../../../lib/canvas/geometry';
-import { IconButton, MOD, cx } from '../../../components/ui';
+import { Button, IconButton, MOD, cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
 import type { ArrangeOp } from '../../../lib/canvas/arrange';
 import { FontSizeField } from './FontSizeField';
@@ -446,8 +446,7 @@ export const PropsPanel = memo(function PropsPanel({
       className={cx(PANEL, 'absolute left-0 top-0 z-10 flex w-max items-center gap-1')}
       style={{ visibility: 'hidden' }}
     >
-      {m.locked ? <Lock className="mx-1 size-4 shrink-0 text-muted" strokeWidth={1.75} role="img" aria-label={t('canvasBoard.props.locked')} data-testid="canvas-prop-locked-badge" /> : null}
-      {!m.locked && m.hasSticky ? (
+      {m.hasSticky && !m.locked ? (
         <SwatchMenu label={t('canvasBoard.props.color')} kind="sticky" tokens={STICKY_COLORS} value={m.stickyColor} palette={palette} onPick={(c) => patch({ color: c }, ['sticky'])} focusCanvas={focusCanvas} testId="canvas-prop-sticky-color" />
       ) : null}
       {!m.locked && m.hasText ? (
@@ -506,18 +505,26 @@ export const PropsPanel = memo(function PropsPanel({
           <Ungroup className={ICON} strokeWidth={1.75} aria-hidden />
         </IconButton>
       ) : null}
-      <IconButton
-        label={t(m.locked ? 'canvasBoard.props.unlock' : 'canvasBoard.props.lock')}
-        shortcut={`⇧${MOD}L`}
-        size="sm"
-        active={m.locked}
-        className={cx(m.locked && 'bg-active text-fg')}
-        onMouseDown={keepFocus}
-        onClick={run(() => engine.toggleLock())}
-        data-testid="canvas-prop-lock"
-      >
-        {m.locked ? <Lock className={ICON} strokeWidth={1.75} aria-hidden /> : <LockOpen className={ICON} strokeWidth={1.75} aria-hidden />}
-      </IconButton>
+      {/* Locked: one labelled button says both the state and the way out (an icon toggle next to a «locked» badge read as two locks). */}
+      {m.locked ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-fg"
+          title={`${t('canvasBoard.props.locked')} · ⇧${MOD}L`}
+          aria-pressed
+          onMouseDown={keepFocus}
+          onClick={run(() => engine.toggleLock())}
+          data-testid="canvas-prop-lock"
+        >
+          <Lock className="size-3.5" strokeWidth={1.75} aria-hidden />
+          {t('canvasBoard.props.unlock')}
+        </Button>
+      ) : (
+        <IconButton label={t('canvasBoard.props.lock')} shortcut={`⇧${MOD}L`} size="sm" onMouseDown={keepFocus} onClick={run(() => engine.toggleLock())} data-testid="canvas-prop-lock">
+          <LockOpen className={ICON} strokeWidth={1.75} aria-hidden />
+        </IconButton>
+      )}
       <div className={DIVIDER} aria-hidden />
       <IconButton label={t('canvasBoard.props.front')} shortcut={`⇧${MOD}]`} size="sm" onMouseDown={keepFocus} onClick={run(() => engine.reorder(1, true))} data-testid="canvas-prop-front">
         <BringToFront className={ICON} strokeWidth={1.75} aria-hidden />

@@ -800,13 +800,12 @@ describe('transform controls (ADR-0127)', () => {
     expect(m.q('canvas-prop-group')).toBeNull();
     expect(m.q('canvas-prop-align')).toBeNull(); // one group = one thing to align
     act(() => m.q('canvas-prop-lock')?.click());
-    expect(m.q('canvas-prop-locked-badge')).not.toBeNull();
     expect(m.q('canvas-prop-sticky-color')).toBeNull();
     expect(m.q('canvas-prop-delete')).toBeNull(); // a lock protects from deletion too
     expect(m.q('canvas-prop-duplicate')).not.toBeNull();
     expect(m.q('canvas-prop-lock')?.getAttribute('aria-pressed')).toBe('true');
     act(() => m.q('canvas-prop-lock')?.click());
-    expect(m.q('canvas-prop-locked-badge')).toBeNull();
+    expect(m.q('canvas-prop-lock')?.getAttribute('aria-pressed')).not.toBe('true');
     expect(m.q('canvas-prop-delete')).not.toBeNull();
     expect(m.q('canvas-prop-sticky-color')).not.toBeNull();
     act(() => m.q('canvas-prop-ungroup')?.click());

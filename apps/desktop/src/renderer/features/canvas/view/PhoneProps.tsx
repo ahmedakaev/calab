@@ -85,7 +85,6 @@ export const PhoneProps = memo(function PhoneProps({ engine, palette, focusCanva
         ) : (
           <span className="shrink-0 px-2 text-control text-muted" data-testid="canvas-phone-multi-hint">{t('canvasPhone.multiHint')}</span>
         )}
-        {m?.locked ? <Lock className="mx-1 size-4 shrink-0 text-muted" strokeWidth={1.75} role="img" aria-label={t('canvasBoard.props.locked')} /> : null}
         {free && m.count === 1 && (m.hasSticky || m.hasText || m.hasShape) ? (
           <PhoneBtn label={t('canvasPhone.editText')} onClick={() => void engine.startTextEdit()} testId="canvas-prop-edit-text">
             <Pencil className={ICON} strokeWidth={1.75} aria-hidden />
