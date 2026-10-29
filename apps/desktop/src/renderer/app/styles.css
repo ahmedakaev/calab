@@ -515,6 +515,11 @@ body {
     transform var(--motion-island) ease-out,
     visibility 0s;
 }
+/* While the folded island is open, frames (the office editor) let the pointer through to the page,
+   so leaving the island onto them is seen (BottomIsland). */
+:root[data-island-open] iframe {
+  pointer-events: none;
+}
 .island-face[data-open] {
   opacity: 0;
   transition: opacity 0s linear var(--motion-island);

@@ -93,6 +93,12 @@ export class IslandHover {
     this.set(!this.open);
   }
 
+  /** Something in the island needs an answer (a prompt): open now; the caller also holds it. */
+  show(): void {
+    this.cancel();
+    this.set(true);
+  }
+
   /** Esc inside the island: closes unless a menu takes the key (it closes first). */
   escape(): boolean {
     if (!this.open || this.held) return false;

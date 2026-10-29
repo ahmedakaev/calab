@@ -100,9 +100,17 @@ export function BottomIsland({ column, mode }: { column: IslandColumn; mode: 'fu
   );
 }
 
-/** A menu / popover of the island is open: its trigger says so (Radix: aria-expanded, data-state). */
-function menuOpenIn(panel: HTMLElement | null): boolean {
-  return !!panel?.querySelector('[aria-expanded="true"], [data-state="open"]');
+/**
+ * A prompt that needs an answer: a direct child of the island with role=status («Начать запись
+ * встречи?», MeetingRecordPrompt). VoiceBar and SelfPanel are a region and a plain row.
+ */
+function promptIn(panel: HTMLElement | null): boolean {
+  return !!panel?.querySelector(':scope > [role="status"]');
+}
+
+/** The island must stay open: a menu / popover of it is open (its trigger: aria-expanded, data-state) or a prompt waits. */
+function holdIn(panel: HTMLElement | null): boolean {
+  return promptIn(panel) || !!panel?.querySelector('[aria-expanded="true"], [data-state="open"]');
 }
 
 /**
@@ -121,6 +129,24 @@ function FoldedIsland({ panelRef, width, content }: { panelRef: RefObject<HTMLDi
   // Leaving the folded form (another section, the setting off, unmount): closed, no timer left.
   useEffect(() => () => h.reset(), [h]);
 
+  // A prompt that needs an answer appears in the island (the meeting recording question): open it
+  // and hold it until answered. Watches only the island's own child list (a prompt / the call bar
+  // coming or going), no subtree: nothing fires on speaking, levels or timers.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const check = (): void => {
+      if (promptIn(panel)) {
+        h.setHeld(true);
+        h.show();
+      } else h.setHeld(holdIn(panel));
+    };
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(panel, { childList: true });
+    return () => mo.disconnect();
+  }, [h, panelRef]);
+
   const inIsland = useCallback(
     (n: EventTarget | null): boolean => n instanceof Node && (!!panelRef.current?.contains(n) || !!toggleRef.current?.contains(n)),
     [panelRef],
@@ -133,20 +159,26 @@ function FoldedIsland({ panelRef, width, content }: { panelRef: RefObject<HTMLDi
       return;
     }
     const panel = panelRef.current;
-    h.setHeld(menuOpenIn(panel));
+    h.setHeld(holdIn(panel));
     // A menu of the island opening / closing (attribute changes inside the open island only).
-    const mo = new MutationObserver(() => h.setHeld(menuOpenIn(panel)));
+    const mo = new MutationObserver(() => h.setHeld(holdIn(panel)));
     if (panel) mo.observe(panel, { subtree: true, attributes: true, attributeFilter: ['aria-expanded', 'data-state'] });
     // A press outside (touch has no hover): the island and its own menus do not count.
     const down = (e: globalThis.PointerEvent): void => {
       if (inIsland(e.target)) return;
-      h.setHeld(menuOpenIn(panel));
+      h.setHeld(holdIn(panel));
       h.pressOutside();
     };
     document.addEventListener('pointerdown', down, true);
+    // A frame (the office editor) swallows the pointer: the page would never see it leave the
+    // island. While open, frames do not take the pointer (styles.css), so the leave is seen; the
+    // first move closes the island and they are live again.
+    const root = document.documentElement;
+    root.setAttribute('data-island-open', '');
     return () => {
       mo.disconnect();
       document.removeEventListener('pointerdown', down, true);
+      root.removeAttribute('data-island-open');
     };
   }, [open, h, panelRef, inIsland]);
 
@@ -160,7 +192,7 @@ function FoldedIsland({ panelRef, width, content }: { panelRef: RefObject<HTMLDi
   const onLeave = useCallback(
     (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return;
-      h.setHeld(menuOpenIn(panelRef.current));
+      h.setHeld(holdIn(panelRef.current));
       h.pointerLeave();
     },
     [h, panelRef],
@@ -168,7 +200,7 @@ function FoldedIsland({ panelRef, width, content }: { panelRef: RefObject<HTMLDi
   const onBlur = useCallback(
     (e: FocusEvent) => {
       if (inIsland(e.relatedTarget)) return;
-      h.setHeld(menuOpenIn(panelRef.current));
+      h.setHeld(holdIn(panelRef.current));
       h.focusLeft();
     },
     [h, panelRef, inIsland],
@@ -176,7 +208,7 @@ function FoldedIsland({ panelRef, width, content }: { panelRef: RefObject<HTMLDi
   const onKey = useCallback(
     (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      h.setHeld(menuOpenIn(panelRef.current));
+      h.setHeld(holdIn(panelRef.current));
       if (h.escape()) {
         e.preventDefault();
         toggleRef.current?.focus({ preventScroll: true });

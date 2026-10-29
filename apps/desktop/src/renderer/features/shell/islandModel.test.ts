@@ -131,6 +131,19 @@ describe('IslandHover', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('a prompt opens it and holds it until answered', () => {
+    h.show();
+    h.setHeld(true);
+    expect(h.open).toBe(true);
+    h.pressOutside();
+    expect(h.escape()).toBe(false);
+    vi.advanceTimersByTime(5000);
+    expect(h.open).toBe(true);
+    h.setHeld(false);
+    vi.advanceTimersByTime(CLOSE_GRACE_MS);
+    expect(h.open).toBe(false);
+  });
+
   it('a tap outside closes it (touch: no hover events)', () => {
     h.toggle();
     h.pressOutside();
