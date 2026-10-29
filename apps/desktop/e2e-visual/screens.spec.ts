@@ -7,7 +7,7 @@ import { FREE_PLAN_LIMITS, defaultSettings, mockPdf, ts } from '../e2e-support/f
 import { CODE_FIXTURE, IDS, MOCK_GPTUNNEL_CODE, MOCK_GPTUNNEL_WEB, PASSWORD, RECORDING_FIXTURE, slowWebpAnimation, type MockServer } from '../e2e-support/mock-server';
 import { encodePng } from '../e2e-support/png';
 import { expect, test } from './app';
-import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, settle } from './harness';
+import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
 import { DAY, seedDay } from './calendarWeb';
 import { startPublisher } from './publisher';
 
@@ -168,6 +168,8 @@ const KEY = new Set([
   'calendar-filter',
   'calendar-findtime',
   'settings-calendar',
+  // Extra time zones of the hour axis (board #85).
+  'calendar-zones',
   // External calendar event details (ADR-0045).
   'calendar-external',
   'settings-caldav',
@@ -184,6 +186,7 @@ const KEY = new Set([
   'boards-task-comments-days',
   'boards-task-history',
   'boards-list',
+  'boards-labels-overflow',
   'boards-filter',
   'boards-settings',
   // Status colour and icon pickers (ADR-0093).
@@ -3034,6 +3037,24 @@ test('chat-lightbox', async ({ open, win, mock, shot }) => {
   }
   await win.keyboard.press('Escape');
   await expect(box).toHaveCount(0);
+
+  // Owner 28.10: a PNG stored with a wrong type and no thumbnail is a picture too (the original is
+  // drawn in a box of the picture's size), next to a normal PNG (above) and a plain file (a chip).
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.grigory, content: '', attachments: [IDS.files.pdf] });
+  mock.injectMessage({ roomId: IDS.rooms.general, authorId: IDS.users.vera, content: '', attachments: [IDS.files.untypedPng] });
+  const untyped = win.getByRole('button', { name: 'Открыть изображение «image.png»' });
+  await expect.poll(() => untyped.locator('img').evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth === 960)).toBe(true);
+  await expect(win.getByRole('button', { name: /^Скачать load-test-report\.pdf/ }).last()).toBeVisible();
+  await feedAtBottom(win);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'chat-image-untyped');
+  await untyped.click();
+  await expect(frame).toHaveAttribute('data-state', 'loaded');
+  await expect(box.getByRole('heading', { name: 'image.png' })).toBeVisible();
+  await expect(box.getByRole('button', { name: 'Скачать' })).toBeVisible();
+  await checkpoint(shot, 'chat-lightbox-untyped');
+  await win.keyboard.press('Escape');
+  await expect(box).toHaveCount(0);
 });
 
 // Code blocks (docs/09 #45, docs/08 «Код в сообщениях»): Вера's 420-line log collapsed at 400
@@ -4043,6 +4064,58 @@ test('settings-calendar', async ({ open, win, mock, shot }) => {
   await checkpoint(shot, 'settings-calendar');
 });
 
+/**
+ * Board #85 (Yandex Calendar's «ещё один часовой пояс»): Калькутта (UTC+5:30) as a muted hour
+ * column left of the main scale in the day and the week, its label over the offset, the axis «now»
+ * line; then Settings → Календарь adds New York by search (the picker shows offset and time now)
+ * and labels it; the week and the day with both (New York on the previous day until 08:00 MSK).
+ */
+test('calendar-zones', async ({ open, win, mock, shot }) => {
+  await open();
+  // Me is read at start: the zone is set after the mock's reset, then the window reloads.
+  mock.setCalendarZones(IDS.users.anna, [{ zone: 'Asia/Kolkata' }]);
+  await win.reload();
+  await expect(win.locator('aside').first()).toBeVisible({ timeout: 30_000 });
+  await mainWindow(win, mock);
+  await calendarDay(win, mock);
+  await win.locator(`[data-cal-day="${DAY}"]`).click();
+  const day = win.getByTestId('day-view');
+  await expect(day.getByTestId('zone-scale')).toHaveCount(1);
+  await expect(day.getByTestId('zone-head')).toHaveText(/Kolkata\s*UTC\+5:30/);
+  await expect(day.getByTestId('zone-now')).toBeVisible();
+  await checkpoint(shot, 'calendar-day-zone1');
+  await win.getByTestId('cal-view').getByRole('radio', { name: /Неделя|Week/ }).click();
+  const week = win.getByTestId('week-view');
+  await expect(week.getByTestId('zone-scale')).toHaveCount(1);
+  await expect(week.getByTestId('zone-now')).toBeVisible();
+  await checkpoint(shot, 'calendar-week-zone1');
+
+  await openSettingsTab(win, openAppSettings(win), appTab('calendar'));
+  await win.getByTestId('cal-zone-add').click();
+  await win.getByPlaceholder('Город или пояс').fill('New York');
+  await expect(win.getByTestId('cal-zone-list').getByRole('option').first()).toContainText('UTC−5');
+  await checkpoint(shot, 'settings-calendar-zones-picker');
+  await win.getByPlaceholder('Город или пояс').press('Enter');
+  const labels = win.getByTestId('cal-zone-label');
+  await expect(labels).toHaveCount(2);
+  await labels.nth(1).fill('Нью-Йорк');
+  await labels.nth(1).press('Enter');
+  await expect(win.getByRole('dialog').getByText('Нью-Йорк', { exact: true })).toBeVisible();
+  await expect(win.getByTestId('cal-zone-add')).toHaveCount(0);
+  await checkpoint(shot, 'settings-calendar-zones');
+  await win.keyboard.press('Escape');
+  await expect(win.getByRole('dialog')).toHaveCount(0);
+
+  await expect(week.getByTestId('zone-scale')).toHaveCount(2);
+  await week.getByTestId('week-scroller').evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(week.getByTestId('zone-newday').first()).toBeVisible();
+  await checkpoint(shot, 'calendar-week-zones');
+  await win.getByTestId('cal-view').getByRole('radio', { name: /День|Day/ }).click();
+  await expect(day.getByTestId('zone-scale')).toHaveCount(2);
+  await day.getByTestId('day-scroller').evaluate((el) => el.scrollTo({ top: 6 * 48 }));
+  await checkpoint(shot, 'calendar-day-zones');
+});
+
 /** ADR-0045 §3: a click on my external event — its attendees (Борис by avatar and name, the rest by address), «Открыть», «Создать встречу в Calab». */
 test('calendar-external', async ({ open, win, mock, shot }) => {
   await open();
@@ -4413,6 +4486,58 @@ test('boards-list', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('archive-empty')).toBeVisible();
   await win.getByTestId('archive-back').click();
   await expect(rows.filter({ hasText: 'CAL-2' })).toHaveCount(1);
+});
+
+/**
+ * Labels past the card width collapse into «+N» (docs/08 «Лейблы»): one row (CAL-1), two rows
+ * (CAL-2), the group on CAL-4; the hover list; the same in the list view and the task panel.
+ */
+test('boards-labels-overflow', async ({ open, win, mock, shot }) => {
+  await open();
+  seedLabelOverflow(mock);
+  await mainWindow(win, mock);
+  await boardsMode(win, mock);
+  const card = (key: string): Locator => win.getByTestId('task-card').filter({ hasText: key });
+  await expect(card('CAL-4').getByTestId('labels-more')).toBeVisible();
+  await expect(card('CAL-1').getByTestId('labels-more')).toHaveCount(0);
+  await expect(card('CAL-2').getByTestId('labels-more')).toHaveCount(0);
+  await checkpoint(shot, 'boards-labels-card');
+  await card('CAL-4').getByTestId('labels-more').scrollIntoViewIfNeeded();
+  await checkpoint(shot, 'boards-labels-card-group');
+  // Hover opens the hidden labels and leaving closes them; Enter on the focused pill opens them, Esc closes.
+  const more = card('CAL-4').getByTestId('labels-more');
+  const list = win.getByTestId('labels-more-list');
+  await more.hover();
+  await expect(list).toBeVisible();
+  await win.mouse.move(0, 0);
+  await expect(list).toHaveCount(0);
+  await more.focus();
+  await win.keyboard.press('Enter');
+  await expect(list).toBeVisible();
+  await expect(list.getByTestId('label-pill')).toHaveCount(6);
+  await checkpoint(shot, 'boards-labels-more', { axe: false });
+  await win.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await expect(win.getByTestId('kanban')).toBeVisible(); // the board's own Esc did not fire
+
+  // The task panel: the labels row with the «+» after them; the group opens the same list.
+  await card('CAL-4').getByTestId('card-title').click();
+  const panel = win.getByTestId('task-panel');
+  await expect(panel.getByTestId('prop-labels')).toBeVisible();
+  await expect(panel.getByTestId('labels-more')).toBeVisible();
+  await checkpoint(shot, 'boards-labels-task');
+  await panel.getByTestId('labels-more').click();
+  await expect(list).toBeVisible();
+  await checkpoint(shot, 'boards-labels-task-more', { axe: false });
+  await win.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await win.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+
+  // The list view: one row of labels, the rest in «+N».
+  await win.getByTestId('view-list').click();
+  await expect(win.getByTestId('list-row').filter({ hasText: 'CAL-4' }).getByTestId('labels-more')).toBeVisible();
+  await checkpoint(shot, 'boards-labels-list', { axe: false });
 });
 
 /** «Фильтр» open over a filtered board: a label condition, the field list. */

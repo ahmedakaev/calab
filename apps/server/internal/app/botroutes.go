@@ -74,6 +74,8 @@ var botRouteGroups = []botRouteGroup{
 		"GET /api/public/disk/{code}",
 		"GET /api/public/disk/{code}/content",
 		"GET /api/public/disk/{code}/thumbnail",
+		"GET /api/office/file/{token}",
+		"POST /api/office/callback/{token}",
 		"GET /api/public/wiki/{code}",
 		"GET /api/public/wiki/{code}/state",
 		"GET /api/public/wiki/{code}/files/{fileId}",
@@ -89,6 +91,9 @@ var botRouteGroups = []botRouteGroup{
 	}},
 	{access: botPublic, why: "the SIP registration agent (ADR-0121): its own bearer token (SIPREG_AGENT_TOKEN), never a user's or a bot's", routes: []string{
 		"GET /api/internal/sipreg-agent",
+	}},
+	{access: botPublic, why: "calendar widgets (ADR-0145): the handler accepts only a purpose-bound widget grant for a live human session, never a user's access token or a bot token", routes: []string{
+		"GET /api/calendar-widget",
 	}},
 	{access: botPublic, why: "signed deliveries of LiveKit, the payment providers and the repository hosting; public offers and the checkout return page", routes: []string{
 		"POST /api/rtc/webhook",
@@ -325,6 +330,7 @@ var botRouteGroups = []botRouteGroup{
 		"GET /api/workspaces/{id}/disk/items",
 		"POST /api/workspaces/{id}/disk/folders",
 		"POST /api/workspaces/{id}/disk/upload",
+		"POST /api/workspaces/{id}/disk/import",
 		"POST /api/workspaces/{id}/disk/trash/empty",
 		"GET /api/workspaces/{id}/disk/usage",
 		"GET /api/workspaces/{id}/disk/activity",
@@ -463,6 +469,13 @@ var botRouteGroups = []botRouteGroup{
 		"PATCH /api/workspaces/{id}/sip/contacts/{cid}",
 		"DELETE /api/workspaces/{id}/sip/contacts/{cid}",
 		"DELETE /api/workspaces/{id}/sip/calls/{cid}",
+	}},
+	{access: botDeny, why: "ADR-0143: the office editor is a person's session in a browser (the Document Server's frame, co-editing presence); a bot reads and writes the same files through the Disk API (by path and sha256), never through an editor session", routes: []string{
+		"GET /api/office/capabilities",
+		"GET /api/office/config",
+		"POST /api/disk/items/{id}/office/convert",
+		"POST /api/workspaces/{id}/office/convert",
+		"POST /api/workspaces/{id}/office/create",
 	}},
 	{access: botDeny, why: "ADR-0139: saved task searches are a person's left-panel filters in the app; a bot searches with GET …/tasks/search directly", routes: []string{
 		"GET /api/workspaces/{id}/task-searches",
@@ -683,6 +696,7 @@ var botRouteGroups = []botRouteGroup{
 		"GET /api/workspaces/{id}/members/birthdays",
 		"PATCH /api/workspaces/{id}/members/{userId}/birthday",
 		"GET /api/me/events/today",
+		"POST /api/me/calendar-widget",
 		"GET /api/me/caldav",
 		"POST /api/me/caldav",
 		"PUT /api/me/caldav",
