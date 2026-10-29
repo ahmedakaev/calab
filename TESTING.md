@@ -2366,3 +2366,16 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 6. Close a tab with unsaved changes → the three-button dialog. Hide the window for 5 minutes, show it → the editor opens again.
 7. Phone: «Создать → Документ» → the file is in the list with the note «Править его можно на компьютере»; opening it views only.
 8. `OFFICE_ENABLED=false` + rollout: after a reconnect the office items and the editor are gone, xlsx opens its card as before.
+
+### CalDAV source DATE preservation (ADR-0144)
+
+- Unit: `go test -race ./internal/caldav` covers calendar-date preservation, recurrence across DST and batch encoding.
+- PG17: `go test -race -tags integration -run '^TestCalDAVDatePersistence$' ./internal/app` imports a DATE event, changes the profile timezone, checks persisted dates and legacy-column defaults.
+- Migration 00133 is additive; previously imported rows acquire original dates on their next successful normal sync.
+
+### Session-bound calendar widget feed (ADR-0145)
+
+- `go test -race ./internal/calendar ./internal/caldav` covers grant type/key separation, expiry and minimized projection.
+- PG17: `go test -race -tags integration -count=1 -run '^Test(CalendarWidget|CalDAVDatePersistence|BotRouteTable)' ./internal/app` covers exact-session revocation, bot/anonymous denial, own-only/SSO policy, workday/cancelled occurrences, source DATE values and bounds.
+- `make gen` and `pnpm -F @calaba/landing gen:routes --check` must have no generated drift.
+- Native widgets and physical acceptance belong to the dependent iOS change.
