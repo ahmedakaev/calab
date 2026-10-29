@@ -7,6 +7,7 @@ import { create as createMsg, type MessageInitShape } from '@bufbuild/protobuf';
 import { timestampNow } from '@bufbuild/protobuf/wkt';
 import {
   ApproverState,
+  BoardStatusType,
   BoardViewKind,
   Permission,
   PresenceStatus,
@@ -18,6 +19,7 @@ import {
   type Board,
   type BoardCategory,
   type BoardFeature,
+  type BoardStatus,
   type BoardView,
   type BoardWebhook,
   type EstimateScale,
@@ -880,6 +882,15 @@ export async function restoreTask(taskId: string): Promise<boolean> {
   }
 }
 
+/**
+ * The status of a duplicate: the source's own, except a finished one (completed / cancelled) —
+ * then none, and the server puts the copy into the board's default (initial) status (CBF #103).
+ */
+export function duplicateStatusId(src: Pick<Task, 'statusId' | 'boardId'>, statuses: readonly BoardStatus[]): string | undefined {
+  const st = statuses.find((x) => x.id === src.statusId);
+  return st && (st.type === BoardStatusType.COMPLETED || st.type === BoardStatusType.CANCELLED) ? undefined : src.statusId;
+}
+
 /** «Дублировать»: a copy with the same properties, «(копия)» in the title, right after it. */
 export async function duplicateTask(taskId: string): Promise<Task | null> {
   const src = useBoards.getState().tasks[taskId];
@@ -887,7 +898,7 @@ export async function duplicateTask(taskId: string): Promise<Task | null> {
   return createTask(src.boardId, {
     title: t('boards.copyTitle', { title: src.title }).slice(0, 200),
     description: src.description,
-    statusId: src.statusId,
+    statusId: duplicateStatusId(src, useBoards.getState().boards[src.boardId]?.statuses ?? []),
     priority: src.priority,
     assignees: src.assignees.map((a) => ({ userId: a.userId, isLead: a.isLead, note: a.note })),
     labelIds: src.labelIds,

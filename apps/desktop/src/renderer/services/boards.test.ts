@@ -17,7 +17,7 @@ const update = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 const search = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 vi.mock('./boardsApi', () => ({ boardsApi: { tasks: { update: (...a: unknown[]) => update(...a), search: (...a: unknown[]) => search(...a) } } }));
 
-const { applyBoardEvent, moveTask, updateTask, gateText, applySnapshotBoards, noticeText, searchAllTasks, ALL_TASKS_LIMIT } = await import('./boards');
+const { duplicateStatusId, applyBoardEvent, moveTask, updateTask, gateText, applySnapshotBoards, noticeText, searchAllTasks, ALL_TASKS_LIMIT } = await import('./boards');
 const { t } = await import('../i18n');
 const { memberName } = await import('../stores/workspaces');
 const { useBoards, workspaceBoards } = await import('../stores/boards');
@@ -257,5 +257,32 @@ describe('«Мои задачи → Все задачи» (CBF-35)', () => {
     await expect(searchAllTasks('w1', 'login', 'done', ac.signal)).resolves.toEqual(['z', 'a']);
     expect(search).toHaveBeenCalledWith('w1', 'login', { state: 'done', limit: ALL_TASKS_LIMIT }, ac.signal);
     expect(useBoards.getState().tasks['z']?.boardId).toBe('b2');
+  });
+});
+
+describe('«Дублировать» status (CBF #103)', () => {
+  const mk = (id: string, type: BoardStatusType, position: number) => create(BoardStatusSchema, { id, type, position });
+  const src = (statusId: string) => ({ statusId, boardId: 'b1' });
+  const basic = [mk('todo', BoardStatusType.UNSTARTED, 1), mk('doing', BoardStatusType.STARTED, 2), mk('done', BoardStatusType.COMPLETED, 3), mk('gone', BoardStatusType.CANCELLED, 4)];
+
+  it('a finished source gets no status: the server picks the default', () => {
+    expect(duplicateStatusId(src('done'), basic)).toBeUndefined();
+  });
+  it('a cancelled source gets no status either', () => {
+    expect(duplicateStatusId(src('gone'), basic)).toBeUndefined();
+  });
+  it('an unfinished source keeps its status', () => {
+    expect(duplicateStatusId(src('doing'), basic)).toBe('doing');
+    expect(duplicateStatusId(src('todo'), basic)).toBe('todo');
+  });
+  it('a custom board: judged by the status type, not the name', () => {
+    const custom = [mk('x1', BoardStatusType.BACKLOG, 1), mk('x2', BoardStatusType.STARTED, 2), mk('Closed', BoardStatusType.CANCELLED, 3), mk('Shipped', BoardStatusType.COMPLETED, 4)];
+    expect(duplicateStatusId(src('Shipped'), custom)).toBeUndefined();
+    expect(duplicateStatusId(src('Closed'), custom)).toBeUndefined();
+    expect(duplicateStatusId(src('x2'), custom)).toBe('x2');
+    expect(duplicateStatusId(src('x1'), custom)).toBe('x1');
+  });
+  it('an unknown status (board not loaded) is kept as is', () => {
+    expect(duplicateStatusId(src('zzz'), [])).toBe('zzz');
   });
 });
