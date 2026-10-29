@@ -1920,6 +1920,8 @@ type TaskGitLink struct {
 	Author    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Draft     bool
+	Seen      []string
 }
 
 type TaskLabel struct {
