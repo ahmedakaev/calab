@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"regexp"
@@ -34,15 +35,21 @@ import (
 
 // Release limits.
 const (
-	MaxReleaseCommits  = 5000 // commits of one call
-	MaxReleaseKeys     = 500  // task_keys of one call
-	MaxReleaseTasks    = 500  // tasks entering a release in one call (the rest: call again)
-	MaxReleaseName     = 64
-	MaxReleaseEnvs     = 10 // environments of a rule trigger
+	MaxReleaseCommits = 5000 // commits of one call
+	MaxReleaseKeys    = 500  // task_keys of one call
+	MaxReleaseTasks   = 500  // tasks entering a release in one call (the rest: call again)
+	MaxReleaseName    = 64
+	MaxReleaseEnvs    = 10 // environments of a rule trigger
+	// MaxBoardEnvs: distinct environments of a board's releases. A task enters one release per
+	// environment, so this bounds task_releases, Task.releases and the release rules a task can
+	// fire (an EDIT_TASKS token inventing «e1», «e2», … would otherwise re-enter every task).
+	MaxBoardEnvs       = 20
 	DefaultReleaseEnv  = "prod"
 	defaultReleaseList = 50
 	maxReleaseList     = 100
 	kindRelease        = "release"
+	// ReasonReleaseEnvLimit: a release of a 21st environment of the board (409).
+	ReasonReleaseEnvLimit = "RELEASE_ENV_LIMIT"
 )
 
 var envRE = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,31}$`)
@@ -107,8 +114,11 @@ func validRelease(req *v1.CreateBoardReleaseRequest, boardKey string) (releaseIn
 		return in, httpx.Validation("environment", "an environment of a-z, 0-9, «.», «_», «-» (at most 32) is required")
 	}
 	in.name = strings.Join(strings.Fields(strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		switch {
+		case unicode.IsControl(r):
 			return ' '
+		case unicode.Is(unicode.Bidi_Control, r):
+			return -1 // U+202E and kin would turn the label around in the task panel and the history
 		}
 		return r
 	}, req.GetName())), " ")
@@ -210,22 +220,37 @@ func (s *Service) createRelease(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		created = up.Created
+		if created {
+			envs, err := q.BoardReleaseEnvironments(ctx, id)
+			if err != nil {
+				return err
+			}
+			// envs holds in.env now: over the limit only when it is a new environment.
+			if len(envs) > MaxBoardEnvs {
+				return httpx.Conflict("at most 20 release environments per board").
+					WithDetails(ReasonReleaseEnvLimit, uint64(len(envs)-1), MaxBoardEnvs) //nolint:gosec // a count
+			}
+		}
 		byCommit, err := q.ReleaseTasksByCommits(ctx, sqlc.ReleaseTasksByCommitsParams{BoardID: id, Shas: in.shas, Environment: in.env,
 			Lim: MaxReleaseTasks + 1})
 		if err != nil {
 			return err
 		}
-		cands := byCommit
+		// The candidates in task-number order: concurrent releases lock tasks in one order (no
+		// deadlock), and the 500 taken are the lowest numbers — each not yet in the environment, so
+		// «truncated → call again» always makes progress.
+		cands := make([]sqlc.ReleaseTasksByCommitsRow, 0, len(byCommit)+len(in.numbers))
+		cands = append(cands, byCommit...)
 		if len(in.numbers) > 0 {
-			named, err := q.LiveTasksByNumbers(ctx, sqlc.LiveTasksByNumbersParams{BoardID: id, Numbers: in.numbers})
+			named, err := q.LiveTasksByNumbers(ctx, sqlc.LiveTasksByNumbersParams{BoardID: id, Numbers: in.numbers, Environment: in.env})
 			if err != nil {
 				return err
 			}
 			found := map[int32]bool{}
 			for _, x := range named {
 				found[x.Number] = true
-				if !slices.Contains(cands, x.ID) {
-					cands = append(cands, x.ID)
+				if !x.Released && !slices.ContainsFunc(cands, func(c sqlc.ReleaseTasksByCommitsRow) bool { return c.ID == x.ID }) {
+					cands = append(cands, sqlc.ReleaseTasksByCommitsRow{ID: x.ID, Number: x.Number})
 				}
 			}
 			for _, n := range in.numbers {
@@ -234,12 +259,13 @@ func (s *Service) createRelease(w http.ResponseWriter, r *http.Request) error {
 				}
 			}
 		}
+		slices.SortFunc(cands, func(a, b sqlc.ReleaseTasksByCommitsRow) int { return cmp.Compare(a.Number, b.Number) })
 		if len(cands) > MaxReleaseTasks {
 			cands, truncated = cands[:MaxReleaseTasks], true
 		}
 		after := map[string]any{"release_id": up.ID.String(), "name": up.Name, "environment": up.Environment, "sha": up.Sha, "url": up.Url}
-		for _, tid := range cands {
-			t, ok, err := taskByID(ctx, tx, tid, true)
+		for _, cand := range cands {
+			t, ok, err := taskByID(ctx, tx, cand.ID, true)
 			if err != nil {
 				return err
 			}

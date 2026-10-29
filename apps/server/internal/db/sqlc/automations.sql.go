@@ -32,6 +32,30 @@ func (q *Queries) AddTaskRelease(ctx context.Context, arg AddTaskReleaseParams) 
 	return result.RowsAffected(), nil
 }
 
+const boardReleaseEnvironments = `-- name: BoardReleaseEnvironments :many
+SELECT DISTINCT environment FROM board_releases WHERE board_id = $1
+`
+
+func (q *Queries) BoardReleaseEnvironments(ctx context.Context, boardID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, boardReleaseEnvironments, boardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var environment string
+		if err := rows.Scan(&environment); err != nil {
+			return nil, err
+		}
+		items = append(items, environment)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const boardRuleCounts = `-- name: BoardRuleCounts :many
 SELECT board_id, count(*)::integer AS rules FROM board_rules
 WHERE board_id = ANY($1::uuid[]) GROUP BY board_id
@@ -693,22 +717,27 @@ func (q *Queries) ListTaskReleases(ctx context.Context, taskIds []uuid.UUID) ([]
 }
 
 const liveTasksByNumbers = `-- name: LiveTasksByNumbers :many
-SELECT t.id, t.number FROM tasks t
-WHERE t.board_id = $1 AND t.number = ANY($2::int[]) AND t.archived_at IS NULL
+SELECT t.id, t.number,
+    EXISTS (SELECT 1 FROM task_releases r WHERE r.task_id = t.id AND r.environment = $1)::boolean AS released
+FROM tasks t
+WHERE t.board_id = $2 AND t.number = ANY($3::int[]) AND t.archived_at IS NULL
 `
 
 type LiveTasksByNumbersParams struct {
-	BoardID uuid.UUID
-	Numbers []int32
+	Environment string
+	BoardID     uuid.UUID
+	Numbers     []int32
 }
 
 type LiveTasksByNumbersRow struct {
-	ID     uuid.UUID
-	Number int32
+	ID       uuid.UUID
+	Number   int32
+	Released bool
 }
 
+// released: the task is already in a release of the environment.
 func (q *Queries) LiveTasksByNumbers(ctx context.Context, arg LiveTasksByNumbersParams) ([]LiveTasksByNumbersRow, error) {
-	rows, err := q.db.Query(ctx, liveTasksByNumbers, arg.BoardID, arg.Numbers)
+	rows, err := q.db.Query(ctx, liveTasksByNumbers, arg.Environment, arg.BoardID, arg.Numbers)
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +745,7 @@ func (q *Queries) LiveTasksByNumbers(ctx context.Context, arg LiveTasksByNumbers
 	items := []LiveTasksByNumbersRow{}
 	for rows.Next() {
 		var i LiveTasksByNumbersRow
-		if err := rows.Scan(&i.ID, &i.Number); err != nil {
+		if err := rows.Scan(&i.ID, &i.Number, &i.Released); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -781,11 +810,13 @@ func (q *Queries) RecordBoardRuleRuns(ctx context.Context, arg RecordBoardRuleRu
 }
 
 const releaseTasksByCommits = `-- name: ReleaseTasksByCommits :many
-SELECT t.id FROM tasks t
+SELECT t.id, t.number FROM tasks t
 WHERE t.board_id = $1 AND t.archived_at IS NULL
-  AND EXISTS (SELECT 1 FROM task_git_links l WHERE l.task_id = t.id
-      AND ((l.kind = 'commit' AND l.ref = ANY($2::text[]))
-        OR (l.kind = 'pr' AND l.merge_shas && $2::text[])))
+  AND t.id IN (
+    SELECT x.task_id FROM unnest($2::text[]) s(sha) CROSS JOIN LATERAL (
+      SELECT l.task_id FROM task_git_links l WHERE l.kind = 'commit' AND l.ref = s.sha
+      UNION ALL
+      SELECT l.task_id FROM task_git_links l WHERE l.kind = 'pr' AND l.merge_shas @> ARRAY[s.sha]) x)
   AND NOT EXISTS (SELECT 1 FROM task_releases r WHERE r.task_id = t.id AND r.environment = $3)
 ORDER BY t.number
 LIMIT $4
@@ -798,9 +829,16 @@ type ReleaseTasksByCommitsParams struct {
 	Lim         int32
 }
 
+type ReleaseTasksByCommitsRow struct {
+	ID     uuid.UUID
+	Number int32
+}
+
 // Live tasks of the board linked to a commit of shas, or to a pull request whose merge / squash /
 // head commit is one of them, not yet in a release of the environment; by number, at most lim.
-func (q *Queries) ReleaseTasksByCommits(ctx context.Context, arg ReleaseTasksByCommitsParams) ([]uuid.UUID, error) {
+// One index probe per SHA (migration 00137): LATERAL keeps the plan off a walk of every link of
+// the board compared with the whole list (`&&` / `= ANY` with 5000 SHAs: seconds).
+func (q *Queries) ReleaseTasksByCommits(ctx context.Context, arg ReleaseTasksByCommitsParams) ([]ReleaseTasksByCommitsRow, error) {
 	rows, err := q.db.Query(ctx, releaseTasksByCommits,
 		arg.BoardID,
 		arg.Shas,
@@ -811,13 +849,13 @@ func (q *Queries) ReleaseTasksByCommits(ctx context.Context, arg ReleaseTasksByC
 		return nil, err
 	}
 	defer rows.Close()
-	items := []uuid.UUID{}
+	items := []ReleaseTasksByCommitsRow{}
 	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		var i ReleaseTasksByCommitsRow
+		if err := rows.Scan(&i.ID, &i.Number); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -892,7 +930,9 @@ func (q *Queries) TrimTaskGitLinks(ctx context.Context, taskID uuid.UUID) (int64
 
 const updateBoardGitBacklink = `-- name: UpdateBoardGitBacklink :one
 UPDATE board_git SET backlink = coalesce($1, backlink),
-    api_token_enc = CASE WHEN $2::boolean THEN $3 ELSE api_token_enc END,
+    api_token_enc = CASE WHEN $2::boolean THEN $3
+        WHEN $4::text IS NOT NULL AND $4::text <> gitlab_url THEN NULL
+        ELSE api_token_enc END,
     gitlab_url = coalesce($4, gitlab_url),
     backlink_error = CASE WHEN $2::boolean OR $4 IS NOT NULL THEN '' ELSE backlink_error END
 WHERE board_id = $5
@@ -908,7 +948,8 @@ type UpdateBoardGitBacklinkParams struct {
 }
 
 // PATCH /api/boards/{id}/git: unset arguments keep the stored value; a new token or address
-// clears the last backlink error.
+// clears the last backlink error. The token is bound to its address: a changed address without
+// a new token forgets the stored one (it never follows the board to another host).
 func (q *Queries) UpdateBoardGitBacklink(ctx context.Context, arg UpdateBoardGitBacklinkParams) (BoardGit, error) {
 	row := q.db.QueryRow(ctx, updateBoardGitBacklink,
 		arg.Backlink,

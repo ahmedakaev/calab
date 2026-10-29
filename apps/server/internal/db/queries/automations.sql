@@ -129,9 +129,12 @@ RETURNING *;
 
 -- name: UpdateBoardGitBacklink :one
 -- PATCH /api/boards/{id}/git: unset arguments keep the stored value; a new token or address
--- clears the last backlink error.
+-- clears the last backlink error. The token is bound to its address: a changed address without
+-- a new token forgets the stored one (it never follows the board to another host).
 UPDATE board_git SET backlink = coalesce(sqlc.narg('backlink'), backlink),
-    api_token_enc = CASE WHEN sqlc.arg('set_token')::boolean THEN sqlc.narg('api_token_enc') ELSE api_token_enc END,
+    api_token_enc = CASE WHEN sqlc.arg('set_token')::boolean THEN sqlc.narg('api_token_enc')
+        WHEN sqlc.narg('gitlab_url')::text IS NOT NULL AND sqlc.narg('gitlab_url')::text <> gitlab_url THEN NULL
+        ELSE api_token_enc END,
     gitlab_url = coalesce(sqlc.narg('gitlab_url'), gitlab_url),
     backlink_error = CASE WHEN sqlc.arg('set_token')::boolean OR sqlc.narg('gitlab_url') IS NOT NULL THEN '' ELSE backlink_error END
 WHERE board_id = sqlc.arg('board_id')
@@ -153,17 +156,27 @@ RETURNING board_releases.*, (xmax = 0)::boolean AS created;
 -- name: ReleaseTasksByCommits :many
 -- Live tasks of the board linked to a commit of shas, or to a pull request whose merge / squash /
 -- head commit is one of them, not yet in a release of the environment; by number, at most lim.
-SELECT t.id FROM tasks t
+-- One index probe per SHA (migration 00137): LATERAL keeps the plan off a walk of every link of
+-- the board compared with the whole list (`&&` / `= ANY` with 5000 SHAs: seconds).
+SELECT t.id, t.number FROM tasks t
 WHERE t.board_id = sqlc.arg('board_id') AND t.archived_at IS NULL
-  AND EXISTS (SELECT 1 FROM task_git_links l WHERE l.task_id = t.id
-      AND ((l.kind = 'commit' AND l.ref = ANY(sqlc.arg('shas')::text[]))
-        OR (l.kind = 'pr' AND l.merge_shas && sqlc.arg('shas')::text[])))
+  AND t.id IN (
+    SELECT x.task_id FROM unnest(sqlc.arg('shas')::text[]) s(sha) CROSS JOIN LATERAL (
+      SELECT l.task_id FROM task_git_links l WHERE l.kind = 'commit' AND l.ref = s.sha
+      UNION ALL
+      SELECT l.task_id FROM task_git_links l WHERE l.kind = 'pr' AND l.merge_shas @> ARRAY[s.sha]) x)
   AND NOT EXISTS (SELECT 1 FROM task_releases r WHERE r.task_id = t.id AND r.environment = sqlc.arg('environment'))
 ORDER BY t.number
 LIMIT sqlc.arg('lim');
 
+-- name: BoardReleaseEnvironments :many
+SELECT DISTINCT environment FROM board_releases WHERE board_id = $1;
+
 -- name: LiveTasksByNumbers :many
-SELECT t.id, t.number FROM tasks t
+-- released: the task is already in a release of the environment.
+SELECT t.id, t.number,
+    EXISTS (SELECT 1 FROM task_releases r WHERE r.task_id = t.id AND r.environment = sqlc.arg('environment'))::boolean AS released
+FROM tasks t
 WHERE t.board_id = sqlc.arg('board_id') AND t.number = ANY(sqlc.arg('numbers')::int[]) AND t.archived_at IS NULL;
 
 -- name: AddTaskRelease :execrows

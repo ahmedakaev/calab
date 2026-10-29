@@ -15,6 +15,7 @@ import (
 	"time"
 
 	v1 "github.com/calaba/calaba/server/gen/calaba/v1"
+	"github.com/calaba/calaba/server/internal/boards"
 	"github.com/calaba/calaba/server/internal/perm"
 )
 
@@ -222,6 +223,21 @@ func TestBoardReleases(t *testing.T) {
 		t.Fatalf("list: %v", list.GetReleases())
 	}
 	guest.must(404, "GET", path, nil, nil)
+
+	// At most 20 environments per board (each re-enters every task): the 21st is 409, a new
+	// release of a known one still passes. Its own board: the per-board rate limit.
+	envs := createBoard(t, o, wid, &v1.CreateBoardRequest{Name: "Envs", Key: "ENV"}, 201)
+	envPath := "/api/boards/" + envs.GetId() + "/releases"
+	for i := range boards.MaxBoardEnvs {
+		o.must(200, "POST", envPath, &v1.CreateBoardReleaseRequest{Sha: sha('a'), Environment: "e" + strconv.Itoa(i)}, nil)
+	}
+	o.must(409, "POST", envPath, &v1.CreateBoardReleaseRequest{Sha: sha('a'), Environment: "e-new"}, nil)
+	o.must(200, "POST", envPath, &v1.CreateBoardReleaseRequest{Sha: sha('b'), Environment: "e0"}, nil)
+	var envList v1.ListBoardReleasesResponse
+	o.must(200, "GET", envPath, nil, &envList)
+	if n := len(envList.GetReleases()); n != boards.MaxBoardEnvs+1 {
+		t.Fatalf("releases %d, want %d (the refused one rolled back)", n, boards.MaxBoardEnvs+1)
+	}
 }
 
 // gitlabStub is a TLS GitLab answering notes with status.
@@ -354,6 +370,26 @@ func TestBoardGitBacklink(t *testing.T) {
 	waitFor(t, "the host refusal", func() bool { return strings.Contains(gitStatus(t, o, b.GetId()).GetBacklinkError(), "is not on") })
 	if n := gl.count(); n != 2 {
 		t.Fatalf("notes %d, want 2", n)
+	}
+	// The token is bound to its address: another address without a new token forgets it (a
+	// changed address never receives the stored token); the same address keeps it.
+	o.must(200, "PATCH", git, &v1.UpdateBoardGitRequest{GitlabUrl: new(gl.srv.URL)}, &pr)
+	if !pr.GetGit().GetHasApiToken() {
+		t.Fatal("the same address dropped the token")
+	}
+	o.must(200, "PATCH", git, &v1.UpdateBoardGitRequest{GitlabUrl: new("https://gitlab.attacker.example")}, &pr)
+	if g := pr.GetGit(); g.GetHasApiToken() || !strings.Contains(g.GetBacklinkError(), "no GitLab API token") {
+		t.Fatalf("a new address kept the token: %v", g)
+	}
+	fifth := createTask(t, o, b.GetId(), &v1.CreateTaskRequest{Title: "Fifth"}, 201)
+	send("Merge Request Hook", labMerged("https://gitlab.attacker.example", fifth.GetKey(), 25, sha('5'), sha('6')))
+	time.Sleep(300 * time.Millisecond)
+	if n := gl.count(); n != 2 {
+		t.Fatalf("notes %d, want 2", n)
+	}
+	o.must(200, "PATCH", git, &v1.UpdateBoardGitRequest{GitlabUrl: new(gl.srv.URL), ApiToken: new(token)}, &pr)
+	if !pr.GetGit().GetHasApiToken() {
+		t.Fatal("token and address together: token lost")
 	}
 	// Removing the token.
 	o.must(200, "PATCH", git, &v1.UpdateBoardGitRequest{ApiToken: new("")}, &pr)

@@ -28,6 +28,9 @@ func TestValidRelease(t *testing.T) {
 		!slices.Equal(in.numbers, []int32{12, 7}) || in.keys[12] != "DEV-12" {
 		t.Fatalf("normalized: %+v", in)
 	}
+	if in := ok(&v1.CreateBoardReleaseRequest{Sha: full, Name: "v1\u202egnp.exe\u2066"}); in.name != "v1gnp.exe" {
+		t.Fatalf("bidi controls kept: %q", in.name)
+	}
 	if in := ok(&v1.CreateBoardReleaseRequest{Sha: full}); in.name != full[:7] {
 		t.Fatalf("default name %q", in.name)
 	}
