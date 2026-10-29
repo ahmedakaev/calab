@@ -4225,16 +4225,36 @@ test('boards-kanban', async ({ open, win, mock, shot }) => {
   await win.keyboard.press('Escape');
   await expect(createMenu).toHaveCount(0);
 
-  // Needs the dev LiveKit: in voice, the boards screen carries the same bottom island as every
-  // screen (owner 23.10); its mic mutes the call while the board stays on screen.
+  // Needs the dev LiveKit: in voice, the boards screen folds the island into my avatar with the
+  // call mark (ADR-0146); hovering it opens the full island over the board, its mic mutes the call
+  // while the board stays on screen; the avatar then shows the red crossed mic.
   await joinVoice(win);
   await boardsMode(win, mock);
   const dock = win.getByTestId('bottom-island');
+  await expect(dock).toBeHidden();
+  await win.getByTestId('island-avatar').hover();
   await expect(dock).toContainText('Голос подключён');
   await dock.getByRole('button', { name: /^Выключить микрофон/ }).click();
   await expect(dock.getByRole('button', { name: /^Включить микрофон/ })).toBeVisible();
   await expect(win.getByTestId('kanban')).toBeVisible();
-  await checkpoint(shot, 'boards-voice-island');
+  await checkpoint(shot, 'boards-voice-island', { keepPointer: true });
+  await win.mouse.move(600, 300);
+  await expect(dock).toBeHidden();
+  await expect(win.getByTestId('island-call-mark')).toHaveAttribute('data-muted', 'true');
+  await checkpoint(shot, 'boards-voice-avatar');
+
+  // The setting off (Settings → Основное): the old full island on every screen.
+  await win.getByRole('button', { name: 'Настройки', exact: true }).click();
+  const settings = win.getByRole('dialog');
+  await settings.getByRole('tab', { name: 'Основное' }).click();
+  const fold = settings.getByRole('switch', { name: /^Островок: сворачивать в аватар/ });
+  await expect(fold).toBeChecked();
+  await fold.click();
+  await expect(fold).not.toBeChecked();
+  await win.keyboard.press('Escape');
+  await expect(settings).toHaveCount(0);
+  await expect(dock).toBeVisible();
+  await expect(win.getByTestId('island-avatar')).toHaveCount(0);
 });
 
 /**
