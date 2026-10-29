@@ -120,6 +120,7 @@ const api: CalabaApi = {
   office: {
     openFrame: () => ipcRenderer.invoke(IPC.officeFrame, true),
     closeFrame: () => ipcRenderer.invoke(IPC.officeFrame, false),
+    warm: (reason) => ipcRenderer.invoke(IPC.officeWarm, reason),
   },
   mail: {
     request: (call) => ipcRenderer.invoke(IPC.mailRequest, call),

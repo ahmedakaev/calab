@@ -173,6 +173,8 @@ export const IPC = {
   // ---- office editor (ADR-0143) ----
   /** renderer → main: true = the editor opens (main asks the server for the Document Server origin and returns it), false = it closed. */
   officeFrame: 'office:frame',
+  /** renderer → main: 'disk' (the Disk opened) or 'ready' (signed in): warm the editor's files in the HTTP cache. */
+  officeWarm: 'office:warm',
 } as const;
 
 /** ◀ ▶ ⟳ of the navigation strip. */

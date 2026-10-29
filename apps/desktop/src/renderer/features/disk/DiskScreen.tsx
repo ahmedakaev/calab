@@ -19,6 +19,8 @@ import { DiskColumns } from './DiskColumns';
 import { DiskListing, DragChip, DropTarget } from './DiskItems';
 import { DiskDialogs } from './Dialogs';
 import { UsageMeter } from './UsageMeter';
+import { useOfficeCaps } from './office/caps';
+import { platform } from '../../platform';
 
 /**
  * «Диск» on the desktop (ADR-0094 §8, docs/08 «Диск»): one panel in place of the column and the
@@ -39,6 +41,12 @@ export function DiskScreen({ workspaceId }: { workspaceId: string }): ReactNode 
   const folderBits = useDisk((s) => (folderId ? (s.items[folderId]?.myBits ?? 0n) : wsBits));
   const write = canWrite(folderBits);
   const manage = (wsBits & DISK_BITS.MANAGE) !== 0n;
+
+  // Someone in the Disk is about to open files: Electron warms the editor's files (main/officeWarm.ts).
+  const officeOn = useOfficeCaps((s) => s.enabled);
+  useEffect(() => {
+    if (officeOn) void platform.office?.warm('disk');
+  }, [officeOn]);
 
   useEffect(() => {
     void loadListing(workspaceId, folderId, trash);
