@@ -2219,7 +2219,7 @@ async function askJoin(page: Page, mock: MockServer): Promise<void> {
     roomId: IDS.rooms.call,
     attendees: [{ userId: IDS.users.anna }],
   });
-  mock.emitReminder(ev.id, IDS.users.anna, 60);
+  mock.emitReminder(ev.id, IDS.users.anna, 60, NOW.getTime() + 3_600_000);
   await page.getByTestId('toast').getByRole('button', { name: 'Перейти в комнату' }).click();
   await expect(page.getByTestId('join-confirm')).toBeVisible();
 }

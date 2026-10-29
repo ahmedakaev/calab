@@ -2401,3 +2401,10 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - If nothing shows over the Windows screen: send `%APPDATA%\Calab\logs\main.log` lines `[annot]` (display mapping, `overlay shown` with bounds/visible/onTop) and the renderer line `annot: first annotation of my stream`.
 - Web presenter (and a window share anywhere): the panel says «Рисунки видны в превью вашего стрима»; while a viewer annotates — «Имя рисует на экране» + «Показать», which opens the stream's pop-out with the drawings.
 - Viewers on Windows / web see each other's and the presenter's drawings on the stream tile (unchanged path, check once).
+
+## Toasts at the top right, confirm before joining from a reminder
+- Raise several toasts (e.g. copy an invite link, disconnect the network): they stack at the top right under the title bar, newest on top, clear of the inbox / settings / help icons; open the inbox — the stack steps left of it. Phone: under the top bar.
+- Meeting with a voice room, reminder «Через 15 минут…» (system notification or toast): a click only brings the window forward and opens «Войти в комнату?» — nobody is joined until «Войти в комнату».
+- Esc / × / «Открыть встречу» close it without joining; «Открыть встречу» shows the meeting in the calendar.
+- Be in another voice room or a call first: the dialog says so, the button reads «Выйти и войти»; confirming leaves it and joins the meeting room.
+- Already in the meeting room: the click only shows the room, no dialog. «Перейти в комнату» in the event card still joins at once.
