@@ -3,7 +3,7 @@ export const zhSip = {
   'sip.dial': '拨打电话号码',
   'sip.dial.label': '电话号码',
   'sip.dial.placeholder': '+86 138 0013 8000',
-  'sip.dial.hint': '使用带 + 的国际格式，可包含空格和括号。分机号写在 “ext.” 或逗号之后：+86 10 1234 5678 ext. 101。通话会产生费用。',
+  'sip.dial.hint': '使用带 + 的国际格式，可包含空格和括号。分机号写在 “ext.” 或逗号之后。通话会产生费用。',
   'sip.dial.call': '拨打',
   'sip.row.label': '电话 {number}',
   'sip.row.hangup': '挂断',

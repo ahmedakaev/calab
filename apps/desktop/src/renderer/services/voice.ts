@@ -2955,12 +2955,13 @@ class VoiceEngine {
   /**
    * A tone key to one phone line of my connected room (ADR-0137 §3.7, ADR-0046 addendum): a
    * SipDTMF data packet addressed to `line` only (lib/media/dtmf; livekit/sip sends it to the
-   * provider as RFC 2833). The line must be a participant of this room right now. Data, not
-   * sound: the echo rules (docs/02) are untouched. Who may press is the caller's check.
+   * provider as RFC 2833); a line that is not in the room gets nothing (livekit-server drops a
+   * packet for an absent identity — never a broadcast). Data, not sound: the echo rules (docs/02)
+   * are untouched. Who may press is the caller's check (the line answered, the server's state).
    */
   publishDtmf(key: string, line: string): boolean {
     const room = this.room;
-    if (!room || room.state !== ConnectionState.Connected || !room.remoteParticipants.has(line)) return false;
+    if (!room || room.state !== ConnectionState.Connected) return false;
     const packet = dtmfPacket(key, line);
     if (!packet) return false;
     room.engine.sendDataPacket(packet, RELIABLE).catch((err: unknown) => log.warn('voice: dtmf failed', err));

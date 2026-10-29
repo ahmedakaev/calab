@@ -3,7 +3,7 @@ export const enSip = {
   'sip.dial': 'Call a phone number',
   'sip.dial.label': 'Phone number',
   'sip.dial.placeholder': '+1 415 555 0123',
-  'sip.dial.hint': 'International format with +; spaces and brackets are fine. An extension goes after “ext.” or a comma: +1 212 555 0100 ext. 101. Calls cost money.',
+  'sip.dial.hint': 'International format with +; spaces and brackets are fine. An extension goes after “ext.” or a comma. Calls cost money.',
   'sip.dial.call': 'Call',
   'sip.row.label': 'Phone {number}',
   'sip.row.hangup': 'Hang up',

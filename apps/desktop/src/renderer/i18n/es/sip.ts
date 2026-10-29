@@ -3,7 +3,7 @@ export const esSip = {
   'sip.dial': 'Llamar a un número',
   'sip.dial.label': 'Número de teléfono',
   'sip.dial.placeholder': '+34 612 345 678',
-  'sip.dial.hint': 'Formato internacional con +; se admiten espacios y paréntesis. La extensión va tras «ext.» o una coma: +34 912 345 678 ext. 101. Las llamadas tienen coste.',
+  'sip.dial.hint': 'Formato internacional con +; se admiten espacios y paréntesis. La extensión va tras «ext.» o una coma. Las llamadas tienen coste.',
   'sip.dial.call': 'Llamar',
   'sip.row.label': 'Teléfono {number}',
   'sip.row.hangup': 'Colgar',
