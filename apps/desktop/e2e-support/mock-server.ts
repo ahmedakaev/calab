@@ -31,6 +31,7 @@ import {
   BoardCategoryResponseSchema,
   BoardWebhookPingResponseSchema,
   BoardWebhookResponseSchema,
+  ListBoardRulesResponseSchema,
   ConvertChecklistItemResponseSchema,
   CreateBoardCategoryRequestSchema,
   CreateTaskChecklistItemRequestSchema,
@@ -8538,6 +8539,8 @@ class MockImpl {
       noContent(c.res);
     });
     this.boardRoute('POST', '/api/boards/:id/webhook/ping', (c, me) => sendMsg(c.res, 200, BoardWebhookPingResponseSchema, b().pingWebhook(c.params[0] ?? '', me)));
+    // ADR-0060: board rules — an empty list only (the rule editor is shot unsaved).
+    this.boardRoute('GET', '/api/boards/:id/rules', (c) => sendMsg(c.res, 200, ListBoardRulesResponseSchema, { rules: [] }));
     // ADR-0058 §2: checklists (TASK_CHECKLIST_* events, no TASK_UPDATE).
     this.boardRoute('POST', '/api/tasks/:id/checklists', (c, me) => {
       const r = parseBody(c, CreateTaskChecklistRequestSchema);
