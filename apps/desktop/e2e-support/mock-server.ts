@@ -781,9 +781,11 @@ export interface MockServer {
    * ADR-0046: `byUserId` placed a call from `roomId` (no permission checks) → SIP_CALL_UPDATE to the
    * room's viewers; `status` default DIALING, `answeredAgoMs` sets answered_at for ACTIVE. Its id.
    */
-  placeSipCall(roomId: string, byUserId: string, number: string, status?: SipCallStatus, answeredAgoMs?: number): string;
+  placeSipCall(roomId: string, byUserId: string, number: string, status?: SipCallStatus, answeredAgoMs?: number, extension?: string): string;
   /** ADR-0046: moves a call (RINGING / ACTIVE / ENDED / FAILED with `reason`) → SIP_CALL_UPDATE. */
   setSipCallStatus(callId: string, status: SipCallStatus, reason?: string): void;
+  /** ADR-0046: the id of the room's live phone call (placed from the UI); '' = none. */
+  liveSipCallOf(roomId: string): string;
   /**
    * ADR-0117: «Команда Calab» on a plan with telephony, a saved SIP account and an exchange — four
    * numbers (103 unassigned, Григорий without one), groups «Отдел продаж» (round robin, forwards to 100 after 45 s) and
@@ -1036,8 +1038,9 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     setRecording: (roomId, rec) => impl.setRecording(roomId, rec),
     setGptunnel: (ws, by) => impl.setGptunnel(ws, by),
     setSip: (ws, patch) => impl.setSip(ws, patch),
-    placeSipCall: (roomId, by, number, status, ago) => impl.placeSipCall(roomId, by, number, status, ago),
+    placeSipCall: (roomId, by, number, status, ago, ext) => impl.placeSipCall(roomId, by, number, status, ago, ext),
     setSipCallStatus: (id, status, reason) => impl.setSipCallStatus(id, status, reason),
+    liveSipCallOf: (roomId) => impl.liveSipCallOf(roomId),
     seedSipExchange: (empty) => impl.seedSipExchange(empty),
     setSipRegistration: (st) => impl.setSipRegistration(st),
     seedSipSchedule: () => impl.seedSipSchedule(),
@@ -6500,7 +6503,7 @@ class MockImpl {
     this.placeSipCall(IDS.rooms.call, IDS.users.anna, '+79262223344', SipCallStatus.ACTIVE, 300_000);
   }
 
-  placeSipCall(roomId: string, byUserId: string, number: string, status = SipCallStatus.DIALING, answeredAgoMs?: number): string {
+  placeSipCall(roomId: string, byUserId: string, number: string, status = SipCallStatus.DIALING, answeredAgoMs?: number, extension = ''): string {
     const room = this.state.rooms.get(roomId);
     if (!room) throw notFound('room not found');
     const id = nextId(this.state, 'file');
@@ -6514,11 +6517,16 @@ class MockImpl {
       status,
       startedAt: timestampFromMs(Date.now() - (answeredAgoMs ?? 0) - 5000),
       participantIdentity: `sip:${id}`,
+      extension,
       ...(status === SipCallStatus.ACTIVE ? { answeredAt: timestampFromMs(Date.now() - (answeredAgoMs ?? 0)) } : {}),
     });
     this.state.sipCalls.set(id, c);
     this.announceSipCall(c);
     return id;
+  }
+
+  liveSipCallOf(roomId: string): string {
+    return [...this.state.sipCalls.values()].find((c) => c.roomId === roomId && isLiveSipStatus(c.status))?.id ?? '';
   }
 
   setSipCallStatus(callId: string, status: SipCallStatus, reason = ''): void {
@@ -7091,7 +7099,9 @@ class MockImpl {
       if (!m || m.role === WorkspaceRole.GUEST) throw forbidden('guests cannot place calls');
       this.requireRoomPerm(room, me, PERMISSION_BITS.PLACE_CALLS | CONNECT);
       if (room.type !== RoomType.VOICE) throw invalid('id', 'not a voice room');
-      const number = normalizeCallee(parseBody(c, PlaceSipCallRequestSchema).number);
+      // An extension after the number (the client sends «<number>,<extension>»; sip.SplitExtension).
+      const [raw = '', ...ext] = parseBody(c, PlaceSipCallRequestSchema).number.split(',');
+      const number = normalizeCallee(raw);
       if (!number) throw invalid('number', 'not a phone number');
       const s = this.sipSettingsOf(room.workspaceId);
       if (!s.enabled || !s.trunkSaved) throw new HttpError(409, ErrorCode.SIP_DISABLED, 'telephony is off');
@@ -7099,7 +7109,7 @@ class MockImpl {
       if ([...this.state.sipCalls.values()].some((x) => x.roomId === room.id && isLiveSipStatus(x.status))) throw new HttpError(409, ErrorCode.SIP_CALL_ACTIVE, 'a call is already active in this room');
       if (!numberAllowed(number, s.allowedPrefixes)) throw new HttpError(422, ErrorCode.SIP_NUMBER_NOT_ALLOWED, 'the number is not in the allowed prefixes', 'number');
       if (number === MOCK_SIP_RATE_NUMBER) throw new HttpError(429, ErrorCode.SIP_RATE_LIMITED, 'too many calls', '', {}, { 'Retry-After': '600' });
-      const id = this.placeSipCall(room.id, me, number);
+      const id = this.placeSipCall(room.id, me, number, SipCallStatus.DIALING, undefined, ext.join(','));
       sendMsg(c.res, 201, SipCallResponseSchema, { call: this.state.sipCalls.get(id) });
     });
 
