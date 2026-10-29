@@ -1,5 +1,5 @@
 /** Static tables of the Canvas screen: tools, hotkeys, swatches (ADR-0126 §5). No React. */
-import type { Arrow, RouteKind, ShapeKind } from '../../../lib/canvas/types';
+import { SOFT_PREFIX, type Arrow, type RouteKind, type ShapeKind } from '../../../lib/canvas/types';
 import { HUE_IDS, INK_EXTRA_IDS, STICKY_IDS, type Tool } from '../engine';
 
 export interface ToolDef {
@@ -52,6 +52,10 @@ export const STICKY_COLORS: readonly string[] = STICKY_IDS;
 export const INK_COLORS: readonly string[] = ['text', ...HUE_IDS, ...INK_EXTRA_IDS];
 export const STROKE_COLORS: readonly string[] = ['stroke', ...HUE_IDS, ...INK_EXTRA_IDS];
 export const FILL_COLORS: readonly string[] = ['none', 'white', ...HUE_IDS];
+/** The hues' soft tones (`soft:<hue>`, stored as `fill` + `soft`): calm columns and areas under stickies. */
+export const SOFT_FILL_COLORS: readonly string[] = HUE_IDS.map((h) => `${SOFT_PREFIX}${h}`);
+/** The fill picker: the plain fills, then the soft row. */
+export const FILL_PICKER: readonly string[] = [...FILL_COLORS, ...SOFT_FILL_COLORS];
 
 /** Text sizes (px) offered by the size field's list; any whole number in `DEFAULTS.minTextSize`..`maxTextSize` can be typed. */
 export const FONT_PRESETS: readonly number[] = [12, 14, 18, 24, 36, 48, 64, 96];

@@ -2,7 +2,7 @@ import { aabb, isConnector } from '../../../lib/canvas/types';
 import { MAP_H, MAP_W, rectToMap, worldToMap, type MapFrame } from '../../../lib/canvas/minimap';
 import type { Rect } from '../../../lib/canvas/geometry';
 import type { Scene } from '../../../lib/canvas/scene';
-import { resolveColor, resolveSticky, type CanvasPalette } from '../engine';
+import { resolveColor, resolveFill, resolveSticky, type CanvasPalette } from '../engine';
 import type { Ctx2D } from '../engine/draw';
 
 const KEY = 'calaba.canvas.minimap';
@@ -63,7 +63,7 @@ export function drawMinimap(ctx: Ctx2D, scene: Scene, palette: CanvasPalette, fr
       ctx.fillStyle = resolveSticky(palette, o.color).bg;
       ctx.fillRect(r.x, r.y, px(r.w), px(r.h));
     } else if (o.kind === 'shape') {
-      const fill = resolveColor(palette, o.fill);
+      const fill = resolveFill(palette, o.fill, o.soft);
       if (fill) {
         ctx.globalAlpha = 0.9;
         ctx.fillStyle = fill;

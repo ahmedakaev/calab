@@ -2,7 +2,7 @@ import { CanvasDoc, clampText, color, endpoint, isGroupId, isKind, isShapeKind, 
 import { fmtFromDelta, type DeltaOp } from './richText';
 import type { Scene } from './scene';
 import { isFontToken } from './textLayout';
-import { DEFAULTS, MAX_OBJECTS, MAX_TEXT, isImageSrc, type Endpoint, type InitExtras, type ObjectInit } from './types';
+import { DEFAULTS, MAX_OBJECTS, MAX_TEXT, SOFT_PREFIX, isImageSrc, type Endpoint, type InitExtras, type ObjectInit } from './types';
 
 /** Text-clipboard format: prefix + JSON (ADR-0126 §4). */
 export const CLIPBOARD_PREFIX = 'calaba-canvas:';
@@ -124,7 +124,8 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
           id,
           init: {
             kind: 'shape', shape: isShapeKind(o.shape) ? o.shape : 'rect', x, y, w: num(o.w, 160), h: num(o.h, 100),
-            fill: color(o.fill, 'none'), stroke: color(o.stroke, 'stroke'), strokeWidth: num(o.strokeWidth, 2, 0, 24), text, ...extras,
+            // A copied soft tone travels as its `soft:` fill (the doc splits it again).
+            fill: o.soft === true ? `${SOFT_PREFIX}${color(o.fill, 'none')}` : color(o.fill, 'none'), stroke: color(o.stroke, 'stroke'), strokeWidth: num(o.strokeWidth, 2, 0, 24), text, ...extras,
           },
         });
         break;

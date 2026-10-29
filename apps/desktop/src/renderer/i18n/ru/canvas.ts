@@ -20,6 +20,7 @@ export const ruCanvas = {
   'canvas.expand': 'Развернуть',
   'canvas.collapse': 'Свернуть',
   'canvas.emptyTree': 'Холстов пока нет',
+  'canvas.emptyTreeCreate': 'Создайте первый холст',
   'canvas.emptyFolder': 'Папка пуста',
   'canvas.pick': 'Выберите холст слева или создайте новый',
   'canvas.path': 'Путь',

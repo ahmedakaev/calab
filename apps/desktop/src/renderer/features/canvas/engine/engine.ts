@@ -23,7 +23,7 @@ import type { Core, Gesture, Mods } from './gestures';
 import { attachInput } from './input';
 import { ImageCache, type DecodeFn, type ImageResolver } from './images';
 import { emptyOverlay, type Outline, type OverlayState, type SelFrame } from './overlay';
-import { readableInk, resolveColor, resolveSticky, type CanvasPalette } from './palette';
+import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import { Renderer, renderSceneTo, type FrameStats } from './renderer';
 import { selectionFrame } from './selection';
 import { TextEditor, type EditSpec } from './textEditor';
@@ -1168,7 +1168,7 @@ export class CanvasEngine implements Core {
     switch (o.kind) {
       case 'sticky': return { box, text: o.text, size: boxFontSize(o), color: resolveSticky(p, o.color).fg, align: 'left', vcenter: false, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
       case 'text': return { box, text: o.text, size: o.size, color: resolveColor(p, o.color) ?? p.ink, align: 'left', vcenter: false, autoHeight: true, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
-      case 'shape': return { box, text: o.text, size: boxFontSize(o), color: shapeInk(p, o.fill), align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
+      case 'shape': return { box, text: o.text, size: boxFontSize(o), color: shapeInk(p, o.fill, o.soft), align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
     }
   }
 
@@ -1579,8 +1579,8 @@ function rectInView(r: Rect, view: Rect): boolean {
 
 
 /** The text color the renderer uses on a shape (readable on its fill), so the editor matches it. */
-function shapeInk(p: CanvasPalette, fillToken: string | undefined): string {
-  const fill = fillToken ? resolveColor(p, fillToken) : undefined;
+function shapeInk(p: CanvasPalette, fillToken: string | undefined, soft?: boolean): string {
+  const fill = fillToken ? resolveFill(p, fillToken, soft) : undefined;
   const ink = resolveColor(p, 'text') ?? p.ink;
   return fill ? readableInk(fill, ink) : ink;
 }

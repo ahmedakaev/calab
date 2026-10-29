@@ -214,8 +214,8 @@ describe('templates', () => {
     const steps = r.engine.doc.undo.undoStack.length;
     const view = r.engine.visibleWorld();
     const ids = r.engine.insertTemplate('kanban', tr);
-    expect(ids).toHaveLength(12);
-    expect(r.engine.selection.size).toBe(12);
+    expect(ids).toHaveLength(17);
+    expect(r.engine.selection.size).toBe(17);
     const b = r.engine.scene.bounds(ids);
     expect(b ? b.x + b.w / 2 : 0).toBeCloseTo(view.x + view.w / 2);
     expect(b ? b.y + b.h / 2 : 0).toBeCloseTo(view.y + view.h / 2);

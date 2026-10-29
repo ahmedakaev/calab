@@ -10,7 +10,7 @@ import type { Arrow, ObjectKind, ObjectPatch, RouteKind } from '../../../lib/can
 import { readableInk, type CanvasEngine, type CanvasPalette } from '../engine';
 import { keepFocus } from './chrome';
 import { useEngineValue } from './hooks';
-import { ARROW_DEFS, FILL_COLORS, INK_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, STROKE_COLORS, STROKE_WIDTHS } from './model';
+import { ARROW_DEFS, FILL_PICKER, INK_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, STROKE_COLORS, STROKE_WIDTHS } from './model';
 import { FontSizeField } from './FontSizeField';
 import { PhoneBtn, SHEET } from './PhoneEditBar';
 import { Swatch, colorLabel, swatchCss } from './PropsPanel';
@@ -218,7 +218,7 @@ function Seg<T extends string | number>({
 const COLOR_PANEL: Record<'sticky' | 'ink' | 'fill' | 'stroke', { kind: 'sticky' | 'ink' | 'fill'; tokens: readonly string[]; label: Parameters<typeof t>[0]; field: 'color' | 'fill' | 'stroke'; value: (m: PanelModel) => string | undefined }> = {
   sticky: { kind: 'sticky', tokens: STICKY_COLORS, label: 'canvasBoard.props.color', field: 'color', value: (m) => m.stickyColor },
   ink: { kind: 'ink', tokens: INK_COLORS, label: 'canvasBoard.props.color', field: 'color', value: (m) => m.textColor },
-  fill: { kind: 'fill', tokens: FILL_COLORS, label: 'canvasBoard.props.fill', field: 'fill', value: (m) => m.fill },
+  fill: { kind: 'fill', tokens: FILL_PICKER, label: 'canvasBoard.props.fill', field: 'fill', value: (m) => m.fill },
   stroke: { kind: 'ink', tokens: STROKE_COLORS, label: 'canvasBoard.props.stroke', field: 'stroke', value: (m) => m.stroke },
 };
 

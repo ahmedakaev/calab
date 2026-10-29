@@ -19,6 +19,7 @@ export const esCanvas: DictShape<typeof ruCanvas> = {
   'canvas.expand': 'Expandir',
   'canvas.collapse': 'Contraer',
   'canvas.emptyTree': 'Aún no hay lienzos',
+  'canvas.emptyTreeCreate': 'Crea tu primer lienzo',
   'canvas.emptyFolder': 'La carpeta está vacía',
   'canvas.pick': 'Elige un lienzo a la izquierda o crea uno nuevo',
   'canvas.path': 'Ruta',

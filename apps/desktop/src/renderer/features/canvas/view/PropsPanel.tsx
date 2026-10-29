@@ -12,13 +12,13 @@ import type { ArrangeOp } from '../../../lib/canvas/arrange';
 import { FontSizeField } from './FontSizeField';
 import { RouteIcon } from './RouteIcon';
 import { ShapeIcon } from './ShapeIcon';
-import type { Arrow, ObjectKind, ObjectPatch, RouteKind, ShapeKind } from '../../../lib/canvas/types';
-import { readableInk, resolveColor, resolveSticky, type CanvasEngine, type CanvasPalette } from '../engine';
+import { splitFill, type Arrow, type ObjectKind, type ObjectPatch, type RouteKind, type ShapeKind } from '../../../lib/canvas/types';
+import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasEngine, type CanvasPalette } from '../engine';
 import { ROTATE_OFFSET_PX } from '../engine/overlay';
 import { DIVIDER, MENU_BOX, PANEL, keepFocus } from './chrome';
 import { NO_INSETS, placePanel, type Insets } from './layout';
 import {
-  ARROW_DEFS, FILL_COLORS, INK_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, STROKE_COLORS, STROKE_WIDTHS,
+  ARROW_DEFS, FILL_PICKER, INK_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, STROKE_COLORS, STROKE_WIDTHS,
 } from './model';
 import { createSelectionModel } from './selectionModel';
 
@@ -51,10 +51,14 @@ export function measureChrome(host: HTMLElement): Insets {
 type ColorKind = 'sticky' | 'ink' | 'fill';
 
 export function swatchCss(palette: CanvasPalette, kind: ColorKind, token: string): string | null {
-  return kind === 'sticky' ? resolveSticky(palette, token).bg : resolveColor(palette, token);
+  if (kind === 'sticky') return resolveSticky(palette, token).bg;
+  const f = splitFill(token);
+  return kind === 'fill' ? resolveFill(palette, f.fill, f.soft) : resolveColor(palette, token);
 }
 
 export function colorLabel(token: string): string {
+  const f = splitFill(token);
+  if (f.soft) return t('canvasBoard.color.softOf', { color: colorLabel(f.fill).toLowerCase() });
   const key = `canvasBoard.color.${token}`;
   const s = t(key as Parameters<typeof t>[0]);
   return s === key ? token : s;
@@ -458,7 +462,7 @@ export const PropsPanel = memo(function PropsPanel({
       {!m.locked && m.hasShape ? (
         <>
           <ShapeMenu value={m.shape} onPick={(shape) => patch({ shape })} focusCanvas={focusCanvas} />
-          <SwatchMenu label={t('canvasBoard.props.fill')} kind="fill" tokens={FILL_COLORS} value={m.fill} palette={palette} onPick={(c) => patch({ fill: c })} focusCanvas={focusCanvas} testId="canvas-prop-fill" />
+          <SwatchMenu label={t('canvasBoard.props.fill')} kind="fill" tokens={FILL_PICKER} value={m.fill} palette={palette} onPick={(c) => patch({ fill: c })} focusCanvas={focusCanvas} testId="canvas-prop-fill" />
         </>
       ) : null}
       {!m.locked && (m.hasShape || m.hasConnector) ? (

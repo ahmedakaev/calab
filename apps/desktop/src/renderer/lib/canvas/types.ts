@@ -79,6 +79,8 @@ export interface ShapeRec extends BaseRec, RichFields {
   readonly fontPx?: number;
   readonly shape: ShapeKind;
   readonly fill: string;
+  /** The fill's soft tone (ADR-0127 addendum 2026-10-29): `fill` stays a plain hue, so an older build draws that hue. */
+  readonly soft?: boolean;
   readonly stroke: string;
   readonly strokeWidth: number;
   readonly text: string;
@@ -157,6 +159,12 @@ export const DEFAULTS = {
   imageSize: 200,
 } as const;
 
+/** A fill as the pickers and templates write it: `soft:<hue>` is the hue's soft tone. */
+export const SOFT_PREFIX = 'soft:';
+export function splitFill(fill: string): { fill: string; soft: boolean } {
+  return fill.startsWith(SOFT_PREFIX) ? { fill: fill.slice(SOFT_PREFIX.length), soft: true } : { fill, soft: false };
+}
+
 /** Transform fields any creation call may carry (copy / paste keep them; `rot` is ignored for connectors). */
 export interface InitExtras {
   rot?: number;
@@ -201,7 +209,10 @@ export interface ObjectPatch {
   color?: string;
   size?: number;
   shape?: ShapeKind;
+  /** A hue, or `soft:<hue>` for its soft tone (stored as `fill` + `soft`). */
   fill?: string;
+  /** The fill's soft tone; false removes it (a `fill` patch sets it from its prefix). */
+  soft?: boolean;
   stroke?: string;
   strokeWidth?: number;
   from?: Endpoint;

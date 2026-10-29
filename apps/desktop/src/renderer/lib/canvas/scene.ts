@@ -551,7 +551,7 @@ export class Scene {
           kind, id, z, x, y,
           w: num(m.get('w'), DEFAULTS.shapeW, DEFAULTS.minBox, MAX_SIZE), h: num(m.get('h'), DEFAULTS.shapeH, DEFAULTS.minBox, MAX_SIZE),
           shape: isShapeKind(shape) ? shape : 'rect',
-          fill: color(m.get('fill'), DEFAULTS.shapeFill), stroke: color(m.get('stroke'), DEFAULTS.shapeStroke),
+          fill: color(m.get('fill'), DEFAULTS.shapeFill), ...(m.get('soft') === true ? { soft: true } : {}), stroke: color(m.get('stroke'), DEFAULTS.shapeStroke),
           strokeWidth: num(m.get('strokeWidth'), DEFAULTS.strokeWidth, 0, 24), text: textOf(), ...rich(), ...fontSizeOf('shape'), ...this.extras(m, true),
         };
       }

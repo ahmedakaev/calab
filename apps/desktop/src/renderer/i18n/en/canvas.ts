@@ -19,6 +19,7 @@ export const enCanvas: DictShape<typeof ruCanvas> = {
   'canvas.expand': 'Expand',
   'canvas.collapse': 'Collapse',
   'canvas.emptyTree': 'No canvases yet',
+  'canvas.emptyTreeCreate': 'Create your first canvas',
   'canvas.emptyFolder': 'The folder is empty',
   'canvas.pick': 'Pick a canvas on the left or create a new one',
   'canvas.path': 'Path',

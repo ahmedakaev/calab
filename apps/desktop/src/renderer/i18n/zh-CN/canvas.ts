@@ -19,6 +19,7 @@ export const zhCanvas: DictShape<typeof ruCanvas> = {
   'canvas.expand': '展开',
   'canvas.collapse': '折叠',
   'canvas.emptyTree': '还没有画布',
+  'canvas.emptyTreeCreate': '创建第一个画布',
   'canvas.emptyFolder': '文件夹为空',
   'canvas.pick': '在左侧选择一个画布，或新建一个',
   'canvas.path': '路径',

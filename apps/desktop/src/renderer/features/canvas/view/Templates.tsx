@@ -1,5 +1,5 @@
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
-import { Columns3, Grid2x2, File, LayoutTemplate, MessagesSquare, Network, Workflow, type LucideIcon } from 'lucide-react';
+import { CalendarClock, Columns3, Grid2x2, File, ChartGantt, LayoutTemplate, MessagesSquare, Network, Target, Workflow, type LucideIcon } from 'lucide-react';
 import { memo, useCallback, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { IconButton, cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
@@ -11,7 +11,10 @@ import { MENU_BOX, PANEL, keepFocus } from './chrome';
 import { useSyncStatus } from './StatusBanner';
 
 /** One icon per template (the menu, the card and the phone's «+» sheet). */
-export const TEMPLATE_ICON: Record<TemplateId, LucideIcon> = { kanban: Columns3, retro: MessagesSquare, swot: Grid2x2, mindmap: Network, flow: Workflow };
+export const TEMPLATE_ICON: Record<TemplateId, LucideIcon> = {
+  kanban: Columns3, retro: MessagesSquare, swot: Grid2x2, mindmap: Network, flow: Workflow,
+  matrix: Target, roadmap: ChartGantt, meeting: CalendarClock,
+};
 
 const text = (key: TemplateKey, params?: Record<string, string | number>): string => t(`canvasBoard.templates.${key}`, params);
 
@@ -26,7 +29,7 @@ export function useInsertTemplate(engine: CanvasEngine, focusCanvas: () => void)
   );
 }
 
-/** «Шаблоны» in the toolbar: one button, the five templates in a small menu. */
+/** «Шаблоны» in the toolbar: one button, the templates in a small menu. */
 export const TemplatesMenu = memo(function TemplatesMenu({ engine, focusCanvas }: { engine: CanvasEngine; focusCanvas: () => void }): ReactNode {
   useLocale();
   const insert = useInsertTemplate(engine, focusCanvas);
@@ -83,7 +86,7 @@ function TemplateRow({ id, onPick, as }: { id: TemplateId; onPick: () => void; a
 }
 
 /**
- * The card on an empty canvas: the same five templates. «Empty» is the scene's: it shows once the document has
+ * The card on an empty canvas: the same templates. «Empty» is the scene's: it shows once the document has
  * arrived (a canvas still loading is empty too), until the first object appears or it is closed. Its box takes
  * pointer events; the rest of the canvas keeps them (double-click for a text still works around it).
  */

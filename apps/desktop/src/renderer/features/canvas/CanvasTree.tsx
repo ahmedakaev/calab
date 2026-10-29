@@ -75,7 +75,7 @@ function TreeColumn({ workspaceId, canCreate }: { workspaceId: string; canCreate
         {canCreate ? <CreateMenu workspaceId={workspaceId} /> : null}
       </div>
       <nav className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-1.5" aria-label={t('canvas.tree')} data-testid="canvas-tree">
-        {query.trim() ? <SearchResults workspaceId={workspaceId} query={query} /> : <ChildList workspaceId={workspaceId} parentId={TOP} depth={0} />}
+        {query.trim() ? <SearchResults workspaceId={workspaceId} query={query} /> : <ChildList workspaceId={workspaceId} parentId={TOP} depth={0} canCreate={canCreate} />}
       </nav>
       <div className="shrink-0 border-t border-line px-1.5 pt-1.5" style={{ paddingBottom: 'calc(var(--island-height, 0px) + 20px)' }}>
         <button
@@ -116,7 +116,7 @@ function CreateMenu({ workspaceId }: { workspaceId: string }): ReactNode {
 }
 
 /** The children of a folder (or the top level), loaded when first shown. */
-const ChildList = memo(function ChildList({ workspaceId, parentId, depth }: { workspaceId: string; parentId: string; depth: number }): ReactNode {
+const ChildList = memo(function ChildList({ workspaceId, parentId, depth, canCreate = false }: { workspaceId: string; parentId: string; depth: number; canCreate?: boolean }): ReactNode {
   const key = childKey(workspaceId, parentId);
   const ids = useCanvas(useShallow((s) => s.lists[key] ?? EMPTY));
   const loaded = useCanvas((s) => !!s.lists[key]);
@@ -132,6 +132,20 @@ const ChildList = memo(function ChildList({ workspaceId, parentId, depth }: { wo
     );
   }
   if (!ids.length) {
+    // The top level, empty: the same dashed «create the first one» as the boards list (BoardsList).
+    if (depth === 0 && canCreate) {
+      return (
+        <button
+          type="button"
+          onClick={() => void createItem(workspaceId, TOP, CanvasItemKind.CANVAS)}
+          className="mt-1 flex w-full items-center gap-2.5 rounded-[var(--radius-row)] border border-dashed border-line px-2 py-2 text-left text-caption text-muted hover:bg-hover hover:text-fg"
+          data-testid="canvas-empty-create"
+        >
+          <Plus className="size-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">{t('canvas.emptyTreeCreate')}</span>
+        </button>
+      );
+    }
     return depth === 0 ? (
       <p className="px-2 py-3 text-caption text-muted">{t('canvas.emptyTree')}</p>
     ) : (

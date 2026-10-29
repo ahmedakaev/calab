@@ -5,7 +5,7 @@ import { F_STRIKE, type Fmt } from '../../../lib/canvas/richText';
 import { LABEL_SIZE, boxFontSize, fontOf, type TextLayout, type TextLayouter } from '../../../lib/canvas/textLayout';
 import { aabb, type ConnectorRec, type ImageRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
 import type { ImageSource } from './images';
-import { readableInk, resolveColor, resolveSticky, type CanvasPalette } from './palette';
+import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import type { VoteBadge } from '../../../lib/canvas/votes';
 import { drawVoteMark } from './voteDraw';
 
@@ -269,7 +269,7 @@ function drawText(ctx: Ctx2D, o: TextBoxRec & { kind: 'text' }, env: DrawEnv): v
 }
 
 function drawShape(ctx: Ctx2D, o: TextBoxRec & { kind: 'shape' }, env: DrawEnv): void {
-  const fill = resolveColor(env.palette, o.fill);
+  const fill = resolveFill(env.palette, o.fill, o.soft);
   const stroke = resolveColor(env.palette, o.stroke);
   ctx.beginPath();
   traceShape(ctx, o.shape, o);

@@ -7,7 +7,7 @@
 import { arrangeUnits } from '../../../lib/canvas/arrange';
 import type { Scene } from '../../../lib/canvas/scene';
 import { boxFontSize } from '../../../lib/canvas/textLayout';
-import type { Arrow, ObjectRec, RouteKind, ShapeKind } from '../../../lib/canvas/types';
+import { SOFT_PREFIX, type Arrow, type ObjectRec, type RouteKind, type ShapeKind } from '../../../lib/canvas/types';
 import type { CanvasEngine } from '../engine';
 
 export interface PanelModel {
@@ -70,7 +70,7 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
   set('textSize', uniform(text.map((o) => o.size)));
   set('fontPx', uniform([...text, ...sticky, ...shape].map(boxFontSize)));
   set('shape', uniform(shape.map((o) => o.shape)));
-  set('fill', uniform(shape.map((o) => o.fill)));
+  set('fill', uniform(shape.map((o) => (o.soft ? `${SOFT_PREFIX}${o.fill}` : o.fill))));
   set('stroke', uniform([...shape.map((o) => o.stroke), ...conn.map((o) => o.stroke)]));
   set('strokeWidth', uniform([...shape.map((o) => o.strokeWidth), ...conn.map((o) => o.strokeWidth)]));
   set('arrow', uniform(conn.map((o) => o.arrow)));

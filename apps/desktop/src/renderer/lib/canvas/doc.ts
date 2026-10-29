@@ -4,7 +4,7 @@ import { after, before, between, isValidKey } from './fracIndex';
 import { fmtFromDelta, fmtToDelta, formatChanges, rawText, type Fmt } from './richText';
 import { fontFields, isFontToken } from './textLayout';
 import {
-  DEFAULTS, MAX_COORD, MAX_OBJECTS, MAX_SIZE, MAX_STATE, MAX_TEXT, SCHEMA_VERSION, SHAPE_KINDS, isImageSrc,
+  DEFAULTS, MAX_COORD, MAX_OBJECTS, MAX_SIZE, MAX_STATE, MAX_TEXT, SCHEMA_VERSION, SHAPE_KINDS, isImageSrc, splitFill,
   type Endpoint, type ObjectInit, type ObjectKind, type ObjectPatch, type ShapeKind, type Side,
 } from './types';
 
@@ -129,7 +129,7 @@ export type PlainObject = { id: string; kind: ObjectKind; z: string } & Record<s
 const FIELD_KEYS: Record<ObjectKind, readonly string[]> = {
   sticky: ['x', 'y', 'w', 'h', 'color', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   text: ['x', 'y', 'w', 'size', 'color', 'rot', 'locked', 'group'],
-  shape: ['shape', 'x', 'y', 'w', 'h', 'fill', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
+  shape: ['shape', 'x', 'y', 'w', 'h', 'fill', 'soft', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   connector: ['from', 'to', 'arrow', 'route', 'stroke', 'strokeWidth', 'label', 'locked', 'group'],
   image: ['x', 'y', 'w', 'h', 'src', 'stickerId', 'rot', 'locked', 'group'],
 };
@@ -137,7 +137,7 @@ const FIELD_KEYS: Record<ObjectKind, readonly string[]> = {
 const PATCH_KEYS: Record<ObjectKind, readonly (keyof ObjectPatch)[]> = {
   sticky: ['x', 'y', 'w', 'h', 'color', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   text: ['x', 'y', 'w', 'size', 'color', 'rot', 'locked', 'group'],
-  shape: ['x', 'y', 'w', 'h', 'shape', 'fill', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
+  shape: ['x', 'y', 'w', 'h', 'shape', 'fill', 'soft', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   connector: ['from', 'to', 'arrow', 'route', 'stroke', 'strokeWidth', 'label', 'locked', 'group'],
   // The picture itself (`src`) is fixed at creation.
   image: ['x', 'y', 'w', 'h', 'rot', 'locked', 'group'],
@@ -182,17 +182,19 @@ function initFields(init: ObjectInit): { fields: Record<string, unknown>; text: 
         },
         text: clampText(init.text ?? ''),
       };
-    case 'shape':
+    case 'shape': {
+      const fill = splitFill(typeof init.fill === 'string' ? init.fill : '');
       return {
         fields: {
           shape: isShapeKind(init.shape) ? init.shape : 'rect',
           x: num(init.x, 0), y: num(init.y, 0),
           w: num(init.w, DEFAULTS.shapeW, DEFAULTS.minBox, MAX_SIZE), h: num(init.h, DEFAULTS.shapeH, DEFAULTS.minBox, MAX_SIZE),
-          fill: color(init.fill, DEFAULTS.shapeFill), stroke: color(init.stroke, DEFAULTS.shapeStroke),
+          fill: color(fill.fill, DEFAULTS.shapeFill), ...(fill.soft ? { soft: true } : {}), stroke: color(init.stroke, DEFAULTS.shapeStroke),
           strokeWidth: num(init.strokeWidth, DEFAULTS.strokeWidth, 0, 24),
         },
         text: clampText(init.text ?? ''),
       };
+    }
     case 'connector':
       return {
         fields: {
@@ -240,11 +242,18 @@ function expandFont(kind: ObjectKind, patch: ObjectPatch): ObjectPatch {
   return patch;
 }
 
+/** Spells a `soft:<hue>` fill out as `fill` + `soft`; a plain fill drops the soft tone. */
+function expandFill(kind: ObjectKind, patch: ObjectPatch): ObjectPatch {
+  if (kind !== 'shape' || typeof patch.fill !== 'string') return patch;
+  const f = splitFill(patch.fill);
+  return { ...patch, fill: f.fill, soft: f.soft };
+}
+
 /** Normalizes a stored field before it is written by a patch; undefined = reject. */
 function patchValue(kind: ObjectKind, key: keyof ObjectPatch, v: unknown): unknown {
   switch (key) {
     case 'rot': return typeof v === 'number' && Number.isFinite(v) ? (normRot(v) === 0 ? REMOVE : normRot(v)) : undefined;
-    case 'locked': return typeof v === 'boolean' ? (v ? true : REMOVE) : undefined;
+    case 'locked': case 'soft': return typeof v === 'boolean' ? (v ? true : REMOVE) : undefined;
     case 'group': return v === null ? REMOVE : isGroupId(v) ? v : undefined;
     case 'fontSize': return isFontToken(v) ? (v === 'm' ? REMOVE : v) : undefined;
     case 'fontPx': return v === null ? REMOVE : typeof v === 'number' && Number.isFinite(v) ? clamp(v, DEFAULTS.minTextSize, DEFAULTS.maxTextSize) : undefined;
@@ -268,7 +277,7 @@ export type StoredFields = ReadonlyMap<string, unknown>;
 /** The fields `patchMany` would write for `raw` on an object of `kind` (only keys valid for it, values normalized). */
 export function normalizePatch(kind: ObjectKind, raw: ObjectPatch): Map<string, unknown> {
   const out = new Map<string, unknown>();
-  const patch = expandFont(kind, raw);
+  const patch = expandFill(kind, expandFont(kind, raw));
   for (const key of PATCH_KEYS[kind]) {
     if (!(key in patch)) continue;
     const v = patchValue(kind, key, patch[key]);
