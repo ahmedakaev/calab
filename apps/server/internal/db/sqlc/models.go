@@ -1644,6 +1644,7 @@ type SipCall struct {
 	Origin              string
 	PeerE164            string
 	Missed              bool
+	Extension           string
 }
 
 type SipCallEvent struct {
