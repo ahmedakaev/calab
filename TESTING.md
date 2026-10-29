@@ -2385,3 +2385,12 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - PG18 + Valkey: `go test -tags integration -count=1 -run TestBoardGit ./internal/app` — draft → «draft» rule only; ready → «MR открыт» rule; a repeated ready / approval with another body fires nothing; merge into `preprod` with filter `main` does not move the task.
 - Manually (GitLab): rules «Draft MR открыт → In Progress», «MR открыт → In Review», «MR влит» with «Целевая ветка» `main`; open a Draft MR `feature/dev-N-…`, mark it ready, approve twice, merge into `preprod`, then into `main`. Expected: In Progress → In Review → (no move) → Ready to Deploy; one journal line per approver.
 - Comment rule `Открыт MR !{pr_number}: {pr_title} {pr_url}` → the card shows the MR number, title and link; `@everyone` in the MR title notifies nobody.
+
+## Stream annotations on Windows and the web (ADR-0028 amendment, #102)
+- Unit: `pnpm -F @calaba/desktop exec vitest run src/shared/annot.test.ts src/renderer/services/annot.test.ts` (display mapping, single-display fallback, «X указывает» indicator and its timer).
+- Matrix, each pair in both directions (presenter shares a **whole screen**, the viewer picks «Указка», then «Карандаш»): macOS ↔ Windows, Windows ↔ web (Chrome), macOS ↔ web.
+- Windows presenter: the pointer and strokes appear over the shared screen; the viewers' video has no doubled drawing (the overlay is excluded from capture). The panel under «Зрители могут рисовать» reads «Рисунки появятся поверх вашего экрана…», then «Имя указывает на экран».
+- Windows with two monitors (also one at 150 % scale): share each monitor in turn — the drawing lands on the shared one, aligned with the viewer's cursor.
+- If nothing shows over the Windows screen: send `%APPDATA%\Calab\logs\main.log` lines `[annot]` (display mapping, `overlay shown` with bounds/visible/onTop) and the renderer line `annot: first annotation of my stream`.
+- Web presenter (and a window share anywhere): the panel says «Рисунки видны в превью вашего стрима»; while a viewer annotates — «Имя рисует на экране» + «Показать», which opens the stream's pop-out with the drawings.
+- Viewers on Windows / web see each other's and the presenter's drawings on the stream tile (unchanged path, check once).
