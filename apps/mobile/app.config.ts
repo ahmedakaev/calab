@@ -98,6 +98,7 @@ const config: ExpoConfig = {
     // Android (DEV-5032): the origin for the native main-frame guard (ADR-0067) and a launch link
     // that is not replayed when the activity is recreated (ADR-0142).
     './plugins/withAndroidWebOrigin',
+    './plugins/withAndroidIntentReset',
   ],
   ...(projectId ? { extra: { eas: { projectId } } } : {}),
 };
