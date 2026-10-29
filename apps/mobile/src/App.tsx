@@ -15,17 +15,18 @@ import { hostReducer, initialHostState } from './hostState';
 import { decideNavigation, decideNewWindow, isAppSubframe, isAppUrl } from './navigation';
 import { strings } from './strings';
 import { callsOperation, callsReply, subscribeCalls, callAudioEnabled } from './incomingCalls';
-import { ActivityProtocol, activityBootstrap, activityReady, linkEvent } from './activityProtocol';
+import { ActivityProtocol, activityBootstrap, activityChallenge, activityReady, androidMessageTrusted, linkEvent } from './activityProtocol';
 import { appUrlForLink } from './links';
-import { acknowledgeNotification, hostChannelEnabled, notificationReply, notificationState, subscribeNotifications, testNotification, notificationTestReply } from './notifications';
+import { acknowledgeNotification, grantNotificationsDocument, hostChannelEnabled, notificationReply, notificationState, revokeNotificationsDocument, subscribeNotifications, testNotification, notificationTestReply } from './notifications';
 import { endSessionActivity, publishSessionActivity, sessionActivityEnabled } from './sessionActivity';
 import { permissionsOperation, permissionsReply, subscribePermissions } from './mediaPermissions';
 import { SHELL_UA_MARKER } from '../../desktop/src/shared/nativeShell';
 
 /**
  * The phone host (ADR-0067): one full-screen WebView with the web client — the same DOM, router and
- * MobileShell as in a browser — plus a load error surface. A status-only capability (ADR-0069)
- * is offered on iOS after a native main-frame/origin/current-document handshake. File hand-off is iOS-native (ADR-0068): the web's
+ * MobileShell as in a browser — plus a load error surface. The host channel (ADR-0069/0070) is
+ * offered on iOS after a native main-frame/origin/current-document handshake, on Android after the
+ * origin + main-frame challenge of activityProtocol.ts (notifications and links only). File hand-off is iOS-native (ADR-0068): the web's
  * `<a download>` of its own blob: from the app's main frame goes to the share sheet, decided in the
  * react-native-webview patch without JS or page input. Incoming universal / app / `calab://` links
  * (ADR-0142) open the same route of the web client. The WebView is edge to edge; the web client applies
@@ -59,6 +60,9 @@ const LINK_HOSTS = (() => {
 /** Every URL reaches `onShouldStart`: the library's own origin list matches by prefix and opens misses via Linking. */
 const ANY_ORIGIN = ['*'];
 
+/** Android has no native frame check in the WebView: the protocol adds the origin + challenge proof. */
+const ANDROID = Platform.OS === 'android';
+
 function openExternal(url: string): void {
   Linking.openURL(url).catch(() => undefined);
 }
@@ -77,20 +81,24 @@ function Host({ origin }: { origin: string }) {
   const web = useRef<WebView>(null);
   const canGoBack = useRef(false);
   const loaded = useRef(false);
-  const activity = useRef(new ActivityProtocol(state.generation));
+  const activity = useRef(new ActivityProtocol(state.generation, ANDROID));
   const resetActivity = useCallback(() => {
     activity.current.reset();
     endSessionActivity();
+    revokeNotificationsDocument(false);
   }, []);
   useEffect(() => {
-    activity.current = new ActivityProtocol(state.generation);
+    activity.current = new ActivityProtocol(state.generation, ANDROID);
     return resetActivity;
   }, [state.generation, resetActivity]);
   const onMessage = useCallback(({ nativeEvent }: WebViewMessageEvent) => {
+    if (ANDROID && !androidMessageTrusted(nativeEvent.url, origin)) return;
     const action = activity.current.accept(nativeEvent.data);
-    if (action?.type === 'ready') {
+    if (action?.type === 'challenge') web.current?.injectJavaScript(activityChallenge(state.generation, action.document, action.nonce));
+    else if (action?.type === 'ready') {
       endSessionActivity();
-      web.current?.injectJavaScript(activityReady(state.generation, action.document, sessionActivityEnabled));
+      grantNotificationsDocument(action.document);
+      web.current?.injectJavaScript(activityReady(state.generation, action.document, sessionActivityEnabled, ANDROID));
     } else if (action?.type === 'calls') {
       void callsOperation(action.document, action).then(value => {
         if (activity.current.belongsTo(state.generation) && activity.current.isCurrent(action.document))
@@ -102,7 +110,7 @@ function Host({ origin }: { origin: string }) {
           web.current?.injectJavaScript(permissionsReply(state.generation, action.document, action.request, reply));
       });
     } else if (action?.type === 'publish') publishSessionActivity(action.document, action.snapshot);
-    else if (action?.type === 'end') endSessionActivity();
+    else if (action?.type === 'end') { endSessionActivity(); revokeNotificationsDocument(action.reason === 'logout'); }
     else if (action?.type === 'notifications' && action.operation === 'ack' && action.eventId) acknowledgeNotification(action.document, action.eventId);
     else if (action?.type === 'notifications' && action.operation === 'test' && action.body) {
       void testNotification(action.document, action.body).then(result => {
@@ -116,7 +124,7 @@ function Host({ origin }: { origin: string }) {
           web.current?.injectJavaScript(notificationReply(state.generation, action.document, action.request, value));
       });
     }
-  }, [state.generation]);
+  }, [origin, state.generation]);
 
   useEffect(() => subscribeNotifications((document, value) => {
     if (activity.current.belongsTo(state.generation) && activity.current.isCurrent(document))
@@ -140,7 +148,7 @@ function Host({ origin }: { origin: string }) {
   /**
    * An incoming link (ADR-0142). A running page with the host channel takes it in place, as a click
    * on the same link would (`calab-host-link`): no reload, an ongoing call stays. Otherwise — cold
-   * start, still loading, error screen, no channel (Android) or no handshake yet — the WebView
+   * start, still loading, error screen, no channel or no handshake yet — the WebView
    * remounts on the app URL and the web's `takeDeepLink` reads it from `location.pathname`.
    */
   const deliverLink = useRef<(raw: string) => void>(() => undefined);

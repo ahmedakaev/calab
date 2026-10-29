@@ -2,7 +2,7 @@ import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import { parseHostActivityMessage } from '../../desktop/src/shared/hostActivity';
 import { parseCallsState } from '../../desktop/src/shared/hostCalls';
-import { ActivityProtocol, activityBootstrap, activityReady, linkEvent } from './activityProtocol';
+import { ActivityProtocol, activityBootstrap, activityChallenge, activityReady, androidMessageTrusted, linkEvent } from './activityProtocol';
 
 const document = '11111111-1111-4111-8111-111111111111';
 const other = '22222222-2222-4222-8222-222222222222';
@@ -114,5 +114,61 @@ describe('host link event (ADR-0142)', () => {
     expect(protocol.current()).toBe(document);
     protocol.accept(JSON.stringify({ v: 1, type: 'revoke', host: 0, document, seq: 1 }));
     expect(protocol.current()).toBeNull();
+  });
+});
+
+describe('Android host channel (DEV-5033, ADR-0070 Android)', () => {
+  const origin = 'https://calab.example.com';
+  const proofOf = (challenge: { document: string; nonce: string }, host = 0) =>
+    JSON.stringify({ v: 1, type: 'proof', host, document: challenge.document, nonce: challenge.nonce });
+  it('trusts only the native source origin of the posting frame, never the fallback top URL', () => {
+    expect(androidMessageTrusted(origin, origin)).toBe(true);
+    for (const url of [`${origin}/`, `${origin}/t/INV-1`, 'https://evil.example', undefined, '']) expect(androidMessageTrusted(url, origin)).toBe(false);
+  });
+  it('becomes ready only after the main document answers the latest challenge', () => {
+    const p = new ActivityProtocol(0, true);
+    const first = p.accept(hello());
+    expect(first).toMatchObject({ type: 'challenge', document });
+    expect(p.current()).toBeNull();
+    expect(p.accept(activity())).toBeNull();
+    const second = p.accept(hello());
+    if (first?.type !== 'challenge' || second?.type !== 'challenge') throw new Error('challenge expected');
+    expect(p.accept(proofOf(first))).toBeNull();
+    expect(p.accept(proofOf(second, 1))).toBeNull();
+    expect(p.accept(proofOf({ ...second, document: other }))).toBeNull();
+    expect(p.accept(proofOf(second))).toEqual({ type: 'ready', document });
+    expect(p.accept(proofOf(second))).toBeNull();
+    expect(p.accept(hello())).toBeNull();
+    expect(p.accept(activity())?.type).toBe('publish');
+    expect(p.accept(JSON.stringify({ v: 1, type: 'revoke', host: 0, document, seq: 2, reason: 'logout' }))).toEqual({ type: 'end', reason: 'logout' });
+    expect(p.accept(proofOf(second))).toBeNull();
+  });
+  it('the injected challenge answers only from the top document with the same id and host', () => {
+    const challenge = (window: Record<string, unknown>) => void runInNewContext(activityChallenge(0, document, '1-abc'), { window, JSON });
+    const send = vi.fn();
+    const top: Record<string, unknown> = { CalabHostActivity: { version: 1, host: 0, document, send } };
+    top.top = top;
+    challenge(top);
+    expect(send).toHaveBeenCalledWith(JSON.stringify({ v: 1, type: 'proof', host: 0, document, nonce: '1-abc' }));
+    const rotated = vi.fn();
+    const next: Record<string, unknown> = { CalabHostActivity: { version: 1, host: 0, document: other, send: rotated } };
+    next.top = next;
+    challenge(next);
+    const frame: Record<string, unknown> = { top: {}, CalabHostActivity: { version: 1, host: 0, document, send: rotated } };
+    challenge(frame);
+    expect(rotated).not.toHaveBeenCalled();
+  });
+  it('advertises only notifications and links, so the web keeps its own permission and call paths', () => {
+    const top: Record<string, unknown> = { ReactNativeWebView: { postMessage: vi.fn() }, crypto: { randomUUID: () => document } };
+    top.top = top;
+    runInNewContext(activityBootstrap(3, true, 'android'), { window: top, crypto: top.crypto });
+    const bridge = top.CalabHostActivity as Record<string, unknown>;
+    expect(bridge).toMatchObject({ version: 1, notificationsVersion: 1, notificationsTestVersion: 1, platform: 'android' });
+    for (const key of ['mediaPermissionsVersion', 'callsVersion', 'callsMuteVersion', 'callsAnswerVersion', 'callsAudioVersion']) expect(bridge[key]).toBeUndefined();
+    expect(activityBootstrap(3)).toContain('callsVersion: 1');
+    const ready = activityReady(3, document, false, true);
+    expect(ready).toContain('"links":1');
+    expect(ready).not.toContain('"calls"');
+    expect(ready).not.toContain('"permissions"');
   });
 });
