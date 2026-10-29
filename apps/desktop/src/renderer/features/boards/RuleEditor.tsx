@@ -41,6 +41,8 @@ import {
   DUE_TRIGGERS,
   GIT_EVENTS,
   MAX_ACTIONS,
+  MAX_BRANCH,
+  MAX_BRANCHES,
   MAX_NAME,
   MAX_RULE_USERS,
   MAX_TEMPLATE,
@@ -49,6 +51,8 @@ import {
   TRIGGER_KINDS,
   blankAction,
   blankTrigger,
+  branchesOf,
+  gitHasTarget,
   moveTo,
   validateDraft,
   type ActionKind,
@@ -161,7 +165,7 @@ export function RuleEditor({ board, rule, initial, readOnly, onClose }: { board:
         </Block>
 
         <Block title={t('rules.then')} testId="rule-then">
-          <Actions board={board} actions={d.actions} onChange={(actions) => set({ actions })} issueAt={issueAt} readOnly={readOnly} />
+          <Actions board={board} actions={d.actions} onChange={(actions) => set({ actions })} issueAt={issueAt} readOnly={readOnly} git={d.trigger.kind.case === 'git'} />
           <Problem text={issueAt('actions')} />
         </Block>
       </fieldset>
@@ -304,6 +308,27 @@ function DaysInput({ value, min, max, onChange }: { value: number; min: number; 
   );
 }
 
+/** The target branches of a Git trigger as one line («main, release/*»); the text is kept as typed. */
+function BranchesInput({ value, onChange }: { value: readonly string[]; onChange: (v: string[]) => void }): ReactNode {
+  const [text, setText] = useState(() => value.join(', '));
+  return (
+    <Input
+      className="w-56"
+      value={text}
+      maxLength={MAX_BRANCHES * (MAX_BRANCH + 2)}
+      placeholder="main, release/*"
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(branchesOf(e.target.value));
+      }}
+      aria-label={t('rules.targetBranch')}
+      title={t('rules.targetBranchHint')}
+      spellCheck={false}
+      data-testid="rule-git-branches"
+    />
+  );
+}
+
 function TextArea({ value, onChange, rows = 3, placeholder, max = MAX_TEMPLATE, label }: { value: string; onChange: (v: string) => void; rows?: number; placeholder?: string; max?: number; label: string }): ReactNode {
   return (
     <TextAreaField
@@ -406,13 +431,30 @@ function TriggerParams({ board, trigger, onChange }: { board: Board; trigger: Ru
       );
     case 'git':
       return (
-        <Select className="w-56" value={String(k.value.event)} onChange={(e) => onChange(withTrigger(trigger, 'git', { event: Number(e.target.value) }))} aria-label={t('rules.k.git')} data-testid="rule-git-event">
-          {GIT_EVENTS.map((g) => (
-            <option key={g.v} value={g.v}>
-              {t(g.label)}
-            </option>
-          ))}
-        </Select>
+        <>
+          <Select
+            className="w-56"
+            value={String(k.value.event)}
+            onChange={(e) => {
+              const event = Number(e.target.value);
+              // A push or a new branch has no target branch: a filter would never match.
+              onChange(withTrigger(trigger, 'git', { event, ...(gitHasTarget(event) ? {} : { targetBranches: [] }) }));
+            }}
+            aria-label={t('rules.k.git')}
+            data-testid="rule-git-event"
+          >
+            {GIT_EVENTS.map((g) => (
+              <option key={g.v} value={g.v}>
+                {t(g.label)}
+              </option>
+            ))}
+          </Select>
+          {gitHasTarget(k.value.event) ? (
+            <Labeled label={t('rules.targetBranch')}>
+              <BranchesInput value={k.value.targetBranches} onChange={(targetBranches) => onChange(withTrigger(trigger, 'git', { targetBranches }))} />
+            </Labeled>
+          ) : null}
+        </>
       );
     case 'dueIn':
     case 'overdue':
@@ -479,7 +521,7 @@ const ACTION_FEATURE: Partial<Record<ActionKind, BoardFeature>> = {
   createSubtasks: BoardFeature.SUBTASKS,
 };
 
-function Actions({ board, actions, onChange, issueAt, readOnly }: { board: Board; actions: RuleAction[]; onChange: (a: RuleAction[]) => void; issueAt: (at: IssueAt) => string | null; readOnly: boolean }): ReactNode {
+function Actions({ board, actions, onChange, issueAt, readOnly, git }: { board: Board; actions: RuleAction[]; onChange: (a: RuleAction[]) => void; issueAt: (at: IssueAt) => string | null; readOnly: boolean; git: boolean }): ReactNode {
   const drag = useRef<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const offered = ACTION_KINDS.filter((k) => {
@@ -562,7 +604,7 @@ function Actions({ board, actions, onChange, issueAt, readOnly }: { board: Board
               </button>
             )}
           </div>
-          <ActionParams board={board} action={a} onChange={(next) => onChange(actions.map((x, j) => (j === i ? next : x)))} />
+          <ActionParams board={board} action={a} git={git} onChange={(next) => onChange(actions.map((x, j) => (j === i ? next : x)))} />
           <Problem text={issueAt(`action:${i}`)} />
         </div>
       ))}
@@ -602,7 +644,7 @@ function withAction<K extends ActionKind>(a: RuleAction, kind: K, patch: Partial
 
 const linesOf = (s: string): string[] => s.split('\n');
 
-function ActionParams({ board, action, onChange }: { board: Board; action: RuleAction; onChange: (a: RuleAction) => void }): ReactNode {
+function ActionParams({ board, action, git, onChange }: { board: Board; action: RuleAction; git: boolean; onChange: (a: RuleAction) => void }): ReactNode {
   const k = action.kind;
   const ws = board.workspaceId;
   switch (k.case) {
@@ -703,14 +745,14 @@ function ActionParams({ board, action, onChange }: { board: Board; action: RuleA
         </>
       );
     case 'comment':
-      return <TemplateField value={k.value.template} onChange={(v) => onChange(withAction(action, 'comment', { template: v }))} />;
+      return <TemplateField git={git} value={k.value.template} onChange={(v) => onChange(withAction(action, 'comment', { template: v }))} />;
     case 'notifyRoom':
       return (
         <>
           <Labeled label={t('rules.room')}>
             <RoomPick workspaceId={ws} value={k.value.roomId} onPick={(id) => onChange(withAction(action, 'notifyRoom', { roomId: id }))} />
           </Labeled>
-          <TemplateField value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyRoom', { template: v }))} />
+          <TemplateField git={git} value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyRoom', { template: v }))} />
         </>
       );
     case 'notifyDm':
@@ -725,7 +767,7 @@ function ActionParams({ board, action, onChange }: { board: Board; action: RuleA
               ))}
             </Select>
           </Labeled>
-          <TemplateField value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyDm', { template: v }))} />
+          <TemplateField git={git} value={k.value.template} onChange={(v) => onChange(withAction(action, 'notifyDm', { template: v }))} />
         </>
       );
     case 'createSubtasks':
@@ -735,11 +777,16 @@ function ActionParams({ board, action, onChange }: { board: Board; action: RuleA
   }
 }
 
-function TemplateField({ value, onChange }: { value: string; onChange: (v: string) => void }): ReactNode {
+function TemplateField({ value, onChange, git }: { value: string; onChange: (v: string) => void; git: boolean }): ReactNode {
   return (
     <div className="flex flex-col gap-1">
       <TextArea label={t('rules.text')} value={value} onChange={onChange} />
       <span className="text-caption text-faint">{t('rules.vars')}</span>
+      {git ? (
+        <span className="text-caption text-faint" data-testid="rule-git-vars">
+          {t('rules.varsGit')}
+        </span>
+      ) : null}
     </div>
   );
 }

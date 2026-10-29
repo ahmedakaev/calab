@@ -4620,6 +4620,26 @@ test('boards-settings', async ({ open, win, mock, shot }) => {
   for (const b of await win.getByTestId('toast').locator('button[aria-label="Закрыть уведомление"]').all()) await b.evaluate((x) => (x as HTMLButtonElement).click());
   await expect(win.getByTestId('toast')).toHaveCount(0);
   await checkpoint(shot, 'boards-settings-access');
+  // Board task #101: a Git rule — the new events, «Целевая ветка», the Git template variables.
+  await win.getByRole('tab', { name: 'Автоматизации' }).click();
+  await expect(win.getByTestId('rules-empty')).toBeVisible();
+  await win.getByTestId('rule-add').click();
+  await win.getByTestId('rule-name').fill('MR влит в main → готово');
+  await win.getByTestId('rule-trigger').selectOption('git');
+  const ev = win.getByTestId('rule-git-event');
+  await expect(ev.locator('option')).toHaveText(['Любое событие', 'Создана ветка', 'Открыт черновик PR', 'Открыт PR', 'Черновик PR готов к ревью', 'Запрошено ревью', 'PR одобрен', 'PR смержен', 'PR закрыт без слияния', 'Новый коммит']);
+  await ev.selectOption({ label: 'Новый коммит' });
+  await expect(win.getByTestId('rule-git-branches')).toHaveCount(0); // a push has no target branch
+  await ev.selectOption({ label: 'PR смержен' });
+  await win.getByTestId('rule-git-branches').fill('main, release/*');
+  await win.getByTestId('rule-action-kind').selectOption('comment');
+  await expect(win.getByTestId('rule-git-vars')).toHaveText('Git: {pr_url} {pr_number} {pr_title} {branch} {target_branch} {git_author}');
+  await win.getByLabel('Текст').fill('Влит MR !{pr_number}: {pr_title} → {target_branch}');
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-rules-git-vars');
+  await win.getByTestId('rule-when').scrollIntoViewIfNeeded();
+  await win.getByTestId('rule-name').focus();
+  await checkpoint(shot, 'boards-rules-git');
 });
 
 /** Board settings → «Статусы», the colour picker of the first status open (ADR-0093): a 6-wide grid over the rows. */

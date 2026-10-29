@@ -29,6 +29,18 @@ func TestParseGolden(t *testing.T) {
 		{"gitlab_mr_merged", GitLab, "Merge Request Hook"},
 		{"gitea_pr_opened", Gitea, "pull_request"},
 		{"gitea_push", Gitea, "push"},
+		// Board task #101: drafts, review requests, approvals, target branches.
+		{"github_pr_draft_opened", GitHub, "pull_request"},
+		{"github_pr_ready", GitHub, "pull_request"},
+		{"github_pr_review_requested", GitHub, "pull_request"},
+		{"github_pr_review_approved", GitHub, "pull_request_review"},
+		{"gitlab_mr_draft_opened", GitLab, "Merge Request Hook"},
+		{"gitlab_mr_ready", GitLab, "Merge Request Hook"},
+		{"gitlab_mr_reviewers", GitLab, "Merge Request Hook"},
+		{"gitlab_mr_approval", GitLab, "Merge Request Hook"},
+		{"gitea_pr_draft_opened", Gitea, "pull_request"},
+		{"gitea_pr_review_requested", Gitea, "pull_request"},
+		{"gitea_pr_approved", Gitea, "pull_request_approved"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
