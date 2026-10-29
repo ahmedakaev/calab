@@ -614,7 +614,8 @@ async function main(): Promise<void> {
       }
     }
     // «--telephony» measures the section alone (no voice call: ADR-0137 §8 «открытый раздел без звонков»).
-    if (!TELEPHONY) await page.getByRole('button', { name: /^Качество связи/ }).first().waitFor({ timeout: 15_000 });
+    // Attached, not visible: outside «Команда» the island is folded into the avatar (ADR-0146).
+    if (!TELEPHONY && !NO_CALL) await page.getByRole('button', { name: /^Качество связи/ }).first().waitFor({ state: 'attached', timeout: 15_000 });
     // Musician mode is per call (not persisted, ADR-0052): turned on from the voice panel's «…».
     if (MUSICIAN) {
       await page.getByRole('button', { name: 'Ещё', exact: true }).last().click();
