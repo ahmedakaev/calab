@@ -202,6 +202,11 @@ const KEY = new Set([
   'temp-room-dialog-result',
   'temp-room-menu',
   'settings-temp-archive',
+  // Toasts at the top right and the join question of a reminder.
+  'toasts',
+  'toast-single',
+  'join-confirm',
+  'join-confirm-switch',
 ]);
 
 // Non-key screens: skipped unless CALABA_VISUAL_ALL=1 (before any fixture, so no app launch).
@@ -2192,6 +2197,52 @@ test('toasts', async ({ open, win, mock, shot }) => {
   });
   await expect(win.getByTestId('toast')).toHaveCount(3);
   await checkpoint(shot, 'toasts');
+});
+
+test('toast-single', async ({ open, win, mock, shot }) => {
+  await open();
+  await mainWindow(win, mock);
+  // Top right under the title bar (the inbox, settings and help icons stay clear).
+  await win.evaluate(() => (window as unknown as { __calabaToast?: (k: string, t: string) => void }).__calabaToast?.('info', 'Ссылка-приглашение скопирована'));
+  await expect(win.getByTestId('toast')).toHaveCount(1);
+  await checkpoint(shot, 'toast-single');
+});
+
+/** A reminder «Через 1 час: Планёрка · Созвон» arrives; its toast action «Перейти в комнату» opens the question. */
+async function askJoin(page: Page, mock: MockServer): Promise<void> {
+  const ev = mock.addEvent({
+    workspaceId: IDS.workspaces.main,
+    organizerId: IDS.users.boris,
+    title: 'Планёрка по релизу',
+    startMs: NOW.getTime() + 3_600_000,
+    endMs: NOW.getTime() + 2 * 3_600_000,
+    roomId: IDS.rooms.call,
+    attendees: [{ userId: IDS.users.anna }],
+  });
+  mock.emitReminder(ev.id, IDS.users.anna, 60, NOW.getTime() + 3_600_000);
+  await page.getByTestId('toast').getByRole('button', { name: 'Перейти в комнату' }).click();
+  await expect(page.getByTestId('join-confirm')).toBeVisible();
+}
+
+test('join-confirm', async ({ open, win, mock, shot }) => {
+  await open();
+  await mainWindow(win, mock);
+  const joined = win.waitForRequest((r) => r.url().endsWith(`/api/rooms/${IDS.rooms.call}/join`), { timeout: 1500 }).then(() => true, () => false);
+  await askJoin(win, mock);
+  await expect(win.getByTestId('join-confirm-warn')).toHaveCount(0);
+  await checkpoint(shot, 'join-confirm');
+  // The click alone never joined; Esc closes without joining.
+  await win.keyboard.press('Escape');
+  await expect(win.getByTestId('join-confirm')).toHaveCount(0);
+  expect(await joined).toBe(false);
+});
+
+test('join-confirm-switch', async ({ open, win, mock, shot }) => {
+  await open();
+  await inVoice(win, mock);
+  await askJoin(win, mock);
+  await expect(win.getByTestId('join-confirm-warn')).toContainText('Вы сейчас в комнате «Переговорка»');
+  await checkpoint(shot, 'join-confirm-switch');
 });
 
 // ---------------------------------------------------------------- voice (needs the dev LiveKit)

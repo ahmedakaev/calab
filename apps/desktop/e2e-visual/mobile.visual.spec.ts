@@ -2810,3 +2810,16 @@ test('m-wiki-public', async ({ page }) => {
   await toc.getByTestId('wiki-public-outline-row').filter({ hasText: 'Процессы' }).tap();
   await expect(page.getByTestId('wiki-public-title')).toHaveText('Процессы');
 });
+
+// Toasts on the phone stay under the top bar (safe area), over the feed, never over the tab bar (owner, 29.10).
+test('m-toasts', async ({ page }) => {
+  await signedInRoom(page);
+  await expect(page.getByTestId('composer')).toBeVisible();
+  await page.evaluate(() => {
+    const push = (window as unknown as { __calabaToast?: (k: string, t: string) => void }).__calabaToast;
+    push?.('info', 'Ссылка-приглашение скопирована');
+    push?.('success', 'Файл сохранён в «Загрузки»');
+  });
+  await expect(page.getByTestId('toast')).toHaveCount(2);
+  await checkpoint(page, 'm-toasts', { main: true });
+});

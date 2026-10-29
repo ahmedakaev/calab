@@ -2417,3 +2417,9 @@ Expected: the task / board / room / wiki / Disk / meeting opens in the app (anot
 5. Tab до аватара, Enter — открыт, Tab ходит по кнопкам островка, Esc — закрыт, фокус на аватаре.
 6. «Команда», «Доски», «Календарь», «Почта», офисный файл: в «Команде» полный островок как раньше, на остальных — аватар.
 7. Настройки → Основное → «Островок: сворачивать в аватар…» выключить. Ожидается: полный островок на всех экранах, как раньше.
+## Toasts at the top right, confirm before joining from a reminder
+- Raise several toasts (e.g. copy an invite link, disconnect the network): they stack at the top right under the title bar, newest on top, clear of the inbox / settings / help icons; open the inbox — the stack steps left of it. Phone: under the top bar.
+- Meeting with a voice room, reminder «Через 15 минут…» (system notification or toast): a click only brings the window forward and opens «Войти в комнату?» — nobody is joined until «Войти в комнату».
+- Esc / × / «Открыть встречу» close it without joining; «Открыть встречу» shows the meeting in the calendar.
+- Be in another voice room or a call first: the dialog says so, the button reads «Выйти и войти»; confirming leaves it and joins the meeting room.
+- Already in the meeting room: the click only shows the room, no dialog. «Перейти в комнату» in the event card still joins at once.
