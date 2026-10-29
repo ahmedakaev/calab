@@ -168,3 +168,38 @@ func TestPushIncomingVoIPCurrentRingSessionAndExpiry(t *testing.T) {
 	}
 	callAction(t, caller.user, 200, expired.ID.String(), "cancel")
 }
+
+// Android carries messages and calls on one FCM token: message preferences off must
+// still ring, and the ring resolves through the same current-session receipt.
+func TestPushIncomingCallOverFCMEndpoint(t *testing.T) {
+	rec := &pushRecorder{}
+	a := app.New(app.Deps{Config: testCfg, DB: testDB, Redis: testRedis, Events: events.Nop{}, Blob: testStore, LiveKit: lkRec, Push: map[v1.PushProvider]push.Provider{
+		v1.PushProvider_PUSH_PROVIDER_FCM: {AppID: "ru.calab.test", Environment: "production", Sender: rec},
+	}})
+	server := httptest.NewServer(a.Handler)
+	t.Cleanup(server.Close)
+	caller, callee, _, _ := callTeam(t)
+	dm := openDM(t, caller.user, callee.id, 201).GetRoom().GetId()
+	request := &v1.RegisterPushDeviceRequest{Provider: v1.PushProvider_PUSH_PROVIDER_FCM, AppId: "ru.calab.test", Environment: "production", InstallationId: uuid.NewString(), Token: "fcm:" + strings.Repeat("A1_-", 30), CallsEnabled: true, NotificationsEnabled: false, MentionsEnabled: proto.Bool(false), AllEnabled: false}
+	var endpoint v1.RegisterPushDeviceResponse
+	pushHTTP(t, server, callee.user, 200, "POST", "/api/me/push-devices", request, &endpoint)
+	t.Cleanup(func() {
+		_, _ = testDB.Pool.Exec(context.Background(), "DELETE FROM push_devices WHERE id=$1", endpoint.Id)
+	})
+	r := calls.Record{ID: uuid.New(), DM: uuid.MustParse(dm), Caller: uuid.MustParse(caller.id), Callee: uuid.MustParse(callee.id), Created: time.Now().UnixMilli(), State: v1.CallState_CALL_STATE_RINGING}
+	if _, err := (calls.Store{C: testRedis}).Start(context.Background(), r, time.Now().Add(45*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	a.Push.Observe(context.Background(), uuid.MustParse(callee.id), &v1.DispatchEvent{Event: &v1.DispatchEvent_CallRing{CallRing: &v1.CallRing{Call: r.Proto()}}})
+	deliverPush(t, a.Push)
+	sent := rec.sent()
+	if len(sent) != 1 || sent[0].Kind != "call" || sent[0].Binding != endpoint.Id {
+		t.Fatal("FCM call endpoint did not ring", len(sent))
+	}
+	var response v1.ResolvePushResponse
+	pushHTTP(t, server, callee.user, 200, "POST", "/api/me/push-resolve", &v1.ResolvePushRequest{Binding: sent[0].Binding, EventId: sent[0].EventID}, &response)
+	if response.Call == nil || response.Call.Id != r.ID.String() || response.RoomId != dm {
+		t.Fatal("FCM ring resolve mismatch")
+	}
+	callAction(t, caller.user, 200, r.ID.String(), "cancel")
+}

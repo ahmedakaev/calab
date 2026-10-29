@@ -139,7 +139,7 @@ func (s *Service) queueUser(ctx context.Context, userID uuid.UUID, job sqlc.Push
 }
 func deviceEnabled(provider int16, notifications, calls bool, kind int16) bool {
 	if kind == callKind {
-		return calls && provider == int16(v1.PushProvider_PUSH_PROVIDER_VOIP)
+		return calls && (provider == int16(v1.PushProvider_PUSH_PROVIDER_VOIP) || provider == int16(v1.PushProvider_PUSH_PROVIDER_FCM))
 	}
 	return notifications && provider != int16(v1.PushProvider_PUSH_PROVIDER_VOIP)
 }

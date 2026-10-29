@@ -274,21 +274,9 @@ func (s *fcmSender) Send(ctx context.Context, e Endpoint, p Payload) Result {
 	if !routingValid(p) {
 		return Result{}
 	}
-	payload, err := json.Marshal(p)
+	data, err := fcmData(p)
 	if err != nil {
 		return Result{}
-	}
-	var raw map[string]json.RawMessage
-	if err = json.Unmarshal(payload, &raw); err != nil {
-		return Result{}
-	}
-	data := make(map[string]string, len(raw))
-	for key, value := range raw {
-		var text string
-		if err = json.Unmarshal(value, &text); err != nil {
-			text = string(value)
-		}
-		data[key] = text
 	}
 	remaining := min(max(time.Until(time.UnixMilli(deliveryExpiry(p))), 0), 10*time.Minute)
 	if remaining <= 0 {
@@ -346,6 +334,55 @@ func (s *fcmSender) Send(ctx context.Context, e Endpoint, p Payload) Result {
 		}
 	}
 	return Result{}
+}
+
+// fcmLimit is the FCM data payload limit (keys and values, bytes).
+const fcmLimit = 4096
+
+// fcmData flattens the routing payload into FCM string data. Android renders the
+// notification itself (data-only message), so a message carries the same title,
+// subtitle and body APNs puts into its alert (ADR-0072 privacy already applied);
+// other kinds stay generic. An optional picture never makes a valid alert too large.
+func fcmData(p Payload) (map[string]string, error) {
+	encode := func(p Payload) (map[string]string, int, error) {
+		payload, err := json.Marshal(p)
+		if err != nil {
+			return nil, 0, err
+		}
+		var raw map[string]json.RawMessage
+		if err = json.Unmarshal(payload, &raw); err != nil {
+			return nil, 0, err
+		}
+		data := make(map[string]string, len(raw)+3)
+		for key, value := range raw {
+			var text string
+			if err = json.Unmarshal(value, &text); err != nil {
+				text = string(value)
+			}
+			data[key] = text
+		}
+		if p.Kind == "message" && p.Title != "" && p.Body != "" {
+			data["title"] = previewLine(p.Title, 80)
+			data["body"] = previewLine(p.Body, 240)
+			if subtitle := previewLine(p.Subtitle, 80); subtitle != "" {
+				data["subtitle"] = subtitle
+			}
+		}
+		size := 0
+		for key, value := range data {
+			size += len(key) + len(value)
+		}
+		return data, size, nil
+	}
+	data, size, err := encode(p)
+	if err == nil && size > fcmLimit && p.AvatarJPEG != "" {
+		p.AvatarJPEG = ""
+		data, size, err = encode(p)
+	}
+	if err == nil && size > fcmLimit {
+		err = fmt.Errorf("push presentation exceeds FCM limit")
+	}
+	return data, err
 }
 
 // Optional pictures must never turn an otherwise valid alert into PayloadTooLarge.

@@ -36,6 +36,29 @@ func providerResponse(code int, body string, headers http.Header) *http.Response
 func providerPayload() Payload {
 	return Payload{Version: 1, Binding: uuid.NewString(), EventID: uuid.NewString(), Kind: "call", ReferenceID: uuid.NewString(), RoomID: uuid.NewString(), ExpiresAt: time.Now().Add(40 * time.Second).UnixMilli()}
 }
+func TestFCMDataCarriesMessagePresentationWithinLimit(t *testing.T) {
+	p := providerPayload()
+	p.Kind, p.Title, p.Subtitle, p.Body = "message", "Илья", "Общий", "Привет"
+	data, err := fcmData(p)
+	if err != nil || data["title"] != "Илья" || data["subtitle"] != "Общий" || data["body"] != "Привет" || data["kind"] != "message" || data["v"] != "1" {
+		t.Fatal("FCM message presentation missing", data)
+	}
+	if _, leaked := data["referenceId"]; leaked || data["binding"] != p.Binding {
+		t.Fatal("FCM data must keep routing opaque")
+	}
+	call := providerPayload()
+	call.Title, call.Body, call.CallerName = "x", "y", "Илья"
+	data, err = fcmData(call)
+	if err != nil || data["title"] != "" || data["body"] != "" || data["callerName"] != "Илья" {
+		t.Fatal("only messages carry alert text")
+	}
+	p.Body = strings.Repeat("я", 240)
+	p.AvatarJPEG = strings.Repeat("A", 3800)
+	data, err = fcmData(p)
+	if err != nil || data["avatarJpeg"] != "" || data["body"] == "" {
+		t.Fatal("optional picture must yield to the FCM limit")
+	}
+}
 func TestAPNSRequestBoundedMinimalVoIPAndTimestamp(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
