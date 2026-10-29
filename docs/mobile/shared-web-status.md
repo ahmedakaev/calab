@@ -1,5 +1,7 @@
 # Телефон: общий веб в оболочке — статус
 
+Как собрать и выпустить `apps/mobile` в TestFlight/Play — [release.md](release.md).
+
 ## 2026-10-29: Android entry link dropped right after loading (regression from #263, DEV-4947)
 
 Found on a real Android phone (Play internal testing build 1.0.0 (2)): a task/room link opened
