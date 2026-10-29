@@ -2082,6 +2082,7 @@ CALABA_WEB_URL=http://127.0.0.1:39571 npx playwright test --config playwright.we
 | C.27 | «Удалить из календаря»: своё событие с участниками, чужое приглашение, вхождение серии («Только это событие»), серия; затем изменить событие у провайдера и удалить в Calab без синхронизации; календарь только для чтения | Текст подтверждения по роли; событие исчезает сразу и у провайдера (участникам — отмена); вхождение — остальные остаются; изменённое — тост «изменилось», событие на месте; read-only — тост; боту / гостю `DELETE /api/me/external-events` — 403 |
 | C.28 | ADR-0104. А и Bob открывают одну встречу (Bob — участник), Carol видит её комнату, Dave — нет (встреча без комнаты). Bob пишет комментарий (Enter), правит его («…» → «Изменить»), А удаляет комментарий Bob; Carol комментирует встречу в своей комнате; curl Dave `GET /api/events/<id>/comments`, гость — то же | Комментарий появляется у всех открытых карточек без перезагрузки (`EVENT_COMMENT_UPSERT`), «Комментарии — N» растёт; «изменено» после правки; у А «…» → «Удалить» на чужом, у Bob «Изменить» только на своём; Dave — 404, гость — 403; у отменённой встречи комментарии видны, поля ввода нет |
 | C.29 | Диалог встречи → «Добавить участников» → ввести `@all` → строка «@all · все участники пространства · N» | Чипы всех участников пространства без гостей и ботов; больше 12 — первые 10 и «+N», рядом с «Участники» число и «Убрать всех»; в пространстве > 99 человек строка неактивна «больше 99 — во встрече до 100 человек» |
+| C.30 | Bug board #85. Настройки → Календарь → «Добавить часовой пояс» → «kolk» → Kolkata; ещё New York, подпись «Нью-Йорк», ↑; третий добавить нельзя. День и неделя; диалог новой встречи; второе устройство того же аккаунта; телефон 375 px | Слева от основной шкалы две приглушённые колонки в строках сетки (Kolkata — «…:30»), в шапке подпись и «UTC+5:30»; пилюля даты в строке полуночи пояса («+1 д» в неделе); линия «сейчас» проходит через колонки; в диалоге — время встречи в обоих поясах; на втором устройстве те же пояса; × убирает колонку; у коллеги без поясов календарь прежний |
 
 Автотесты: `docs/20-calendar-testing.md` (Go-интеграционные `internal/app/events_*_integration_test.go`, unit десктопа, Playwright e2e против мока, прод-smoke).
 
@@ -2349,6 +2350,16 @@ Stand with a real provider (telephony on, a Caller ID), member A with `PLACE_CAL
 5. Answered call: «Клавиатура» → press 1 2 #; the second phone (or an IVR you call) hears / receives the tones. If not — record it in docs/12 (DTMF line).
 6. «Набор»: type «101» → «Имя · вн. 101», call → internal call; long press «0» → «+»; paste «Тел.: 8 (916) 123-45-67» → «8 916 123-45-67». Member without `PLACE_CALLS`: the note, the call button only for internal numbers.
 
+## Telephony: tones and an extension in a room call (ADR-0046 addendum 29.10)
+
+Stand with a real provider, an IVR that reads back keys (or an office PBX with extensions), A and B in one voice room; A has `PLACE_CALLS`, B is a plain member.
+
+1. A: «Позвонить на номер» → «+7 495 … доб. 101» (also try «…,101» and «…;101») → Enter. The row and the «В голосе» card show «доб. 101»; no «Клавиатура» while it rings.
+2. Answer: ~2 s later the IVR / PBX receives 1 0 1 (the provider's CDR, or the PBX connects extension 101). Only the number reached the trunk (the provider's log).
+3. A: island «Клавиатура» → «Тоновый набор: +7 495 … доб. 101» → press 2 #; the IVR reacts; a soft tick per key in A's speakers only (B hears no clicks).
+4. B (no `MUTE_MEMBERS`): no «Клавиатура» anywhere; a moderator (`MUTE_MEMBERS`) has it. Phone (iPhone): the header's people stack → the line row → «Клавиатура» card.
+5. A second room with its own line: keys pressed in room 1 never reach room 2's callee. Hang up mid-extension («…,,,,9») → no more tones, no errors.
+
 ## Notifications lead to the source; «Упоминания» with task events (ADR-0141, #99)
 
 macOS desktop build, two workspaces, member B in both; A mentions and assigns B.
@@ -2370,3 +2381,22 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 6. Close a tab with unsaved changes → the three-button dialog. Hide the window for 5 minutes, show it → the editor opens again.
 7. Phone: «Создать → Документ» → the file is in the list with the note «Править его можно на компьютере»; opening it views only.
 8. `OFFICE_ENABLED=false` + rollout: after a reconnect the office items and the editor are gone, xlsx opens its card as before.
+
+### CalDAV source DATE preservation (ADR-0144)
+
+- Unit: `go test -race ./internal/caldav` covers calendar-date preservation, recurrence across DST and batch encoding.
+- PG17: `go test -race -tags integration -run '^TestCalDAVDatePersistence$' ./internal/app` imports a DATE event, changes the profile timezone, checks persisted dates and legacy-column defaults.
+- Migration 00133 is additive; previously imported rows acquire original dates on their next successful normal sync.
+
+### Session-bound calendar widget feed (ADR-0145)
+
+- `go test -race ./internal/calendar ./internal/caldav` covers grant type/key separation, expiry and minimized projection.
+- PG17: `go test -race -tags integration -count=1 -run '^Test(CalendarWidget|CalDAVDatePersistence|BotRouteTable)' ./internal/app` covers exact-session revocation, bot/anonymous denial, own-only/SSO policy, workday/cancelled occurrences, source DATE values and bounds.
+- `make gen` and `pnpm -F @calaba/landing gen:routes --check` must have no generated drift.
+- Native widgets and physical acceptance belong to the dependent iOS change.
+
+## Git events: draft, review, approval, target branch (ADR-0060 §4, #101 stage A)
+- `go test -race ./internal/boards/...` — golden webhooks of GitHub/GitLab/Gitea for every new event, the draft→ready flow, redelivery, target-branch globs, template variables.
+- PG18 + Valkey: `go test -tags integration -count=1 -run TestBoardGit ./internal/app` — draft → «draft» rule only; ready → «MR открыт» rule; a repeated ready / approval with another body fires nothing; merge into `preprod` with filter `main` does not move the task.
+- Manually (GitLab): rules «Draft MR открыт → In Progress», «MR открыт → In Review», «MR влит» with «Целевая ветка» `main`; open a Draft MR `feature/dev-N-…`, mark it ready, approve twice, merge into `preprod`, then into `main`. Expected: In Progress → In Review → (no move) → Ready to Deploy; one journal line per approver.
+- Comment rule `Открыт MR !{pr_number}: {pr_title} {pr_url}` → the card shows the MR number, title and link; `@everyone` in the MR title notifies nobody.

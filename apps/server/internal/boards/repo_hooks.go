@@ -398,13 +398,18 @@ func (s *Service) linkTask(ctx context.Context, q *sqlc.Queries, t taskRow, ev *
 		if err != nil && !db.IsNotFound(err) {
 			return false, err
 		}
-		if existed && prev.State == l.State && prev.Title == l.Title && prev.Url == l.URL {
+		event, seen, differs := vcs.Apply(vcs.Prior{Found: existed, State: prev.State, Title: prev.Title, URL: prev.Url, Draft: prev.Draft,
+			Seen: prev.Seen}, l)
+		if !differs {
 			continue // a repeat (or a commit seen on another branch)
 		}
 		link, err := q.UpsertTaskGitLink(ctx, sqlc.UpsertTaskGitLinkParams{TaskID: t.ID, Kind: l.Kind, Provider: ev.Provider, Repo: ev.Repo,
-			Ref: l.Ref, Title: l.Title, Url: l.URL, State: l.State, Author: l.Author})
+			Ref: l.Ref, Title: l.Title, Url: l.URL, State: l.State, Author: l.Author, Draft: l.Draft, Seen: seen})
 		if err != nil {
 			return false, err
+		}
+		if existed && event == "" && prev.State == l.State && prev.Title == l.Title && prev.Url == l.URL && prev.Draft == l.Draft {
+			continue // only the one-shot keys changed (an approval withdrawn, a reviewer removed): nothing to show
 		}
 		changed = true
 		if l.Kind == vcs.KindCommit {
@@ -413,22 +418,28 @@ func (s *Service) linkTask(ctx context.Context, q *sqlc.Queries, t taskRow, ev *
 			}
 			continue
 		}
-		event := l.Event
-		if existed && event == vcs.EventBranchCreated {
-			event = ""
-		}
 		var before map[string]any
 		if existed {
 			before = map[string]any{"state": prev.State, "title": prev.Title}
+			if l.Kind == vcs.KindPR {
+				before["draft"] = prev.Draft
+			}
 		}
-		if err := c.recordAs(ctx, q, t, nil, "git", before, map[string]any{"event": event, "kind": link.Kind, "provider": link.Provider,
-			"repo": link.Repo, "ref": link.Ref, "title": link.Title, "url": link.Url, "state": link.State}); err != nil {
+		after := map[string]any{"event": event, "kind": link.Kind, "provider": link.Provider, "repo": link.Repo, "ref": link.Ref,
+			"title": link.Title, "url": link.Url, "state": link.State, "branch": l.Branch, "author": l.Actor}
+		if l.Kind == vcs.KindPR {
+			after["target_branch"], after["draft"] = l.Target, l.Draft
+			if len(l.Users) > 0 && event != "" {
+				after["users"] = l.Users
+			}
+		}
+		if err := c.recordAs(ctx, q, t, nil, "git", before, after); err != nil {
 			return false, err
 		}
 	}
 	if len(commits) > 0 {
 		if err := c.recordAs(ctx, q, t, nil, "git", nil, map[string]any{"event": vcs.EventCommitPushed, "kind": vcs.KindCommit,
-			"provider": ev.Provider, "repo": ev.Repo, "ref": ev.Branch, "commits": commits}); err != nil {
+			"provider": ev.Provider, "repo": ev.Repo, "ref": ev.Branch, "commits": commits, "branch": ev.Branch, "author": ev.Author}); err != nil {
 			return false, err
 		}
 	}

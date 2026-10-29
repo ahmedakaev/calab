@@ -31,6 +31,7 @@ import {
   BoardCategoryResponseSchema,
   BoardWebhookPingResponseSchema,
   BoardWebhookResponseSchema,
+  ListBoardRulesResponseSchema,
   ConvertChecklistItemResponseSchema,
   CreateBoardCategoryRequestSchema,
   CreateTaskChecklistItemRequestSchema,
@@ -483,6 +484,7 @@ import {
   UserSchema,
   UserSettingsSchema,
   WorkHoursSchema,
+  CalendarZoneSchema,
   VoiceStateSchema,
   VoiceDisconnectReason,
   VoiceStreamStopReason,
@@ -780,9 +782,11 @@ export interface MockServer {
    * ADR-0046: `byUserId` placed a call from `roomId` (no permission checks) → SIP_CALL_UPDATE to the
    * room's viewers; `status` default DIALING, `answeredAgoMs` sets answered_at for ACTIVE. Its id.
    */
-  placeSipCall(roomId: string, byUserId: string, number: string, status?: SipCallStatus, answeredAgoMs?: number): string;
+  placeSipCall(roomId: string, byUserId: string, number: string, status?: SipCallStatus, answeredAgoMs?: number, extension?: string): string;
   /** ADR-0046: moves a call (RINGING / ACTIVE / ENDED / FAILED with `reason`) → SIP_CALL_UPDATE. */
   setSipCallStatus(callId: string, status: SipCallStatus, reason?: string): void;
+  /** ADR-0046: the id of the room's live phone call (placed from the UI); '' = none. */
+  liveSipCallOf(roomId: string): string;
   /**
    * ADR-0117: «Команда Calab» on a plan with telephony, a saved SIP account and an exchange — four
    * numbers (103 unassigned, Григорий without one), groups «Отдел продаж» (round robin, forwards to 100 after 45 s) and
@@ -953,6 +957,8 @@ export interface MockServer {
   setCalDav(userId: string, patch?: Partial<CalDavRec>): void;
   /** ADR-0041: `userId`'s work hours (default 10:00–19:00 Mon–Fri in their zone; the mock's default zone is Moscow). */
   setWorkHours(userId: string, wh: WorkHoursRec): void;
+  /** Board #85: `userId`'s extra calendar zones (Me.settings.calendar_zones), pushed with their Me. */
+  setCalendarZones(userId: string, zones: ReadonlyArray<{ zone: string; label?: string }>): void;
   /** ADR-0041 §4: what the fake CalDAV server holds for `userId`: a sync with import on copies it to their external busy time (default: 11:00–12:00 MSK of the clock's day). */
   setCalDavRemote(userId: string, intervals: readonly Span[]): void;
   /** The answer link token of an external attendee (the page /e/<id>/rsvp?t=…). */
@@ -1033,8 +1039,9 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     setRecording: (roomId, rec) => impl.setRecording(roomId, rec),
     setGptunnel: (ws, by) => impl.setGptunnel(ws, by),
     setSip: (ws, patch) => impl.setSip(ws, patch),
-    placeSipCall: (roomId, by, number, status, ago) => impl.placeSipCall(roomId, by, number, status, ago),
+    placeSipCall: (roomId, by, number, status, ago, ext) => impl.placeSipCall(roomId, by, number, status, ago, ext),
     setSipCallStatus: (id, status, reason) => impl.setSipCallStatus(id, status, reason),
+    liveSipCallOf: (roomId) => impl.liveSipCallOf(roomId),
     seedSipExchange: (empty) => impl.seedSipExchange(empty),
     setSipRegistration: (st) => impl.setSipRegistration(st),
     seedSipSchedule: () => impl.seedSipSchedule(),
@@ -1082,6 +1089,10 @@ export async function startMockServer(opts: MockServerOptions = {}): Promise<Moc
     },
     setCalDav: (u, patch) => impl.seedCalDav(u, patch),
     setWorkHours: (u, wh) => impl.calWorkHours.set(u, { ...wh, days: [...wh.days] }),
+    setCalendarZones: (u, zones) => {
+      const rec = impl.state.users.get(u);
+      if (rec) rec.settings.calendarZones = zones.map((z) => create(CalendarZoneSchema, { zone: z.zone, label: z.label ?? '' }));
+    },
     setCalDavRemote: (u, list) => impl.calDavRemote.set(u, [...list]),
     setEventRecording: (id, at, rec) => impl.setEventRecording(id, at, rec),
     eventRsvpToken: (id, email, st) => rsvpToken(id, email, st),
@@ -3393,11 +3404,20 @@ class MockImpl {
         u.settings.eventReminders = mins.sort((x, y) => y - x);
         u.settings.eventRemindersDnd = b.eventReminders.dnd;
       }
+      if (b.calendarZones) {
+        // Board #85 (the server's rules, users/calendar_zones.go): ≤ 2 distinct IANA zones, labels ≤ 16.
+        if (u.user.isBot) throw forbidden('not for bots');
+        const zones = b.calendarZones.zones.map((z) => ({ zone: z.zone.trim(), label: z.label.trim() }));
+        if (zones.length > 2 || new Set(zones.map((z) => z.zone)).size !== zones.length || zones.some((z) => !/^[A-Z][A-Za-z0-9_+-]*(\/[A-Z][A-Za-z0-9_+-]*)*$/.test(z.zone) || Array.from(z.label).length > 16))
+          throw invalid('calendarZones.zones', 'at most 2 distinct IANA zones, labels ≤ 16 characters');
+        u.settings.calendarZones = zones.map((z) => create(CalendarZoneSchema, z));
+      }
       if (b.settings) {
         const st = create(UserSettingsSchema, b.settings);
         // Meeting reminders are stored apart: a settings replace keeps them (user.proto).
         st.eventReminders = u.settings.eventReminders;
         st.eventRemindersDnd = u.settings.eventRemindersDnd;
+        st.calendarZones = u.settings.calendarZones; // board #85: kept apart too
         if (st.micMode === MicMode.UNSPECIFIED) st.micMode = MicMode.VAD;
         // The server keeps the deprecated flag in sync with mic_mode (user.proto).
         // eslint-disable-next-line @typescript-eslint/no-deprecated
@@ -6484,7 +6504,7 @@ class MockImpl {
     this.placeSipCall(IDS.rooms.call, IDS.users.anna, '+79262223344', SipCallStatus.ACTIVE, 300_000);
   }
 
-  placeSipCall(roomId: string, byUserId: string, number: string, status = SipCallStatus.DIALING, answeredAgoMs?: number): string {
+  placeSipCall(roomId: string, byUserId: string, number: string, status = SipCallStatus.DIALING, answeredAgoMs?: number, extension = ''): string {
     const room = this.state.rooms.get(roomId);
     if (!room) throw notFound('room not found');
     const id = nextId(this.state, 'file');
@@ -6498,11 +6518,16 @@ class MockImpl {
       status,
       startedAt: timestampFromMs(Date.now() - (answeredAgoMs ?? 0) - 5000),
       participantIdentity: `sip:${id}`,
+      extension,
       ...(status === SipCallStatus.ACTIVE ? { answeredAt: timestampFromMs(Date.now() - (answeredAgoMs ?? 0)) } : {}),
     });
     this.state.sipCalls.set(id, c);
     this.announceSipCall(c);
     return id;
+  }
+
+  liveSipCallOf(roomId: string): string {
+    return [...this.state.sipCalls.values()].find((c) => c.roomId === roomId && isLiveSipStatus(c.status))?.id ?? '';
   }
 
   setSipCallStatus(callId: string, status: SipCallStatus, reason = ''): void {
@@ -7075,7 +7100,9 @@ class MockImpl {
       if (!m || m.role === WorkspaceRole.GUEST) throw forbidden('guests cannot place calls');
       this.requireRoomPerm(room, me, PERMISSION_BITS.PLACE_CALLS | CONNECT);
       if (room.type !== RoomType.VOICE) throw invalid('id', 'not a voice room');
-      const number = normalizeCallee(parseBody(c, PlaceSipCallRequestSchema).number);
+      // An extension after the number (the client sends «<number>,<extension>»; sip.SplitExtension).
+      const [raw = '', ...ext] = parseBody(c, PlaceSipCallRequestSchema).number.split(',');
+      const number = normalizeCallee(raw);
       if (!number) throw invalid('number', 'not a phone number');
       const s = this.sipSettingsOf(room.workspaceId);
       if (!s.enabled || !s.trunkSaved) throw new HttpError(409, ErrorCode.SIP_DISABLED, 'telephony is off');
@@ -7083,7 +7110,7 @@ class MockImpl {
       if ([...this.state.sipCalls.values()].some((x) => x.roomId === room.id && isLiveSipStatus(x.status))) throw new HttpError(409, ErrorCode.SIP_CALL_ACTIVE, 'a call is already active in this room');
       if (!numberAllowed(number, s.allowedPrefixes)) throw new HttpError(422, ErrorCode.SIP_NUMBER_NOT_ALLOWED, 'the number is not in the allowed prefixes', 'number');
       if (number === MOCK_SIP_RATE_NUMBER) throw new HttpError(429, ErrorCode.SIP_RATE_LIMITED, 'too many calls', '', {}, { 'Retry-After': '600' });
-      const id = this.placeSipCall(room.id, me, number);
+      const id = this.placeSipCall(room.id, me, number, SipCallStatus.DIALING, undefined, ext.join(','));
       sendMsg(c.res, 201, SipCallResponseSchema, { call: this.state.sipCalls.get(id) });
     });
 
@@ -8522,6 +8549,8 @@ class MockImpl {
       noContent(c.res);
     });
     this.boardRoute('POST', '/api/boards/:id/webhook/ping', (c, me) => sendMsg(c.res, 200, BoardWebhookPingResponseSchema, b().pingWebhook(c.params[0] ?? '', me)));
+    // ADR-0060: board rules — an empty list only (the rule editor is shot unsaved).
+    this.boardRoute('GET', '/api/boards/:id/rules', (c) => sendMsg(c.res, 200, ListBoardRulesResponseSchema, { rules: [] }));
     // ADR-0058 §2: checklists (TASK_CHECKLIST_* events, no TASK_UPDATE).
     this.boardRoute('POST', '/api/tasks/:id/checklists', (c, me) => {
       const r = parseBody(c, CreateTaskChecklistRequestSchema);

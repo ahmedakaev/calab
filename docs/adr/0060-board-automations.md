@@ -113,6 +113,21 @@ task_git_links     id uuidv7, task_id → tasks CASCADE, kind ('branch'|'pr'|'co
   ни его, ни коммиты push'а до него (в payload GitLab/Gitea нет parents, свои коммиты, отправленные вместе с merge,
   тоже теряются — они остаются привязаны к PR по ветке). На задачу — ≤ 50 связей, старые
   коммиты вытесняются.
+- **Черновики, ревью, апрув, целевая ветка** (доска #101, этап A, 2026-10-29): событие несёт `draft` (GitLab
+  `draft`/`work_in_progress`, GitHub `draft`, Gitea `draft` или заголовок `WIP:`/`[WIP]`) и целевую ветку (GitLab
+  `target_branch`, GitHub/Gitea `base.ref`). Новые `RuleGitEvent`: `PR_DRAFT_OPENED` (черновик открыт — **не**
+  `PR_OPENED`), `PR_READY` (GitLab `update` с `changes.draft` true→false, GitHub `ready_for_review`, а также любая правка,
+  после которой сохранённый черновик перестал им быть), `PR_REVIEW_REQUESTED` (GitLab `changes.reviewers` — добавленные,
+  GitHub/Gitea `review_requested`), `PR_APPROVED` (GitLab `approval`/`approved`, GitHub `pull_request_review` `approved`,
+  Gitea `pull_request_approved`). Правило на `PR_OPENED` срабатывает и на `PR_READY` («открыт для ревью», как Linear).
+  Одна доставка — одно событие (в GitLab `update` смена draft важнее добавленных ревьюеров). **Идемпотентность** сверх
+  хэша тела в Valkey: решение принимает `vcs.Apply` против сохранённой связи — `draft` (повтор «ready» ничего не делает) и
+  `seen` (ключи `approved:<user>`, `review:<user>`: событие только для нового ключа; `unapproval`/`dismissed`/снятие
+  ревьюера ключ удаляют — повторный апрув снова событие). Фильтр триггера `Git.target_branches` (≤ 10, ≤ 200 символов,
+  без пробелов): точное имя или glob (`*` — любые символы включая `/`, `?` — один); пусто — любая ветка; непустой фильтр
+  не совпадает с событиями ветки/коммита. Шаблоны действий Git-правил: `{pr_url} {pr_number} {pr_title} {branch}
+  {target_branch} {git_author}` (`git_author` — кто совершил событие); значения — одна строка ≤ 200 символов, `@` с
+  U+2060 (тексты автоматизаций не разбираются на упоминания, а так и не будут). Для других триггеров — пусто.
 - **Результат**: upsert `task_git_links` (PR меняет `state`/`title`), запись журнала `git` (`before/after` — связь),
   событие `TASK_GIT_LINKS_UPDATE`, вебхук доски `task.updated` с `changes[field=git]`, триггер правил `git {event}` —
   всё в одной транзакции. Smart-commit `FNG-12 #done` / `#status:<имя>` — **не в v1** (бэклог: переходы делать правилами

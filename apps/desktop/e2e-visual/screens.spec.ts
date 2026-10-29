@@ -168,6 +168,8 @@ const KEY = new Set([
   'calendar-filter',
   'calendar-findtime',
   'settings-calendar',
+  // Extra time zones of the hour axis (board #85).
+  'calendar-zones',
   // External calendar event details (ADR-0045).
   'calendar-external',
   'settings-caldav',
@@ -4097,6 +4099,58 @@ test('settings-calendar', async ({ open, win, mock, shot }) => {
   await checkpoint(shot, 'settings-calendar');
 });
 
+/**
+ * Board #85 (Yandex Calendar's «ещё один часовой пояс»): Калькутта (UTC+5:30) as a muted hour
+ * column left of the main scale in the day and the week, its label over the offset, the axis «now»
+ * line; then Settings → Календарь adds New York by search (the picker shows offset and time now)
+ * and labels it; the week and the day with both (New York on the previous day until 08:00 MSK).
+ */
+test('calendar-zones', async ({ open, win, mock, shot }) => {
+  await open();
+  // Me is read at start: the zone is set after the mock's reset, then the window reloads.
+  mock.setCalendarZones(IDS.users.anna, [{ zone: 'Asia/Kolkata' }]);
+  await win.reload();
+  await expect(win.locator('aside').first()).toBeVisible({ timeout: 30_000 });
+  await mainWindow(win, mock);
+  await calendarDay(win, mock);
+  await win.locator(`[data-cal-day="${DAY}"]`).click();
+  const day = win.getByTestId('day-view');
+  await expect(day.getByTestId('zone-scale')).toHaveCount(1);
+  await expect(day.getByTestId('zone-head')).toHaveText(/Kolkata\s*UTC\+5:30/);
+  await expect(day.getByTestId('zone-now')).toBeVisible();
+  await checkpoint(shot, 'calendar-day-zone1');
+  await win.getByTestId('cal-view').getByRole('radio', { name: /Неделя|Week/ }).click();
+  const week = win.getByTestId('week-view');
+  await expect(week.getByTestId('zone-scale')).toHaveCount(1);
+  await expect(week.getByTestId('zone-now')).toBeVisible();
+  await checkpoint(shot, 'calendar-week-zone1');
+
+  await openSettingsTab(win, openAppSettings(win), appTab('calendar'));
+  await win.getByTestId('cal-zone-add').click();
+  await win.getByPlaceholder('Город или пояс').fill('New York');
+  await expect(win.getByTestId('cal-zone-list').getByRole('option').first()).toContainText('UTC−5');
+  await checkpoint(shot, 'settings-calendar-zones-picker');
+  await win.getByPlaceholder('Город или пояс').press('Enter');
+  const labels = win.getByTestId('cal-zone-label');
+  await expect(labels).toHaveCount(2);
+  await labels.nth(1).fill('Нью-Йорк');
+  await labels.nth(1).press('Enter');
+  await expect(win.getByRole('dialog').getByText('Нью-Йорк', { exact: true })).toBeVisible();
+  await expect(win.getByTestId('cal-zone-add')).toHaveCount(0);
+  await checkpoint(shot, 'settings-calendar-zones');
+  await win.keyboard.press('Escape');
+  await expect(win.getByRole('dialog')).toHaveCount(0);
+
+  await expect(week.getByTestId('zone-scale')).toHaveCount(2);
+  await week.getByTestId('week-scroller').evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(week.getByTestId('zone-newday').first()).toBeVisible();
+  await checkpoint(shot, 'calendar-week-zones');
+  await win.getByTestId('cal-view').getByRole('radio', { name: /День|Day/ }).click();
+  await expect(day.getByTestId('zone-scale')).toHaveCount(2);
+  await day.getByTestId('day-scroller').evaluate((el) => el.scrollTo({ top: 6 * 48 }));
+  await checkpoint(shot, 'calendar-day-zones');
+});
+
 /** ADR-0045 §3: a click on my external event — its attendees (Борис by avatar and name, the rest by address), «Открыть», «Создать встречу в Calab». */
 test('calendar-external', async ({ open, win, mock, shot }) => {
   await open();
@@ -4601,6 +4655,26 @@ test('boards-settings', async ({ open, win, mock, shot }) => {
   for (const b of await win.getByTestId('toast').locator('button[aria-label="Закрыть уведомление"]').all()) await b.evaluate((x) => (x as HTMLButtonElement).click());
   await expect(win.getByTestId('toast')).toHaveCount(0);
   await checkpoint(shot, 'boards-settings-access');
+  // Board task #101: a Git rule — the new events, «Целевая ветка», the Git template variables.
+  await win.getByRole('tab', { name: 'Автоматизации' }).click();
+  await expect(win.getByTestId('rules-empty')).toBeVisible();
+  await win.getByTestId('rule-add').click();
+  await win.getByTestId('rule-name').fill('MR влит в main → готово');
+  await win.getByTestId('rule-trigger').selectOption('git');
+  const ev = win.getByTestId('rule-git-event');
+  await expect(ev.locator('option')).toHaveText(['Любое событие', 'Создана ветка', 'Открыт черновик PR', 'Открыт PR', 'Черновик PR готов к ревью', 'Запрошено ревью', 'PR одобрен', 'PR смержен', 'PR закрыт без слияния', 'Новый коммит']);
+  await ev.selectOption({ label: 'Новый коммит' });
+  await expect(win.getByTestId('rule-git-branches')).toHaveCount(0); // a push has no target branch
+  await ev.selectOption({ label: 'PR смержен' });
+  await win.getByTestId('rule-git-branches').fill('main, release/*');
+  await win.getByTestId('rule-action-kind').selectOption('comment');
+  await expect(win.getByTestId('rule-git-vars')).toHaveText('Git: {pr_url} {pr_number} {pr_title} {branch} {target_branch} {git_author}');
+  await win.getByLabel('Текст').fill('Влит MR !{pr_number}: {pr_title} → {target_branch}');
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-rules-git-vars');
+  await win.getByTestId('rule-when').scrollIntoViewIfNeeded();
+  await win.getByTestId('rule-name').focus();
+  await checkpoint(shot, 'boards-rules-git');
 });
 
 /** Board settings → «Статусы», the colour picker of the first status open (ADR-0093): a 6-wide grid over the rows. */

@@ -2,7 +2,7 @@ import { seedInlineButtons } from '../e2e-support/inline-buttons';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { AiState, FormerMemberReason, Plan, RecordingStatus, WorkspaceRole } from '@calaba/protocol';
+import { AiState, FormerMemberReason, Plan, RecordingStatus, SipCallStatus, WorkspaceRole } from '@calaba/protocol';
 import { ts } from '../e2e-support/fixtures';
 import { CANVAS_PUBLIC_CODE, CODE_FIXTURE, IDS, MOCK_GPTUNNEL_WEB, WIKI_PUBLIC_CODE, startMockServer, type MockServer } from '../e2e-support/mock-server';
 import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
@@ -951,6 +951,26 @@ test('m-calendar-day', async ({ page }) => {
   await longPress(page.getByTestId('event-block').filter({ hasText: 'Планёрка' }));
   await expectMenuCard(page, 'm-calendar-event-menu');
   await expect(page.getByTestId('event-panel')).toHaveCount(0);
+});
+
+// Board #85: two extra zones as narrow muted columns left of the day's scale (compact offsets),
+// New York on the previous day until 08:00 MSK; the same list in Profile → Календарь.
+test('m-calendar-zones', async ({ page }) => {
+  mock.setClock(NOW.getTime());
+  seedDay(mock);
+  mock.setCalendarZones(IDS.users.anna, [{ zone: 'Asia/Kolkata' }, { zone: 'America/New_York', label: 'Нью-Йорк' }]);
+  await signedIn(page);
+  await tab(page, 'calendar');
+  const day = page.getByTestId('day-view');
+  await expect(day.getByTestId('zone-scale')).toHaveCount(2);
+  await expect(day.getByTestId('zone-head').first()).toHaveText(/Kolkata\s*\+5:30/);
+  await day.getByTestId('day-scroller').evaluate((el) => el.scrollTo({ top: 6 * 48 }));
+  await checkpoint(page, 'm-calendar-zones');
+  await openProfile(page);
+  await page.getByTestId('phone-profile-calendar').tap();
+  await expect(page.getByTestId('cal-zone-label')).toHaveCount(2);
+  await page.getByTestId('cal-zone-label').last().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await checkpoint(page, 'm-settings-calendar-zones');
 });
 
 // The header's date opens a month card (weekday in the label, today / chosen day marked); a day pick navigates.
@@ -2052,6 +2072,36 @@ test('m-telephony-no-place-calls', async ({ page }) => {
   for (const k of '101') await dial.locator(`[data-key="${k}"]`).tap();
   await expect(dial.getByTestId('tel-dial-suggestion')).toContainText('Борис Петров');
   await expect(dial.getByTestId('tel-dial-call')).toBeEnabled();
+});
+
+// ADR-0046 addendum «Тональный набор»: a voice room's answered phone line on a phone — the
+// header's «В голосе» card lists it after the people («+7 495 123-45-67 доб. 101», «Клавиатура»,
+// «Завершить»); «Клавиатура» opens the shared tone pad as a centred card over it (owner 07.10: no
+// bottom sheets), a level the «‹» or a tap on the card beneath takes back.
+test('m-telephony-room-keypad', async ({ page }) => {
+  await signedIn(page);
+  mock.seedSipExchange();
+  await openRoom(page, /^Созвон/);
+  await page.getByTestId('room-header-join').tap();
+  const strip = page.getByTestId('mobile-voice-strip');
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText(/подключ|\d{2}:\d{2}/i, { timeout: 30_000 });
+  mock.placeSipCall(IDS.rooms.call, IDS.users.anna, '+74951234567', SipCallStatus.ACTIVE, 65_000, '101');
+  // WebKit here has no microphone: its toast is not what the frames are about.
+  await page.getByTestId('toast').first().waitFor({ timeout: 5000 }).catch(() => undefined);
+  while (await page.getByTestId('toast').count()) await page.getByTestId('toast').first().getByRole('button', { name: 'Закрыть' }).tap();
+  await page.getByTestId('room-voice-people').tap();
+  const card = page.getByTestId('voice-people-card');
+  const line = card.getByTestId('sip-call-row');
+  await expect(line).toHaveAttribute('aria-label', 'Телефон +7 495 123-45-67 доб. 101');
+  await expect(line.getByTestId('sip-call-ext')).toHaveText('· доб. 101');
+  await expect(line.getByTestId('sip-hangup')).toBeVisible();
+  await checkpoint(page, 'm-room-call-line', { mask: [line.getByTestId('sip-status'), strip.getByTestId('mobile-voice-status')] });
+  await line.getByTestId('sip-keypad').tap();
+  const sheet = page.getByTestId('sip-keypad-popover');
+  await expect(sheet.getByTestId('dtmf-for')).toHaveText('Тоновый набор: +7 495 123-45-67 доб. 101');
+  for (const k of '2#') await sheet.locator(`[data-key="${k}"]`).tap();
+  await expect(sheet.getByTestId('dtmf-typed')).toHaveText('2#');
+  await checkpoint(page, 'm-room-call-keypad', { mask: [strip.getByTestId('mobile-voice-status')] });
 });
 
 // «Телефония» pinned to the bar (in place of «Календарь»): the tab with my missed calls.

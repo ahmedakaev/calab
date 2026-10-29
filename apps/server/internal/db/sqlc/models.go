@@ -993,6 +993,8 @@ type ExternalBusy struct {
 	Etag      string
 	Recurring bool
 	WebUrl    string
+	StartDate string
+	EndDate   string
 }
 
 type ExternalRemindersSent struct {
@@ -1642,6 +1644,7 @@ type SipCall struct {
 	Origin              string
 	PeerE164            string
 	Missed              bool
+	Extension           string
 }
 
 type SipCallEvent struct {
@@ -1918,6 +1921,8 @@ type TaskGitLink struct {
 	Author    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Draft     bool
+	Seen      []string
 }
 
 type TaskLabel struct {
@@ -2016,6 +2021,7 @@ type User struct {
 	Phone                          *string
 	TaskNotifyOff                  []string
 	TaskNotifyBots                 []uuid.UUID
+	CalendarZones                  []byte
 }
 
 type UserAttribution struct {
