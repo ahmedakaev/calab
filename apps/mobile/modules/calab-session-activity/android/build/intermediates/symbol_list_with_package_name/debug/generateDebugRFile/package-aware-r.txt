@@ -1,0 +1,9 @@
+io.calab.host
+drawable calab_notification
+string calab_push_answer
+string calab_push_app_name
+string calab_push_channel_calls
+string calab_push_channel_messages
+string calab_push_decline
+string calab_push_incoming_call
+string calab_push_new_notification

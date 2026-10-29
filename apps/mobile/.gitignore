@@ -14,3 +14,5 @@ dist/
 *.mobileprovision
 credentials.json
 dist-ios/
+# Firebase client config (ADR-0070 Android): per deployment, never committed.
+google-services.json
