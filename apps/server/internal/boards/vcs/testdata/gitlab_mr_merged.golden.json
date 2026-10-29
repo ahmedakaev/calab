@@ -23,7 +23,11 @@
       "Actor": "root",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": [
+        "4929cf3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
     }
   },
   "Links": [
@@ -43,7 +47,11 @@
       "Actor": "root",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": [
+        "4929cf3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
     },
     {
       "Number": 6,
@@ -61,7 +69,8 @@
       "Actor": "root",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   ]
 }

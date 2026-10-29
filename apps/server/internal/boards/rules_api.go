@@ -152,6 +152,12 @@ func (s *Service) validateRule(r *http.Request, q *sqlc.Queries, b sqlc.Board, n
 			return in, err
 		}
 		k.Git.TargetBranches = bs
+	case *v1.RuleTrigger_Release_:
+		envs, err := validEnvironments(k.Release.GetEnvironments())
+		if err != nil {
+			return in, err
+		}
+		k.Release.Environments = envs
 	case *v1.RuleTrigger_DueIn_, *v1.RuleTrigger_Overdue_:
 		if tr.GetDueIn().GetDays() > MaxRuleTriggerDay || tr.GetOverdue().GetDays() > MaxRuleTriggerDay {
 			return in, httpx.Validation("trigger", "days must be 0..30")
