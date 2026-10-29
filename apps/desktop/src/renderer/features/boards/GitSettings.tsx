@@ -173,7 +173,7 @@ function BacklinkCard({ board, git, onSaved }: { board: Board; git: BoardGit; on
   const status = !git.backlinkError ? '' : !git.hasApiToken ? t('git.backlink.noToken') : !git.gitlabUrl ? t('git.backlink.noUrl') : t('git.lastError', { error: git.backlinkError });
   return (
     <Card title={t('git.backlink.card')} footer={t('git.backlink.footer')}>
-      <div className="px-3" data-testid="git-backlink">
+      <div className="px-3 py-1.5" data-testid="git-backlink">
         <Switch checked={git.backlink} disabled={busy} onChange={(v) => void save({ backlink: v })} label={t('git.backlink.switch')} hint={t('git.backlink.hint', { key: board.key })} />
       </div>
       <Row label={t('git.backlink.url')}>

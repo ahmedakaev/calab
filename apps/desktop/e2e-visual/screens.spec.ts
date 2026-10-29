@@ -7,7 +7,7 @@ import { FREE_PLAN_LIMITS, defaultSettings, mockPdf, ts } from '../e2e-support/f
 import { CODE_FIXTURE, IDS, MOCK_GPTUNNEL_CODE, MOCK_GPTUNNEL_WEB, PASSWORD, RECORDING_FIXTURE, slowWebpAnimation, type MockServer } from '../e2e-support/mock-server';
 import { encodePng } from '../e2e-support/png';
 import { expect, test } from './app';
-import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
+import { NOW, checkpoint, expectAssigneeStacks, joinVoice, login, seedAssigneeCounts, seedDays, seedLabelOverflow, seedReleases, settle } from './harness';
 import { DAY, seedDay } from './calendarWeb';
 import { startPublisher } from './publisher';
 
@@ -4453,6 +4453,7 @@ test('boards-task-history', async ({ open, win, mock, shot }) => {
 /** The list grouped by status, two rows selected: the bulk actions bar. */
 test('boards-list', async ({ open, win, mock, shot }) => {
   await open();
+  seedReleases(mock); // board task #101: not on the rows — the grouping and the task panel at the end
   await mainWindow(win, mock);
   await boardsMode(win, mock);
   await win.getByTestId('view-list').click();
@@ -4486,6 +4487,21 @@ test('boards-list', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('archive-empty')).toBeVisible();
   await win.getByTestId('archive-back').click();
   await expect(rows.filter({ hasText: 'CAL-2' })).toHaveCount(1);
+  // Board task #101: grouped by release — the newest first, «Без релиза» last; then a task's «Релиз».
+  await win.getByTestId('display-menu').click();
+  await win.getByTestId('group-by').selectOption('release');
+  await win.keyboard.press('Escape');
+  await expect(win.getByTestId('list-group').first()).toContainText('stage · 1288');
+  await expect(win.getByTestId('list-group').last()).toContainText('Без релиза');
+  while (await win.getByTestId('toast').count()) await win.getByTestId('toast').first().getByRole('button', { name: 'Закрыть' }).click();
+  await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-list-release');
+  await rows.filter({ hasText: 'CAL-3' }).getByText('Эхо в звонке').click();
+  const panel = win.getByTestId('task-panel');
+  await expect(panel.getByTestId('prop-release')).toHaveText(['stage · 1288', 'prod · 4929cf3']);
+  await panel.getByTestId('prop-release').last().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await checkpoint(shot, 'boards-task-release');
 });
 
 /**
@@ -4640,6 +4656,35 @@ test('boards-settings', async ({ open, win, mock, shot }) => {
   await win.getByTestId('rule-when').scrollIntoViewIfNeeded();
   await win.getByTestId('rule-name').focus();
   await checkpoint(shot, 'boards-rules-git');
+  // Board task #101 stage B: «Задача вошла в релиз» (prod by default) with the status condition of
+  // DEV's «Ready to Deploy → Deployed»; {release} under the template.
+  await win.getByTestId('rule-name').fill('Вошла в релиз prod → готово');
+  await win.getByTestId('rule-trigger').selectOption('release');
+  await expect(win.getByTestId('rule-release-envs')).toHaveValue('prod');
+  await win.getByTestId('rule-release-envs').fill('prod, stage');
+  await expect(win.getByTestId('rule-release-vars')).toHaveText('Релиз: {release}');
+  await win.getByLabel('Текст').fill('Выкачено в {release}');
+  await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await win.getByTestId('rule-when').scrollIntoViewIfNeeded();
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-rules-release');
+  await win.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
+  // The GitLab backlink: off by default, the title-visibility help, the address and a write-only token.
+  await win.getByRole('tab', { name: 'Git' }).click();
+  await win.getByTestId('git-provider').selectOption({ label: 'GitLab' });
+  await win.getByTestId('git-save').click();
+  const backlink = win.getByTestId('git-backlink');
+  await expect(backlink.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+  await backlink.getByRole('switch').click();
+  await expect(win.getByTestId('git-backlink-error')).toHaveText('Заметки не пишутся: нет токена API.');
+  await win.getByTestId('git-backlink-url').fill('https://git.example.com');
+  await win.getByTestId('git-backlink-token').fill('glpat-0123456789abcdefghij');
+  await win.getByTestId('git-backlink-save').click();
+  await expect(win.getByTestId('git-backlink-error')).toHaveCount(0);
+  await expect(win.getByTestId('git-backlink-forget')).toBeVisible();
+  await backlink.scrollIntoViewIfNeeded();
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-settings-backlink');
 });
 
 /** Board settings → «Статусы», the colour picker of the first status open (ADR-0093): a 6-wide grid over the rows. */

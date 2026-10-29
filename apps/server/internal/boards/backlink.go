@@ -205,7 +205,7 @@ func (s *Service) postNote(ctx context.Context, g sqlc.BoardGit, n backlinkNote)
 	if !strings.HasPrefix(n.mr, base+"/") {
 		return fmt.Errorf("merge request !%s is not on %s: the note was not posted", n.iid, base)
 	}
-	if _, err := strconv.ParseUint(n.iid, 10, 63); err != nil || n.repo == "" {
+	if _, err := strconv.ParseUint(n.iid, 10, 63); err != nil || n.repo == "" || strings.Contains(n.repo, "..") {
 		return errors.New("a merge request without a number or project: the note was not posted")
 	}
 	tok, err := s.repo.token.Open(g.ApiTokenEnc)
