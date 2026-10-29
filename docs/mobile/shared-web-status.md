@@ -1,5 +1,21 @@
 # Телефон: общий веб в оболочке — статус
 
+## 2026-10-29: Android host channel and FCM push (DEV-5031, DEV-5033)
+
+The host channel is on for Android too (`hostChannelEnabled`). It has no native frame check in the
+WebView, so `activityProtocol.ts` adds one: the posting frame's native `sourceOrigin` must equal
+the app origin, and a hello is granted only after a main-frame challenge/proof. Android announces
+notifications and links only (no media permissions/calls), so `calab-host-link` now opens a link
+in place on Android as well. New Kotlin module (`modules/calab-session-activity/android`,
+`io.calab.host`): the iOS `CalabMessageNotifications` contract over plain Firebase Messaging, data-only
+pushes rendered natively (message channel; call channel with ringtone and Answer/Decline), a tap
+trampoline, and `POST_NOTIFICATIONS`. Server: FCM endpoints may carry calls; FCM data now carries
+the message title/subtitle/body (ADR-0072 privacy applies). Web: registers FCM for
+`provider: 'fcm'` and passes call taps to the call service. Config: `CALAB_ANDROID_GOOGLE_SERVICES_FILE`
+(optional). Checked: unit/integration tests, `expo prebuild` + merged manifest, `assembleDebug`
+with and without google-services.json. **Not verified on a device**; needs the Firebase project,
+`PUSH_FCM_*` on the server and a new Android build. ADR-0070/0071 «Android», push-deployment «FCM».
+
 ## 2026-10-29: Android entry link dropped right after loading (regression from #263, DEV-4947)
 
 Found on a real Android phone (Play internal testing build 1.0.0 (2)): a task/room link opened

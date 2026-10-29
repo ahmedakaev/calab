@@ -87,3 +87,63 @@ prompt guards; bounded bridge payload, old-host fallback and revoke/timeout repl
 test results do not reach push-state subscribers; shared permission UI reflects native
 state; iOS compilation plus device banner check. A new web deployment and native build
 are needed for the complete fix. Existing TestFlight review is not changed by this work.
+
+## Android (2026-10-29)
+
+DEV-5031/DEV-5033. Канал host включён и на Android; сообщения push идут через FCM тем же
+контрактом `CalabMessageNotifications` (`pushState`, `acknowledgePush`, `testNotification`,
+`onPushChanged`), что и на iOS.
+
+- **Граница канала.** Патч WebView на Android не трогаем (навигацию и intent MainActivity
+  ведёт отдельная работа), поэтому «эквивалентная native граница» собрана из того, что
+  react-native-webview 13 уже доказывает нативно. (1) WebMessageListener сообщает
+  `sourceOrigin` отправившего фрейма; RN принимает сообщение, только если он **точно равен**
+  origin приложения. Чужой iframe отвергнут; запасной JavascriptInterface (WebView без
+  listener) отдаёт URL верхней страницы с путём и тоже отвергнут. (2) Hello не даёт
+  полномочий сразу: RN внедряет в main frame (`evaluateJavascript`) challenge, который отвечает
+  `proof` со случайным nonce этого host только если текущий `CalabHostActivity.document`
+  совпадает. Hello старого документа, застрявший при навигации, не захватит новую страницу.
+  Same-origin iframe по силе равен основному фрейму (может исполнять код в родителе), так что
+  проверка main frame сверх origin ничего бы не добавила. Native не получает auth Calab.
+- **Document authority в native.** На iOS её выдаёт патч WebView (`CalabHostDocumentGranted`).
+  На Android RN передаёт её модулю после proof (`grantDocument`) и отзывает при каждом
+  loadStart/ошибке/remount/revoke (`revokeDocument`). Logout дополнительно стирает отложенный
+  tap и уведомления Calab. Async-ответы перепроверяют документ, как на iOS.
+- **Объявляем только реализованное.** Bridge Android: `notificationsVersion`,
+  `notificationsTestVersion`, `platform: 'android'`; ack — `notifications: 1, links: 1`.
+  `mediaPermissionsVersion` и `calls*` не объявляются, поэтому веб сразу идёт обычными путями
+  браузера, без таймаутов. Live Activity на Android нет (capability `notifications`).
+- **Ссылки.** `calab-host-link` работает и на Android: ссылка в уже открытую страницу
+  открывается на месте, без remount и обрыва звонка. Remount остаётся до handshake
+  (ограничение ADR-0142 для Android снято).
+- **Транспорт.** Endpoint = FCM registration token, `PUSH_PROVIDER_FCM`, `environment`
+  всегда `production`, `appId` = applicationId (`PUSH_FCM_APP_ID` должен совпадать с ним).
+  Веб регистрирует провайдера по `state.provider` (`fcm` — аддитивное поле; без него APNs).
+  FCM-сообщения только data, high priority, TTL до 10 минут (`restricted_package_name`);
+  уведомление рисует модуль. Текст — только из payload сервера: для сообщений сервер теперь
+  кладёт в data тот же title/subtitle/body, что и в APNs alert, после настройки превью
+  ADR-0072. Без них и для task/calendar — общий «Новое сообщение». Аватар отбрасывается, если
+  data превысит лимит FCM 4096 байт.
+- **Foreground.** Как на iOS: общий renderer владеет звуком/alert, native ничего не показывает.
+- **Tap.** Trampoline-Activity сохраняет opaque `{binding,eventId,expiresAt}` и поднимает
+  задачу приложения как иконка лаунчера, не трогая intent MainActivity. Дальше — тот же путь
+  iOS: `tap` в `pushState`, веб разрешает через `POST /api/me/push-resolve`, открывает комнату,
+  `acknowledgePush`. Ссылка на экран есть только у message и call, как на iOS.
+- **Разрешение.** Android 13+ `POST_NOTIFICATIONS` запрашивается только по запросу веба
+  (тот же prompt, что и на iOS). Android не отличает «ещё не спрашивали» от «отказано»: модуль
+  помнит собственный запрос, `default` — только до него. Ниже 13 — `areNotificationsEnabled`.
+- **Retry.** `CalabPushRetry` повторён один в один: ошибка токена блокирует попытки на 15 с,
+  снимается при явном запросе или возврате в foreground, не таймером. Ожидание токена ≤ 10 с.
+  Ротация токена (`onNewToken`/`onRegistered`) отправляет новое состояние в веб, и тот
+  перерегистрирует endpoint идемпотентно.
+- **Сборка.** Обычный Firebase SDK (`firebase-messaging` через gradle модуля), без
+  react-native-firebase. `google-services.json` — из `CALAB_ANDROID_GOOGLE_SERVICES_FILE`
+  через встроенный `android.googleServicesFile` Expo. Без файла сборка проходит, default
+  FirebaseApp отсутствует → `unsupported`.
+
+Ворота: unit-тесты (протокол, challenge, состояние FCM, регистрация), `go test` push и
+интеграционные `Push`, компиляция Kotlin (`assembleDebug` с файлом и без), merged manifest.
+Доставка FCM на устройство, tap в холодном/тёплом состоянии, prompt Android 13 и время
+внедрения bootstrap (Android выполняет его в `onPageStarted`, не гарантированно до скриптов
+страницы — тогда канала просто нет, как у старого бинарника) **не проверены**.
+Операторский контракт — [push-deployment](../mobile/push-deployment.md#fcm-android-2026-10-29).

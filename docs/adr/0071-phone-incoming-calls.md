@@ -62,3 +62,35 @@ physical-iOS arm64 Release скомпилирована и подписана л
 реальные PushKit/CallKit/locked answer/audio по-прежнему UNVERIFIED.
 Registry следует local-account scope общего identity слоя; deployment contract —
 [push-deployment](../mobile/push-deployment.md).
+
+## Android (2026-10-29)
+
+DEV-5031, v1 без ConnectionService. Одно FCM-устройство несёт и сообщения, и звонки:
+отдельного VoIP-токена у Android нет, а уникальность `(provider, environment, app_id, token)`
+не позволяет завести второй endpoint на тот же токен.
+
+- **Сервер.** `calls_enabled` разрешён для VoIP (только звонки, как раньше) и для FCM (вместе
+  с `notifications_enabled` или без); APNs alert по-прежнему не звонит. `deviceEnabled`
+  отправляет звонок на FCM-endpoint с `calls_enabled`. Политика send/resolve та же: свежая
+  сессия, DND, доступ к DM, актуальный RINGING, срок ring. Настройки сообщений звонки не
+  подавляют. Комментарий в `push.proto` («только VoIP») устарел — поправить вместе со
+  следующей правкой proto (`make gen`).
+- **Веб.** Для `provider: 'fcm'` регистрирует FCM с `callsEnabled: true`,
+  `notificationsEnabled = mentions || all`, и держит endpoint ради звонков, даже если
+  уведомления о сообщениях выключены. Capability `incomingCalls` на Android не объявлена:
+  нет native ring/CallKit-аналога, состояние звонка ведёт общий call service.
+- **Телефон.** Call push — data high priority (TTL = остаток ring ≤ 45 с) → heads-up
+  уведомление в канале «Звонки» с рингтоном (insistent) и кнопками «Отклонить»/«Ответить»,
+  `timeoutAfter` = срок ring; один звонок за раз. В foreground не показывается: звонит
+  общий веб. Любое касание сохраняет opaque tap с `action: 'answer' | 'decline'`
+  (аддитивное поле `HostPushTap`) и открывает приложение. Веб разрешает его через
+  `push-resolve`, получает `call` и отдаёт общему call service: `answer` → обычный accept,
+  `decline` → decline. Простое касание открывает личку, и веб звонит сам. Возврат приложения в
+  foreground и сообщение о пропущенном звонке гасят нативный звонок.
+- **v2 (не сделано).** ConnectionService/self-managed telecom, full-screen intent поверх
+  блокировки (`USE_FULL_SCREEN_INTENT` и декларация Play), ответ без разблокировки, отмена
+  звонка push'ем. Сейчас звонок, отменённый или принятый на другом устройстве, звенит до
+  конца ring (≤ 45 с), а ответ требует разблокировки и загрузки веба.
+
+Ворота: `TestPushIncomingCallOverFCMEndpoint` (регистрация FCM с calls, ring при выключенных
+сообщениях, resolve), unit-тесты веба. Доставка и ответ на устройстве **не проверены**.
