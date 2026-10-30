@@ -514,7 +514,7 @@ export function DescriptionEditor({ task, canEdit, attachments }: { task: Task; 
   const stableKey = useCallback((e: KeyboardEvent) => keyRef.current(e), []);
   const onReady = useCallback((a: WikiEditorApi | null) => {
     api.current = a;
-    a?.editor.commands.focus('end');
+    a?.focus('end');
   }, []);
   // CBF-59: a picture pasted / dropped / picked in the editor becomes an attachment of the task at once; the text refers to it.
   const upload = useCallback(
