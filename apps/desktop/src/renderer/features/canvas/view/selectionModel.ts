@@ -18,6 +18,8 @@ export interface PanelModel {
   hasConnector: boolean;
   /** Freehand strokes are selected. */
   hasInk: boolean;
+  /** Frames are selected. */
+  hasFrame: boolean;
   /** Every selected object is locked: nothing of the selection can be changed or deleted, only unlocked, grouped, ordered or duplicated. */
   locked: boolean;
   /** Two or more objects that are not already exactly one group. */
@@ -42,6 +44,10 @@ export interface PanelModel {
   inkColor?: string;
   inkWidth?: number;
   inkMarker?: boolean;
+  /** The selected frames' hue, where they agree. */
+  frameFill?: string;
+  /** The name of the one selected frame (only when it is the whole selection). */
+  frameTitle?: string;
 }
 
 function uniform<T>(values: readonly T[]): T | undefined {
@@ -58,6 +64,7 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
   const shape = objs.flatMap((o) => (o.kind === 'shape' ? [o] : []));
   const conn = objs.flatMap((o) => (o.kind === 'connector' ? [o] : []));
   const ink = objs.flatMap((o) => (o.kind === 'ink' ? [o] : []));
+  const frame = objs.flatMap((o) => (o.kind === 'frame' ? [o] : []));
   const out: PanelModel = {
     count: objs.length,
     hasSticky: sticky.length > 0,
@@ -65,6 +72,7 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
     hasShape: shape.length > 0,
     hasConnector: conn.length > 0,
     hasInk: ink.length > 0,
+    hasFrame: frame.length > 0,
     locked: objs.every((o) => o.locked === true),
     canGroup: objs.length >= 2 && !(firstGroup !== undefined && objs.every((o) => o.group === firstGroup) && groupSize(firstGroup) <= objs.length),
     canUngroup: objs.some((o) => o.group !== undefined),
@@ -86,11 +94,13 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
   set('inkColor', uniform(ink.map((o) => o.stroke)));
   set('inkWidth', uniform(ink.map((o) => o.strokeWidth)));
   set('inkMarker', uniform(ink.map((o) => o.marker === true)));
+  set('frameFill', uniform(frame.map((o) => o.fill)));
+  if (objs.length === 1 && frame[0]) out.frameTitle = frame[0].title;
   return out;
 }
 
 const KEYS: readonly (keyof PanelModel)[] = [
-  'count', 'hasSticky', 'hasText', 'hasShape', 'hasConnector', 'locked', 'canGroup', 'canUngroup', 'units', 'stickyColor', 'textColor', 'textSize', 'fontPx', 'shape', 'fill', 'stroke', 'strokeWidth', 'arrow', 'route', 'hasInk', 'inkColor', 'inkWidth', 'inkMarker',
+  'count', 'hasSticky', 'hasText', 'hasShape', 'hasConnector', 'locked', 'canGroup', 'canUngroup', 'units', 'stickyColor', 'textColor', 'textSize', 'fontPx', 'shape', 'fill', 'stroke', 'strokeWidth', 'arrow', 'route', 'hasInk', 'inkColor', 'inkWidth', 'inkMarker', 'hasFrame', 'frameFill', 'frameTitle',
 ];
 
 export const samePanelModel = (a: PanelModel | null, b: PanelModel | null): boolean =>

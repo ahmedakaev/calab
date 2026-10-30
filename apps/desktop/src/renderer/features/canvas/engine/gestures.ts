@@ -61,6 +61,10 @@ export interface Core {
   readonly touch?: boolean;
   /** The pen's color, width and kind. */
   readonly inkStyle: InkStyle;
+  /** The size a click of the «Фрейм» tool places. */
+  readonly frameSize: { readonly w: number; readonly h: number };
+  /** The title a new frame gets («Фрейм 3»). */
+  nextFrameTitle(): string;
   /** The eraser's radius, screen px. */
   readonly eraserPx: number;
   /** Shows the stroke in progress (null: none); `dirty` is the world rect that changed since the last call (null: all of it). */
@@ -217,8 +221,10 @@ export class MoveGesture implements Gesture {
     private readonly onClickOnly: () => void,
     private readonly slop = DRAG_PX,
   ) {
-    // Locked objects stay where they are, whatever else moves with them.
-    this.ids = Array.from(ids).filter((id) => !core.scene.get(id)?.locked);
+    // Locked objects stay where they are, whatever else moves with them. A frame takes what it holds along (computed
+    // now: an object dragged in or out later is simply in or out).
+    const free = (id: string): boolean => !core.scene.get(id)?.locked;
+    this.ids = core.scene.withFrameMembers(Array.from(ids).filter(free)).filter(free);
     this.capture();
   }
 
@@ -356,8 +362,9 @@ export class ResizeGesture implements Gesture {
       p = sn.p;
       guides = sn.guides;
     }
-    const minW = isText ? DEFAULTS.minTextW : DEFAULTS.minBox;
-    const minH = isText ? 1 : DEFAULTS.minBox;
+    const isFrame = single?.kind === 'frame';
+    const minW = isText ? DEFAULTS.minTextW : isFrame ? DEFAULTS.minFrame : DEFAULTS.minBox;
+    const minH = isText ? 1 : isFrame ? DEFAULTS.minFrame : DEFAULTS.minBox;
     const patches = new Map<string, ObjectPatch>();
     if (single) {
       const r = resizeRotated(single, rot, handle, p, { keepAspect, minW, minH });
@@ -414,7 +421,8 @@ export class RotateGesture implements Gesture {
     const rects: Rect[] = [];
     for (const id of ids) {
       const o = core.scene.get(id);
-      if (!o || o.locked) continue;
+      // A frame never turns.
+      if (!o || o.locked || o.kind === 'frame') continue;
       if (isConnector(o)) {
         const f: { from?: Point; to?: Point } = {};
         if (!isBound(o.from)) f.from = { x: o.from.x, y: o.from.y };
@@ -514,7 +522,7 @@ export class MarqueeGesture implements Gesture {
 
 // ── create (sticky / text / shape) ──────────────────────────────────────────
 
-export type CreateKind = 'sticky' | 'text' | 'shape';
+export type CreateKind = 'sticky' | 'text' | 'shape' | 'frame';
 
 export class CreateGesture implements Gesture {
   readonly kind = 'create';
@@ -544,6 +552,16 @@ export class CreateGesture implements Gesture {
     const doc = this.core.doc;
     doc.checkpoint();
     let id: string | null;
+    if (this.what === 'frame') {
+      // A drag draws it; a click places the armed size centered on the pointer. Neither opens a text editor.
+      const r = this.dragged ? this.rect(w, m) : null;
+      const { w: fw, h: fh } = this.core.frameSize;
+      id = doc.create(r
+        ? { kind: 'frame', x: r.x, y: r.y, w: Math.max(r.w, DEFAULTS.minFrame), h: Math.max(r.h, DEFAULTS.minFrame), title: this.core.nextFrameTitle() }
+        : { kind: 'frame', x: snapTo(this.from.x - fw / 2, this.core.gridSize || 1), y: snapTo(this.from.y - fh / 2, this.core.gridSize || 1), w: fw, h: fh, title: this.core.nextFrameTitle() });
+      this.core.finishCreate(id ? [id] : [], false);
+      return;
+    }
     if (this.dragged) {
       const r = this.rect(w, m);
       const bw = Math.max(r.w, this.what === 'text' ? DEFAULTS.minTextW : DEFAULTS.minBox);

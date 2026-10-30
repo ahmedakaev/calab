@@ -79,6 +79,18 @@ export function drawMinimap(ctx: Ctx2D, scene: Scene, palette: CanvasPalette, fr
         ctx.lineWidth = 1;
         ctx.strokeRect(r.x + 0.5, r.y + 0.5, Math.max(r.w - 1, 1), Math.max(r.h - 1, 1));
       }
+    } else if (o.kind === 'frame') {
+      // A frame: its soft tone faintly and its outline (it lies under everything, which is drawn over it).
+      const fill = resolveFill(palette, o.fill, true);
+      if (fill) {
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = fill;
+        ctx.fillRect(r.x, r.y, px(r.w), px(r.h));
+      }
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = palette.plaque;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, Math.max(r.w - 1, 1), Math.max(r.h - 1, 1));
     } else if (o.kind === 'image') {
       // A picture: one plain plaque, like its stand-in before it loads.
       ctx.globalAlpha = 0.5;

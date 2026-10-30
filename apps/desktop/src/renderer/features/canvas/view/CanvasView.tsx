@@ -22,6 +22,7 @@ import type { CanvasPalette, RefusedWhy } from '../engine';
 import { CanvasMenu, type MenuMode } from './CanvasMenu';
 import { CommentsLayer, CommentsToggle } from './comments/CommentsLayer';
 import { ZoomBar } from './Controls';
+import { FramesPanel } from './FramesPanel';
 import { MiniMap } from './MiniMap';
 import { PhoneEditBar } from './PhoneEditBar';
 import { PhoneFormatBar } from './PhoneFormatBar';
@@ -152,6 +153,7 @@ export function CanvasView({ canvasId, workspaceId, bits, onOpenHistory, onShare
       remoteCanvas: remote.current,
       editorHost: host,
       editorLabel: () => t('canvasBoard.textEditor'),
+      frameTitle: (n) => t('canvasBoard.frame.default', { n }),
       deps: live.current.deps,
       palette: live.current.palette,
       readOnly: !live.current.canWrite,
@@ -380,7 +382,7 @@ function ViewerChrome({ session, focusCanvas, gone, phone }: { session: CanvasSe
   const [helpOpen, setHelpOpen] = useState(false);
   return (
     <>
-      <ZoomBar engine={engine} focusCanvas={focusCanvas} canWrite={false} helpOpen={helpOpen} onHelpOpenChange={setHelpOpen} phone={phone} minimap={false} />
+      <ZoomBar engine={engine} focusCanvas={focusCanvas} canWrite={false} helpOpen={helpOpen} onHelpOpenChange={setHelpOpen} phone={phone} minimap={false} frames={false} />
       <ViewerStatus engine={engine} sync={sync} timer={timer} gone={gone} />
       <SelectionAnnouncer engine={engine} />
     </>
@@ -447,6 +449,7 @@ function Chrome({
       {comments}
       <ZoomBar engine={engine} focusCanvas={focusCanvas} canWrite={canWrite} helpOpen={helpOpen} onHelpOpenChange={onHelpOpenChange} comments={commentsToggle} />
       <MiniMap engine={engine} palette={palette} focusCanvas={focusCanvas} />
+      <FramesPanel engine={engine} palette={palette} editable={editable} focusCanvas={focusCanvas} />
       <Presence store={presence} engine={engine} />
       <StatusBanner engine={engine} sync={sync} timer={timer} canWrite={canWrite} gone={gone} onRetry={onRetry} />
       <SelectionAnnouncer engine={engine} />

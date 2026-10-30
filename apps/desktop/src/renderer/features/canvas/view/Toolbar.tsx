@@ -1,5 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
-import { Check, Eraser, Highlighter, MessageSquarePlus, MousePointer2, Pencil, Redo2, Type, Undo2 } from 'lucide-react';
+import { Check, Eraser, Frame, Highlighter, MessageSquarePlus, MousePointer2, Pencil, Redo2, Type, Undo2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ALT, IconButton, MOD, cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
@@ -14,6 +14,7 @@ import { TemplatesMenu } from './Templates';
 import { TimerButton } from './Timer';
 import type { TimerStore } from './timerStore';
 import { VoteButton } from './Vote';
+import { FRAME_PRESETS, type FramePreset } from '../../../lib/canvas/frames';
 import { ERASER_SIZES } from '../../../lib/canvas/ink';
 import { PEN_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, TOOL_DEFS } from './model';
 import { Swatch, colorLabel, inkWidthItems } from './PropsPanel';
@@ -256,6 +257,33 @@ function InkPanel({ engine, palette }: { engine: CanvasEngine; palette: CanvasPa
   );
 }
 
+const FRAME_LABELS: Record<FramePreset, 'canvasBoard.frame.wide' | 'canvasBoard.frame.a4' | 'canvasBoard.frame.square' | 'canvasBoard.frame.custom'> = {
+  '16:9': 'canvasBoard.frame.wide',
+  a4: 'canvasBoard.frame.a4',
+  '1:1': 'canvasBoard.frame.square',
+  custom: 'canvasBoard.frame.custom',
+};
+
+/** The frame tool's sizes: each a little outline in its proportions; «свой» is a dashed one (drag it out on the canvas). */
+function FrameSizes({ engine }: { engine: CanvasEngine }): ReactNode {
+  const value = useEngineValue(engine, (s) => s.frameSize);
+  return (
+    <div className="flex w-52 flex-col gap-0.5" data-testid="canvas-frame-sizes">
+      {FRAME_PRESETS.map((p) => {
+        const k = 16 / Math.max(p.w, p.h);
+        return (
+          <FlyoutOption key={p.id} label={t(FRAME_LABELS[p.id])} selected={value === p.id} onPick={() => engine.setFrameSize(p.id)} testId={`canvas-frame-size-${p.id}`} className={cx(MENU_ITEM, 'w-full')}>
+            <span aria-hidden className="grid size-[18px] place-items-center">
+              <span className={cx('rounded-[2px] border-[1.5px] border-current', p.id === 'custom' && 'border-dashed')} style={p.id === 'custom' ? { width: 16, height: 12 } : { width: p.w * k, height: p.h * k }} />
+            </span>
+            {t(FRAME_LABELS[p.id])}
+          </FlyoutOption>
+        );
+      })}
+    </div>
+  );
+}
+
 /** A sticky note in one color: the swatch of the sticky tool's flyout (a note, not a dot — what will land on the canvas). */
 function StickySwatch({ bg }: { bg: string }): ReactNode {
   return (
@@ -384,6 +412,16 @@ export const Toolbar = memo(function Toolbar({ engine, timer, palette, focusCanv
             ))}
           </div>
         }
+      />
+      <ToolButton
+        {...common}
+        tool="frame"
+        icon={<Frame className={ICON} strokeWidth={1.75} aria-hidden />}
+        active={tool === 'frame'}
+        pinned={pinned === 'frame'}
+        flyoutLabel={t('canvasBoard.frame.size')}
+        flyoutTestId="canvas-frame-menu"
+        flyout={<FrameSizes engine={engine} />}
       />
       <ToolButton
         {...common}

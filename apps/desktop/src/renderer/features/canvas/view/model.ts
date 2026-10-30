@@ -17,6 +17,7 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   { tool: 'text', key: 'T', label: 'canvasBoard.tool.text' },
   { tool: 'shape', key: 'R', label: 'canvasBoard.tool.shape' },
   { tool: 'connector', key: 'C', label: 'canvasBoard.tool.connector' },
+  { tool: 'frame', key: 'F', label: 'canvasBoard.tool.frame' },
   { tool: 'pen', key: 'P', label: 'canvasBoard.tool.pen' },
   { tool: 'eraser', key: 'E', label: 'canvasBoard.tool.eraser' },
   { tool: 'comment', key: 'C', alt: true, label: 'canvasBoard.tool.comment' },
@@ -58,6 +59,8 @@ export const FILL_COLORS: readonly string[] = ['none', 'white', ...HUE_IDS];
 export const SOFT_FILL_COLORS: readonly string[] = HUE_IDS.map((h) => `${SOFT_PREFIX}${h}`);
 /** The fill picker: the plain fills, then the soft row. */
 export const FILL_PICKER: readonly string[] = [...FILL_COLORS, ...SOFT_FILL_COLORS];
+/** A frame's board: none, white or a hue, each drawn as its soft tone (so the frame stays a background). */
+export const FRAME_FILLS: readonly string[] = FILL_COLORS;
 
 /** Text sizes (px) offered by the size field's list; any whole number in `DEFAULTS.minTextSize`..`maxTextSize` can be typed. */
 export const FONT_PRESETS: readonly number[] = [12, 14, 18, 24, 36, 48, 64, 96];

@@ -6,10 +6,10 @@ import { inkFromStroke } from '../../../lib/canvas/ink';
 import { buildTemplate, type TemplateText } from '../../../lib/canvas/templates';
 import type { ObjectInit } from '../../../lib/canvas/types';
 
-export const HINT_IDS = ['select', 'sticky', 'text', 'shape', 'connector', 'pen', 'comment', 'sticker', 'templates', 'vote', 'timer'] as const;
+export const HINT_IDS = ['select', 'sticky', 'text', 'shape', 'connector', 'frame', 'pen', 'comment', 'sticker', 'templates', 'vote', 'timer'] as const;
 export type HintId = (typeof HINT_IDS)[number];
 
-export type HintArtKey = 'idea' | 'task' | 'note' | 'title' | 'body' | 'start' | 'finish' | 'comment';
+export type HintArtKey = 'idea' | 'task' | 'note' | 'title' | 'body' | 'start' | 'finish' | 'comment' | 'frame';
 export type HintText = (key: HintArtKey) => string;
 
 type Item = { id: string; init: ObjectInit };
@@ -54,6 +54,14 @@ export function hintScene(id: HintId, tr: HintText, tpl: TemplateText): Item[] {
         { id: 'a', init: { kind: 'shape', shape: 'rounded', x: 0, y: 0, w: 150, h: 80, fill: 'soft:green', stroke: 'green', text: tr('start') } },
         { id: 'b', init: { kind: 'shape', shape: 'rounded', x: 320, y: 90, w: 150, h: 80, fill: 'soft:blue', stroke: 'blue', text: tr('finish') } },
         { id: 'w', init: { kind: 'connector', from: { id: 'a', side: 'right' }, to: { id: 'b', side: 'left' }, route: 'curve', arrow: 'end', stroke: 'stroke', strokeWidth: 3 } },
+      ];
+    case 'frame':
+      // A titled board holding a row of notes (what the owner's Miro example looked like).
+      return [
+        { id: 'f', init: { kind: 'frame', x: 0, y: 0, w: 470, h: 170, fill: 'blue', title: tr('frame') } },
+        sticky('a', 20, 20, 'yellow', tr('idea'), 130),
+        sticky('b', 170, 20, 'pink', tr('task'), 130),
+        sticky('c', 320, 20, 'mint', tr('note'), 130),
       ];
     case 'pen':
       return [

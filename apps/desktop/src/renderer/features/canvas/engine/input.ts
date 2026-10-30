@@ -1,4 +1,4 @@
-import { ROTATE_CURSOR, dist, hitHandleRot, resizeCursorAt, rotateHandlePoint, type HandleId, type Point } from '../../../lib/canvas/geometry';
+import { ROTATE_CURSOR, dist, hitHandleRot, rectContainsPoint, resizeCursorAt, rotateHandlePoint, type HandleId, type Point } from '../../../lib/canvas/geometry';
 import { isConnector } from '../../../lib/canvas/types';
 import type { CanvasEngine, Tool } from './engine';
 import {
@@ -23,7 +23,7 @@ const mods = (e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey
   mod: e.ctrlKey || e.metaKey,
 });
 
-const TOOL_KEYS = { v: 1, s: 1, t: 1, r: 1, c: 1, k: 1, p: 1, e: 1 };
+const TOOL_KEYS = { v: 1, s: 1, t: 1, r: 1, c: 1, k: 1, p: 1, e: 1, f: 1 };
 const NO_MODS: Mods = { shift: false, alt: false, mod: false };
 /** Touch editing (ADR-0127 wave 5b): a press that stays put this long on empty canvas opens the phone's menu. */
 const LONG_PRESS_MS = 500;
@@ -143,7 +143,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
   /** A finger on an editable canvas (the phone's edit mode): tap selects, drag moves what is selected, anything else pans. */
   const touchDown = (e: PointerEvent, s: Point, w: Point): void => {
     const tool = engine.tool;
-    if (tool === 'sticky' || tool === 'text' || tool === 'shape') {
+    if (tool === 'sticky' || tool === 'text' || tool === 'shape' || tool === 'frame') {
       // A tap places the object (a text opens its editor at once); a drag pans to where it should go.
       engine.activeGesture = new TapPanGesture(engine, s, () => new CreateGesture(engine, tool, w, s).end(w, s, NO_MODS));
       return;
@@ -299,6 +299,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
       case 'sticky':
       case 'text':
       case 'shape':
+      case 'frame':
         engine.activeGesture = new CreateGesture(engine, engine.tool, w, s);
         return;
       case 'connector':
@@ -457,6 +458,12 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
     // A double-click on a handle of the frame is two presses on the handle, not a new text.
     if (rotateHandleAt(w) || resizeHandleAt(w)) return;
     const hit = engine.hitAt(w);
+    // A frame's board is a place to write on, as the empty canvas; its title is renamed in the properties.
+    if (hit?.kind === 'frame') {
+      const title = engine.scene.frameTitleRect(hit);
+      if (!title || !rectContainsPoint(title, w, 0)) engine.createTextAt(w);
+      return;
+    }
     if (hit) {
       // While voting a double-click is two votes, not a text edit.
       if (engine.votableAt(hit.id)) return;
@@ -595,6 +602,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
             case 'c': if (engine.readOnly) return; engine.setTool('connector'); break;
             case 'p': if (engine.readOnly) return; engine.setTool('pen'); break;
             case 'e': if (engine.readOnly) return; engine.setTool('eraser'); break;
+            case 'f': if (engine.readOnly) return; engine.setTool('frame'); break;
             // K: «Стикер из набора» — the view opens the sticker picker.
             case 'k': if (engine.readOnly) return; engine.emitStickerKey(); break;
             default: return;

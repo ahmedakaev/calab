@@ -11,6 +11,7 @@ import { Button, IconButton, MOD, cx } from '../../../components/ui';
 import { t, useLocale } from '../../../i18n';
 import type { ArrangeOp } from '../../../lib/canvas/arrange';
 import { FontSizeField } from './FontSizeField';
+import { FrameTitleField } from './FrameTitleField';
 import { RouteIcon } from './RouteIcon';
 import { ShapeIcon } from './ShapeIcon';
 import { splitFill, type Arrow, type ObjectKind, type ObjectPatch, type RouteKind, type ShapeKind } from '../../../lib/canvas/types';
@@ -19,7 +20,7 @@ import { ROTATE_OFFSET_PX } from '../engine/overlay';
 import { DIVIDER, MENU_BOX, PANEL, keepFocus } from './chrome';
 import { NO_INSETS, placePanel, type Insets } from './layout';
 import {
-  ARROW_DEFS, FILL_PICKER, INK_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, STROKE_COLORS, STROKE_WIDTHS,
+  ARROW_DEFS, FILL_PICKER, FRAME_FILLS, INK_COLORS, ROUTE_DEFS, SHAPE_DEFS, STICKY_COLORS, STROKE_COLORS, STROKE_WIDTHS,
 } from './model';
 import { createSelectionModel } from './selectionModel';
 
@@ -28,6 +29,7 @@ const ICON = 'size-4';
 /** The screen's floating panels, by test id, and the edge each one hangs from. */
 const CHROME: readonly { id: string; edge: keyof Insets }[] = [
   { id: 'canvas-toolbar', edge: 'left' },
+  { id: 'canvas-frames-panel', edge: 'left' },
   { id: 'canvas-history', edge: 'bottom' },
   { id: 'canvas-zoom', edge: 'bottom' },
   { id: 'canvas-presence', edge: 'top' },
@@ -49,10 +51,12 @@ export function measureChrome(host: HTMLElement): Insets {
   return out;
 }
 
-type ColorKind = 'sticky' | 'ink' | 'fill';
+/** `frame`: a hue as a frame draws it (its soft tone). */
+type ColorKind = 'sticky' | 'ink' | 'fill' | 'frame';
 
 export function swatchCss(palette: CanvasPalette, kind: ColorKind, token: string): string | null {
   if (kind === 'sticky') return resolveSticky(palette, token).bg;
+  if (kind === 'frame') return resolveFill(palette, token, true);
   const f = splitFill(token);
   return kind === 'fill' ? resolveFill(palette, f.fill, f.soft) : resolveColor(palette, token);
 }
@@ -455,6 +459,22 @@ export const PropsPanel = memo(function PropsPanel({
       className={cx(PANEL, 'absolute left-0 top-0 z-10 flex w-max items-center gap-1')}
       style={{ visibility: 'hidden' }}
     >
+      {!m.locked && m.frameTitle !== undefined ? (
+        <FrameTitleField
+          // A new selection starts a fresh draft.
+          key={engine.getState().selectedId ?? ''}
+          value={m.frameTitle}
+          label={t('canvasBoard.props.frameTitle')}
+          placeholder={t('canvasBoard.frames.untitled')}
+          onCommit={(title) => patch({ title }, ['frame'])}
+          onDone={focusCanvas}
+          className="h-7 w-40"
+          testId="canvas-prop-frame-title"
+        />
+      ) : null}
+      {!m.locked && m.hasFrame ? (
+        <SwatchMenu label={t('canvasBoard.props.fill')} kind="frame" tokens={FRAME_FILLS} value={m.frameFill} palette={palette} onPick={(c) => patch({ fill: c }, ['frame'])} focusCanvas={focusCanvas} testId="canvas-prop-frame-fill" />
+      ) : null}
       {m.hasSticky && !m.locked ? (
         <SwatchMenu label={t('canvasBoard.props.color')} kind="sticky" tokens={STICKY_COLORS} value={m.stickyColor} palette={palette} onPick={(c) => patch({ color: c }, ['sticky'])} focusCanvas={focusCanvas} testId="canvas-prop-sticky-color" />
       ) : null}
@@ -470,7 +490,7 @@ export const PropsPanel = memo(function PropsPanel({
       {!m.locked && m.hasShape ? (
         <>
           <ShapeMenu value={m.shape} onPick={(shape) => patch({ shape })} focusCanvas={focusCanvas} />
-          <SwatchMenu label={t('canvasBoard.props.fill')} kind="fill" tokens={FILL_PICKER} value={m.fill} palette={palette} onPick={(c) => patch({ fill: c })} focusCanvas={focusCanvas} testId="canvas-prop-fill" />
+          <SwatchMenu label={t('canvasBoard.props.fill')} kind="fill" tokens={FILL_PICKER} value={m.fill} palette={palette} onPick={(c) => patch({ fill: c }, ['shape'])} focusCanvas={focusCanvas} testId="canvas-prop-fill" />
         </>
       ) : null}
       {!m.locked && (m.hasShape || m.hasConnector) ? (

@@ -18,6 +18,7 @@ export const esCanvasPhone: DictShape<typeof ruCanvasPhone> = {
   'canvasPhone.armed.comment': 'Toca un objeto o el lienzo para dejar un comentario',
   'canvasPhone.armed.pen': 'Dibuja en el lienzo con el dedo',
   'canvasPhone.armed.eraser': 'Pasa el dedo por una línea para borrarla',
+  'canvasPhone.armed.frame': 'Toca el lienzo para colocar un marco',
   'canvasPhone.multi': 'Seleccionar varios',
   'canvasPhone.multiHint': 'Toca los objetos para seleccionarlos',
   'canvasPhone.selected': { one: '{n} seleccionado', many: '{n} seleccionados', other: '{n} seleccionados' },

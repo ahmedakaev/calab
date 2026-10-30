@@ -12,6 +12,7 @@ import { contentRect } from '../../../lib/canvas/shapes';
 import { buildTemplate, type TemplateId, type TemplateText } from '../../../lib/canvas/templates';
 import { LABEL_SIZE, TextLayouter, boxFontSize, estimateMeasure, fontOf, type MeasureFn } from '../../../lib/canvas/textLayout';
 import { connectorMidpoint, type ConcreteSide } from '../../../lib/canvas/route';
+import { framePresetSize, type FramePreset } from '../../../lib/canvas/frames';
 import { ERASER_SIZES, INK_MAX_WIDTH, INK_MIN_WIDTH, MARKER_WIDTHS, PEN_WIDTHS } from '../../../lib/canvas/ink';
 import { LiveLayer } from '../../../lib/canvas/live';
 import {
@@ -35,7 +36,7 @@ import { BADGE_MARGIN_PX, hitBadge } from './voteDraw';
 export type RefusedWhy = 'objects' | 'size' | 'create' | 'clipboard';
 
 /** `pen` draws with the pen or the marker (`EngineState.inkMarker`); `eraser` removes freehand strokes (ADR-0127 addendum 2026-10-29). */
-export type Tool = 'select' | 'sticky' | 'text' | 'shape' | 'connector' | 'comment' | 'pen' | 'eraser';
+export type Tool = 'select' | 'sticky' | 'text' | 'shape' | 'connector' | 'comment' | 'pen' | 'eraser' | 'frame';
 
 /** A click (tap) of the «Комментарий» tool (ADR-0127 wave 4): where, and the object under it (null = the field). */
 export interface CommentClick {
@@ -65,6 +66,8 @@ export interface EngineState {
   readonly inkWidth: number;
   /** The eraser's radius, screen px (`ERASER_SIZES`). */
   readonly eraserPx: number;
+  /** The size the «Фрейм» tool places with a click (`custom`: drag to draw, a click places 16:9). */
+  readonly frameSize: FramePreset;
   /** Rounded zoom, percent. */
   readonly zoomPct: number;
   readonly canUndo: boolean;
@@ -121,6 +124,8 @@ export interface EngineOptions {
   editorHost?: HTMLElement;
   /** The text editor's accessible name, in the UI language (read at every open). */
   editorLabel?: () => string;
+  /** The title of the `n`-th frame, in the UI language («Фрейм 3»); absent: new frames are untitled. */
+  frameTitle?: (n: number) => string;
   /**
    * Pictures (ADR-0127, 2026-10-23): an API media path → a URL an <img> loads (the app's authenticated loader). Absent:
    * pictures are drawn as plaques.
@@ -136,7 +141,7 @@ export interface EngineOptions {
   cancelRaf?: (id: number) => void;
 }
 
-const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'inkMarker', 'inkColor', 'inkWidth', 'eraserPx', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
+const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'inkMarker', 'inkColor', 'inkWidth', 'eraserPx', 'frameSize', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
 const LOCAL_AWARENESS_MS = 50;
 /** Gestures that follow their pointer when the camera moves under it, and pan the view at its edge. */
 const FOLLOW_KINDS: ReadonlySet<Gesture['kind']> = new Set(['marquee', 'move', 'resize']);
@@ -233,6 +238,7 @@ export class CanvasEngine implements Core {
   private quickHot: ConcreteSide | null = null;
   private quickT0 = 0;
   private eraser_: number = ERASER_SIZES[1] ?? 12;
+  private frame_: FramePreset = '16:9';
   /** The pen's and the marker's color and width, each kept for the session; `marker_` picks which one the pen tool uses. */
   private readonly pens = { pen: { color: DEFAULTS.inkStroke, width: PEN_WIDTHS[1] ?? 4 }, marker: { color: 'yellow', width: MARKER_WIDTHS[1] ?? 20 } };
   private marker_ = false;
@@ -383,6 +389,7 @@ export class CanvasEngine implements Core {
       inkColor: this.pen.color,
       inkWidth: this.pen.width,
       eraserPx: this.eraser_,
+      frameSize: this.frame_,
       zoomPct: Math.round(this.cam.scale * 100),
       canUndo: this.doc.undo.undoStack.length > 0,
       canRedo: this.doc.undo.redoStack.length > 0,
@@ -438,6 +445,15 @@ export class CanvasEngine implements Core {
 
   get inkStyle(): InkStyle {
     return { color: this.pen.color, width: this.pen.width, marker: this.marker_ };
+  }
+
+  get frameSize(): { w: number; h: number } {
+    return framePresetSize(this.frame_);
+  }
+
+  /** «Фрейм N»: one more than the frames already on the board. */
+  nextFrameTitle(): string {
+    return this.opts.frameTitle?.(this.scene.frames().length + 1) ?? '';
   }
 
   // ── Core (used by gestures and input) ───────────────────────────────────────
@@ -888,6 +904,30 @@ export class CanvasEngine implements Core {
     this.sync();
   }
 
+  /** The size a click of the «Фрейм» tool places, kept for the session. */
+  setFrameSize(p: FramePreset): void {
+    this.frame_ = p;
+    this.sync();
+  }
+
+  /**
+   * The frames panel: brings a frame into view whole (animated, a margin around it) and selects it, so its title and
+   * fill are one click away. Unknown ids are ignored.
+   */
+  zoomToFrame(id: string): void {
+    const f = this.scene.get(id);
+    if (!f || f.kind !== 'frame') return;
+    this.setSelection([id]);
+    this.moveCamera(fitRect({ x: f.x, y: f.y - 32, w: f.w, h: f.h + 32 }, this.viewport, 48));
+  }
+
+  /** Renames a frame (the frames panel's inline field): one undo step. */
+  renameFrame(id: string, title: string): void {
+    if (!this.canEdit() || this.scene.get(id)?.kind !== 'frame') return;
+    this.doc.checkpoint();
+    this.doc.patch(id, { title });
+  }
+
   setConnectorRoute(r: RouteKind): void {
     this.route_ = r;
   }
@@ -1123,7 +1163,8 @@ export class CanvasEngine implements Core {
     this.doc.checkpoint();
     // The copy lands to the right of the selection (a gap of 24), on the same line; a lone connector has no box to go beside and keeps the small diagonal step.
     const bb = boundsOf([...this.sel].flatMap((id) => { const o = this.scene.get(id); return o && !isConnector(o) ? [aabb(o)] : []; }));
-    const ids = duplicate(this.scene, this.doc, this.sel, bb ? bb.w + 24 : 24, bb ? 0 : 24);
+    // A frame is copied with what it holds.
+    const ids = duplicate(this.scene, this.doc, this.scene.withFrameMembers(this.sel), bb ? bb.w + 24 : 24, bb ? 0 : 24);
     if (ids.length > 0) this.setSelection(ids);
     else this.refused(this.sel.size);
     return ids;
@@ -1136,7 +1177,7 @@ export class CanvasEngine implements Core {
 
   /** Writes the selection to the clipboard. Returns the text (also for callers with their own clipboard). */
   async copy(): Promise<string | null> {
-    const text = serialize(this.scene, this.doc, this.sel);
+    const text = serialize(this.scene, this.doc, this.scene.withFrameMembers(this.sel));
     if (text && this.clipboardPort) {
       try {
         await this.clipboardPort.writeText(text);
@@ -1152,8 +1193,8 @@ export class CanvasEngine implements Core {
   /** Copies the selection and deletes what may be deleted: on locked objects ⌘X is a plain copy. */
   async cut(): Promise<void> {
     if (!this.canEdit()) return;
-    // What was copied is what goes: the selection may change while the clipboard write is awaited.
-    const ids = [...this.sel].filter((id) => !this.scene.get(id)?.locked);
+    // What was copied is what goes (a frame with what it holds): the selection may change while the clipboard write is awaited.
+    const ids = this.scene.withFrameMembers(this.sel).filter((id) => !this.scene.get(id)?.locked);
     await this.copy();
     const alive = ids.filter((id) => this.scene.get(id));
     if (!this.canEdit() || alive.length === 0) return;
@@ -1236,11 +1277,12 @@ export class CanvasEngine implements Core {
     return p;
   }
 
-  /** Moves the selection by a world delta (arrow keys); locked objects stay. */
+  /** Moves the selection by a world delta (arrow keys); locked objects stay, a frame takes what it holds along. */
   nudge(dx: number, dy: number): void {
     if (!this.canEdit() || this.sel.size === 0) return;
     const patches = new Map<string, ObjectPatch>();
-    for (const id of this.sel) {
+    const free = [...this.sel].filter((id) => !this.scene.get(id)?.locked);
+    for (const id of this.scene.withFrameMembers(free)) {
       const o = this.scene.get(id);
       if (o && !o.locked) patches.set(id, this.shiftPatch(o, dx, dy));
     }
@@ -1365,7 +1407,7 @@ export class CanvasEngine implements Core {
 
   private editSpec(o: ObjectRec): EditSpec | null {
     const p = this.palette;
-    if (o.kind === 'image' || o.kind === 'ink') return null;
+    if (o.kind === 'image' || o.kind === 'ink' || o.kind === 'frame') return null;
     if (isConnector(o)) {
       const m = connectorMidpoint(o);
       return { box: { x: m.x - 80, y: m.y - 12, w: 160, h: 24 }, text: o.label, size: LABEL_SIZE, color: p.ink, align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily };

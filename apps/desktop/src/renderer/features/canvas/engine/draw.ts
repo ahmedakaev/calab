@@ -5,7 +5,8 @@ import { F_STRIKE, type Fmt } from '../../../lib/canvas/richText';
 import { LABEL_SIZE, boxFontSize, fontOf, type TextLayout, type TextLayouter } from '../../../lib/canvas/textLayout';
 import { MARKER_ALPHA, isDot, traceInk } from '../../../lib/canvas/ink';
 import { visualBounds } from '../../../lib/canvas/scene';
-import { type ConnectorRec, type ImageRec, type InkRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
+import { FRAME_RADIUS, FRAME_TITLE_GAP, FRAME_TITLE_SIZE, frameTitleRect } from '../../../lib/canvas/frames';
+import { MAX_SIZE, type ConnectorRec, type FrameRec, type ImageRec, type InkRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
 import type { ImageSource } from './images';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import type { VoteBadge } from '../../../lib/canvas/votes';
@@ -131,7 +132,43 @@ function drawBody(ctx: Ctx2D, o: ObjectRec, env: DrawEnv): void {
     case 'ink':
       drawInk(ctx, o, env);
       break;
+    case 'frame':
+      drawFrame(ctx, o, env);
+      break;
   }
+}
+
+/**
+ * A frame: its board in the hue's soft tone (or none) with a hairline outline, and the title above the top-left corner,
+ * cut at the frame's width. Drawn first of all (the scene orders frames below everything), so it never covers content.
+ */
+function drawFrame(ctx: Ctx2D, o: FrameRec, env: DrawEnv): void {
+  const fill = resolveFill(env.palette, o.fill, true);
+  const plain = env.scale < TEXT_PLAQUE_SCALE;
+  ctx.beginPath();
+  if (plain) ctx.rect(o.x, o.y, o.w, o.h);
+  else traceRounded(ctx, o, FRAME_RADIUS);
+  if (fill) {
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+  ctx.strokeStyle = env.palette.plaque;
+  ctx.lineWidth = 1 / env.scale;
+  ctx.stroke();
+  if (!o.title || env.hiddenText === o.id || FRAME_TITLE_SIZE * env.scale < MIN_GLYPH_PX) return;
+  const lay = env.layouter.layout(o.title, FRAME_TITLE_SIZE, MAX_SIZE);
+  const r = frameTitleRect(o, lay.widths[0] ?? 0);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(r.x, r.y, r.w, r.h + FRAME_TITLE_GAP);
+  ctx.clip();
+  ctx.fillStyle = env.palette.ink;
+  ctx.globalAlpha *= 0.72;
+  ctx.font = font(env, FRAME_TITLE_SIZE);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.fillText(lay.lines[0] ?? o.title, o.x, o.y - FRAME_TITLE_GAP - FRAME_TITLE_SIZE * 0.22);
+  ctx.restore();
 }
 
 /** A freehand stroke: the smoothed line with round caps and joins; a marker semi-transparent in one pass (no darker overlaps). */
