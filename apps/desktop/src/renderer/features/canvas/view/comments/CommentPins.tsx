@@ -122,7 +122,8 @@ const Pin = memo(function Pin({ id, workspaceId, engine, onPick }: { id: string;
         data-object-id={c.objectId || undefined}
         data-ox={c.x}
         data-oy={c.y}
-        aria-label={c.resolved ? `${t('canvasComments.pinLabel', { name: author })} · ${t('canvasComments.resolved')}` : t('canvasComments.pinLabel', { name: author })}
+        // The visible count is part of the name (a screen reader hears what is shown).
+        aria-label={c.resolved ? `${t('canvasComments.pinLabel', { name: author })} · ${t('canvasComments.resolved')}` : `${replies + 1} · ${t('canvasComments.pinLabel', { name: author })}`}
         aria-pressed={active}
         style={PIN_STYLE}
         onPointerDown={(e) => e.stopPropagation()}

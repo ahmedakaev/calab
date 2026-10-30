@@ -104,13 +104,14 @@ export const TemplatesCard = memo(function TemplatesCard({ engine, sync, focusCa
   const insert = useInsertTemplate(engine, focusCanvas);
   if (!empty || !synced || closed) return null;
   return (
-    <div className="pointer-events-none absolute inset-0 z-[5] grid place-items-center px-24 py-16" data-testid="canvas-templates-card-host">
-      <div className={cx(PANEL, 'pointer-events-auto flex w-[min(460px,100%)] flex-col')} role="region" aria-label={t('canvasBoard.templates.title')} data-testid="canvas-templates-card">
+    <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center px-24 py-16" data-testid="canvas-templates-card-host">
+      <div className={cx(PANEL, 'pointer-events-auto flex max-h-full w-[min(460px,100%)] flex-col')} role="region" aria-label={t('canvasBoard.templates.title')} data-testid="canvas-templates-card">
         <div className="flex flex-col gap-0.5 px-3 pb-2.5 pt-3">
           <span className="text-title text-fg">{t('canvasBoard.templates.title')}</span>
           <span className="text-caption text-muted">{t('canvasBoard.templates.hint')}</span>
         </div>
-        <div className="flex flex-col gap-0.5">
+        {/* The list scrolls inside the card when the window is low (960 × 600 with all the templates). */}
+        <div className="scrollbar-thin flex min-h-0 flex-col gap-0.5 overflow-y-auto">
           {/* «Blank canvas» only puts the card away; the canvas stays as it is. */}
           <button
             type="button"
