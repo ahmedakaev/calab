@@ -72,6 +72,18 @@ describe('QuickGesture (press on a dot)', () => {
     expect(wire?.to).toMatchObject({ id: t.b });
     expect(t.finished).toHaveBeenCalledWith([wire?.id], false);
   });
+  it('the arrow it makes is the curve the drag previewed, whatever the connector setting', () => {
+    const t = setup();
+    let wire: number[] | null | undefined;
+    (t.g as unknown as { core: { setOverlay: (o: { wire?: number[] | null }) => void } }).core.setOverlay = (o) => {
+      if (o.wire) wire = o.wire;
+    };
+    t.g.move({ x: 680, y: 130 }, { x: 680, y: 130 }, mods);
+    t.g.end();
+    const made = [...t.scene.all()].find(isConnector);
+    expect(made?.route).toBe('curve');
+    expect(made?.points).toEqual(wire);
+  });
   it('released on empty canvas: the line stays, the drop menu opens at its end, nothing is written yet', () => {
     const t = setup();
     const before = t.doc.count;

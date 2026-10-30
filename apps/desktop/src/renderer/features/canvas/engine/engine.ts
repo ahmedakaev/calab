@@ -23,7 +23,7 @@ import { AwarenessLayer, sameView, type PeerState, type PeerView } from './aware
 import { QuickGesture, type Core, type Gesture, type InkStyle, type Mods } from './gestures';
 import { attachInput, toolCursor } from './input';
 import { ImageCache, type DecodeFn, type ImageResolver } from './images';
-import { OPPOSITE, QUICK_ANIM_MS, QUICK_SIDES, choiceInit, choiceSize, dropRect, quickInit, type QuickChoice, quickSideAt, quickTarget } from './quick';
+import { OPPOSITE, QUICK_ANIM_MS, QUICK_ROUTE, QUICK_SIDES, choiceInit, choiceSize, dropRect, quickInit, type QuickChoice, quickSideAt, quickTarget } from './quick';
 import { emptyOverlay, type InkPreview, type Outline, type OverlayState, type SelFrame } from './overlay';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import { Renderer, renderSceneTo, type FrameStats } from './renderer';
@@ -707,7 +707,7 @@ export class CanvasEngine implements Core {
     this.doc.checkpoint();
     const made = this.doc.createMany([
       { id, init: choiceInit(c, src, rect, this.sticky_, text.trim()) },
-      { init: { kind: 'connector', from: { id: src.id, side: d.side }, to: { id, side }, arrow: 'end', route: this.route_ } },
+      { init: { kind: 'connector', from: { id: src.id, side: d.side }, to: { id, side }, arrow: 'end', route: QUICK_ROUTE } },
     ]);
     this.finishCreate(made.length ? [id] : [], !text.trim());
   }
@@ -738,7 +738,7 @@ export class CanvasEngine implements Core {
     this.doc.checkpoint();
     const made = this.doc.createMany([
       { id, init: quickInit(src, at) },
-      { init: { kind: 'connector', from: { id: src.id, side }, to: { id, side: OPPOSITE[side] }, arrow: 'end', route: this.route_ } },
+      { init: { kind: 'connector', from: { id: src.id, side }, to: { id, side: OPPOSITE[side] }, arrow: 'end', route: QUICK_ROUTE } },
     ]);
     this.quickHot = null;
     this.finishCreate(made.length ? [id] : [], true);

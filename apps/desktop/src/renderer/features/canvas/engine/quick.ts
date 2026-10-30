@@ -5,7 +5,7 @@
  */
 import { rectInflate, type Point, type Rect } from '../../../lib/canvas/geometry';
 import type { ConcreteSide } from '../../../lib/canvas/route';
-import { DEFAULTS, type ObjectInit, type ShapeKind, type ShapeRec, type StickyRec } from '../../../lib/canvas/types';
+import { DEFAULTS, type ObjectInit, type RouteKind, type ShapeKind, type ShapeRec, type StickyRec } from '../../../lib/canvas/types';
 
 /** No dot on top: the rotation knob is there. */
 export const QUICK_SIDES: readonly ConcreteSide[] = ['right', 'bottom', 'left'];
@@ -17,6 +17,9 @@ export const QUICK_HIT_PX = 10;
 export const QUICK_GAP = 80;
 /** How long a hovered dot takes to grow into its button (the preview fades in with it). */
 export const QUICK_ANIM_MS = 140;
+
+/** The wire a handle makes is a curve whatever the connector setting: the dragged preview is an arc and the result keeps it. */
+export const QUICK_ROUTE: RouteKind = 'curve';
 
 export const OPPOSITE: Readonly<Record<ConcreteSide, ConcreteSide>> = { right: 'left', left: 'right', top: 'bottom', bottom: 'top' };
 

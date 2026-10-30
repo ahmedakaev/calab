@@ -7,7 +7,7 @@ import {
   ROT_STEP, angleToward, boundsOf, dist, mapRect, normRot, rectCenter, rectFromPoints, rectInflate, resizeRect, resizeRotated, rotatePoint, snapAngle, snapTo,
   type HandleId, type Point, type Rect,
 } from '../../../lib/canvas/geometry';
-import { anchorOf, curveControls, flattenCubic, SIDE_DIR, SIDES, type ConcreteSide } from '../../../lib/canvas/route';
+import { anchorOf, curveControls, flattenCubic, routeConnector, SIDE_DIR, SIDES, type ConcreteSide } from '../../../lib/canvas/route';
 import type { Scene } from '../../../lib/canvas/scene';
 import { snapMove, snapResizePoint, type SnapOptions } from '../../../lib/canvas/snap';
 import {
@@ -15,7 +15,7 @@ import {
   type BoxRec, type ConnectorRec, type Endpoint, type ObjectInit, type ObjectPatch, type ShapeRec, type StickyRec, type RouteKind, type ShapeKind,
 } from '../../../lib/canvas/types';
 import type { InkPreview, OverlayState } from './overlay';
-import { edgeMid } from './quick';
+import { edgeMid, QUICK_ROUTE } from './quick';
 
 /** What the pen draws with now (remembered for the session by the engine). */
 export interface InkStyle {
@@ -683,9 +683,7 @@ export class QuickGesture implements Gesture {
     this.target = glueAt(this.core, w, this.src.id);
     if (this.target) {
       this.at = null;
-      const b = this.target.active ?? rectCenter(this.target.rect);
-      const side = this.target.side;
-      this.core.setOverlay({ quick: null, ghost: null, wire: this.arc(a, b, side === 'auto' ? undefined : SIDE_DIR[side]), ...glueOverlay(this.target) });
+      this.core.setOverlay({ quick: null, ghost: null, wire: this.glued(this.target), ...glueOverlay(this.target) });
       return;
     }
     const g = m.mod ? 0 : this.core.gridSize;
@@ -693,10 +691,24 @@ export class QuickGesture implements Gesture {
     this.core.setOverlay({ quick: null, ghost: null, wire: this.arc(a, this.at), glue: null });
   }
 
-  /** The dragged line as an arc: it leaves the source along its side's normal (like a curved connector). */
-  private arc(a: Point, b: Point, bDir?: Point): number[] {
+  /** Over a target: exactly the connector that release creates (same ends, same route), so nothing jumps on drop. */
+  private glued(t: GlueTarget): number[] {
+    const lookup = (id: string): BoxRec | undefined => {
+      const o = this.core.scene.get(id);
+      return o && isBox(o) ? o : undefined;
+    };
+    return routeConnector({ id: this.src.id, side: this.side }, { id: t.id, side: t.side }, QUICK_ROUTE, lookup).points;
+  }
+
+  /**
+   * The free line as an arc: it leaves the source along its side's normal and arrives heading straight from the start.
+   * That end direction turns continuously with the pointer (a curved connector's free end snaps to an axis, which
+   * flips the arc by 90° on the diagonal).
+   */
+  private arc(a: Point, b: Point): number[] {
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
     const from = { p: a, dir: SIDE_DIR[this.side], target: null, side: null };
-    const to = { p: b, dir: bDir ?? null, target: null, side: null };
+    const to = { p: b, dir: { x: (a.x - b.x) / d, y: (a.y - b.y) / d }, target: null, side: null };
     const [c1, c2] = curveControls(from, to);
     return flattenCubic(a, c1, c2, b);
   }
@@ -710,7 +722,7 @@ export class QuickGesture implements Gesture {
       this.core.setOverlay({ wire: null, glue: null });
       this.core.doc.checkpoint();
       const from = { id: this.src.id, side: this.side };
-      const id = this.core.doc.create({ kind: 'connector', from, to: { id: this.target.id, side: this.target.side }, arrow: 'end', route: this.core.connectorRoute });
+      const id = this.core.doc.create({ kind: 'connector', from, to: { id: this.target.id, side: this.target.side }, arrow: 'end', route: QUICK_ROUTE });
       this.core.finishCreate(id ? [id] : [], false);
       return;
     }
