@@ -8,7 +8,7 @@
  */
 import { Check, MessageCircle, MessageCirclePlus } from 'lucide-react';
 import { timestampMs } from '@bufbuild/protobuf/wkt';
-import { memo, useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Tip, cx } from '../../../../components/ui';
 import { t } from '../../../../i18n';
@@ -93,7 +93,7 @@ function PinCard({ id, workspaceId }: { id: string; workspaceId: string }): Reac
   );
 }
 
-const Pin = memo(function Pin({ id, workspaceId, engine }: { id: string; workspaceId: string; engine: CanvasEngine }): ReactNode {
+const Pin = memo(function Pin({ id, workspaceId, engine, onPick }: { id: string; workspaceId: string; engine: CanvasEngine; onPick: (id: string) => void }): ReactNode {
   const c = useCanvasComments((s) => s.byId[id]);
   const replies = useCanvasComments((s) => s.replies[id]?.length ?? 0);
   const active = useCanvasComments((s) => s.active === id);
@@ -126,11 +126,7 @@ const Pin = memo(function Pin({ id, workspaceId, engine }: { id: string; workspa
         aria-pressed={active}
         style={PIN_STYLE}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => {
-          const st = useCanvasComments.getState();
-          st.setActive(id);
-          st.setPanel(true);
-        }}
+        onClick={() => onPick(id)}
         className={cx(
           'pointer-events-auto absolute left-0 top-0 flex h-7 min-w-7 items-center gap-0.5 rounded-full rounded-bl-none border px-1.5 text-caption font-medium shadow-sm',
           // The thread open in the panel: filled, with a halo and above the other pins — the one pin that is «here».
@@ -176,10 +172,19 @@ function DraftPin({ draft, engine }: { draft: CommentDraft; engine: CanvasEngine
 }
 
 /** Pins of the threads (resolved ones as ticks; with «Только открытые» only the open ones and the active one) and the draft's. */
-export const CommentPins = memo(function CommentPins({ engine, canvasId, workspaceId }: { engine: CanvasEngine; canvasId: string; workspaceId: string }): ReactNode {
+export const CommentPins = memo(function CommentPins({
+  engine, canvasId, workspaceId, onPick, layer,
+}: {
+  engine: CanvasEngine;
+  canvasId: string;
+  workspaceId: string;
+  /** A pin clicked: its thread opens (a popover at the pin on the desktop, the panel on the phone). Stable. */
+  onPick: (id: string) => void;
+  /** The layer element, for the popover's anchor. */
+  layer: RefObject<HTMLDivElement | null>;
+}): ReactNode {
   const ids = useCanvasComments(useShallow((s) => (s.threads[canvasId] ?? EMPTY).filter((id) => !s.filterOpen || !s.byId[id]?.resolved || s.active === id)));
   const draft = useCanvasComments((s) => (s.draft?.canvasId === canvasId ? s.draft : null));
-  const layer = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = layer.current;
     if (!el) return undefined;
@@ -196,11 +201,11 @@ export const CommentPins = memo(function CommentPins({ engine, canvasId, workspa
       offView();
       offScene();
     };
-  }, [engine]);
+  }, [engine, layer]);
   return (
     <div ref={layer} className="pointer-events-none absolute left-0 top-0 z-[5] size-0 overflow-visible" data-testid="canvas-comment-pins">
       {ids.map((id) => (
-        <Pin key={id} id={id} workspaceId={workspaceId} engine={engine} />
+        <Pin key={id} id={id} workspaceId={workspaceId} engine={engine} onPick={onPick} />
       ))}
       {draft ? <DraftPin draft={draft} engine={engine} /> : null}
     </div>

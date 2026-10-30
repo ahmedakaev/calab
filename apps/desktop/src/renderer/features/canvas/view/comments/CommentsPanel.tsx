@@ -28,7 +28,7 @@ import { CommentInput } from './CommentInput';
 
 const EMPTY: readonly string[] = [];
 
-interface Ctx {
+export interface Ctx {
   canvasId: string;
   workspaceId: string;
   rights: CommentRights;
@@ -61,9 +61,11 @@ const Item = memo(function Item({ id, meta, ctx, editing, onEdit, onDelete }: { 
   );
 });
 
-const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): ReactNode {
-  const resolved = useCanvasComments((s) => !!s.byId[id]?.resolved);
-  const active = useCanvasComments((s) => s.active === id);
+/**
+ * A thread's comments and its field (a reply, or the edit of one of its comments): shared by the panel's card and the
+ * popover at the pin. `reply` shows the reply field; an edit shows it anyway.
+ */
+export const ThreadBody = memo(function ThreadBody({ id, ctx, reply, autoFocus = false, scroll = false }: { id: string; ctx: Ctx; reply: boolean; autoFocus?: boolean; scroll?: boolean }): ReactNode {
   // The grouping's input as one primitive: an edit or a resolve does not re-group the thread.
   const shape = useCanvasComments((s) =>
     [id, ...(s.replies[id] ?? EMPTY)]
@@ -76,7 +78,6 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
   );
   // The thread's day is in its header: no date pill over the first row of every card.
   const { items, metas } = useCommentGroups(shape, false);
-  const startMs = items[0]?.ms ?? 0;
   const [editId, setEditId] = useState<string | null>(null);
   const editBody = useCanvasComments((s) => (editId ? s.byId[editId]?.body : undefined));
   // The edited comment went away (deleted elsewhere): the field goes back to a reply.
@@ -103,6 +104,39 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
   );
   const cancelEdit = useCallback(() => setEditId(null), []);
   const submit = useCallback((wire: string, eid?: string) => (eid ? editComment(eid, wire) : replyTo(ctx.canvasId, id, wire)), [ctx.canvasId, id]);
+  return (
+    <>
+      {/* `scroll`: the comments scroll in a bounded box (the popover) and the field stays below them. */}
+      <div className={cx('pb-2 pt-1', scroll && 'min-h-0 flex-1 overflow-y-auto bg-feed')} onClick={() => useCanvasComments.getState().setActive(id)} role="presentation">
+        {items.map((it, i) => (
+          <Item key={it.key} id={it.key} meta={metas[i] as RowMeta} ctx={ctx} editing={editing?.id === it.key} onEdit={onEdit} onDelete={onDelete} />
+        ))}
+      </div>
+      {(reply && ctx.rights.write) || editing ? (
+        <CommentInput
+          canvasId={ctx.canvasId}
+          workspaceId={ctx.workspaceId}
+          placeholder={t('canvasComments.replyPlaceholder')}
+          editing={editing}
+          onCancelEdit={cancelEdit}
+          onSubmit={submit}
+          autoFocus={autoFocus}
+          className="border-t border-line bg-main px-2 pb-2 pt-2"
+        />
+      ) : null}
+    </>
+  );
+});
+
+const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): ReactNode {
+  const resolved = useCanvasComments((s) => !!s.byId[id]?.resolved);
+  const active = useCanvasComments((s) => s.active === id);
+  // Open in its popover at the pin: the field is there, not here.
+  const inPopover = useCanvasComments((s) => s.active === id && s.pinOpen);
+  const startMs = useCanvasComments((s) => {
+    const c = s.byId[id];
+    return c?.createdAt ? timestampMs(c.createdAt) : 0;
+  });
 
   const show = (): void => {
     const st = useCanvasComments.getState();
@@ -111,7 +145,6 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
     const p = c ? pinWorld(c, (o) => ctx.engine.scene.get(o)) : null;
     if (p) ctx.engine.centerOn(p);
   };
-  const composer = (active && ctx.rights.write) || !!editing;
   // A pin picked on the canvas brings its thread into view here.
   const li = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -153,22 +186,7 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
           </Button>
         ) : null}
       </div>
-      <div className="pb-2 pt-1" onClick={() => useCanvasComments.getState().setActive(id)} role="presentation">
-        {items.map((it, i) => (
-          <Item key={it.key} id={it.key} meta={metas[i] as RowMeta} ctx={ctx} editing={editing?.id === it.key} onEdit={onEdit} onDelete={onDelete} />
-        ))}
-      </div>
-      {composer ? (
-        <CommentInput
-          canvasId={ctx.canvasId}
-          workspaceId={ctx.workspaceId}
-          placeholder={t('canvasComments.replyPlaceholder')}
-          editing={editing}
-          onCancelEdit={cancelEdit}
-          onSubmit={submit}
-          className="border-t border-line bg-main px-2 pb-2 pt-2"
-        />
-      ) : null}
+      <ThreadBody id={id} ctx={ctx} reply={active && !inPopover} />
     </li>
   );
 });
@@ -267,7 +285,8 @@ export const CommentsPanel = memo(function CommentsPanel({
           </ul>
         )}
       </div>
-      {rights.write ? <Draft ctx={ctx} /> : null}
+      {/* On the desktop a new thread is written in its popover at the pin. */}
+      {rights.write && phone ? <Draft ctx={ctx} /> : null}
     </aside>
   );
 });
