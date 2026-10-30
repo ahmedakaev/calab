@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureOnOutputHeadset, livekitOutputStale, outputSink } from './outputRoute';
+import { captureOnOutputHeadset, livekitOutputStale, outputSink, outputsChanged } from './outputRoute';
 
 const out = (deviceId: string, label: string, groupId = `g-${deviceId}`) => ({ deviceId, groupId, kind: 'audiooutput' as const, label });
 const inp = (deviceId: string, label: string, groupId = `g-${deviceId}`) => ({ deviceId, groupId, kind: 'audioinput' as const, label });
@@ -92,5 +92,18 @@ describe('captureOnOutputHeadset', () => {
     expect(captureOnOutputHeadset(null, 'AirPods Pro', 'air')).toBe(false);
     expect(captureOnOutputHeadset(list, '', 'air')).toBe(false);
     expect(captureOnOutputHeadset([spk, mbpMic], 'AirPods Pro', 'air')).toBe(false);
+  });
+});
+
+describe('outputsChanged', () => {
+  const base = [defaultTo(spk), spk, air, mbpMic, airMic];
+  it('an output comes or goes, or the default moves: yes', () => {
+    expect(outputsChanged(base, [defaultTo(spk), spk, mbpMic])).toBe(true);
+    expect(outputsChanged(base, [defaultTo(air), spk, air, mbpMic, airMic])).toBe(true);
+    expect(outputsChanged(null, base)).toBe(true);
+  });
+  it('only inputs / cameras changed, or the order: no', () => {
+    expect(outputsChanged(base, [defaultTo(spk), spk, air, mbpMic])).toBe(false);
+    expect(outputsChanged(base, [air, spk, defaultTo(spk), { deviceId: 'cam', groupId: 'c', kind: 'videoinput' as never, label: 'FaceTime' }])).toBe(false);
   });
 });

@@ -894,6 +894,29 @@ describe('VoiceEngine', () => {
     expect(useVoice.getState().roomId).toBeNull();
   });
 
+  it('a rejoin whose room drops right as connect() resolves is not counted as back: the cycle goes on', async () => {
+    await voice.join('A', 'ws');
+    // The first rejoin attempt: LiveKit connects, then the room is gone before our connect() returns.
+    FakeRoom.onConnect = () => {
+      FakeRoom.onConnect = null;
+      const room = FakeRoom.all.at(-1);
+      return Promise.resolve().then(() => {
+        if (!room) return;
+        room.state = 'Disconnected';
+        room.emit('Disconnected', 'SIGNAL_CLOSE');
+      });
+    };
+    FakeRoom.all[0]?.emit('Disconnected', 'SIGNAL_CLOSE');
+    await vi.advanceTimersByTimeAsync(1_100);
+    expect(joinVoice).toHaveBeenCalledTimes(2);
+    expect(useVoice.getState().phase).toBe('reconnecting');
+    // Next attempt (2 s later) gets in for real.
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect(joinVoice).toHaveBeenCalledTimes(3);
+    expect(FakeRoom.all.at(-1)?.state).toBe('Connected');
+    expect(useVoice.getState().phase).toBe('connected');
+  });
+
   it('a failing reconnect cycle keeps the seat: no unmount of the voice panel, one stable phase (0.2.1)', async () => {
     await voice.join('A', 'ws');
     const seen: { roomId: string | null; phase: string }[] = [];
@@ -1426,6 +1449,21 @@ describe('per-user volume and local mute (docs/09 #20)', () => {
       await vi.advanceTimersByTimeAsync(1600);
       expect(a.binds).toBe(before + 1);
       usePrefs.getState().setPrefs({ micDeviceId: null });
+    });
+
+    it('devicechange re-binds only when the outputs changed, not on a mic / camera change', async () => {
+      const list = [dflt('MacBook Speakers', 'g-mbp'), spk, inp('mbp-mic', 'MacBook Mic', 'g-mbp')];
+      await fire(list);
+      await voice.join('A', 'ws');
+      const a = subscribe(FakeRoom.all.at(-1), 'u2:phone', 'TR_a');
+      await vi.advanceTimersByTimeAsync(2000);
+      const before = a.binds;
+      await fire([...list, inp('usb-mic', 'USB Mic', 'g-usb')]);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(a.binds).toBe(before);
+      await fire([dflt('AirPods Pro', 'g-air'), spk, air, inp('mbp-mic', 'MacBook Mic', 'g-mbp')]);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(a.binds).toBe(before + 1);
     });
 
     it('a mic on another device does not re-bind', async () => {

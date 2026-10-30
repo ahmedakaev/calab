@@ -67,3 +67,19 @@ export function captureOnOutputHeadset(list: readonly Device[] | null, micLabel:
   if (!out.groupId) return false;
   return list.some((d) => d.kind === 'audioinput' && d.groupId === out.groupId && deviceName(d.label) === micName);
 }
+
+/**
+ * A `devicechange` touched the outputs: a device came or went, or the OS default moved (the
+ * «default» alias names another device). Input / camera changes do not — re-binding then would
+ * reopen every remote renderer for nothing. An unknown previous list counts as a change.
+ */
+export function outputsChanged(prev: readonly Device[] | null, next: readonly Device[]): boolean {
+  if (!prev) return true;
+  const key = (l: readonly Device[]): string =>
+    l
+      .filter((d) => d.kind === 'audiooutput')
+      .map((d) => (d.deviceId === DEFAULT_SINK || d.deviceId === 'communications' ? `${d.deviceId}=${d.groupId}|${deviceName(d.label)}` : d.deviceId))
+      .sort()
+      .join('\n');
+  return key(prev) !== key(next);
+}

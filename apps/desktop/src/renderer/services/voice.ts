@@ -57,7 +57,7 @@ import { REMOTE_LEVEL, RemoteLevelSpeaking, readLevel, type LevelSample } from '
 import { audioDevices, deviceName, deviceSwitches, type AudioDevice } from '../lib/deviceSwitch';
 import { answerCallSelf, canSpeakFrom, isDeviceGone, meterUpdate, micModeFor, mySeat, pttAllowed, pttCue, qualityOf, remoteAudio, toggleDeafen, toggleMute, transmitDecision, withUserMuted, withUserVolume } from '../lib/voiceLogic';
 import { RemoteAudioOut } from '../lib/media/remoteAudioOut';
-import { captureOnOutputHeadset, livekitOutputStale, outputSink } from '../lib/media/outputRoute';
+import { captureOnOutputHeadset, livekitOutputStale, outputSink, outputsChanged } from '../lib/media/outputRoute';
 import { useMessages } from '../stores/messages';
 import { useRooms } from '../stores/rooms';
 import { isTempRoom } from '../lib/tempRooms';
@@ -398,9 +398,9 @@ class VoiceEngine {
       this.snapshotDevices(true);
       void this.onDevicesChanged();
       // macOS moves the default output (charger, dock, headphones): re-assert our sink and the
-      // playback state (deafen!) on every remote element once the switch has settled.
+      // playback state (deafen!) on every remote element; the snapshot re-binds them once the
+      // switch has settled — only when the outputs changed (snapshotDevices).
       void this.applyOutputDevice();
-      this.scheduleRebind();
     });
     this.snapshotDevices(false);
     void this.applyOutputDevice(); // the chosen output for every remote element from the first one on
@@ -920,6 +920,14 @@ class VoiceEngine {
         if (gen !== this.rejoinGen) return;
         await this.connect(roomId, wsId, true, undefined, serverMuted);
         if (gen !== this.rejoinGen) return;
+        // A Disconnected between room.connect() resolving and here is ignored by its handler
+        // (a rejoin is running): a room that is not Connected now is not back — drop it, go on.
+        if (this.room && this.room.state !== ConnectionState.Connected && !this.nativeAudio?.connected) {
+          log.info(`voice: rejoin attempt ${attempt + 1} got a room that is ${this.room.state} already`);
+          await this.teardown(false, true);
+          if (gen !== this.rejoinGen) return;
+          continue;
+        }
         if (this.room || this.nativeAudio?.connected) {
           if (stream) toast.info(t('mediaErr.stream.restart'));
           // The camera comes back by itself (a new capture, no preview); start() explains a failure.
@@ -2453,6 +2461,8 @@ class VoiceEngine {
       }
       const prev = this.devices;
       this.devices = next;
+      // An input / camera change leaves the remote renderers alone (CBF-108).
+      if (announce && outputsChanged(prev, next)) this.scheduleRebind();
       if (!announce || !prev || !this.roomId) return;
       const p = prefs();
       for (const sw of deviceSwitches(prev, next, { micDeviceId: p.micDeviceId, outputDeviceId: p.outputDeviceId })) announceDeviceSwitch(sw);
