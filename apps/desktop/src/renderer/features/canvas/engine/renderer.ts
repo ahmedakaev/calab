@@ -4,7 +4,7 @@ import type { Scene, SceneChange } from '../../../lib/canvas/scene';
 import { visualBounds } from '../../../lib/canvas/scene';
 import { AwarenessLayer } from './awareness';
 import { drawBackground, drawObjects, releaseScratch, type Ctx2D, type DrawEnv } from './draw';
-import { drawOverlay, type OverlayState } from './overlay';
+import { drawOverlay, overlayBounds, type OverlayState } from './overlay';
 import type { ImageSource } from './images';
 import type { CanvasPalette } from './palette';
 
@@ -60,6 +60,8 @@ export interface FrameStats {
 }
 
 const MAX_REGIONS = 8;
+/** Damage over more than this share of the canvas is composited whole (cheaper than clipping that much). */
+const PARTIAL_MAX_SHARE = 0.6;
 
 /**
  * Canvas 2D renderer, on demand (ADR-0126 §4): a frame is scheduled only when something is dirty or a
@@ -78,10 +80,13 @@ export class Renderer {
   private mainDirty = true;
   /**
    * Only this world rect of the overlay changed since the last frame (the pen's stroke growing): the frame composites
-   * just that part of the screen. Any other request composites everything (`compositeAll`).
+   * just that part of the screen.
    */
   private overlayDirty: Rect | null = null;
+  /** Composite everything on the next frame: the first one, and any frame request without a remote layer. */
   private compositeAll = true;
+  /** The overlay's world box at the last frame (`overlayBounds`): where its old pixels are, to repaint on the next one. */
+  private lastOverlay: Rect | null = null;
   private remoteDirty = true;
   /** Device-pixel box the remote layer painted last (what to clear next), and the camera it was painted for. */
   private remoteBox: Rect | null = null;
@@ -238,10 +243,15 @@ export class Renderer {
     this.requestFrame();
   }
 
-  /** Only the overlay/camera changed (selection, guides, pan): a frame, no content repaint beyond the scroll. */
+  /**
+   * Only the overlay/camera changed (selection, guides, pan): a frame, no content repaint beyond the scroll. What it
+   * composites is worked out by the frame (the changed content and the overlay's old and new box, or everything after
+   * a scroll or zoom).
+   */
   requestFrame(): void {
     this.mainDirty = true;
-    this.compositeAll = true;
+    // Without a remote layer the peers are painted on this canvas too, and nothing tracks where: composite it all.
+    if (!this.remote) this.compositeAll = true;
     this.schedule();
   }
 
@@ -301,8 +311,24 @@ export class Renderer {
     const dirty = this.dirty;
     this.dirty = [];
     this.fullDirty = false;
-    // A frame for a piece of the overlay alone (the stroke's tail): the content stays, so only that box is composited.
-    const partial = !this.compositeAll && !full && dx === 0 && dy === 0 && dirty.length === 0 ? this.overlayDirty : null;
+    const ov = this.o.getOverlay();
+    const ovBox = overlayBounds(ov, cam.scale);
+    const lastOv = this.lastOverlay;
+    this.lastOverlay = ovBox;
+    // What changed on screen: the changed content, and the overlay where it was and where it is now (a dragged sticky,
+    // its frame and handles). Only that is composited; a scroll, a zoom, peers drawn on this canvas (no remote layer)
+    // or a change over most of the screen composite everything. The pen's stroke growing: just its tail.
+    let partial: Rect[] | null = null;
+    if (!this.compositeAll && !full && dx === 0 && dy === 0) {
+      if (dirty.length === 0 && this.overlayDirty) partial = [this.overlayDirty];
+      else if (this.remote) {
+        const boxes = [...dirty];
+        if (lastOv) boxes.push(lastOv);
+        if (ovBox) boxes.push(ovBox);
+        if (this.overlayDirty) boxes.push(this.overlayDirty);
+        partial = boxes;
+      }
+    }
     this.compositeAll = false;
     this.overlayDirty = null;
 
@@ -331,24 +357,31 @@ export class Renderer {
     // Composite: content, then overlay + remote layer (world transform).
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
-    if (partial) {
-      const part = this.toDeviceRegions([partial], cam, W, H)[0];
-      // Off screen: nothing to show.
-      if (!part) return;
+    let parts = partial ? this.toDeviceRegions(partial, cam, W, H) : null;
+    // One rect around all of it: a rectangular clip is a plain scissor on the GPU, several rects need a mask.
+    if (parts && parts.length > 1) parts = [parts.reduce((u, r) => rectUnion(u, r))];
+    // Most of the screen anyway: one plain composite is cheaper than clipping.
+    if (parts && parts.reduce((a, r) => a + r.w * r.h, 0) > PARTIAL_MAX_SHARE * W * H) parts = null;
+    if (parts) {
+      // Nothing on screen changed (e.g. the change is off screen).
+      if (parts.length === 0) {
+        this.onFrame?.();
+        return;
+      }
       this.stats.partial++;
       c.save();
       c.beginPath();
-      c.rect(part.x, part.y, part.w, part.h);
+      for (const r of parts) c.rect(r.x, r.y, r.w, r.h);
       c.clip();
-      c.drawImage(this.layer as unknown as CanvasImageSource, part.x, part.y, part.w, part.h, part.x, part.y, part.w, part.h);
+      for (const r of parts) c.drawImage(this.layer as unknown as CanvasImageSource, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
     } else c.drawImage(this.layer as unknown as CanvasImageSource, 0, 0);
     c.setTransform(dpr * cam.scale, 0, 0, dpr * cam.scale, dpr * cam.tx, dpr * cam.ty);
-    const ov = this.o.getOverlay();
     drawOverlay(c, ov, this.palette, cam.scale);
     if (!this.remote) this.o.awareness.draw(c, cam, this.o.scene, this.palette, (this.o.now ?? Date.now)());
     c.setTransform(1, 0, 0, 1, 0, 0);
-    if (partial) {
-      c.restore();
+    if (parts) c.restore();
+    // Peers' selections follow the objects (the remote layer is redrawn below when content changed).
+    if (parts && !(contentChanged && this.o.awareness.hasSelections)) {
       this.onFrame?.();
       return;
     }

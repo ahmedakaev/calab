@@ -5,7 +5,7 @@ import type { ConcreteSide } from '../../../lib/canvas/route';
 import type { ConnectorRec } from '../../../lib/canvas/types';
 import { strokeInk, type Ctx2D } from './draw';
 import { resolveColor, type CanvasPalette } from './palette';
-import { OPPOSITE, edgeMid, quickDot } from './quick';
+import { OPPOSITE, QUICK_HIT_PX, QUICK_OFFSET_PX, edgeMid, quickDot } from './quick';
 
 export const HANDLE_PX = 8;
 /** The phone's handles: drawn a little larger, hit from a 44 px zone (radius `TOUCH_HIT_PX`), the rotation handle hung further out. */
@@ -82,6 +82,67 @@ export const emptyOverlay = (): OverlayState => ({ outlines: [], connectors: [],
 
 export const overlayIsEmpty = (o: OverlayState): boolean =>
   o.outlines.length === 0 && o.connectors.length === 0 && !o.group && !o.marquee && o.guides.length === 0 && !o.angle && !o.ghost && !o.wire && !o.glue && !o.ink && !o.quick;
+
+/** Screen px every overlay box is padded by: handles, the rotate knob above a frame, the «continue» dots, line widths. */
+const OVERLAY_PAD_PX = TOUCH_ROTATE_OFFSET_PX + TOUCH_HANDLE_PX + QUICK_HIT_PX + 6;
+/** Room the angle pill takes down-right of its point (screen px), whatever its text. */
+const ANGLE_BOX_PX = { w: 14 + 72, h: 14 + 24 };
+
+/**
+ * The world rect everything `drawOverlay` paints lies in (padded for handles, knobs and dots), or null for an empty
+ * overlay. The renderer composites only what changed: the old and the new overlay box plus the changed content — a
+ * dragged sticky no longer re-composites the whole screen every frame. Errs on the large side; must never be smaller.
+ */
+export function overlayBounds(o: OverlayState, scale: number): Rect | null {
+  const px = 1 / scale;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  const add = (x: number, y: number, w = 0, h = 0): void => {
+    if (x < x0) x0 = x;
+    if (y < y0) y0 = y;
+    if (x + w > x1) x1 = x + w;
+    if (y + h > y1) y1 = y + h;
+  };
+  // A turned rect: the circle around it.
+  const turned = (r: Rect, rot: number | undefined): void => {
+    if (!rot) {
+      add(r.x, r.y, r.w, r.h);
+      return;
+    }
+    const c = rectCenter(r);
+    const R = Math.hypot(r.w, r.h) / 2;
+    add(c.x - R, c.y - R, 2 * R, 2 * R);
+  };
+  const pts = (p: readonly number[], pad: number): void => {
+    for (let i = 0; i + 1 < p.length; i += 2) add((p[i] ?? 0) - pad, (p[i + 1] ?? 0) - pad, 2 * pad, 2 * pad);
+  };
+  for (const r of o.outlines) turned(r.rect, r.rot);
+  for (const c of o.connectors) pts(c.points, Math.max(c.strokeWidth, 1) * px);
+  if (o.group) turned(o.group.rect, o.group.rot);
+  if (o.quick) {
+    const d = (QUICK_OFFSET_PX + QUICK_HIT_PX) * px;
+    add(o.quick.rect.x - d, o.quick.rect.y - d, o.quick.rect.w + 2 * d, o.quick.rect.h + 2 * d);
+    if (o.quick.hot) add(o.quick.hot.ghost.x, o.quick.hot.ghost.y, o.quick.hot.ghost.w, o.quick.hot.ghost.h);
+  }
+  if (o.marquee) add(o.marquee.x, o.marquee.y, o.marquee.w, o.marquee.h);
+  if (o.ghost) add(o.ghost.x, o.ghost.y, o.ghost.w, o.ghost.h);
+  if (o.glue) {
+    turned(o.glue.rect, o.glue.rot);
+    for (const a of o.glue.anchors) add(a.x, a.y);
+  }
+  if (o.wire) pts(o.wire, 0);
+  for (const g of o.guides) {
+    if (g.axis === 'x') add(g.at, Math.min(g.from, g.to), 0, Math.abs(g.to - g.from));
+    else add(Math.min(g.from, g.to), g.at, Math.abs(g.to - g.from), 0);
+  }
+  if (o.angle) add(o.angle.at.x, o.angle.at.y, ANGLE_BOX_PX.w * px, ANGLE_BOX_PX.h * px);
+  if (o.ink) pts(o.ink.points, Math.max(o.ink.width, px) / 2);
+  if (x1 < x0) return null;
+  const pad = OVERLAY_PAD_PX * px;
+  return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad };
+}
 
 /** Paints the overlay. The context carries the camera transform (world units); `scale` is the camera scale. */
 export function drawOverlay(ctx: Ctx2D, o: OverlayState, p: CanvasPalette, scale: number): void {

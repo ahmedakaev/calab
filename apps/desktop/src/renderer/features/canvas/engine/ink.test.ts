@@ -192,3 +192,47 @@ describe('Renderer: the stroke in progress', () => {
     expect(canvas.fake.calls.find((c) => c.name === 'drawImage')?.args.length).toBe(3);
   });
 });
+
+describe('Renderer: a drag composites only what changed', () => {
+  it('a moved sticky and its selection frame: their old and new boxes, not the whole screen; a scroll: everything', () => {
+    const doc = makeDoc();
+    const scene = new Scene(doc);
+    const canvas = fakeCanvas();
+    const remote = fakeCanvas();
+    const layer = fakeCtx();
+    const raf = manualRaf();
+    let overlay = emptyOverlay();
+    let cam = { tx: 0, ty: 0, scale: 1 };
+    const r = new Renderer({
+      canvas: canvas as unknown as HTMLCanvasElement, remoteCanvas: remote as unknown as HTMLCanvasElement, scene, palette: defaultPalette('light'),
+      getCamera: () => cam, getOverlay: () => overlay, awareness: new AwarenessLayer(),
+      raf: raf.raf, cancelRaf: raf.cancel, makeLayer: () => ({ width: 0, height: 0, getContext: () => layer.ctx }),
+    });
+    r.resize(1600, 1000, 1);
+    const [id] = doc.createMany([{ init: { kind: 'sticky', x: 100, y: 100, w: 100, h: 100 } }]);
+    overlay = { ...overlay, outlines: [{ rect: { x: 100, y: 100, w: 100, h: 100 }, rot: 0 }] };
+    raf.flush();
+    canvas.fake.clear();
+    // One step of a drag: the sticky moves 20 to the right, its outline with it.
+    doc.patch(id ?? '', { x: 120 });
+    overlay = { ...overlay, outlines: [{ rect: { x: 120, y: 100, w: 100, h: 100 }, rot: 0 }] };
+    r.requestFrame();
+    raf.flush();
+    expect(r.stats.partial).toBe(1);
+    const blits = canvas.fake.calls.filter((c) => c.name === 'drawImage');
+    expect(blits.length).toBeGreaterThan(0);
+    // Every copied piece is a part of the screen around the sticky, far from the full 1600 × 1000.
+    for (const b of blits) {
+      const [, x = 0, y = 0, w = 0, h = 0] = b.args as number[];
+      expect(w * h).toBeLessThan(0.1 * 1600 * 1000);
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(y).toBeGreaterThanOrEqual(0);
+    }
+    canvas.fake.clear();
+    cam = { tx: 30, ty: 0, scale: 1 };
+    r.requestFrame();
+    raf.flush();
+    expect(r.stats.partial).toBe(1);
+    expect(canvas.fake.calls.find((c) => c.name === 'drawImage')?.args.length).toBe(3);
+  });
+});
