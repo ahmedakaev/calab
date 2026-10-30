@@ -3,7 +3,7 @@ import { rectUnion, rectsIntersect, type Rect } from '../../../lib/canvas/geomet
 import type { Scene, SceneChange } from '../../../lib/canvas/scene';
 import { visualBounds } from '../../../lib/canvas/scene';
 import { AwarenessLayer } from './awareness';
-import { drawBackground, drawObjects, type Ctx2D, type DrawEnv } from './draw';
+import { drawBackground, drawObjects, releaseScratch, type Ctx2D, type DrawEnv } from './draw';
 import { drawOverlay, type OverlayState } from './overlay';
 import type { ImageSource } from './images';
 import type { CanvasPalette } from './palette';
@@ -128,6 +128,7 @@ export class Renderer {
     this.off();
     if (this.raf) (this.o.cancelRaf ?? cancelAnimationFrame)(this.raf);
     this.raf = 0;
+    releaseScratch();
   }
 
   private makeLayer(w: number, h: number): LayerCanvas {
@@ -173,6 +174,7 @@ export class Renderer {
       (this.o.cancelRaf ?? cancelAnimationFrame)(this.raf);
       this.raf = 0;
     }
+    if (!on) releaseScratch();
   }
 
   setHiddenText(id: string | null): void {

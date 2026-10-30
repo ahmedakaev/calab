@@ -143,7 +143,19 @@ function drawInk(ctx: Ctx2D, o: InkRec, env: DrawEnv): void {
 
 let scratch: { canvas: HTMLCanvasElement | OffscreenCanvas; ctx: Ctx2D } | null = null;
 
-/** A shared offscreen canvas of at least `w × h` device px (grown, never shrunk), cleared; null where there is none. */
+/** The most the eraser's scratch canvas holds per side, device px (1024² ≈ 4 MB); a larger stroke is painted in tiles. */
+export const SCRATCH_TILE = 1024;
+
+/** Drops the scratch canvas (a hidden window or a destroyed engine holds nothing); the next erased stroke makes it anew. */
+export function releaseScratch(): void {
+  if (scratch) {
+    scratch.canvas.width = 0;
+    scratch.canvas.height = 0;
+  }
+  scratch = null;
+}
+
+/** A shared offscreen canvas of at least `w × h` device px (≤ SCRATCH_TILE, grown, never shrunk), cleared; null where there is none. */
 function scratchOf(w: number, h: number): Ctx2D | null {
   if (!scratch || scratch.canvas.width < w || scratch.canvas.height < h) {
     const cw = Math.max(w, scratch?.canvas.width ?? 0);
@@ -166,9 +178,9 @@ function scratchOf(w: number, h: number): Ctx2D | null {
 
 /**
  * A stroke with eraser swaths: painted opaque into the scratch canvas (only the device box of the stroke inside the
- * painted region), the swaths punched out with `destination-out`, the result laid on `ctx` in one pass (a marker's
- * transparency applied once). False when it cannot (no transform or scratch: a test double), so the caller paints
- * the stroke whole.
+ * painted region, walked in tiles of at most SCRATCH_TILE px so the scratch stays small), the swaths punched out with
+ * `destination-out`, the result laid on `ctx` in one pass per tile (a marker's transparency applied once: tiles do
+ * not overlap). False when it cannot (no transform or scratch: a test double), so the caller paints the stroke whole.
  */
 function strokeErased(ctx: Ctx2D, o: InkRec, color: string, width: number, region: Rect | undefined): boolean {
   const erase = o.erase;
@@ -201,9 +213,22 @@ function strokeErased(ctx: Ctx2D, o: InkRec, color: string, width: number, regio
   dy0 = Math.max(0, Math.floor(dy0));
   dx1 = Math.min(ctx.canvas.width, Math.ceil(dx1));
   dy1 = Math.min(ctx.canvas.height, Math.ceil(dy1));
-  const w = dx1 - dx0;
-  const h = dy1 - dy0;
-  if (w <= 0 || h <= 0) return true;
+  if (dx1 <= dx0 || dy1 <= dy0) return true;
+  for (let ty = dy0; ty < dy1; ty += SCRATCH_TILE) {
+    for (let tx = dx0; tx < dx1; tx += SCRATCH_TILE) {
+      const w = Math.min(SCRATCH_TILE, dx1 - tx);
+      const h = Math.min(SCRATCH_TILE, dy1 - ty);
+      if (!paintErasedTile(ctx, o, erase, t, color, width, tx, ty, w, h)) return false;
+    }
+  }
+  return true;
+}
+
+/** One tile (`w × h` device px at `dx0, dy0`) of an erased stroke: paint, punch the swaths out, lay on `ctx`. */
+function paintErasedTile(
+  ctx: Ctx2D, o: InkRec, erase: readonly number[], t: DOMMatrix, color: string, width: number,
+  dx0: number, dy0: number, w: number, h: number,
+): boolean {
   const s = scratchOf(w, h);
   if (!s || !scratch) return false;
   s.setTransform(t.a, t.b, t.c, t.d, t.e - dx0, t.f - dy0);
