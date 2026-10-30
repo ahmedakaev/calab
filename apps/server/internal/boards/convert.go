@@ -298,11 +298,12 @@ func Snapshot(ctx context.Context, q *sqlc.Queries, wsID uuid.UUID, m perm.Membe
 
 // taskCols are the columns of taskRow, over tasks t JOIN boards b. The bot owner is a scalar
 // subquery on bots' primary key: no extra round trip and no join that FOR NO KEY UPDATE OF t
-// would have to name (ADR-0151).
+// would have to name; only a bot of the board's workspace (its home, where the owner manages it)
+// counts (ADR-0151).
 const taskCols = `t.id, t.board_id, t.number, t.title, t.description, t.status_id, t.priority, t.created_by,
 	t.estimate, t.start_on, t.due_on, t.parent_id, t.milestone_id, t.position, t.room_id, t.created_at,
 	t.updated_at, t.started_at, t.completed_at, t.completed_by, t.archived_at, b.key, b.workspace_id, t.approval_required,
-	t.task_milestone_id, (SELECT bo.owner_user_id FROM bots bo WHERE bo.user_id = t.created_by)`
+	t.task_milestone_id, (SELECT bo.owner_user_id FROM bots bo WHERE bo.user_id = t.created_by AND bo.workspace_id = b.workspace_id)`
 
 // taskRow is a task with its board's key and workspace.
 type taskRow struct {

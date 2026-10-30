@@ -232,7 +232,8 @@ func invitedCond(a *Args, user uuid.UUID, author bool) string {
 		" OR EXISTS (SELECT 1 FROM task_subscribers iw WHERE iw.task_id = t.id AND iw.user_id = " + u + " AND iw.watcher)"
 	if author {
 		cond += " OR t.created_by = " + u +
-			" OR EXISTS (SELECT 1 FROM bots ab WHERE ab.user_id = t.created_by AND ab.owner_user_id = " + u + ")"
+			" OR EXISTS (SELECT 1 FROM bots ab JOIN boards ib ON ib.id = t.board_id WHERE ab.user_id = t.created_by" +
+			" AND ab.owner_user_id = " + u + " AND ab.workspace_id = ib.workspace_id)"
 	}
 	return cond + ")"
 }

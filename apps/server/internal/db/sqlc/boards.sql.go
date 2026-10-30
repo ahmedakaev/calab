@@ -1351,6 +1351,7 @@ SELECT t.id AS task_id, t.board_id, (t.archived_at IS NOT NULL)::boolean AS task
        EXISTS (SELECT 1 FROM task_approvers x WHERE x.task_id = t.id AND x.user_id = $1)::boolean AS approver,
        EXISTS (SELECT 1 FROM task_subscribers x WHERE x.task_id = t.id AND x.user_id = $1 AND x.watcher)::boolean AS watcher
 FROM tasks t LEFT JOIN bots bo ON bo.user_id = t.created_by
+  AND bo.workspace_id = (SELECT tb.workspace_id FROM boards tb WHERE tb.id = t.board_id)
 WHERE t.room_id = $2
 `
 
@@ -2099,7 +2100,8 @@ WHERE b.workspace_id = $1 AND b.archived_at IS NULL AND t.archived_at IS NULL
                 UNION SELECT w.task_id FROM task_subscribers w WHERE w.user_id = $2 AND w.watcher)
        OR (t.board_id = ANY($3::uuid[])
            AND (t.created_by = $2
-                OR EXISTS (SELECT 1 FROM bots ab WHERE ab.user_id = t.created_by AND ab.owner_user_id = $2))))
+                OR EXISTS (SELECT 1 FROM bots ab WHERE ab.user_id = t.created_by AND ab.owner_user_id = $2
+                           AND ab.workspace_id = b.workspace_id))))
   AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = $2 AND u.is_bot)
 `
 
@@ -2588,7 +2590,7 @@ JOIN (SELECT a.task_id, a.user_id, 1 AS how FROM task_assignees a
       UNION ALL SELECT p.task_id, p.user_id, 2 AS how FROM task_approvers p
       UNION ALL SELECT w.task_id, w.user_id, 3 AS how FROM task_subscribers w WHERE w.watcher
       UNION ALL SELECT c.id, c.created_by, 4 AS how FROM tasks c WHERE c.created_by IS NOT NULL
-      UNION ALL SELECT c.id, ob.owner_user_id, 4 AS how FROM tasks c JOIN bots ob ON ob.user_id = c.created_by) x ON x.task_id = t.id
+      UNION ALL SELECT c.id, ob.owner_user_id, 4 AS how FROM tasks c JOIN bots ob ON ob.user_id = c.created_by AND ob.workspace_id = $1) x ON x.task_id = t.id
 JOIN users u ON u.id = x.user_id AND NOT u.is_bot
 WHERE b.workspace_id = $1 AND b.archived_at IS NULL AND t.archived_at IS NULL
 GROUP BY t.id, t.board_id, x.user_id

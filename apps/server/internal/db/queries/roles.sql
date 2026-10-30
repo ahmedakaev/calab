@@ -80,7 +80,7 @@ SELECT m.user_id, m.role,
        u.is_bot, bo.owner_user_id AS bot_owner
 FROM workspace_members m
 JOIN users u ON u.id = m.user_id
-LEFT JOIN bots bo ON bo.user_id = m.user_id
+LEFT JOIN bots bo ON bo.user_id = m.user_id AND bo.workspace_id = m.workspace_id
 WHERE m.workspace_id = $1;
 
 -- name: GetMemberAccess :one

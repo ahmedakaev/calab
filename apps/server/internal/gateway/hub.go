@@ -638,9 +638,10 @@ func (h *Hub) routeLocked(st *wsState, wid, id uuid.UUID, ev *v1.DispatchEvent) 
 			bot = b
 		}
 		owner := parseID(bot.GetOwnerUserId())
-		// ADR-0151: the owner is an author of the bot's tasks (create-only rule); a bot that
-		// left (or was deleted) no longer makes its owner one here — fail closed until a reload.
-		if id := parseID(bot.GetUser().GetId()); id != uuid.Nil && owner != uuid.Nil {
+		// ADR-0151: the owner is an author of the bot's tasks (create-only rule) in the bot's home
+		// workspace only; a bot that left (or was deleted) no longer makes its owner one here —
+		// fail closed until a reload.
+		if id := parseID(bot.GetUser().GetId()); id != uuid.Nil && owner != uuid.Nil && parseID(bot.GetWorkspaceId()) == wid {
 			st.setBotOwner(id, owner)
 		}
 		if d := ev.GetBotDelete(); d != nil {

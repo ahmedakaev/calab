@@ -84,6 +84,17 @@ func TestBotOwnerIsTaskAuthor(t *testing.T) {
 		t.Fatalf("created by me %v", taskKeys(my.GetTasks()))
 	}
 
+	// Only in the bot's home workspace: added to another one (by its managers), the bot does
+	// not make its owner an author there.
+	ws2 := createWorkspace(t, o, v1.WorkspaceVisibility_WORKSPACE_VISIBILITY_PRIVATE).GetId()
+	carl.must(200, "POST", "/api/invites/"+invite(t, o, ws2)+"/join", nil, nil)
+	o.must(201, "POST", "/api/workspaces/"+ws2+"/bots/add", &v1.AddBotRequest{BotUserId: mine.id}, nil)
+	away := createBoard(t, o, ws2, &v1.CreateBoardRequest{Name: "Чужое", Key: "BOA", IsPrivate: true}, 201)
+	setBoardPerms(o, away.GetId(), 200, creatorOv(o), userOv(carl.id, vc, 0), userOv(mine.id, vc, 0))
+	abroad := createTask(t, mine, away.GetId(), &v1.CreateTaskRequest{Title: "в чужом"}, 201)
+	patchTask(t, carl, abroad.GetId(), &v1.UpdateTaskRequest{Title: &title}, 403)
+	carl.must(403, "POST", "/api/tasks/"+abroad.GetId()+"/archive", nil, nil)
+
 	// The bot deleted: its owner is nobody's author any more.
 	setBoardPerms(o, bid, 200, creatorOv(o), userOv(carl.id, vc, 0))
 	carl.must(204, "DELETE", "/api/workspaces/"+wid+"/bots/"+mine.id, nil, nil)
