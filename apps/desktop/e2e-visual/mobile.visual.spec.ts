@@ -1180,6 +1180,23 @@ test('m-boards-task', async ({ page }) => {
   await checkpoint(page, 'm-boards-task-desc', { keyboard: true });
 });
 
+// Board #107: the read view of a description is the editor's own typography — paragraphs, a list, a link, an emoji, bold.
+// (The edit side is compared on the desktop in `boards-task`; opening the editor on a long description crashes in this
+// WebKit run — docs/12-tech-backlog.md.)
+test('m-boards-task-desc-wysiwyg', async ({ page }) => {
+  mock.setClock(NOW.getTime());
+  const cal4 = mock.boards.taskByKey('CAL-4');
+  if (cal4) cal4.task.description = 'Эхо пропало после правки 🎉 подробности на https://calab.io/docs\n\nВторой абзац.\n\n- первый **жирный** пункт\n- второй пункт';
+  await signedIn(page);
+  await tab(page, 'boards');
+  const nav = page.getByTestId('phone-boards');
+  await nav.getByTestId('board-row').filter({ hasText: 'Разработка' }).getByRole('button').first().tap();
+  await page.getByTestId('list-row').filter({ hasText: 'CAL-4' }).getByText('Карточки задач').tap();
+  const panel = page.getByTestId('task-panel');
+  await expect(panel.getByTestId('task-description').locator('li')).toHaveCount(2);
+  await checkpoint(page, 'm-boards-task-desc-read');
+});
+
 // «История» on the phone's task screen (ADR-0091): two tabs as segments, a detail opened.
 test('m-boards-task-history', async ({ page }) => {
   mock.setClock(NOW.getTime());

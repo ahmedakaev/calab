@@ -15,6 +15,7 @@ import { buildExtensions } from './extensions';
 import { BubbleBar, SuggestionMenu, TableBar } from './Menus';
 import { offeredBlocks } from './suggestions';
 import type { WikiEditorProps } from './types';
+import './prose.css';
 import './wiki.css';
 
 type EnvProps = Pick<WikiEditorProps, 'onUploadImage' | 'mentionSource' | 'pageSource' | 'imagePath' | 'onError' | 'blocks' | 'highlight' | 'onKey'>;
