@@ -233,7 +233,8 @@ describe('templates', () => {
     const ids = r.engine.insertTemplate('flow', tr);
     const conn = ids.map((i) => r.engine.scene.get(i)).find((o) => o?.kind === 'connector');
     const before = conn?.kind === 'connector' ? [...conn.points] : [];
-    r.engine.doc.patch(ids[0] ?? '', { x: (r.engine.scene.get(ids[0] ?? '')?.x ?? 0) - 200 });
+    const glued = conn?.kind === 'connector' && 'id' in conn.from ? conn.from.id : '';
+    r.engine.doc.patch(glued, { x: (r.engine.scene.get(glued)?.x ?? 0) - 200 });
     const after = r.engine.scene.get(conn?.id ?? '');
     expect(after?.kind === 'connector' ? after.points[0] : 0).not.toBe(before[0]);
   });

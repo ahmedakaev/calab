@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { CANVAS_BITS } from '@calaba/protocol';
+import * as TooltipP from '@radix-ui/react-tooltip';
 import { act, createElement, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,7 +67,7 @@ async function mount(opts: { relay?: MockRelay; name?: string; phone?: boolean; 
     deps: deps(relay, opts.name ?? 'Ann'),
   };
   await act(async () => {
-    root.render(createElement(CanvasView, props));
+    root.render(createElement(TooltipP.Provider, null, createElement(CanvasView, props)));
     await vi.advanceTimersByTimeAsync(0);
   });
   const canvas = host.querySelector('canvas') as HTMLCanvasElement;
@@ -82,7 +83,7 @@ async function mount(opts: { relay?: MockRelay; name?: string; phone?: boolean; 
     key: (key) => act(() => void canvas.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))),
     rerender: async (next) => {
       await act(async () => {
-        root.render(createElement(CanvasView, { ...props, ...next }));
+        root.render(createElement(TooltipP.Provider, null, createElement(CanvasView, { ...props, ...next })));
         await vi.advanceTimersByTimeAsync(0);
       });
     },
