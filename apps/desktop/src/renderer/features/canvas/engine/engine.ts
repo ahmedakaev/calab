@@ -152,6 +152,8 @@ const EDGE_PAN_MAX_DT = 0.05;
 /** Our camera goes out at most this often (5/s), and only when it moved. */
 const LOCAL_VIEW_MS = 200;
 const ANIM_MS = 180;
+/** How long a sticky pad's corner takes to lift under the pointer (and to settle after it). */
+const PAD_LIFT_MS = 180;
 /** Phone: the format bar above the keyboard (44 px targets + padding) and the zoom bar / count of others at the top. */
 const PHONE_FORMAT_BAR_PX = 56;
 const PHONE_TOP_BARS_PX = 64;
@@ -236,6 +238,9 @@ export class CanvasEngine implements Core {
   private sticky_: string = DEFAULTS.stickyColor;
   /** The hovered «continue» dot. */
   private quickHot: ConcreteSide | null = null;
+  /** The sticky pad under the pointer, and each pad's corner lift in motion: from `v0` toward `to` since `t0`. */
+  private padHot: string | null = null;
+  private readonly padAnim = new Map<string, { v0: number; to: number; t0: number }>();
   private quickT0 = 0;
   private eraser_: number = ERASER_SIZES[1] ?? 12;
   private frame_: FramePreset = '16:9';
@@ -297,6 +302,7 @@ export class CanvasEngine implements Core {
       beforeFrame: () => this.frameStart(),
       awareness: this.awareness,
       getVotes: () => (this.votes.active ? this.votes : undefined),
+      getPadLift: (id) => this.padLift(id),
       maxDpr: this.lowPower ? 1 : 2,
       ...(opts.raf ? { raf: opts.raf } : {}),
       ...(opts.cancelRaf ? { cancelRaf: opts.cancelRaf } : {}),
@@ -558,6 +564,7 @@ export class CanvasEngine implements Core {
         if (dt > 0) this.steerCamera(panBy(this.liveCamera, -v.x * dt, -v.y * dt));
       } else d.at = 0;
     }
+    if (this.padAnim.size > 0 && this.stepPads()) more = true;
     const q = this.overlay.quick;
     if (q?.hot && q.hot.t < 1) {
       const t = Math.min(1, (this.now() - this.quickT0) / QUICK_ANIM_MS);
@@ -671,6 +678,44 @@ export class CanvasEngine implements Core {
     const area = rectInflate(probe, Math.max(src.w, src.h) * 6);
     const taken = this.scene.query(area).flatMap((o) => (o.id !== src.id && !isConnector(o) ? [aabb(o)] : []));
     return quickTarget(src, side, taken);
+  }
+
+  /** A pad's corner lift now (0…1): eased toward 1 under the pointer, back to 0 after it leaves. */
+  private padLift(id: string): number {
+    const a = this.padAnim.get(id);
+    if (!a) return 0;
+    const k = Math.min(1, (this.now() - a.t0) / PAD_LIFT_MS);
+    const e = 1 - (1 - k) * (1 - k) * (1 - k);
+    return a.v0 + (a.to - a.v0) * e;
+  }
+
+  /** The pointer is over this sticky pad (or none): its corner starts to lift, the previous one's to settle. */
+  hoverPad(id: string | null): void {
+    if (id === this.padHot) return;
+    const now = this.now();
+    for (const [pid, to] of [[this.padHot, 0], [id, 1]] as const) {
+      if (!pid) continue;
+      if (this.reducedMotion) {
+        if (to === 0) this.padAnim.delete(pid);
+        else this.padAnim.set(pid, { v0: 1, to: 1, t0: now - PAD_LIFT_MS });
+      } else this.padAnim.set(pid, { v0: this.padLift(pid), to, t0: now });
+      const o = this.scene.get(pid);
+      if (o) this.renderer.invalidate(visualBounds(o));
+    }
+    this.padHot = id;
+  }
+
+  /** One frame of the pads' lift: repaints the moving ones; true while any still moves. */
+  private stepPads(): boolean {
+    let moving = false;
+    const now = this.now();
+    for (const [id, a] of this.padAnim) {
+      const o = this.scene.get(id);
+      if (o) this.renderer.invalidate(visualBounds(o));
+      if (now - a.t0 < PAD_LIFT_MS) moving = true;
+      else if (a.to === 0) this.padAnim.delete(id);
+    }
+    return moving;
   }
 
   /** Hover over a dot (or off it): the preview of what a click there would make. */
@@ -1453,7 +1498,8 @@ export class CanvasEngine implements Core {
     if (this.editor.isOpen) this.editor.commit();
     const target = id ?? this.state.selectedId;
     const o = target ? this.scene.get(target) : undefined;
-    if (!o || o.locked) return false;
+    // A sticky pad is not written on (owner 30.10): it hands out stickies; its name goes next to it.
+    if (!o || o.locked || (o.kind === 'sticky' && o.pad)) return false;
     const spec = this.editSpec(o);
     if (!spec) return false;
     const oid = o.id;

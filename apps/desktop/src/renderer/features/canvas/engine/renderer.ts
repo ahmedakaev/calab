@@ -23,6 +23,8 @@ export interface RendererOptions {
   awareness: AwarenessLayer;
   /** Vote badges: the book while a vote exists (open or finished), null otherwise (ADR-0127). */
   getVotes?: () => DrawEnv['votes'];
+  /** A sticky pad's hover lift (0…1), see DrawEnv.padLift. */
+  getPadLift?: (id: string) => number;
   /** Decoded pictures (absent: pictures are plaques). */
   images?: ImageSource;
   /** Max device-pixel ratio; 1 in the low-power mode. */
@@ -399,7 +401,7 @@ export class Renderer {
   // ── frame ──────────────────────────────────────────────────────────────────
 
   private env(scale: number): DrawEnv {
-    return { palette: this.palette, layouter: this.o.scene.text, scale, hiddenText: this.hiddenText, votes: this.o.getVotes?.(), images: this.o.images, skip: this.lift?.ids };
+    return { palette: this.palette, layouter: this.o.scene.text, scale, hiddenText: this.hiddenText, votes: this.o.getVotes?.(), images: this.o.images, skip: this.lift?.ids, padLift: this.o.getPadLift };
   }
 
   frame(): void {

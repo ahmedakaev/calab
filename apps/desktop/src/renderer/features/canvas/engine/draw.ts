@@ -40,6 +40,8 @@ export interface DrawEnv {
   region?: Rect | undefined;
   /** Objects not painted here: lifted into the renderer's drag sprite while they move. */
   skip?: ReadonlySet<string> | undefined;
+  /** How far a sticky pad's corner is lifted by the pointer over it (0…1, animated by the engine); absent: 0. */
+  padLift?: ((id: string) => number) | undefined;
 }
 
 const font = (env: DrawEnv, size: number): string => `${size}px ${env.palette.fontFamily}`;
@@ -472,7 +474,9 @@ function drawSticky(ctx: Ctx2D, o: TextBoxRec & { kind: 'sticky' }, env: DrawEnv
   if (band > 0 && !plain) {
     const a = ctx.globalAlpha;
     const top = o.y + o.h - band;
-    const curl = Math.min(o.w, o.h - band) * 0.16;
+    // The pointer over the pad lifts the corner (eased by the engine): an invitation to tear a sheet off.
+    const lift = env.padLift?.(o.id) ?? 0;
+    const curl = Math.min(o.w, o.h - band) * (0.16 + 0.2 * lift);
     const right = o.x + o.w;
     ctx.save();
     ctx.beginPath();

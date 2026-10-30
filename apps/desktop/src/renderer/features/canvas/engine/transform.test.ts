@@ -694,6 +694,44 @@ describe('sticky pads (owner 30.10)', () => {
     expect(snap(r, p)).toMatchObject({ x: 200, y: 100 });
   });
 
+  it('is not written on: a double-click or a text edit does not open it', () => {
+    const r = rig();
+    const p = pad(r);
+    r.canvas.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 180, clientY: 180 }));
+    expect(r.engine.getState().editing).toBe(false);
+    expect(r.engine.startTextEdit(p)).toBe(false);
+  });
+
+  it('the pointer over it: a hand, the corner lifts over a few frames and settles when it leaves', () => {
+    const r = rig({ reducedMotion: false });
+    pad(r);
+    r.raf.flush();
+    r.move(180, 180);
+    expect(r.canvas.style.cursor).toBe('grab');
+    let frames = 0;
+    for (let i = 0; i < 20; i++) {
+      r.clock.t += 16;
+      if (r.raf.pending === 0) break;
+      r.raf.flush();
+      frames++;
+    }
+    // A short animation, then no more frames at rest.
+    expect(frames).toBeGreaterThan(2);
+    expect(r.raf.pending).toBe(0);
+    r.move(900, 700);
+    r.clock.t += 400;
+    r.raf.flush();
+    r.raf.flush();
+    expect(r.raf.pending).toBe(0);
+    // With reduced motion the corner just lifts: one repaint, no animation.
+    const still = rig();
+    pad(still);
+    still.raf.flush();
+    still.move(180, 180);
+    still.raf.flush();
+    expect(still.raf.pending).toBe(0);
+  });
+
   it('the flag is stored, copied and patched like any field', () => {
     const r = rig();
     const p = pad(r);

@@ -123,10 +123,14 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
     if (g) return resizeCursorAt(g, engine.selectionFrame()?.rot ?? 0);
     if (connectorEndAt(w)) return 'pointer';
     const over = engine.hitAt(w);
+    const padId = over?.kind === 'sticky' && over.pad && !engine.votableAt(over.id) ? over.id : null;
+    const pad = padId !== null;
+    // Its corner lifts under the pointer (the engine animates it).
+    engine.hoverPad(padId);
     if (!over) return '';
     if (engine.votableAt(over.id)) return 'pointer';
     // A pad hands out stickies: a hand, as for taking one (Alt-drag moves it).
-    return over.kind === 'sticky' && over.pad ? 'grab' : 'move';
+    return pad ? 'grab' : 'move';
   };
 
   /** The selection frame's rotation handle under the pointer. */
@@ -472,6 +476,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
   const onLeave = (): void => {
     engine.setLocalCursor(null);
     engine.hoverQuick(null);
+    engine.hoverPad(null);
   };
 
   const onDouble = (e: MouseEvent): void => {
