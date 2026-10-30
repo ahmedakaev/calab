@@ -36,6 +36,7 @@ export const TRIGGER_KINDS: readonly TriggerKind[] = [
   'checklistCompleted',
   'commentCreated',
   'git',
+  'release',
   'dueIn',
   'overdue',
   'stale',
@@ -90,6 +91,15 @@ export function branchesOf(text: string): string[] {
   return [...new Set(text.split(/[\s,]+/).filter(Boolean))];
 }
 
+/** The environment filter of a release trigger (board task #101): ≤ 10 names of the server's form. */
+export const MAX_ENVS = 10;
+export const ENV_RE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
+
+/** «prod, Stage» → ["prod", "stage"]: commas or spaces separate, lower case, repeats dropped. */
+export function envsOf(text: string): string[] {
+  return [...new Set(text.toLowerCase().split(/[\s,]+/).filter(Boolean))];
+}
+
 export const ASSIGNEE_MODES: ReadonlyArray<{ v: RuleAssigneesMode; label: MessageKey }> = [
   { v: RuleAssigneesMode.SET, label: 'rules.mode.set' },
   { v: RuleAssigneesMode.ADD, label: 'rules.mode.add' },
@@ -125,6 +135,8 @@ export function blankTrigger(kind: TriggerKind): RuleTrigger {
       return create(RuleTriggerSchema, { kind: { case: kind, value: { days: 0 } } });
     case 'stale':
       return create(RuleTriggerSchema, { kind: { case: kind, value: { days: 14 } } });
+    case 'release':
+      return create(RuleTriggerSchema, { kind: { case: kind, value: { environments: ['prod'] } } });
     default:
       return create(RuleTriggerSchema, { kind: { case: kind, value: {} } });
   }
@@ -200,6 +212,8 @@ export function validateDraft(d: RuleDraft): RuleIssue[] {
   else if (tr.case === 'stale' && (tr.value.days < 1 || tr.value.days > 90)) out.push({ at: 'trigger', key: 'rules.err.days' });
   else if (tr.case === 'git' && (tr.value.targetBranches.length > MAX_BRANCHES || tr.value.targetBranches.some((b) => b.length > MAX_BRANCH))) {
     out.push({ at: 'trigger', key: 'rules.err.branches' });
+  } else if (tr.case === 'release' && (tr.value.environments.length > MAX_ENVS || tr.value.environments.some((e) => !ENV_RE.test(e)))) {
+    out.push({ at: 'trigger', key: 'rules.err.environments' });
   }
   if (d.actions.length < 1 || d.actions.length > MAX_ACTIONS) out.push({ at: 'actions', key: 'rules.err.actions' });
   d.actions.forEach((a, i) => {

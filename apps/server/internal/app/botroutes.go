@@ -46,6 +46,18 @@ type botRouteGroup struct {
 // decision; an unlisted pattern is denied to bots at run time. tools/gen-bot-routes.ts reads
 // this table for the docs (_routes.json): keep one route per line.
 var botRouteGroups = []botRouteGroup{
+	{access: botPublic, why: "calendar subscriptions: a revocable purpose-bound capability with fresh owner and workspace checks", routes: []string{
+		"GET /api/calendar-feed.ics",
+		"GET /api/calendar-connect",
+	}},
+	{access: botDeny, why: "personal calendar export and subscription credentials require a human session", routes: []string{
+		"GET /api/workspaces/{id}/calendar.ics",
+		"GET /api/events/{id}/calendar.ics",
+		"GET /api/workspaces/{id}/calendar-subscription",
+		"POST /api/workspaces/{id}/calendar-subscription",
+		"PUT /api/workspaces/{id}/calendar-subscription",
+		"DELETE /api/workspaces/{id}/calendar-subscription",
+	}},
 	// ---------------------------------------------------------------- public
 	{access: botPublic, why: "outside the API or before authentication; /gateway takes IDENTIFY with the bot token", routes: []string{
 		"GET /healthz",
@@ -312,6 +324,8 @@ var botRouteGroups = []botRouteGroup{
 		"DELETE /api/task-milestones/{id}",
 		"GET /api/boards/{id}/rules",
 		"GET /api/rules/{id}/runs",
+		"POST /api/boards/{id}/releases", // board task #101: a CI bot with EDIT_TASKS
+		"GET /api/boards/{id}/releases",
 		"GET /api/me/tasks",
 		"GET /api/me/task-notices",
 		"GET /api/workspaces/{id}/tasks/search",
@@ -409,6 +423,7 @@ var botRouteGroups = []botRouteGroup{
 		"GET /api/boards/{id}/git",
 		"PUT /api/boards/{id}/git",
 		"DELETE /api/boards/{id}/git",
+		"PATCH /api/boards/{id}/git",
 		"GET /api/boards/{id}/webhook",
 		"PUT /api/boards/{id}/webhook",
 		"DELETE /api/boards/{id}/webhook",
@@ -787,6 +802,7 @@ var botAudited = map[string]bool{
 	"DELETE /api/rules/{id}":                                              true,
 	"PUT /api/boards/{id}/git":                                            true,
 	"DELETE /api/boards/{id}/git":                                         true,
+	"PATCH /api/boards/{id}/git":                                          true,
 	"PUT /api/boards/{id}/webhook":                                        true,
 	"DELETE /api/boards/{id}/webhook":                                     true,
 	"PUT /api/boards/{id}/permissions":                                    true,

@@ -2385,3 +2385,44 @@ A Document Server per docs/ops/office-onlyoffice-deploy.md, `OFFICE_ENABLED=true
 - PG18 + Valkey: `go test -tags integration -count=1 -run TestBoardGit ./internal/app` — draft → «draft» rule only; ready → «MR открыт» rule; a repeated ready / approval with another body fires nothing; merge into `preprod` with filter `main` does not move the task.
 - Manually (GitLab): rules «Draft MR открыт → In Progress», «MR открыт → In Review», «MR влит» with «Целевая ветка» `main`; open a Draft MR `feature/dev-N-…`, mark it ready, approve twice, merge into `preprod`, then into `main`. Expected: In Progress → In Review → (no move) → Ready to Deploy; one journal line per approver.
 - Comment rule `Открыт MR !{pr_number}: {pr_title} {pr_url}` → the card shows the MR number, title and link; `@everyone` in the MR title notifies nobody.
+
+## Releases and the GitLab backlink (ADR-0060 §4, #101 stage B)
+- PG18 + Valkey: `go test -tags integration -count=1 -run 'TestBoardReleases|TestBoardGitBacklink' ./internal/app`.
+- Manually: a bot with `EDIT_TASKS` on DEV; rule «Задача вошла в релиз» `prod`, condition «Статус = Ready to Deploy», action → Deployed, comment `{release}`.
+- Merge an MR `feature/dev-N-…` into `main`; run the CI step of the bot docs «Релизы из CI» (`git log <prev>..<sha>`). Expected: DEV-N → Deployed, panel «Релиз: prod · <pipeline>» opens the pipeline, journal «задача вошла в релиз».
+- Repeat the same call: `created: false`, no new journal entry; `environment: stage` adds the tasks to stage without the prod rule.
+- List view → «Группировка: Релиз»; filter «Релиз» = the release / «Без релиза».
+- Git (GitLab) → «Ссылка на задачу в GitLab»: on, address + token with `api`; open an MR `feature/dev-M-…` → one note «Задача Calab: DEV-M — …»; redeliver → no second note; a bare mention in an MR description → none; a bad token → status names the `api` scope.
+## Stream annotations on Windows and the web (ADR-0028 amendment, #102)
+- Unit: `pnpm -F @calaba/desktop exec vitest run src/shared/annot.test.ts src/renderer/services/annot.test.ts` (display mapping, single-display fallback, «X указывает» indicator and its timer).
+- Matrix, each pair in both directions (presenter shares a **whole screen**, the viewer picks «Указка», then «Карандаш»): macOS ↔ Windows, Windows ↔ web (Chrome), macOS ↔ web.
+- Windows presenter: the pointer and strokes appear over the shared screen; the viewers' video has no doubled drawing (the overlay is excluded from capture). The panel under «Зрители могут рисовать» reads «Рисунки появятся поверх вашего экрана…», then «Имя указывает на экран».
+- Windows with two monitors (also one at 150 % scale): share each monitor in turn — the drawing lands on the shared one, aligned with the viewer's cursor.
+- If nothing shows over the Windows screen: send `%APPDATA%\Calab\logs\main.log` lines `[annot]` (display mapping, `overlay shown` with bounds/visible/onTop) and the renderer line `annot: first annotation of my stream`.
+- Web presenter (and a window share anywhere): the panel says «Рисунки видны в превью вашего стрима»; while a viewer annotates — «Имя рисует на экране» + «Показать», which opens the stream's pop-out with the drawings.
+- Viewers on Windows / web see each other's and the presenter's drawings on the stream tile (unchanged path, check once).
+
+## Calab links in chat open in the app (desktop)
+1. Signed in on `app.calab.io` (and once with a session on `app.calab.ru`), post links on both hosts and `meet.gptunnel.ru`: `/t/DEV-1`, `/t/dev-1000022`, `/b/<id>`, `/r/<code>`, `/join/<code>`, `/m/<room>/<msg>`, `/dm/<id>`, `/e/<id>`, `/wiki/<id>`, `/canvas/<id>`, `/disk/<id>`, `/plans?plan=team`, and `[text](https://app.calab.ru/t/DEV-1)`.
+2. Click each: plain, Cmd/Ctrl, middle button, the link card's title, inside a quote / forward, in a plain-text letter in Mail.
+Expected: the task / board / room / wiki / Disk / meeting opens in the app (another workspace's task switches the workspace); no browser.
+3. `/download/`, `/e/<id>/rsvp`, `/c/<code>`, `https://example.org`, `https://www.calab.io/t/DEV-1` open in the browser.
+4. On a self-hosted server `https://app.calab.io/t/DEV-1` opens in the browser.
+## Нижний островок в аватаре (ADR-0146)
+
+1. Запуск: `tools/dev-mock.sh --voice` (мок, Анна, в «Переговорке», открыт «Диск»). Ожидается: внизу слева на рейле только аватар с зелёной меткой звонка, список «Диска» идёт до низа окна.
+2. Навести на аватар. Ожидается: через долю секунды поверх контента открывается полный островок («Голос подключён» и панель «я»), аватар не сдвигается ни на пиксель.
+3. Выключить микрофон в островке, увести мышь. Ожидается: островок закрывается через ~0,25 с, на аватаре красный перечёркнутый микрофон. ⌘⇧M (mute) работает и в свёрнутом виде.
+4. Открыть ▾ у микрофона и увести мышь на меню и за него. Ожидается: пока меню открыто, островок не закрывается.
+5. Tab до аватара, Enter — открыт, Tab ходит по кнопкам островка, Esc — закрыт, фокус на аватаре.
+6. «Команда», «Доски», «Календарь», «Почта», офисный файл: в «Команде» полный островок как раньше, на остальных — аватар.
+7. Настройки → Основное → «Островок: сворачивать в аватар…» выключить. Ожидается: полный островок на всех экранах, как раньше.
+## Toasts at the top right, confirm before joining from a reminder
+- Raise several toasts (e.g. copy an invite link, disconnect the network): they stack at the top right under the title bar, newest on top, clear of the inbox / settings / help icons; open the inbox — the stack steps left of it. Phone: under the top bar.
+- Meeting with a voice room, reminder «Через 15 минут…» (system notification or toast): a click only brings the window forward and opens «Войти в комнату?» — nobody is joined until «Войти в комнату».
+- Esc / × / «Открыть встречу» close it without joining; «Открыть встречу» shows the meeting in the calendar.
+- Be in another voice room or a call first: the dialog says so, the button reads «Выйти и войти»; confirming leaves it and joins the meeting room.
+- Already in the meeting room: the click only shows the room, no dialog. «Перейти в комнату» in the event card still joins at once.
+
+- Task tabs (#104, #105): open a task, ⌘-click two others (three tabs), click a fourth card plainly — the three stay and a fourth tab appears; another plain click replaces only that fourth one.
+- Open the Mail section and click any task tab (also one of another workspace): the task opens over the mail, no click is lost.

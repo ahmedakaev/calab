@@ -1,5 +1,53 @@
 # Телефон: общий веб в оболочке — статус
 
+Как собрать и выпустить `apps/mobile` в TestFlight/Play — [release.md](release.md).
+
+## 2026-10-30: Android host channel and FCM push (DEV-5031, DEV-5033)
+
+The host channel is on for Android too (`hostChannelEnabled`). Its boundary is native, as on
+iOS: the react-native-webview patch passes a WebMessageListener message to RN only from the main
+frame of exactly the app origin (`CalabOriginGuard`, DEV-5032) and the frame-less
+JavascriptInterface fallback delivers nothing; `activityProtocol.ts` has no Android-specific
+challenge any more. Android announces notifications and links only (no media permissions/calls),
+so `calab-host-link` opens a link in place on Android as well. Kotlin module
+(`modules/calab-session-activity/android`, `io.calab.host`): the iOS `CalabMessageNotifications`
+contract over plain Firebase Messaging, data-only pushes rendered natively (message channel; call
+channel with ringtone and Answer/Decline; a server `call-cancel` stops a ring that ended early),
+a tap trampoline, and `POST_NOTIFICATIONS`. Server: FCM endpoints may carry calls; FCM data
+carries the message title/subtitle/body (ADR-0072 privacy applies). Web: registers FCM for
+`provider: 'fcm'` and passes call taps to the call service. Config:
+`CALAB_ANDROID_GOOGLE_SERVICES_FILE` (optional). Checked: unit/integration tests, `expo prebuild`
++ `assembleDebug`. **Not verified on a device**; needs the Firebase project, `PUSH_FCM_*` on the
+server and a new Android build. ADR-0070/0071 «Android», push-deployment «FCM».
+
+## 2026-10-29: Android native origin guard and launch-intent reset (DEV-5032, ADR-0067)
+
+The patched react-native-webview now decides main-frame navigations natively: only the exact
+origin from the manifest meta-data `dev.calab.mobile.WEB_ORIGIN` (written by
+`plugins/withAndroidWebOrigin.js` from `EXPO_PUBLIC_CALAB_URL`) loads; everything else is cancelled
+without waiting for JS, and JS is notified fire-and-forget to open the link in the OS or show the
+error, as before. `shouldInterceptRequest` answers main-frame requests outside the origin (POST
+included) with an empty 403. `plugins/withAndroidIntentReset.js` stops `getInitialURL()` replaying
+the launch link after process death / Recents.
+Checked: JVM test of the origin check, plugin tests, `expo prebuild` + `assembleDebug`; Pixel_9
+emulator — without the reset the link replayed after kill+Recents, force-stop+Recents and
+kill+launcher, with it none did. **Not device-verified**: the guard in a live WebView (no network
+in the sandbox), POST, a third-party iframe app, Play internal track. Needs a new Android build.
+
+## 2026-10-29: Android entry link dropped right after loading (regression from #263, DEV-4947)
+
+Found on a real Android phone (Play internal testing build 1.0.0 (2)): a task/room link opened
+the app, briefly loaded the linked route, then fell back to the home screen. Cause: PR #263 made
+the `loaded` event clear `entry` in `apps/mobile/src/hostState.ts` so a later `retry` would go
+back to the origin — but `entry` is also what the mounted WebView renders as
+`source={{ uri: state.entry ?? origin }}` in `App.tsx` (same `key={state.generation}`), and
+react-native-webview reloads whenever `source.uri` changes. Clearing `entry` on `loaded` made the
+WebView navigate away from the link right after it finished loading. Android hits this on every
+link (no host channel); iOS only on a cold start or a fallback case, and build 22 predates #263.
+Fix: `entry` now never changes while its generation stays mounted; a new `entryLoaded` flag
+(reset by `open`/`retry`/`processGone`) tracks whether it loaded, and `retry` drops `entry` only
+when `entryLoaded` is true. Needs a new Android build (1.0.0 (3)) to pick up the fix.
+
 ## 2026-10-29: Android shell recognized by a UA marker (DEV-4947)
 
 The web client's `nativeShell()` previously relied only on the host bridge

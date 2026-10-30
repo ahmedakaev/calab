@@ -175,6 +175,9 @@ type PullRequest struct {
 	// key the link has not seen (a redelivery or a second «approved» of GitLab does nothing).
 	// Forget: keys dropped (unapproved, a reviewer removed), so the event may fire again.
 	Once, Forget []string
+	// SHAs: the merge, squash and head commits of a merged pull request (SHAs form), matched
+	// against the commits of a board release.
+	SHAs []string
 }
 
 // keyRE: a task key anywhere in a text (ADR-0060 §4). Letters of any case are matched here;
@@ -303,6 +306,7 @@ type Link struct {
 	Users   []string
 	Once    []string
 	Forget  []string
+	SHAs    []string // a merged pull request's commits (PullRequest.SHAs)
 }
 
 // Links turns an event into the links of the board's tasks (key boardKey): a new branch whose
@@ -340,7 +344,7 @@ func Links(ev *Event, boardKey string) []Link {
 			Author: pr.Author, Draft: pr.Draft, Branch: clip(pr.Branch, MaxRef), Target: clip(pr.Target, MaxRef), Actor: clip(actor, MaxAuthor)}
 		for _, n := range drive {
 			l := base
-			l.Number, l.Event, l.Users, l.Once, l.Forget = n, pr.Event, pr.Users, pr.Once, pr.Forget
+			l.Number, l.Event, l.Users, l.Once, l.Forget, l.SHAs = n, pr.Event, pr.Users, pr.Once, pr.Forget, pr.SHAs
 			add(l)
 		}
 		for _, n := range Keys(pr.Body, boardKey) {
@@ -374,6 +378,7 @@ type Prior struct {
 	State, Title, URL string
 	Draft             bool
 	Seen              []string
+	SHAs              []string
 }
 
 // Apply decides what link l of a delivery does to its stored row p: the rule event it fires
@@ -414,7 +419,8 @@ func Apply(p Prior, l Link) (event string, seen []string, changed bool) {
 	case event == "" && p.Found && p.Draft && !l.Draft && l.State == StateOpen:
 		event = EventPRReady
 	}
-	changed = !p.Found || p.State != l.State || p.Title != l.Title || p.URL != l.URL || p.Draft != l.Draft || !slices.Equal(seen, p.Seen)
+	changed = !p.Found || p.State != l.State || p.Title != l.Title || p.URL != l.URL || p.Draft != l.Draft || !slices.Equal(seen, p.Seen) ||
+		(len(l.SHAs) > 0 && !slices.Equal(l.SHAs, p.SHAs))
 	if !changed || l.Mention {
 		event = ""
 	}
@@ -503,4 +509,37 @@ func clip(s string, n int) string {
 		return s
 	}
 	return string([]rune(s)[:n])
+}
+
+// SafeURL is safeURL for callers outside the package: an http(s) address of at most MaxURL
+// characters, else "".
+func SafeURL(s string) string { return safeURL(s) }
+
+// NoteKey is the Seen key of a pull request link whose backlink note was posted (board task
+// #101): one note per merge request and task, never again on a redelivery.
+const NoteKey = "note:calab"
+
+// ValidSHA reports a full commit id: 40 (SHA-1) or 64 (SHA-256) lowercase hex characters.
+func ValidSHA(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for i := range len(s) {
+		if c := s[i]; (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// SHAs keeps the full commit ids of ss (lower-cased), without empties and duplicates, in order.
+func SHAs(ss ...string) []string {
+	var out []string
+	for _, s := range ss {
+		s = strings.ToLower(strings.TrimSpace(s))
+		if ValidSHA(s) && !slices.Contains(out, s) {
+			out = append(out, s)
+		}
+	}
+	return out
 }

@@ -43,7 +43,8 @@
       "Actor": "jsmith",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     },
     {
       "Number": 5,
@@ -61,7 +62,8 @@
       "Actor": "jsmith",
       "Users": null,
       "Once": null,
-      "Forget": null
+      "Forget": null,
+      "SHAs": null
     }
   ]
 }

@@ -441,14 +441,18 @@ type BoardFormUpload struct {
 }
 
 type BoardGit struct {
-	BoardID     uuid.UUID
-	Provider    string
-	SecretEnc   []byte
-	CreatedBy   *uuid.UUID
-	CreatedAt   time.Time
-	LastEventAt *time.Time
-	LastError   string
-	EventsCount int32
+	BoardID       uuid.UUID
+	Provider      string
+	SecretEnc     []byte
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	LastEventAt   *time.Time
+	LastError     string
+	EventsCount   int32
+	Backlink      bool
+	ApiTokenEnc   []byte
+	GitlabUrl     string
+	BacklinkError string
 }
 
 type BoardLabel struct {
@@ -473,6 +477,19 @@ type BoardPermission struct {
 	TargetID   string
 	Allow      int64
 	Deny       int64
+}
+
+type BoardRelease struct {
+	ID          uuid.UUID
+	BoardID     uuid.UUID
+	Environment string
+	Sha         string
+	Name        string
+	Url         string
+	CreatedBy   *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	TasksCount  int32
 }
 
 type BoardRule struct {
@@ -665,6 +682,13 @@ type CaldavPush struct {
 	NextAt    time.Time
 	Error     string
 	CreatedAt time.Time
+}
+
+type CalendarSubscription struct {
+	ID          uuid.UUID
+	WorkspaceID uuid.UUID
+	UserID      uuid.UUID
+	CreatedAt   time.Time
 }
 
 type CanvasActivity struct {
@@ -1923,6 +1947,7 @@ type TaskGitLink struct {
 	UpdatedAt time.Time
 	Draft     bool
 	Seen      []string
+	MergeShas []string
 }
 
 type TaskLabel struct {
@@ -1964,6 +1989,13 @@ type TaskRelation struct {
 	Kind      string
 	CreatedBy *uuid.UUID
 	CreatedAt time.Time
+}
+
+type TaskRelease struct {
+	TaskID      uuid.UUID
+	Environment string
+	ReleaseID   uuid.UUID
+	CreatedAt   time.Time
 }
 
 type TaskSearch struct {

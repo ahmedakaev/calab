@@ -5,7 +5,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { AiState, FormerMemberReason, Plan, RecordingStatus, SipCallStatus, WorkspaceRole } from '@calaba/protocol';
 import { ts } from '../e2e-support/fixtures';
 import { CANVAS_PUBLIC_CODE, CODE_FIXTURE, IDS, MOCK_GPTUNNEL_WEB, WIKI_PUBLIC_CODE, startMockServer, type MockServer } from '../e2e-support/mock-server';
-import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, seedLabelOverflow, settle } from './harness';
+import { expectAccessible, expectAssigneeStacks, layoutProblems, NOW, PASSWORD, seedAssigneeCounts, seedDays, seedLabelOverflow, seedReleases, settle } from './harness';
 import { seedDay } from './calendarWeb';
 
 /**
@@ -201,7 +201,8 @@ async function mobileProblems(page: Page, main: boolean): Promise<string[]> {
       const INTERACTIVE = 'button, a[href], input, select, textarea, [role="tab"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="switch"], [role="checkbox"], [role="radio"], [role="option"]';
       const ALLOW: Array<[string, string]> = [
         ['[data-inline-target]', 'a link inside a sentence of body text (e.g. the organizer mailto in «Организатор: …»), marked in code'],
-        ['[data-message-id] a[href]', 'links in message text and link-preview titles: inline in running text; the row itself is the tap / long-press target'],
+        ['.wiki-prose[contenteditable="true"] a[href]', 'links in text being edited (wiki page, task description): inline in running text, a tap places the caret'],
+        ['[data-message-id] a[href]','links in message text and link-preview titles: inline in running text; the row itself is the tap / long-press target'],
         ['[data-message-id] button[data-profile-user], [data-message-id] [data-inline-target]', 'author avatar / name and reaction chips in a feed message: dense by design (Telegram-like), the message row is the target; chips keep >= 8 px gaps'],
         ['[data-history-row] button[data-profile-user]', 'actor avatar / name in a task history row (ADR-0091): dense like the feed; the row and its 44 px details chevron are the targets'],
         ['input[type="file"], input[type="range"], input[aria-hidden="true"]', 'native input hidden behind a custom control, or a slider whose thumb row is the target'],
@@ -1056,6 +1057,7 @@ test('m-my-tasks', async ({ page }) => {
 test('m-boards-list', async ({ page }) => {
   mock.setClock(NOW.getTime());
   seedAssigneeCounts(mock); // #92: CAL-1 / CAL-2 / CAL-4 with 1 / 2 / 5 assignees
+  seedReleases(mock); // board task #101: the task screen at the end (rows do not show them)
   await signedIn(page);
   // The «Доски» tab (ADR-0073, owner 06.10): the list of the open workspace, a board is pushed.
   await tab(page, 'boards');
@@ -1097,6 +1099,14 @@ test('m-boards-list', async ({ page }) => {
   await expect(page.getByTestId('task-context-menu')).toBeVisible();
   await expectMenuCard(page, 'm-task-menu', true);
   await expect(page.getByTestId('task-panel')).toHaveCount(0);
+  // Board task #101: the task screen's «Релиз» — one per environment, a tap opens the pipeline.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('task-context-menu')).toHaveCount(0);
+  await page.getByTestId('list-row').filter({ hasText: 'CAL-3' }).getByText('Эхо в звонке').tap();
+  const panel = page.getByTestId('task-panel');
+  await expect(panel.getByTestId('prop-release')).toHaveText(['stage · 1288', 'prod · 4929cf3']);
+  await panel.getByTestId('prop-release').last().evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await checkpoint(page, 'm-boards-task-release');
 });
 
 // Owner 07.10: the create dialog has the start date (when the board's dates are on).
@@ -1169,6 +1179,49 @@ test('m-boards-task', async ({ page }) => {
   await page.keyboard.press('Enter');
   await page.keyboard.type('[] проверить на телефоне');
   await checkpoint(page, 'm-boards-task-desc', { keyboard: true });
+});
+
+// Board #107: the read view of a description is the editor's own typography — paragraphs, a list, a link, an emoji, bold.
+test('m-boards-task-desc-wysiwyg', async ({ page }) => {
+  mock.setClock(NOW.getTime());
+  const cal4 = mock.boards.taskByKey('CAL-4');
+  if (cal4) cal4.task.description = 'Эхо пропало после правки 🎉 подробности на https://calab.io/docs\n\nВторой абзац.\n\n- первый **жирный** пункт\n- второй пункт';
+  await signedIn(page);
+  await tab(page, 'boards');
+  const nav = page.getByTestId('phone-boards');
+  await nav.getByTestId('board-row').filter({ hasText: 'Разработка' }).getByRole('button').first().tap();
+  await page.getByTestId('list-row').filter({ hasText: 'CAL-4' }).getByText('Карточки задач').tap();
+  const panel = page.getByTestId('task-panel');
+  const read = panel.getByTestId('task-description');
+  await expect(read.locator('li')).toHaveCount(2);
+  // Block geometry relative to the first paragraph (the keyboard may scroll the panel).
+  const boxes = async (root: Locator): Promise<number[][]> => {
+    const first = await root.locator('p').first().boundingBox();
+    const out: number[][] = [];
+    for (const sel of ['p >> nth=1', 'li >> nth=0', 'li >> nth=1']) {
+      const b = await root.locator(sel).boundingBox();
+      out.push(b && first ? [b.x - first.x, b.y - first.y, b.width, b.height] : []);
+    }
+    return out;
+  };
+  const readBoxes = await boxes(read);
+  await checkpoint(page, 'm-boards-task-desc-read');
+  // Board #109: opening the editor on this text (it ends in a list) and re-opening it after «Готово» threw
+  // «Applying a mismatched transaction» in WebKit. The blocks stay where the read view drew them.
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  for (const pass of ['open', 'reopen']) {
+    await read.tap();
+    const prose = panel.getByTestId('task-description-editor').locator('.wiki-prose');
+    await expect(prose, pass).toBeFocused();
+    await expect(prose.locator('li')).toHaveCount(2);
+    const editBoxes = await boxes(prose);
+    for (let i = 0; i < readBoxes.length; i++) for (let j = 0; j < 4; j++) expect(Math.abs((editBoxes[i]?.[j] ?? 1e6) - (readBoxes[i]?.[j] ?? -1e6)), `${pass}: block ${i} coord ${j}: read ${String(readBoxes[i])} edit ${String(editBoxes[i])}`).toBeLessThanOrEqual(1);
+    if (pass === 'open') await checkpoint(page, 'm-boards-task-desc-edit', { keyboard: true });
+    await panel.getByTestId('task-description-save').tap();
+    await expect(panel.getByTestId('task-description-editor')).toHaveCount(0);
+  }
+  expect(errors).toEqual([]);
 });
 
 // «История» on the phone's task screen (ADR-0091): two tabs as segments, a detail opened.
@@ -2800,4 +2853,17 @@ test('m-wiki-public', async ({ page }) => {
   await checkpoint(page, 'm-wiki-public-toc', { snapshot: false });
   await toc.getByTestId('wiki-public-outline-row').filter({ hasText: 'Процессы' }).tap();
   await expect(page.getByTestId('wiki-public-title')).toHaveText('Процессы');
+});
+
+// Toasts on the phone stay under the top bar (safe area), over the feed, never over the tab bar (owner, 29.10).
+test('m-toasts', async ({ page }) => {
+  await signedInRoom(page);
+  await expect(page.getByTestId('composer')).toBeVisible();
+  await page.evaluate(() => {
+    const push = (window as unknown as { __calabaToast?: (k: string, t: string) => void }).__calabaToast;
+    push?.('info', 'Ссылка-приглашение скопирована');
+    push?.('success', 'Файл сохранён в «Загрузки»');
+  });
+  await expect(page.getByTestId('toast')).toHaveCount(2);
+  await checkpoint(page, 'm-toasts', { main: true });
 });

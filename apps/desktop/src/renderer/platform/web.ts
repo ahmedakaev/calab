@@ -1,4 +1,6 @@
+import { isCalendarLink } from '../../shared/calendarLink';
 import { consentReturnPath } from '../../shared/ssoReturn';
+import { parseOriginList } from '../../shared/ownLink';
 import { create, fromJson, toJson, type JsonValue } from '@bufbuild/protobuf';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
 import {
@@ -457,6 +459,7 @@ function info(): AppInfo {
     micAccess: 'n/a',
     screenAccess: 'n/a',
     locales: [...navigator.languages],
+    appOrigins: parseOriginList(import.meta.env.VITE_APP_ORIGINS),
   };
 }
 
@@ -670,7 +673,7 @@ export function createWebPlatform(): Platform {
         const url = raw.trim();
         if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener,noreferrer');
         // mailto: (the plan contact, ADR-0024) hands over to the mail client, the page stays.
-        else if (/^mailto:[^\s/]+@/i.test(url)) location.href = url;
+        else if (/^mailto:[^\s/]+@/i.test(url) || isCalendarLink(url, location.origin)) location.href = url;
         return Promise.resolve();
       },
       // ADR-0084: the web keeps the hosted checkout in a new tab (the phone host hands that to the

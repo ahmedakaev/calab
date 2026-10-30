@@ -332,3 +332,28 @@ func TestParseHubDistinct(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+// Release matching (board task #101): the merge commits of a pull request are kept full and
+// lower-case; a delivery that only brings them updates the stored row without an event.
+func TestMergeSHAs(t *testing.T) {
+	a, b := "4929CF3A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	if got := SHAs(a, "", "4929cf3", b, a, "zz"+b[2:]); !slices.Equal(got, []string{"4929cf3a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e", b}) {
+		t.Fatalf("SHAs: %q", got)
+	}
+	if ValidSHA(a) || !ValidSHA(b) || ValidSHA(b[:39]) || !ValidSHA(b+b[:24]) {
+		t.Fatal("ValidSHA")
+	}
+	l := Link{Kind: KindPR, State: StateMerged, Title: "t", SHAs: []string{b}}
+	p := Prior{Found: true, State: StateMerged, Title: "t", Seen: []string{}}
+	if ev, _, changed := Apply(p, l); !changed || ev != "" {
+		t.Fatalf("new SHAs: %q %v", ev, changed)
+	}
+	p.SHAs = []string{b}
+	if _, _, changed := Apply(p, l); changed {
+		t.Fatal("same SHAs changed the link")
+	}
+	l.SHAs = nil
+	if _, _, changed := Apply(p, l); changed {
+		t.Fatal("an event without SHAs changed the link")
+	}
+}
