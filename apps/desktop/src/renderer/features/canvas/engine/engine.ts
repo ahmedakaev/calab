@@ -698,6 +698,14 @@ export class CanvasEngine implements Core {
     return () => this.dropListeners.delete(fn);
   }
 
+  liftMoving(ids: readonly string[]): void {
+    this.renderer.liftObjects(ids);
+  }
+
+  dropMoving(): void {
+    this.renderer.dropLift();
+  }
+
   openQuickDrop(src: string, side: ConcreteSide, from: Point, at: Point): void {
     this.drop = { src, side, from, at };
     const d: QuickDrop = { screen: worldToScreen(this.cam, at) };

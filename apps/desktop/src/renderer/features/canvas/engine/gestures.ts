@@ -73,6 +73,9 @@ export interface Core {
   refuseCreate(): void;
   /** A «continue» line released on empty canvas: the line stays and the drop menu opens at its end. */
   openQuickDrop(src: string, side: ConcreteSide, from: Point, at: Point): void;
+  /** A drag starts moving these: the renderer may paint them as one sprite until `dropMoving` (Renderer.liftObjects). */
+  liftMoving?(ids: readonly string[]): void;
+  dropMoving?(): void;
 }
 
 export interface Gesture {
@@ -264,6 +267,7 @@ export class MoveGesture implements Gesture {
           this.capture();
         }
       }
+      this.core.liftMoving?.(this.ids);
     }
     let dx = w.x - this.fromWorld.x;
     let dy = w.y - this.fromWorld.y;
@@ -298,6 +302,7 @@ export class MoveGesture implements Gesture {
     }
     if (this.ids.length === 0) return;
     this.core.live.commit();
+    this.core.dropMoving?.();
     this.core.doc.endGesture();
     this.core.setOverlay({ guides: [] });
   }
@@ -305,6 +310,7 @@ export class MoveGesture implements Gesture {
   cancel(): void {
     if (!this.started || this.ids.length === 0) return;
     this.core.live.drop();
+    this.core.dropMoving?.();
     // Takes back the Alt-copies, if any; the move itself was never written.
     this.core.doc.cancelGesture();
     if (this.selectedBefore) this.core.setSelection(this.selectedBefore);

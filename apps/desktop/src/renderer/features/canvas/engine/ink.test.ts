@@ -236,3 +236,45 @@ describe('Renderer: a drag composites only what changed', () => {
     expect(canvas.fake.calls.find((c) => c.name === 'drawImage')?.args.length).toBe(3);
   });
 });
+
+describe('Renderer: a lifted drag', () => {
+  it('moves one sprite: no content repaint while the objects travel, and they are painted back on drop', () => {
+    const doc = makeDoc();
+    const scene = new Scene(doc);
+    const canvas = fakeCanvas();
+    const remote = fakeCanvas();
+    const layer = fakeCtx();
+    const sprite = fakeCtx();
+    const raf = manualRaf();
+    const r = new Renderer({
+      canvas: canvas as unknown as HTMLCanvasElement, remoteCanvas: remote as unknown as HTMLCanvasElement, scene, palette: defaultPalette('light'),
+      getCamera: () => ({ tx: 0, ty: 0, scale: 1 }), getOverlay: () => emptyOverlay(), awareness: new AwarenessLayer(),
+      raf: raf.raf, cancelRaf: raf.cancel,
+      makeLayer: (w) => ({ width: 0, height: 0, getContext: () => (w > 1 && w < 1600 ? sprite.ctx : layer.ctx) }),
+    });
+    r.resize(1600, 1000, 1);
+    const [a, b] = doc.createMany([
+      { init: { kind: 'sticky', x: 100, y: 100, w: 100, h: 100 } },
+      { init: { kind: 'sticky', x: 250, y: 100, w: 100, h: 100 } },
+    ]);
+    raf.flush();
+    expect(r.liftObjects([a ?? '', b ?? ''])).toBe(true);
+    raf.flush();
+    // Painted once into the sprite (both stickies), the layer once without them.
+    expect(sprite.count('fill')).toBeGreaterThan(0);
+    const regions = r.stats.regions;
+    for (let i = 1; i <= 5; i++) {
+      doc.patchMany(new Map([[a ?? '', { x: 100 + 10 * i }], [b ?? '', { x: 250 + 10 * i }]]));
+      raf.flush();
+    }
+    expect(r.stats.regions).toBe(regions);
+    expect(r.stats.sprite).toBeGreaterThanOrEqual(5);
+    r.dropLift();
+    raf.flush();
+    expect(r.stats.regions).toBeGreaterThan(regions);
+    // Too big to lift: the drag paints as before.
+    const [huge] = doc.createMany([{ init: { kind: 'shape', shape: 'rect', x: 0, y: 0, w: 5000, h: 5000 } }]);
+    expect(r.liftObjects([huge ?? ''])).toBe(false);
+  });
+});
+

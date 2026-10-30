@@ -38,6 +38,8 @@ export interface DrawEnv {
   images?: ImageSource | undefined;
   /** The world region being painted (set by `drawObjects`): an erased stroke composes only that much of itself. */
   region?: Rect | undefined;
+  /** Objects not painted here: lifted into the renderer's drag sprite while they move. */
+  skip?: ReadonlySet<string> | undefined;
 }
 
 const font = (env: DrawEnv, size: number): string => `${size}px ${env.palette.fontFamily}`;
@@ -540,5 +542,5 @@ export function drawObjects(ctx: Ctx2D, objects: readonly ObjectRec[], region: R
   const e = env.region === region ? env : { ...env, region };
   // By what is painted (a wide marker's or a thick outline's edge is outside the frame), or a repaint beside the line
   // would wipe that edge with the background.
-  for (const o of objects) if (o.kind === 'connector' || rectsIntersect(visualBounds(o), region)) drawObject(ctx, o, e);
+  for (const o of objects) if (!e.skip?.has(o.id) && (o.kind === 'connector' || rectsIntersect(visualBounds(o), region))) drawObject(ctx, o, e);
 }
