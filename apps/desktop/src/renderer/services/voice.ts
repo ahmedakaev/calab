@@ -47,6 +47,7 @@ import { ECHO, EchoRiskDetector, RemoteActivity, duckWanted, duckable } from '..
 import { RateTracker, audioSourceEcho, candidatePair, inboundAudio, inboundVideo, outboundAudio, outboundVideo, transportBytes } from '../lib/media/stats';
 import { VoiceGate, rmsToDb } from '../lib/media/vad';
 import { denoiseMode, wakeDbFor } from '../lib/media/denoiseSleep';
+import { rnnoiseSupported } from '../lib/media/rnnoiseSupport';
 import { isMobileNow } from '../lib/mobile';
 import { playSound } from '../lib/sounds';
 import { joinLeaveCue, joinLeaveSoundMax } from '../lib/media/joinLeaveSound';
@@ -445,7 +446,9 @@ class VoiceEngine {
     if (s.outputDeviceId !== p.outputDeviceId || s.micDeviceId !== p.micDeviceId) this.resetEcho();
     // Without RNNoise the pipeline has a gain stage only in the speakerphone modes: rebuild when that flips.
     const gainFlips = s.echoMode !== p.echoMode && this.mic !== null && this.mic.duckable !== (this.mic.rnnoise || duckable(s.echoMode));
-    if ((s.rnnoise !== p.rnnoise || s.micDeviceId !== p.micDeviceId || gainFlips) && this.mic) void this.restartMic();
+    // The synced RNNoise pref flipped on another device changes nothing where RNNoise can't run.
+    const denoiseFlips = s.rnnoise !== p.rnnoise && rnnoiseSupported();
+    if ((denoiseFlips || s.micDeviceId !== p.micDeviceId || gainFlips) && this.mic) void this.restartMic();
     if (s.echoMode !== p.echoMode) this.applyDuck();
     if (s.red !== p.red && this.micTrack && this.room) void this.republishMic();
     if (s.personalBitrateKbps !== p.personalBitrateKbps) this.applyMicTier();

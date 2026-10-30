@@ -1738,6 +1738,13 @@ test('m-settings', async ({ page }) => {
     return el.getBoundingClientRect().bottom <= innerHeight + 1 && el.scrollTop > 0;
   });
   expect(fits, 'settings section scrolls on its screen').toBe(true);
+  // Board #114: WebKit keeps its own NS (no `noiseSuppression` constraint) — RNNoise is off and
+  // disabled here, with the reason under it.
+  const noise = panel.getByRole('switch', { name: 'Шумоподавление' });
+  await noise.scrollIntoViewIfNeeded();
+  await expect(noise).toBeDisabled();
+  await expect(panel.getByText('На этом устройстве шум убирает сама система', { exact: false })).toBeVisible();
+  await checkpoint(page, 'm-settings-voice-noise', { snapshot: false });
 });
 
 // Owner 07.10: no workspace rail — the header's «Команда Calab ⌄» opens the switcher (the desktop's
