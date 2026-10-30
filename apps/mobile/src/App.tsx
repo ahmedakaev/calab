@@ -15,9 +15,9 @@ import { hostReducer, initialHostState } from './hostState';
 import { decideNavigation, decideNewWindow, isAppSubframe, isAppUrl } from './navigation';
 import { strings } from './strings';
 import { callsOperation, callsReply, subscribeCalls, callAudioEnabled } from './incomingCalls';
-import { ActivityProtocol, activityBootstrap, activityChallenge, activityReady, androidMessageTrusted, linkEvent } from './activityProtocol';
+import { ActivityProtocol, activityBootstrap, activityReady, linkEvent } from './activityProtocol';
 import { appUrlForLink } from './links';
-import { acknowledgeNotification, grantNotificationsDocument, hostChannelEnabled, notificationReply, notificationState, revokeNotificationsDocument, subscribeNotifications, testNotification, notificationTestReply } from './notifications';
+import { acknowledgeNotification, hostChannelEnabled, notificationReply, notificationState, setNotificationsDocument, subscribeNotifications, testNotification, notificationTestReply } from './notifications';
 import { endSessionActivity, publishSessionActivity, sessionActivityEnabled } from './sessionActivity';
 import { permissionsOperation, permissionsReply, subscribePermissions } from './mediaPermissions';
 import { SHELL_UA_MARKER } from '../../desktop/src/shared/nativeShell';
@@ -25,8 +25,8 @@ import { SHELL_UA_MARKER } from '../../desktop/src/shared/nativeShell';
 /**
  * The phone host (ADR-0067): one full-screen WebView with the web client — the same DOM, router and
  * MobileShell as in a browser — plus a load error surface. The host channel (ADR-0069/0070) is
- * offered on iOS after a native main-frame/origin/current-document handshake, on Android after the
- * origin + main-frame challenge of activityProtocol.ts (notifications and links only). File hand-off is iOS-native (ADR-0068): the web's
+ * offered after a native main-frame/origin handshake in the WebView patch (iOS also checks the
+ * current document); Android offers notifications and links only. File hand-off is iOS-native (ADR-0068): the web's
  * `<a download>` of its own blob: from the app's main frame goes to the share sheet, decided in the
  * react-native-webview patch without JS or page input. Incoming universal / app / `calab://` links
  * (ADR-0142) open the same route of the web client. The WebView is edge to edge; the web client applies
@@ -60,7 +60,7 @@ const LINK_HOSTS = (() => {
 /** Every URL reaches `onShouldStart`: the library's own origin list matches by prefix and opens misses via Linking. */
 const ANY_ORIGIN = ['*'];
 
-/** Android has no native frame check in the WebView: the protocol adds the origin + challenge proof. */
+/** Android announces notifications and links only (ADR-0070, Android). */
 const ANDROID = Platform.OS === 'android';
 
 function openExternal(url: string): void {
@@ -81,23 +81,21 @@ function Host({ origin }: { origin: string }) {
   const web = useRef<WebView>(null);
   const canGoBack = useRef(false);
   const loaded = useRef(false);
-  const activity = useRef(new ActivityProtocol(state.generation, ANDROID));
+  const activity = useRef(new ActivityProtocol(state.generation));
   const resetActivity = useCallback(() => {
     activity.current.reset();
     endSessionActivity();
-    revokeNotificationsDocument(false);
+    setNotificationsDocument(null, false);
   }, []);
   useEffect(() => {
-    activity.current = new ActivityProtocol(state.generation, ANDROID);
+    activity.current = new ActivityProtocol(state.generation);
     return resetActivity;
   }, [state.generation, resetActivity]);
   const onMessage = useCallback(({ nativeEvent }: WebViewMessageEvent) => {
-    if (ANDROID && !androidMessageTrusted(nativeEvent.url, origin)) return;
     const action = activity.current.accept(nativeEvent.data);
-    if (action?.type === 'challenge') web.current?.injectJavaScript(activityChallenge(state.generation, action.document, action.nonce));
-    else if (action?.type === 'ready') {
+    if (action?.type === 'ready') {
       endSessionActivity();
-      grantNotificationsDocument(action.document);
+      setNotificationsDocument(action.document, false);
       web.current?.injectJavaScript(activityReady(state.generation, action.document, sessionActivityEnabled, ANDROID));
     } else if (action?.type === 'calls') {
       void callsOperation(action.document, action).then(value => {
@@ -110,7 +108,7 @@ function Host({ origin }: { origin: string }) {
           web.current?.injectJavaScript(permissionsReply(state.generation, action.document, action.request, reply));
       });
     } else if (action?.type === 'publish') publishSessionActivity(action.document, action.snapshot);
-    else if (action?.type === 'end') { endSessionActivity(); revokeNotificationsDocument(action.reason === 'logout'); }
+    else if (action?.type === 'end') { endSessionActivity(); setNotificationsDocument(null, action.reason === 'logout'); }
     else if (action?.type === 'notifications' && action.operation === 'ack' && action.eventId) acknowledgeNotification(action.document, action.eventId);
     else if (action?.type === 'notifications' && action.operation === 'test' && action.body) {
       void testNotification(action.document, action.body).then(result => {
@@ -124,7 +122,7 @@ function Host({ origin }: { origin: string }) {
           web.current?.injectJavaScript(notificationReply(state.generation, action.document, action.request, value));
       });
     }
-  }, [origin, state.generation]);
+  }, [state.generation]);
 
   useEffect(() => subscribeNotifications((document, value) => {
     if (activity.current.belongsTo(state.generation) && activity.current.isCurrent(document))
@@ -185,8 +183,10 @@ function Host({ origin }: { origin: string }) {
   }, []);
 
   /**
-   * The top frame left the app anyway (an Android POST or a decision past the library's 250 ms):
-   * stop and show the error. After the fact, not a boundary: the page has already started loading.
+   * The top frame reports a URL outside the app anyway: stop and show the error. A last resort, not
+   * the boundary — both WebView patches already refuse such main-frame loads natively (iOS policy;
+   * Android CalabOriginGuard incl. POST via shouldInterceptRequest, DEV-5032), so this fires only if
+   * a navigation slips past them (e.g. an engine path the guard does not see).
    */
   const leftApp = useCallback(
     (url: string): boolean => {

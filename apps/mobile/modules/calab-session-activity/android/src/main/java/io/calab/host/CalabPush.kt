@@ -17,8 +17,9 @@ import java.util.UUID
 /**
  * Android counterpart of CalabMessagePush (CalabMessageNotificationsModule.swift), ADR-0070
  * Android. Everything runs on the main looper. The document authority comes from the RN host
- * (App.tsx), which grants it only after the origin + main-frame proof of activityProtocol.ts and
- * revokes it on every navigation, reload, remount and logout; no Calab auth reaches native.
+ * (App.tsx), which grants it after the hello of a main-frame message of the exact app origin
+ * (the react-native-webview patch drops everything else natively) and revokes it on every
+ * navigation, reload, remount and logout; no Calab auth reaches native.
  */
 internal object CalabPush {
   private const val PREFS = "calab.push"

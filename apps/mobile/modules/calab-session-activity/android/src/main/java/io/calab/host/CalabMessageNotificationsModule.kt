@@ -7,7 +7,9 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * The CalabMessageNotifications contract of iOS (`pushState`, `acknowledgePush`,
  * `testNotification`, `onPushChanged`) over FCM, plus the document grant that the iOS WebView
- * patch posts natively and the RN host passes here (`grantDocument` / `revokeDocument`).
+ * patch posts natively and the RN host passes here (`setDocument`; null revokes). The RN host
+ * learns the document only from messages the patched WebMessageListener delivered: main frame,
+ * exact app origin (ADR-0070, Android).
  */
 class CalabMessageNotificationsModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -22,8 +24,9 @@ class CalabMessageNotificationsModule : Module() {
       appContext.reactContext?.let { CalabPushNotifier.cancelCall(it) }
       CalabPush.refresh()
     }
-    Function("grantDocument") { document: String -> CalabPush.grant(document) }
-    Function("revokeDocument") { logout: Boolean -> CalabPush.revoke(logout) }
+    Function("setDocument") { document: String?, logout: Boolean ->
+      if (document == null) CalabPush.revoke(logout) else CalabPush.grant(document)
+    }
     AsyncFunction("pushState") { document: String, requestPermission: Boolean, promise: Promise ->
       CalabPush.state(document, requestPermission, appContext.permissions) { promise.resolve(it) }
     }
