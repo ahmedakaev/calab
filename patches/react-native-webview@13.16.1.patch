@@ -127,6 +127,42 @@ diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebChrome
              });
          }
  
+diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java b/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java
+--- a/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java
++++ b/android/src/main/java/com/reactnativecommunity/webview/RNCWebView.java
+@@ -253,7 +253,18 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
+             this.bridgeListener = new WebViewCompat.WebMessageListener() {
+               @Override
+               public void onPostMessage(@NonNull WebView view, @NonNull WebMessageCompat message, @NonNull Uri sourceOrigin, boolean isMainFrame, @NonNull JavaScriptReplyProxy replyProxy) {
+-                RNCWebView.this.onMessage(message.getData(), sourceOrigin.toString());
++                // Calab patch (ADR-0070, Android): the host channel's frame proof, as the iOS patch
++                // does with WKFrameInfo. Only the main frame of exactly the app origin reaches RN;
++                // the event URL is that bare origin. Chromium reports the serialized origin
++                // (`https://host[:port]`, no path or trailing slash; "null" for opaque origins), so
++                // any other form fails closed. Subframes and foreign origins are dropped here.
++                CalabOriginGuard.Origin origin = RNCWebViewClient.calabWebOrigin(view.getContext());
++                String source = sourceOrigin.toString();
++                if (!isMainFrame || origin == null || !origin.toString().equals(source)) {
++                  FLog.d("RNCWebView", "Calab: dropped a host message from " + (isMainFrame ? "a main frame outside the app origin" : "a subframe"));
++                  return;
++                }
++                RNCWebView.this.onMessage(message.getData(), source);
+               }
+             };
+             WebViewCompat.addWebMessageListener(
+@@ -444,6 +455,12 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
+          */
+         @JavascriptInterface
+         public void postMessage(String message) {
++            // Calab patch (ADR-0070, Android): this fallback (a WebView without WEB_MESSAGE_LISTENER)
++            // has no frame identity, so it delivers nothing: no host channel, like an old build.
++            if (true) {
++                FLog.d(TAG, "Calab: dropped a host message without frame proof (no WebMessageListener)");
++                return;
++            }
+             if (mWebView.getMessagingEnabled()) {
+                 // Post to main thread because `mWebView.getUrl()` requires to be executed on main.
+                 mWebView.post(() -> mWebView.onMessage(message, mWebView.getUrl()));
 diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 --- a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
 +++ b/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
@@ -152,7 +188,7 @@ diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewCl
  import java.util.concurrent.atomic.AtomicReference;
  
  public class RNCWebViewClient extends WebViewClient {
-@@ -90,8 +95,84 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -90,8 +95,85 @@ public class RNCWebViewClient extends WebViewClient {
        reactWebView.callInjectedJavaScriptBeforeContentLoaded();
      }
  
@@ -173,7 +209,8 @@ diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewCl
 +    private static volatile CalabOriginGuard.Origin calabWebOrigin = null;
 +    private static volatile boolean calabWebOriginRead = false;
 +
-+    private static CalabOriginGuard.Origin calabWebOrigin(Context context) {
++    /** Also read by RNCWebView's message listener (host channel frame proof, ADR-0070 Android). */
++    static CalabOriginGuard.Origin calabWebOrigin(Context context) {
 +        if (calabWebOriginRead) return calabWebOrigin;
 +        String raw = null;
 +        try {
@@ -237,7 +274,7 @@ diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewCl
          final RNCWebView rncWebView = (RNCWebView) view;
          final boolean isJsDebugging = rncWebView.getReactApplicationContext().getJavaScriptContextHolder().get() == 0;
  
-@@ -143,7 +224,8 @@ public class RNCWebViewClient extends WebViewClient {
+@@ -143,7 +225,8 @@ public class RNCWebViewClient extends WebViewClient {
      @Override
      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
          final String url = request.getUrl().toString();

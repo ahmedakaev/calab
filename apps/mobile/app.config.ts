@@ -31,6 +31,13 @@ const incomingCalls = env('CALAB_IOS_INCOMING_CALLS') === '1';
 if (incomingCalls && !pushEnvironment) throw new Error('CALAB_IOS_INCOMING_CALLS requires CALAB_IOS_PUSH_ENVIRONMENT');
 const nativeCallAudio = env('CALAB_IOS_NATIVE_CALL_AUDIO') === '1';
 if (nativeCallAudio && !incomingCalls) throw new Error('CALAB_IOS_NATIVE_CALL_AUDIO requires incoming calls');
+/**
+ * Android push (ADR-0070/0071, Android): the Firebase project's google-services.json for this
+ * applicationId. Optional — without it the build still succeeds and push reports `unsupported` at
+ * runtime (no default FirebaseApp). Expo's built-in `googleServicesFile` copies it and applies the
+ * Google Services Gradle plugin; no react-native-firebase.
+ */
+const googleServicesFile = env('CALAB_ANDROID_GOOGLE_SERVICES_FILE');
 const owner = env('CALAB_EXPO_OWNER');
 const projectId = env('CALAB_EAS_PROJECT_ID');
 
@@ -78,8 +85,10 @@ const config: ExpoConfig = {
     // Defaults to the iOS build number (CALAB_ANDROID_VERSION_CODE) so one env number drives both
     // stores unless Android needs its own, higher value (Play rejects a re-upload of the same code).
     versionCode: identity.versionCode,
-    // The WebView grants getUserMedia only for permissions the app declares.
-    permissions: ['RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'CAMERA'],
+    ...(googleServicesFile ? { googleServicesFile } : {}),
+    // The WebView grants getUserMedia only for permissions the app declares. POST_NOTIFICATIONS is
+    // the Android 13+ runtime permission for push, asked only through the web client's prompt.
+    permissions: ['RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'CAMERA', 'POST_NOTIFICATIONS'],
     intentFilters: [
       ...(linkHosts.length ? [{
         action: 'VIEW',
