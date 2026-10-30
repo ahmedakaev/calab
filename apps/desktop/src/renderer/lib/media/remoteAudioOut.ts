@@ -175,7 +175,8 @@ export class RemoteAudioOut<E extends AudioOutElement = HTMLMediaElement> {
 
   private async sink(entry: Entry<E>, id: string): Promise<void> {
     // No setSinkId: the element keeps the OS-selected output; the playback state is still re-asserted.
-    // A gone device rejects: the element stays on what it plays to now (Chromium falls back to the default).
+    // A gone device rejects: the element stays where it is (the caller routes a gone choice to
+    // the default itself, lib/media/outputRoute).
     if (typeof entry.el.setSinkId === 'function') await entry.el.setSinkId(id).catch(() => undefined);
     if (this.els.get(entry.sid) === entry) this.apply(entry, true);
   }
