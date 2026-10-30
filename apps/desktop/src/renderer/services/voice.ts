@@ -58,6 +58,7 @@ import { REMOTE_LEVEL, RemoteLevelSpeaking, readLevel, type LevelSample } from '
 import { audioDevices, deviceName, deviceSwitches, type AudioDevice } from '../lib/deviceSwitch';
 import { answerCallSelf, canSpeakFrom, isDeviceGone, meterUpdate, micModeFor, mySeat, pttAllowed, pttCue, qualityOf, remoteAudio, toggleDeafen, toggleMute, transmitDecision, withUserMuted, withUserVolume } from '../lib/voiceLogic';
 import { RemoteAudioOut } from '../lib/media/remoteAudioOut';
+import { captureOnOutputHeadset, livekitOutputStale, outputSink, outputsChanged } from '../lib/media/outputRoute';
 import { useMessages } from '../stores/messages';
 import { useRooms } from '../stores/rooms';
 import { isTempRoom } from '../lib/tempRooms';
@@ -152,6 +153,11 @@ const REJOIN_MAX_BACKOFF_MS = 15_000;
 const REJOIN_GIVE_UP_MS = 90_000;
 /** `devicechange` comes in bursts while the OS switches the output: re-bind the elements once it settles (#255). */
 const REBIND_SETTLE_MS = 400;
+/**
+ * The capture opened on the headset the voices play to (CBF-108): macOS moves a Bluetooth headset
+ * to the HFP profile, which takes about a second and fires no `devicechange` — re-bind after it.
+ */
+const HEADSET_ROUTE_SETTLE_MS = 1500;
 /**
  * Mic track mute / unmute (ADR-0134): an op unsettled after this counts as failed (a lock held
  * across a dead link), and a failed one is retried after MUTE_RETRY_MS (by attempt, capped) —
@@ -253,6 +259,8 @@ class VoiceEngine {
   private muteRetryTimer: number | null = null;
   /** scheduleRebind: the settle timer after an output device change. */
   private rebindTimer: number | null = null;
+  /** performance.now() the pending re-bind is due at: a later request never brings it forward. */
+  private rebindDue = 0;
   private muteFails = 0;
   private room: Room | null = null;
   private nativeAudio: HostCallAudioSession | null = null;
@@ -391,9 +399,9 @@ class VoiceEngine {
       this.snapshotDevices(true);
       void this.onDevicesChanged();
       // macOS moves the default output (charger, dock, headphones): re-assert our sink and the
-      // playback state (deafen!) on every remote element once the switch has settled.
+      // playback state (deafen!) on every remote element; the snapshot re-binds them once the
+      // switch has settled — only when the outputs changed (snapshotDevices).
       void this.applyOutputDevice();
-      this.scheduleRebind();
     });
     this.snapshotDevices(false);
     void this.applyOutputDevice(); // the chosen output for every remote element from the first one on
@@ -731,8 +739,8 @@ class VoiceEngine {
         dynacast: true,
         webAudioMix: false, // echo rule 1
         disconnectOnPageLeave: true,
-        // LiveKit re-selects the output on `devicechange` unless it knows ours (RoomEvent.ActiveDeviceChanged below).
-        ...(prefs().outputDeviceId ? { audioOutput: { deviceId: prefs().outputDeviceId ?? '' } } : {}),
+        // LiveKit applies its output id to every new remote track: it must be ours (lib/media/outputRoute).
+        ...(this.outputSinkNow() ? { audioOutput: { deviceId: this.outputSinkNow() } } : {}),
       });
       this.room = room;
       // H.264 «Авто» = High on the wire (hardware on macOS): codec preferences set between
@@ -915,6 +923,14 @@ class VoiceEngine {
         if (gen !== this.rejoinGen) return;
         await this.connect(roomId, wsId, true, undefined, serverMuted);
         if (gen !== this.rejoinGen) return;
+        // A Disconnected between room.connect() resolving and here is ignored by its handler
+        // (a rejoin is running): a room that is not Connected now is not back — drop it, go on.
+        if (this.room && this.room.state !== ConnectionState.Connected && !this.nativeAudio?.connected) {
+          log.info(`voice: rejoin attempt ${attempt + 1} got a room that is ${this.room.state} already`);
+          await this.teardown(false, true);
+          if (gen !== this.rejoinGen) return;
+          continue;
+        }
         if (this.room || this.nativeAudio?.connected) {
           if (stream) toast.info(t('mediaErr.stream.restart'));
           // The camera comes back by itself (a new capture, no preview); start() explains a failure.
@@ -2334,9 +2350,32 @@ class VoiceEngine {
     this.audioOut.applyAll();
   }
 
-  /** Echo rule 2: switch output with setSinkId on the same <audio> elements (and re-apply deafen). */
-  private async applyOutputDevice(): Promise<void> {
-    await this.audioOut.setSink(prefs().outputDeviceId ?? '');
+  /** Remote output routes run one at a time, each after the device snapshot queued before it. */
+  private outputOps: Promise<void> = Promise.resolve();
+
+  /** The sink remote voices use now: the chosen device while present, else the default (CBF-108). */
+  private outputSinkNow(): string {
+    return outputSink(this.devices, prefs().outputDeviceId);
+  }
+
+  /**
+   * Echo rule 2: switch output with setSinkId on the same <audio> elements (and re-apply deafen).
+   * LiveKit is told the same id: it re-applies its own to every new remote track, and in
+   * Chromium one element's setSinkId moves all remote voices (lib/media/outputRoute).
+   */
+  private applyOutputDevice(): Promise<void> {
+    const run = this.outputOps.then(() => this.devicesOps).then(async () => {
+      const sink = this.outputSinkNow();
+      await this.audioOut.setSink(sink);
+      const room = this.room;
+      // WebKit without element setSinkId: LiveKit refuses the switch (the OS picks the output there).
+      if (typeof HTMLMediaElement !== 'undefined' && !('setSinkId' in HTMLMediaElement.prototype)) return;
+      if (!room || !livekitOutputStale(sink, room.options.audioOutput?.deviceId, room.getActiveDevice('audiooutput'))) return;
+      // Its setSinkId on our elements is a no-op now (same id); ActiveDeviceChanged comes back here, in sync.
+      await room.switchActiveDevice('audiooutput', sink).catch((e: unknown) => log.warn('voice: LiveKit output switch failed', e));
+    });
+    this.outputOps = run.catch(() => undefined);
+    return this.outputOps;
   }
 
   /** Mute someone for me only (CHAT-SHELL, member menu); persisted per device like volumes. */
@@ -2425,6 +2464,8 @@ class VoiceEngine {
       }
       const prev = this.devices;
       this.devices = next;
+      // An input / camera change leaves the remote renderers alone (CBF-108).
+      if (announce && outputsChanged(prev, next)) this.scheduleRebind();
       if (!announce || !prev || !this.roomId) return;
       const p = prefs();
       for (const sw of deviceSwitches(prev, next, { micDeviceId: p.micDeviceId, outputDeviceId: p.outputDeviceId })) announceDeviceSwitch(sw);
@@ -2502,6 +2543,8 @@ class VoiceEngine {
       this.micFallback = true;
     }
     this.micLost = false;
+    // The capture opened on the headset the voices play to: re-bind them once its route settled.
+    if (this.room && captureOnOutputHeadset(this.devices, built.deviceLabel, this.outputSinkNow())) this.scheduleRebind(HEADSET_ROUTE_SETTLE_MS);
     // Capture permission reveals device labels: the list the next change is diffed against needs them.
     this.snapshotDevices(false, true);
     this.gate.reset();
@@ -3548,8 +3591,13 @@ class VoiceEngine {
    * Headphones switched (#255): the elements opened before the switch could stay silent — re-bind
    * them once the burst of `devicechange` events has settled (one timeout, no polling).
    */
-  private scheduleRebind(): void {
-    if (this.rebindTimer !== null) window.clearTimeout(this.rebindTimer);
+  private scheduleRebind(ms = REBIND_SETTLE_MS): void {
+    const now = performance.now();
+    if (this.rebindTimer !== null) {
+      window.clearTimeout(this.rebindTimer);
+      ms = Math.max(ms, this.rebindDue - now);
+    }
+    this.rebindDue = now + ms;
     this.rebindTimer = window.setTimeout(() => {
       this.rebindTimer = null;
       const room = this.room;
@@ -3559,7 +3607,7 @@ class VoiceEngine {
         log.info(`voice: output devices changed, ${r.rebound} remote audio element(s) re-bound`);
         if (r.blocked > 0 && !document.hidden) this.offerPlayback();
       });
-    }, REBIND_SETTLE_MS);
+    }, ms);
   }
 
   /** One pass of «play what the system paused» (RemoteAudioOut.replayPaused); a refusal offers the tap. */
