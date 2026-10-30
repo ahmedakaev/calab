@@ -1539,6 +1539,15 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('voice-phase')).toHaveText('Вас не слышно');
   await expect(win.getByTestId('toast')).toHaveCount(1); // still only the sound prompt
   await checkpoint(shot, 'voice-audio-recovery-unheard');
+  // Outside «Команда» the island is folded (ADR-0146): the avatar's mark carries the state.
+  await win.getByTestId('toast').getByRole('button', { name: 'Закрыть' }).click();
+  await win.getByTestId('section-calendar').click();
+  const mark = win.getByTestId('island-call-mark');
+  await expect(mark).toHaveAttribute('data-trouble', 'unheard');
+  await checkpoint(shot, 'voice-audio-recovery-folded-unheard');
+  await win.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('recovering'));
+  await expect(mark).toHaveAttribute('data-trouble', 'recovering');
+  await checkpoint(shot, 'voice-audio-recovery-folded');
 });
 
 test('workspace-menu', async ({ open, win, mock, shot }) => {
