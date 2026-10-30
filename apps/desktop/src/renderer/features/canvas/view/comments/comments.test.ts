@@ -149,7 +149,7 @@ describe('pins (a DOM layer over the canvas, ADR-0127 wave 4)', () => {
     expect(els[0]?.hidden).toBe(true);
   });
 
-  it('a comment event re-renders its own pin only; resolved threads leave the canvas', () => {
+  it('a comment event re-renders its own pin only; a resolved thread stays as a tick, gone with «Только открытые»', () => {
     const r = rig();
     act(() => useCanvasComments.getState().setCanvas(CV, [comment('a'), comment('b', { authorId: 'bob' })]));
     const layer = pins(r);
@@ -157,7 +157,12 @@ describe('pins (a DOM layer over the canvas, ADR-0127 wave 4)', () => {
     act(() => useCanvasComments.getState().upsert(comment('b', { authorId: 'bob', body: 'changed' })));
     expect(named.calls).toEqual(['bob']);
     act(() => useCanvasComments.getState().upsert(comment('a', { resolved: true })));
-    expect([...layer.querySelectorAll<HTMLElement>('[data-testid="canvas-comment-pin"]')].map((e) => e.dataset['commentId'])).toEqual(['b']);
+    const ids = (): (string | undefined)[] => [...layer.querySelectorAll<HTMLElement>('[data-testid="canvas-comment-pin"]')].map((e) => e.dataset['commentId']);
+    expect(ids()).toEqual(['a', 'b']);
+    expect(layer.querySelector('[data-comment-id="a"] [data-testid="canvas-comment-pin-resolved"]')).not.toBeNull();
+    act(() => useCanvasComments.getState().setFilterOpen(true));
+    expect(ids()).toEqual(['b']);
+    act(() => useCanvasComments.getState().setFilterOpen(false));
   });
 });
 

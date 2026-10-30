@@ -305,6 +305,8 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
         engine.activeGesture = new WireGesture(engine, w, s);
         return;
       case 'comment':
+        // The new thread's field takes the focus: no compatibility mousedown, whose default would focus the canvas back.
+        e.preventDefault();
         engine.emitCommentAt(s, w);
         return;
       case 'pen':

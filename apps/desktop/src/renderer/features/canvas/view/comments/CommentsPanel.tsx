@@ -8,7 +8,7 @@
  * row subscribed to its own ids.
  */
 import { timestampMs } from '@bufbuild/protobuf/wkt';
-import { Check, MapPin, MessageCirclePlus, RotateCcw, X } from 'lucide-react';
+import { Check, LocateFixed, MessageCirclePlus, RotateCcw, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { confirmAction } from '../../../../components/Confirm';
@@ -127,12 +127,16 @@ const Thread = memo(function Thread({ id, ctx }: { id: string; ctx: Ctx }): Reac
       data-resolved={resolved || undefined}
     >
       <div className={cx('flex h-8 items-center gap-1 border-b border-line px-1', active ? 'bg-[color-mix(in_srgb,var(--color-accent)_16%,var(--color-main))]' : 'bg-main')}>
-        <Button variant="ghost" size="sm" className="min-w-0 text-muted hover:text-fg" onClick={show} data-testid="canvas-comment-show"
-          aria-label={resolved ? `${t('canvasComments.resolved')} · ${t('canvasComments.showPin')}` : undefined}
-        >
-          {resolved ? <Check className="size-3.5 shrink-0 text-success" aria-hidden /> : <MapPin className="size-3.5 shrink-0" aria-hidden />}
-          <span className="truncate">{resolved ? t('canvasComments.resolved') : t('canvasComments.showPin')}</span>
-        </Button>
+        {/* A crosshair, named by its tooltip: the header keeps room for the day and the resolve button. */}
+        <IconButton size="sm" label={t('canvasComments.showPin')} onClick={show} data-testid="canvas-comment-show">
+          <LocateFixed className="size-4" aria-hidden />
+        </IconButton>
+        {resolved ? (
+          <span className="flex min-w-0 items-center gap-1 text-caption text-success" data-testid="canvas-comment-resolved">
+            <Check className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{t('canvasComments.resolved')}</span>
+          </span>
+        ) : null}
         <span className="flex-1" />
         {startMs ? <span className="shrink-0 px-1 text-caption text-muted">{fmt.dayLabel(new Date(startMs))}</span> : null}
         {ctx.rights.write || ctx.rights.moderate ? (
