@@ -82,6 +82,7 @@ import { onWikiPageRemove, onWikiPageUpsert } from './wiki';
 import { onCanvasItemRemove, onCanvasItemUpsert } from './canvas';
 import { onCanvasCommentDelete, onCanvasCommentMention, onCanvasCommentUpsert, resyncCanvasComments } from './canvasComments';
 import { restoreSectionOnBoot } from '../features/shell/sectionNav';
+import { armNavHistory } from './navHistory';
 import { useCanvas } from '../stores/canvas';
 import { useWiki } from '../stores/wiki';
 import { applyAutomationEvent } from './automations';
@@ -255,6 +256,8 @@ export function applyDispatch(ev: DispatchEvent): void {
       ensureActiveWorkspace();
       // The first READY of this page: back on the section the workspace was left on (ADR-0074 §1).
       restoreSectionOnBoot();
+      // From here every change of place is a step of the ‹ › history (board #113).
+      armNavHistory();
       // Calendar (ADR-0038): rooms' active meetings, listed months again, today's count, a pending /e/<id>.
       onCalendarReady(r.workspaces);
       // Boards (ADR-0042): loaded boards and the open task reloaded, a pending /b/ or /t/ link.
