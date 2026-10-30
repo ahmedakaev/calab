@@ -28,6 +28,7 @@ import { PhoneFormatBar } from './PhoneFormatBar';
 import { PhoneProps } from './PhoneProps';
 import { PhoneEditHint, PhoneNote, PhoneOthers } from './PhoneChrome';
 import { Presence } from './PresenceBar';
+import { QuickDropMenu } from './QuickDropMenu';
 import { PropsPanel } from './PropsPanel';
 import { SelectionAnnouncer } from './SelectionAnnouncer';
 import { StatusBanner, ViewerStatus } from './StatusBanner';
@@ -438,6 +439,7 @@ function Chrome({
           <Toolbar engine={engine} timer={timer} palette={palette} focusCanvas={focusCanvas} workspaceId={workspaceId} />
           <HistoryBar engine={engine} focusCanvas={focusCanvas} />
           <PropsPanel engine={engine} palette={palette} focusCanvas={focusCanvas} />
+          <QuickDropMenu engine={engine} focusCanvas={focusCanvas} />
           <TextFormatBar engine={engine} />
           <TemplatesCard engine={engine} sync={sync} focusCanvas={focusCanvas} />
         </>

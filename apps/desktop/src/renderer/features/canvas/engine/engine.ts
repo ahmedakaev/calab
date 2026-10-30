@@ -1,6 +1,6 @@
 import type * as Y from 'yjs';
 import {
-  DEFAULT_CAMERA, clampScale, edgePanVelocity, fitRect, lerpCamera, nextZoomStep, panBy, sameCamera, screenToWorld, visibleRect, zoomAt,
+  DEFAULT_CAMERA, clampScale, edgePanVelocity, fitRect, lerpCamera, nextZoomStep, panBy, sameCamera, screenToWorld, visibleRect, worldToScreen, zoomAt,
   type Camera,
 } from '../../../lib/canvas/camera';
 import { duplicate, parse, serialize, toInits } from '../../../lib/canvas/clipboard';
@@ -11,18 +11,19 @@ import { Scene, visualBounds } from '../../../lib/canvas/scene';
 import { contentRect } from '../../../lib/canvas/shapes';
 import { buildTemplate, type TemplateId, type TemplateText } from '../../../lib/canvas/templates';
 import { LABEL_SIZE, TextLayouter, boxFontSize, estimateMeasure, fontOf, type MeasureFn } from '../../../lib/canvas/textLayout';
-import { connectorMidpoint } from '../../../lib/canvas/route';
+import { connectorMidpoint, type ConcreteSide } from '../../../lib/canvas/route';
 import { ERASER_SIZES, INK_MAX_WIDTH, INK_MIN_WIDTH, MARKER_WIDTHS, PEN_WIDTHS } from '../../../lib/canvas/ink';
 import { LiveLayer } from '../../../lib/canvas/live';
 import {
   DEFAULTS, MAX_OBJECTS, aabb, hasText, isConnector,
-  type ObjectKind, type ObjectPatch, type ObjectRec, type RouteKind, type ShapeKind,
+  type ObjectKind, type ObjectPatch, type ObjectRec, type RouteKind, type ShapeKind, type ShapeRec, type StickyRec,
 } from '../../../lib/canvas/types';
 import { VOTE_DEFAULT, VoteBook, type VotePhase, type VoteSession } from '../../../lib/canvas/votes';
 import { AwarenessLayer, sameView, type PeerState, type PeerView } from './awareness';
-import type { Core, Gesture, InkStyle, Mods } from './gestures';
+import { QuickGesture, type Core, type Gesture, type InkStyle, type Mods } from './gestures';
 import { attachInput, toolCursor } from './input';
 import { ImageCache, type DecodeFn, type ImageResolver } from './images';
+import { OPPOSITE, QUICK_ANIM_MS, QUICK_SIDES, choiceInit, choiceSize, dropRect, quickInit, type QuickChoice, quickSideAt, quickTarget } from './quick';
 import { emptyOverlay, type InkPreview, type Outline, type OverlayState, type SelFrame } from './overlay';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import { Renderer, renderSceneTo, type FrameStats } from './renderer';
@@ -44,6 +45,11 @@ export interface CommentClick {
 }
 
 /** Everything React is allowed to see: primitives only (ADR-0126 §4). The object identity changes only when a value does. */
+/** The drop menu's place: the end of the «continue» line, canvas px. */
+export interface QuickDrop {
+  readonly screen: Point;
+}
+
 export interface EngineState {
   /** The selected object when exactly one is selected. */
   readonly selectedId: string | null;
@@ -215,11 +221,17 @@ export class CanvasEngine implements Core {
   private reducedMotion: boolean;
   private readonly pressListeners = new Set<(screen: Point, world: Point) => void>();
   private readonly commentListeners = new Set<(c: CommentClick) => void>();
+  private readonly dropListeners = new Set<(d: QuickDrop | null) => void>();
+  /** A «continue» line released on empty canvas, waiting for the drop menu's choice. */
+  private drop: { src: string; side: ConcreteSide; from: Point; at: Point } | null = null;
   private readonly stickerListeners = new Set<() => void>();
   private tool_: Tool = 'select';
   private multi_ = false;
   private shape_: ShapeKind = 'rect';
   private sticky_: string = DEFAULTS.stickyColor;
+  /** The hovered «continue» dot. */
+  private quickHot: ConcreteSide | null = null;
+  private quickT0 = 0;
   private eraser_: number = ERASER_SIZES[1] ?? 12;
   /** The pen's and the marker's color and width, each kept for the session; `marker_` picks which one the pen tool uses. */
   private readonly pens = { pen: { color: DEFAULTS.inkStroke, width: PEN_WIDTHS[1] ?? 4 }, marker: { color: 'yellow', width: MARKER_WIDTHS[1] ?? 20 } };
@@ -530,6 +542,12 @@ export class CanvasEngine implements Core {
         if (dt > 0) this.steerCamera(panBy(this.liveCamera, -v.x * dt, -v.y * dt));
       } else d.at = 0;
     }
+    const q = this.overlay.quick;
+    if (q?.hot && q.hot.t < 1) {
+      const t = Math.min(1, (this.now() - this.quickT0) / QUICK_ANIM_MS);
+      this.overlay = { ...this.overlay, quick: { ...q, hot: { ...q.hot, t } } };
+      if (t < 1) more = true;
+    }
     this.flushCamera();
     if (d && !sameCamera(d.cam, this.cam)) {
       d.cam = this.cam;
@@ -606,8 +624,124 @@ export class CanvasEngine implements Core {
       else outlines.push({ rect: { x: o.x, y: o.y, w: o.w, h: o.h }, rot: o.rot ?? 0 });
     }
     const group = !this.readOnly && !this.editor.isOpen ? selectionFrame(recs) : null;
-    this.overlay = { ...this.overlay, outlines: this.sel.size > 1 ? outlines : [], connectors, group, ...(this.touch ? { touch: true } : {}) };
+    // No dots while the drop menu waits (its line is drawn instead).
+    const src = group && !this.drop ? this.quickSource() : null;
+    const quick = src ? { rect: { x: src.x, y: src.y, w: src.w, h: src.h }, sides: QUICK_SIDES, hot: null } : null;
+    this.quickHot = null;
+    this.overlay = { ...this.overlay, outlines: this.sel.size > 1 ? outlines : [], connectors, group, quick, ...(this.touch ? { touch: true } : {}) };
     this.renderer.requestFrame();
+  }
+
+  /**
+   * The object the «continue» dots belong to (engine/quick.ts): one selected, unlocked, unturned sticky or shape with
+   * the select tool, a mouse and nothing being edited.
+   */
+  private quickSource(): StickyRec | ShapeRec | null {
+    if (this.sel.size !== 1 || this.tool_ !== 'select' || this.touch || this.readOnly || this.editor.isOpen) return null;
+    const o = this.getSelected()[0];
+    return o && (o.kind === 'sticky' || o.kind === 'shape') && !o.locked && !o.rot ? o : null;
+  }
+
+  /** The «continue» dot under the pointer, if any (input: the hover cursor and the press). */
+  quickAt(w: Point): ConcreteSide | null {
+    if (!this.overlay.quick) return null;
+    const src = this.quickSource();
+    return src ? quickSideAt(src, w, this.px(1)) : null;
+  }
+
+  /** The new object's frame for `side` (the spot beside the source, stepping past objects already there). */
+  private quickRect(src: StickyRec | ShapeRec, side: ConcreteSide): Rect {
+    const probe = quickTarget(src, side, []);
+    const area = rectInflate(probe, Math.max(src.w, src.h) * 6);
+    const taken = this.scene.query(area).flatMap((o) => (o.id !== src.id && !isConnector(o) ? [aabb(o)] : []));
+    return quickTarget(src, side, taken);
+  }
+
+  /** Hover over a dot (or off it): the preview of what a click there would make. */
+  hoverQuick(side: ConcreteSide | null): void {
+    if (side === this.quickHot) return;
+    this.quickHot = side;
+    const q = this.overlay.quick;
+    const src = q ? this.quickSource() : null;
+    if (!q || !src) return;
+    // The dot grows into its button and the preview fades in over QUICK_ANIM_MS (frameStart steps it); none with reduced motion.
+    this.quickT0 = this.now();
+    this.setOverlay({ quick: { ...q, hot: side ? { side, ghost: this.quickRect(src, side), t: this.reducedMotion ? 1 : 0 } : null } });
+  }
+
+  /** A press on a dot: a click makes the quick copy, a drag places it (or connects) where it is released. */
+  quickGesture(side: ConcreteSide, s: Point): Gesture | null {
+    const src = this.quickSource();
+    if (!src) return null;
+    return new QuickGesture(this, src, side, s, () => this.quickCreate(side), () => this.refreshOverlay());
+  }
+
+  /** The drop menu opens (`screen`: the line's end, canvas px) or closes (null). */
+  onQuickDrop(fn: (d: QuickDrop | null) => void): () => void {
+    this.dropListeners.add(fn);
+    return () => this.dropListeners.delete(fn);
+  }
+
+  openQuickDrop(src: string, side: ConcreteSide, from: Point, at: Point): void {
+    this.drop = { src, side, from, at };
+    const d: QuickDrop = { screen: worldToScreen(this.cam, at) };
+    for (const fn of [...this.dropListeners]) fn(d);
+  }
+
+  /**
+   * The drop menu's choice: the object at the line's end (its side facing the line on the end), wired from the source,
+   * selected — one undo step. With `text` (typed in the menu's field) it is written in; without, its editor opens.
+   */
+  quickPlace(c: QuickChoice, text = ''): void {
+    const d = this.drop;
+    if (!d) return;
+    this.closeDrop();
+    const src = this.scene.get(d.src);
+    if (!src || (src.kind !== 'sticky' && src.kind !== 'shape') || this.readOnly) {
+      this.refreshOverlay();
+      return;
+    }
+    const size = choiceSize(c, src);
+    const { rect, side } = dropRect(d.from, d.at, size.w, size.h);
+    const id = newId();
+    this.doc.checkpoint();
+    const made = this.doc.createMany([
+      { id, init: choiceInit(c, src, rect, this.sticky_, text.trim()) },
+      { init: { kind: 'connector', from: { id: src.id, side: d.side }, to: { id, side }, arrow: 'end', route: this.route_ } },
+    ]);
+    this.finishCreate(made.length ? [id] : [], !text.trim());
+  }
+
+  /** The drop menu closed without a choice: the line goes, nothing is written, the dots come back. */
+  quickDismiss(): void {
+    if (!this.drop) return;
+    this.closeDrop();
+    this.refreshOverlay();
+  }
+
+  get quickDropOpen(): boolean {
+    return this.drop !== null;
+  }
+
+  private closeDrop(): void {
+    this.drop = null;
+    this.setOverlay({ wire: null });
+    for (const fn of [...this.dropListeners]) fn(null);
+  }
+
+  /** A click on a dot: the next object beside the source, wired from it, selected with its text open — one undo step. */
+  quickCreate(side: ConcreteSide): void {
+    const src = this.quickSource();
+    if (!src) return;
+    const at = this.quickRect(src, side);
+    const id = newId();
+    this.doc.checkpoint();
+    const made = this.doc.createMany([
+      { id, init: quickInit(src, at) },
+      { init: { kind: 'connector', from: { id: src.id, side }, to: { id, side: OPPOSITE[side] }, arrow: 'end', route: this.route_ } },
+    ]);
+    this.quickHot = null;
+    this.finishCreate(made.length ? [id] : [], true);
   }
 
   /** The selection frame the input hit-tests its handles against (null when read-only or editing): the one the overlay draws, kept current by `refreshOverlay`. */

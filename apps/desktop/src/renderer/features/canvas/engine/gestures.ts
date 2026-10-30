@@ -7,14 +7,15 @@ import {
   ROT_STEP, angleToward, boundsOf, dist, mapRect, normRot, rectCenter, rectFromPoints, rectInflate, resizeRect, resizeRotated, rotatePoint, snapAngle, snapTo,
   type HandleId, type Point, type Rect,
 } from '../../../lib/canvas/geometry';
-import { anchorOf, SIDES, type ConcreteSide } from '../../../lib/canvas/route';
+import { anchorOf, curveControls, flattenCubic, SIDE_DIR, SIDES, type ConcreteSide } from '../../../lib/canvas/route';
 import type { Scene } from '../../../lib/canvas/scene';
 import { snapMove, snapResizePoint, type SnapOptions } from '../../../lib/canvas/snap';
 import {
   DEFAULTS, aabb, isBound, isBox, isConnector,
-  type BoxRec, type ConnectorRec, type Endpoint, type ObjectInit, type ObjectPatch, type RouteKind, type ShapeKind,
+  type BoxRec, type ConnectorRec, type Endpoint, type ObjectInit, type ObjectPatch, type ShapeRec, type StickyRec, type RouteKind, type ShapeKind,
 } from '../../../lib/canvas/types';
 import type { InkPreview, OverlayState } from './overlay';
+import { edgeMid } from './quick';
 
 /** What the pen draws with now (remembered for the session by the engine). */
 export interface InkStyle {
@@ -66,10 +67,12 @@ export interface Core {
   previewInk(ink: InkPreview | null, dirty: Rect | null): void;
   /** A create was refused by the document (the object or state limit): said to the user, not swallowed. */
   refuseCreate(): void;
+  /** A «continue» line released on empty canvas: the line stays and the drop menu opens at its end. */
+  openQuickDrop(src: string, side: ConcreteSide, from: Point, at: Point): void;
 }
 
 export interface Gesture {
-  readonly kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'create' | 'wire' | 'endpoint' | 'pinch' | 'tap' | 'draw' | 'erase';
+  readonly kind: 'pan' | 'move' | 'resize' | 'rotate' | 'marquee' | 'create' | 'wire' | 'endpoint' | 'pinch' | 'tap' | 'draw' | 'erase' | 'quick';
   move(w: Point, s: Point, m: Mods): void;
   end(w: Point, s: Point, m: Mods): void;
   cancel(): void;
@@ -647,6 +650,82 @@ export class WireGesture implements Gesture {
 
   cancel(): void {
     this.core.setOverlay({ wire: null, glue: null });
+  }
+}
+
+// ── «continue» drag (engine/quick.ts) ───────────────────────────────────────
+
+/**
+ * Pressed on a «continue» dot. A click (no drag) is the quick copy beside the source (`click`). A drag pulls a wire
+ * out of that side — a dashed line that follows the pointer, nothing else is drawn on the way: over another object it
+ * glues to it and the release just connects the two; released on empty canvas, the line stays and the drop menu
+ * opens at its end (the engine's `openQuickDrop`: what to put there). Esc puts the dots back.
+ */
+export class QuickGesture implements Gesture {
+  readonly kind = 'quick';
+  private dragged = false;
+  private target: GlueTarget | null = null;
+  private at: Point | null = null;
+
+  constructor(
+    private readonly core: Core,
+    private readonly src: StickyRec | ShapeRec,
+    private readonly side: ConcreteSide,
+    private readonly fromScreen: Point,
+    private readonly click: () => void,
+    private readonly restore: () => void,
+  ) {}
+
+  move(w: Point, s: Point, m: Mods): void {
+    if (!this.dragged && Math.hypot(s.x - this.fromScreen.x, s.y - this.fromScreen.y) < DRAG_PX * 2) return;
+    this.dragged = true;
+    const a = edgeMid(this.src, this.side);
+    this.target = glueAt(this.core, w, this.src.id);
+    if (this.target) {
+      this.at = null;
+      const b = this.target.active ?? rectCenter(this.target.rect);
+      const side = this.target.side;
+      this.core.setOverlay({ quick: null, ghost: null, wire: this.arc(a, b, side === 'auto' ? undefined : SIDE_DIR[side]), ...glueOverlay(this.target) });
+      return;
+    }
+    const g = m.mod ? 0 : this.core.gridSize;
+    this.at = g ? { x: snapTo(w.x, g), y: snapTo(w.y, g) } : w;
+    this.core.setOverlay({ quick: null, ghost: null, wire: this.arc(a, this.at), glue: null });
+  }
+
+  /** The dragged line as an arc: it leaves the source along its side's normal (like a curved connector). */
+  private arc(a: Point, b: Point, bDir?: Point): number[] {
+    const from = { p: a, dir: SIDE_DIR[this.side], target: null, side: null };
+    const to = { p: b, dir: bDir ?? null, target: null, side: null };
+    const [c1, c2] = curveControls(from, to);
+    return flattenCubic(a, c1, c2, b);
+  }
+
+  end(): void {
+    if (!this.dragged) {
+      this.click();
+      return;
+    }
+    if (this.target) {
+      this.core.setOverlay({ wire: null, glue: null });
+      this.core.doc.checkpoint();
+      const from = { id: this.src.id, side: this.side };
+      const id = this.core.doc.create({ kind: 'connector', from, to: { id: this.target.id, side: this.target.side }, arrow: 'end', route: this.core.connectorRoute });
+      this.core.finishCreate(id ? [id] : [], false);
+      return;
+    }
+    if (!this.at) {
+      this.core.setOverlay({ wire: null, glue: null });
+      this.restore();
+      return;
+    }
+    // The line stays drawn while the menu is open.
+    this.core.openQuickDrop(this.src.id, this.side, edgeMid(this.src, this.side), this.at);
+  }
+
+  cancel(): void {
+    this.core.setOverlay({ ghost: null, wire: null, glue: null });
+    this.restore();
   }
 }
 

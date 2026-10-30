@@ -1,9 +1,11 @@
 import { DEG, HANDLE_IDS, handlePoint, rectCenter, type Point, type Rect } from '../../../lib/canvas/geometry';
 import type { Guide } from '../../../lib/canvas/snap';
 import { traceRounded } from '../../../lib/canvas/shapes';
+import type { ConcreteSide } from '../../../lib/canvas/route';
 import type { ConnectorRec } from '../../../lib/canvas/types';
 import { strokeInk, type Ctx2D } from './draw';
 import { resolveColor, type CanvasPalette } from './palette';
+import { OPPOSITE, edgeMid, quickDot } from './quick';
 
 export const HANDLE_PX = 8;
 /** The phone's handles: drawn a little larger, hit from a 44 px zone (radius `TOUCH_HIT_PX`), the rotation handle hung further out. */
@@ -64,12 +66,22 @@ export interface OverlayState {
   glue: { rect: Rect; /** Rotation of the glue target. */ rot?: number; anchors: readonly Point[]; active: Point | null } | null;
   /** The pen's stroke while it is drawn (written to the document on release). */
   ink?: InkPreview | null;
+  /** «Continue» dots beside one selected sticky / shape (engine/quick.ts); `hot`: the hovered one with its preview. */
+  quick?: QuickOverlay | null;
+}
+
+/** The source frame and its sides (dots placed at draw time, so they keep their screen distance at any zoom). */
+export interface QuickOverlay {
+  rect: Rect;
+  sides: readonly ConcreteSide[];
+  /** `t`: 0…1, the hover animation's progress. */
+  hot: { side: ConcreteSide; ghost: Rect; t: number } | null;
 }
 
 export const emptyOverlay = (): OverlayState => ({ outlines: [], connectors: [], group: null, marquee: null, guides: [], angle: null, ghost: null, wire: null, glue: null });
 
 export const overlayIsEmpty = (o: OverlayState): boolean =>
-  o.outlines.length === 0 && o.connectors.length === 0 && !o.group && !o.marquee && o.guides.length === 0 && !o.angle && !o.ghost && !o.wire && !o.glue && !o.ink;
+  o.outlines.length === 0 && o.connectors.length === 0 && !o.group && !o.marquee && o.guides.length === 0 && !o.angle && !o.ghost && !o.wire && !o.glue && !o.ink && !o.quick;
 
 /** Paints the overlay. The context carries the camera transform (world units); `scale` is the camera scale. */
 export function drawOverlay(ctx: Ctx2D, o: OverlayState, p: CanvasPalette, scale: number): void {
@@ -115,6 +127,8 @@ export function drawOverlay(ctx: Ctx2D, o: OverlayState, p: CanvasPalette, scale
     if (g.resize) for (const h of HANDLE_IDS) if (!(g.widthOnly && (h === 'n' || h === 's')) && !(g.cornersOnly && h.length === 1)) drawHandle(ctx, handlePoint(g.rect, h), p, px, false, hp);
     ctx.restore();
   }
+
+  if (o.quick) drawQuick(ctx, o.quick, p, px);
 
   if (o.marquee) {
     ctx.fillStyle = p.accentFill;
@@ -207,6 +221,70 @@ function strokeTurned(ctx: Ctx2D, r: Rect, rot: number): void {
   ctx.rotate(rot * DEG);
   ctx.strokeRect(-r.w / 2, -r.h / 2, r.w, r.h);
   ctx.restore();
+}
+
+/** The «continue» dots; the hovered one grows into an arrow button with the next object and its wire previewed. */
+function drawQuick(ctx: Ctx2D, q: QuickOverlay, p: CanvasPalette, px: number): void {
+  const hot = q.hot;
+  // Ease-out: quick at first, settling at the end.
+  const e = hot ? 1 - (1 - hot.t) ** 3 : 0;
+  if (hot) {
+    ctx.save();
+    ctx.globalAlpha = e;
+    const from = edgeMid(q.rect, hot.side);
+    const to = edgeMid(hot.ghost, OPPOSITE[hot.side]);
+    ctx.lineWidth = px * 1.5;
+    ctx.strokeStyle = p.accent;
+    ctx.fillStyle = p.accentFill;
+    ctx.setLineDash([6 * px, 4 * px]);
+    ctx.fillRect(hot.ghost.x, hot.ghost.y, hot.ghost.w, hot.ghost.h);
+    ctx.strokeRect(hot.ghost.x, hot.ghost.y, hot.ghost.w, hot.ghost.h);
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+  for (const side of q.sides) {
+    if (hot?.side === side) continue;
+    const d = quickDot(q.rect, side, px);
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, 4.5 * px, 0, Math.PI * 2);
+    ctx.fillStyle = p.accent;
+    ctx.fill();
+    ctx.lineWidth = px * 1.5;
+    ctx.strokeStyle = p.handleFill;
+    ctx.stroke();
+  }
+  if (!hot) return;
+  const at = quickDot(q.rect, hot.side, px);
+  const dir = { x: hot.side === 'right' ? 1 : hot.side === 'left' ? -1 : 0, y: hot.side === 'bottom' ? 1 : hot.side === 'top' ? -1 : 0 };
+  ctx.beginPath();
+  ctx.arc(at.x, at.y, (4.5 + 7.5 * e) * px, 0, Math.PI * 2);
+  ctx.fillStyle = p.accent;
+  ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = e;
+  // An arrow pointing where the object will go.
+  const s = 5 * px;
+  const nx = -dir.y;
+  const ny = dir.x;
+  ctx.beginPath();
+  ctx.moveTo(at.x - dir.x * s, at.y - dir.y * s);
+  ctx.lineTo(at.x + dir.x * s, at.y + dir.y * s);
+  ctx.moveTo(at.x + dir.x * s - (dir.x - nx) * s * 0.7, at.y + dir.y * s - (dir.y - ny) * s * 0.7);
+  ctx.lineTo(at.x + dir.x * s, at.y + dir.y * s);
+  ctx.lineTo(at.x + dir.x * s - (dir.x + nx) * s * 0.7, at.y + dir.y * s - (dir.y + ny) * s * 0.7);
+  ctx.lineWidth = px * 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // White on the accent in both themes (the handle fill is dark in the dark one).
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+  ctx.restore();
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
 }
 
 function drawHandle(ctx: Ctx2D, at: Point, p: CanvasPalette, px: number, round: boolean, size = HANDLE_PX): void {

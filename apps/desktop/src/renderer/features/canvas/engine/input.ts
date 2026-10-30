@@ -98,6 +98,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
   const hoverCursor = (w: Point): string => {
     if (engine.tool !== 'select') return toolCursor(engine.tool, engine.eraserPx);
     if (engine.readOnly) return 'grab';
+    if (engine.quickAt(w)) return 'pointer';
     if (rotateHandleAt(w)) return ROTATE_CURSOR;
     const g = resizeHandleAt(w);
     if (g) return resizeCursorAt(g, engine.selectionFrame()?.rot ?? 0);
@@ -319,6 +320,12 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
         break;
     }
     // Select tool.
+    const quick = engine.quickAt(w);
+    const qg = quick ? engine.quickGesture(quick, s) : null;
+    if (qg) {
+      engine.activeGesture = qg;
+      return;
+    }
     if (rotateHandleAt(w)) {
       engine.activeGesture = new RotateGesture(engine, engine.selection, w);
       // The turn keeps its cursor while the pointer leaves the knob (moves do not touch it during a gesture).
@@ -393,7 +400,10 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
       return;
     }
     engine.setLocalCursor(w);
-    if (e.pointerType === 'mouse') setCursor(spaceDown ? 'grab' : hoverCursor(w));
+    if (e.pointerType === 'mouse') {
+      engine.hoverQuick(spaceDown ? null : engine.quickAt(w));
+      setCursor(spaceDown ? 'grab' : hoverCursor(w));
+    }
   };
 
   const finish = (e: PointerEvent, cancelled: boolean): void => {
@@ -434,7 +444,10 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
 
   const onUp = (e: PointerEvent): void => finish(e, false);
   const onCancel = (e: PointerEvent): void => finish(e, true);
-  const onLeave = (): void => engine.setLocalCursor(null);
+  const onLeave = (): void => {
+    engine.setLocalCursor(null);
+    engine.hoverQuick(null);
+  };
 
   const onDouble = (e: MouseEvent): void => {
     if (engine.readOnly || engine.tool !== 'select') return;
