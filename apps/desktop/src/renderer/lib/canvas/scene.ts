@@ -11,7 +11,7 @@ import { SpatialGrid } from './grid';
 import { RouteCache, connectorMidpoint, routeConnector } from './route';
 import { pointInShape } from './shapes';
 import { fmtFromDelta, type Fmt } from './richText';
-import { SHAPE_PAD, STICKY_PAD, TEXT_PAD, TextLayouter, isFontToken, storedFontPx, type FontToken } from './textLayout';
+import { SHAPE_PAD, TEXT_PAD, TextLayouter, stickyPad, isFontToken, storedFontPx, type FontToken } from './textLayout';
 import {
   DEFAULTS, MAX_SIZE, aabb, isBound, isBox, isConnector, isFrame, isImageSrc,
   type BoxRec, type ConnectorRec, type Endpoint, type FrameRec, type ObjectRec, type RouteKind, type Arrow,
@@ -717,4 +717,4 @@ function distNearOutline(o: BoxRec, p: Point, tol: number): boolean {
   return !(inner.w > 0 && inner.h > 0 && pointInShape(o.shape, inner, p));
 }
 
-export const boxPad = (o: BoxRec): number => (o.kind === 'sticky' ? STICKY_PAD : o.kind === 'shape' ? SHAPE_PAD : TEXT_PAD);
+export const boxPad = (o: BoxRec): number => (o.kind === 'sticky' ? stickyPad(o) : o.kind === 'shape' ? SHAPE_PAD : TEXT_PAD);

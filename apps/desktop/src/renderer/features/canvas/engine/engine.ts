@@ -21,7 +21,7 @@ import {
 } from '../../../lib/canvas/types';
 import { VOTE_DEFAULT, VoteBook, type VotePhase, type VoteSession } from '../../../lib/canvas/votes';
 import { AwarenessLayer, sameView, type PeerState, type PeerView } from './awareness';
-import { QuickGesture, type Core, type Gesture, type InkStyle, type Mods } from './gestures';
+import { QuickGesture, createScale, type Core, type Gesture, type InkStyle, type Mods } from './gestures';
 import { attachInput, toolCursor } from './input';
 import { ImageCache, type DecodeFn, type ImageResolver } from './images';
 import { OPPOSITE, QUICK_ANIM_MS, QUICK_ROUTE, QUICK_SIDES, choiceInit, choiceSize, dropRect, quickInit, type QuickChoice, quickSideAt, quickTarget } from './quick';
@@ -1423,7 +1423,7 @@ export class CanvasEngine implements Core {
     const box = contentRect(o);
     const turn = o.rot ? { rot: o.rot, center: rectCenter(o) } : {};
     switch (o.kind) {
-      case 'sticky': return { box, text: o.text, size: boxFontSize(o), color: resolveSticky(p, o.color).fg, align: 'left', vcenter: false, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
+      case 'sticky': return { box, text: o.text, size: boxFontSize(o), color: resolveSticky(p, o.color).fg, align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
       case 'text': return { box, text: o.text, size: o.size, color: resolveColor(p, o.color) ?? p.ink, align: 'left', vcenter: false, autoHeight: true, fontFamily: p.fontFamily, rich: true, sized: true, frame: p.accent, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
       case 'shape': return { box, text: o.text, size: boxFontSize(o), color: shapeInk(p, o.fill, o.soft), align: 'center', vcenter: true, autoHeight: false, fontFamily: p.fontFamily, rich: true, sized: true, ...(o.fmt ? { fmt: o.fmt } : {}), ...turn };
     }
@@ -1537,7 +1537,10 @@ export class CanvasEngine implements Core {
   createTextAt(world: Point): string | null {
     if (!this.canEdit()) return null;
     this.doc.checkpoint();
-    const id = this.doc.create({ kind: 'text', x: world.x - 8, y: world.y - DEFAULTS.textSize });
+    // Sized for the zoom, like a click with the text tool.
+    const k = createScale(this.px(1));
+    const size = Math.min(DEFAULTS.maxTextSize, Math.round(DEFAULTS.textSize * k));
+    const id = this.doc.create({ kind: 'text', x: world.x - 8 * k, y: world.y - size, w: DEFAULTS.textW * k, size });
     this.finishCreate(id ? [id] : [], true);
     return id;
   }

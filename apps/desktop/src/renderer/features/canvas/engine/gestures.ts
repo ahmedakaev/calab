@@ -10,6 +10,7 @@ import {
 import { anchorOf, curveControls, flattenCubic, routeConnector, SIDE_DIR, SIDES, type ConcreteSide } from '../../../lib/canvas/route';
 import type { Scene } from '../../../lib/canvas/scene';
 import { snapMove, snapResizePoint, type SnapOptions } from '../../../lib/canvas/snap';
+import { SHAPE_TEXT_SIZE, STICKY_TEXT_SIZE } from '../../../lib/canvas/textLayout';
 import {
   DEFAULTS, aabb, isBound, isBox, isConnector,
   type BoxRec, type ConnectorRec, type Endpoint, type ObjectPatch, type ShapeRec, type StickyRec, type RouteKind, type ShapeKind,
@@ -546,6 +547,27 @@ export class MarqueeGesture implements Gesture {
 
 export type CreateKind = 'sticky' | 'text' | 'shape' | 'frame';
 
+/** The steps a new object's size takes with the zoom (`createScale`): tidy sizes, not one per wheel tick. */
+const CREATE_STEPS: readonly number[] = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
+
+/**
+ * How much bigger (in world units) a new object is made so that it looks about as big on screen as at 100 % (owner
+ * 30.10: zoomed out, a new sticky was a speck): `worldPerPx` is the world size of a screen pixel; the nearest step in
+ * log scale, 0.5 (zoomed in) … 8 (zoomed far out).
+ */
+export function createScale(worldPerPx: number): number {
+  const want = Math.log(Math.max(1e-6, worldPerPx));
+  let best = 1;
+  for (const s of CREATE_STEPS) if (Math.abs(Math.log(s) - want) < Math.abs(Math.log(best) - want)) best = s;
+  return best;
+}
+
+/** The text size fields of a new sticky or shape made `k` times bigger (none at 1: the default token). */
+export function scaledFont(kind: 'sticky' | 'shape', k: number): { fontPx?: number } {
+  if (k === 1) return {};
+  return { fontPx: Math.min(DEFAULTS.maxTextSize, Math.round((kind === 'sticky' ? STICKY_TEXT_SIZE : SHAPE_TEXT_SIZE) * k)) };
+}
+
 export class CreateGesture implements Gesture {
   readonly kind = 'create';
   private dragged = false;
@@ -577,29 +599,38 @@ export class CreateGesture implements Gesture {
     if (this.what === 'frame') {
       // A drag draws it; a click places the armed size centered on the pointer. Neither opens a text editor.
       const r = this.dragged ? this.rect(w, m) : null;
-      const { w: fw, h: fh } = this.core.frameSize;
+      const fk = createScale(this.core.px(1));
+      const fw = this.core.frameSize.w * fk;
+      const fh = this.core.frameSize.h * fk;
       id = doc.create(r
         ? { kind: 'frame', x: r.x, y: r.y, w: Math.max(r.w, DEFAULTS.minFrame), h: Math.max(r.h, DEFAULTS.minFrame), title: this.core.nextFrameTitle() }
         : { kind: 'frame', x: snapTo(this.from.x - fw / 2, this.core.gridSize || 1), y: snapTo(this.from.y - fh / 2, this.core.gridSize || 1), w: fw, h: fh, title: this.core.nextFrameTitle() });
       this.core.finishCreate(id ? [id] : [], false);
       return;
     }
+    // Sized for the zoom: a click zoomed out makes a sticky that looks like one at 100 %, its text too.
+    const k = createScale(this.core.px(1));
+    const textSize = Math.min(DEFAULTS.maxTextSize, Math.round(DEFAULTS.textSize * k));
     if (this.dragged) {
       const r = this.rect(w, m);
       const bw = Math.max(r.w, this.what === 'text' ? DEFAULTS.minTextW : DEFAULTS.minBox);
       const bh = Math.max(r.h, DEFAULTS.minBox);
       id = this.what === 'sticky'
-        ? doc.create({ kind: 'sticky', color: this.core.stickyColor, x: r.x, y: r.y, w: bw, h: bh })
+        ? doc.create({ kind: 'sticky', color: this.core.stickyColor, x: r.x, y: r.y, w: bw, h: bh, ...scaledFont('sticky', k) })
         : this.what === 'text'
-          ? doc.create({ kind: 'text', x: r.x, y: r.y, w: bw })
-          : doc.create({ kind: 'shape', shape: this.core.shapeKind, x: r.x, y: r.y, w: bw, h: bh });
+          ? doc.create({ kind: 'text', x: r.x, y: r.y, w: bw, size: textSize })
+          : doc.create({ kind: 'shape', shape: this.core.shapeKind, x: r.x, y: r.y, w: bw, h: bh, ...scaledFont('shape', k) });
     } else {
       const c = this.core.gridSize && !m.mod ? { x: snapTo(this.from.x, this.core.gridSize), y: snapTo(this.from.y, this.core.gridSize) } : this.from;
+      const sw = DEFAULTS.stickySize * k;
       id = this.what === 'sticky'
-        ? doc.create({ kind: 'sticky', color: this.core.stickyColor, x: c.x - DEFAULTS.stickySize / 2, y: c.y - DEFAULTS.stickySize / 2 })
+        ? doc.create({ kind: 'sticky', color: this.core.stickyColor, x: c.x - sw / 2, y: c.y - sw / 2, w: sw, h: sw, ...scaledFont('sticky', k) })
         : this.what === 'text'
-          ? doc.create({ kind: 'text', x: c.x - 8, y: c.y - DEFAULTS.textSize })
-          : doc.create({ kind: 'shape', shape: this.core.shapeKind, x: c.x - DEFAULTS.shapeW / 2, y: c.y - DEFAULTS.shapeH / 2 });
+          ? doc.create({ kind: 'text', x: c.x - 8 * k, y: c.y - textSize, w: DEFAULTS.textW * k, size: textSize })
+          : doc.create({
+            kind: 'shape', shape: this.core.shapeKind, x: c.x - (DEFAULTS.shapeW * k) / 2, y: c.y - (DEFAULTS.shapeH * k) / 2,
+            w: DEFAULTS.shapeW * k, h: DEFAULTS.shapeH * k, ...scaledFont('shape', k),
+          });
     }
     this.core.finishCreate(id ? [id] : [], true);
   }

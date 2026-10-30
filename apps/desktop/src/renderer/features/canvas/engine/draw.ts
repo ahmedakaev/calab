@@ -465,23 +465,56 @@ function drawSticky(ctx: Ctx2D, o: TextBoxRec & { kind: 'sticky' }, env: DrawEnv
     traceRounded(ctx, o, STICKY_RADIUS);
     ctx.fill();
   }
-  // A pad: the sheets under the top one show as a darker band at the bottom, split by a lighter line (inside the frame,
-  // so its bounds stay the sticky's).
+  // A pad (a stack to tear sheets off): the edges of the sheets under the top one as a darker band at the bottom, and
+  // the top sheet's bottom-right corner curled up, the next sheet showing under it. All inside the sticky's frame, so
+  // its bounds and repaints stay those of a sticky.
   const band = o.pad ? padBand(o.h) : 0;
   if (band > 0 && !plain) {
+    const a = ctx.globalAlpha;
+    const top = o.y + o.h - band;
+    const curl = Math.min(o.w, o.h - band) * 0.16;
+    const right = o.x + o.w;
     ctx.save();
     ctx.beginPath();
     traceRounded(ctx, o, STICKY_RADIUS);
     ctx.clip();
-    const a = ctx.globalAlpha;
     ctx.fillStyle = '#000000';
-    ctx.globalAlpha = a * 0.22;
-    ctx.fillRect(o.x, o.y + o.h - band, o.w, band);
+    // The sheet edges: two darker stripes.
+    ctx.globalAlpha = a * 0.16;
+    ctx.fillRect(o.x, top, o.w, band);
     ctx.globalAlpha = a * 0.12;
-    ctx.fillRect(o.x, o.y + o.h - band, o.w, Math.max(1 / env.scale, band * 0.18));
+    ctx.fillRect(o.x, top + band / 2, o.w, band / 2);
+    // Under the curl: the next sheet.
+    ctx.globalAlpha = a * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(right, top - curl);
+    ctx.lineTo(right, top);
+    ctx.lineTo(right - curl, top);
+    ctx.closePath();
+    ctx.fill();
+    // The curled flap: the sheet's back, lighter, with a soft shadow along its fold.
+    ctx.globalAlpha = a;
+    ctx.fillStyle = c.bg;
+    ctx.beginPath();
+    ctx.moveTo(right, top - curl);
+    ctx.quadraticCurveTo(right - curl * 0.55, top - curl * 0.55, right - curl, top);
+    ctx.lineTo(right - curl * 0.92, top - curl * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = a * 0.28;
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.globalAlpha = a * 0.18;
+    ctx.lineWidth = Math.max(1 / env.scale, curl * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(right, top - curl);
+    ctx.quadraticCurveTo(right - curl * 0.55, top - curl * 0.55, right - curl, top);
+    ctx.stroke();
     ctx.restore();
   }
-  if (env.hiddenText !== o.id) drawLines(ctx, env, o, o.text, o.fmt, boxFontSize(o), contentRect(band > 0 ? { ...o, h: o.h - band } : o), c.fg, 'left', false);
+  // Centred both ways, as in Miro (owner 30.10); the lines wrap at the sticky's width.
+  if (env.hiddenText !== o.id) drawLines(ctx, env, o, o.text, o.fmt, boxFontSize(o), contentRect(band > 0 ? { ...o, h: o.h - band } : o), c.fg, 'center', true);
 }
 
 function drawText(ctx: Ctx2D, o: TextBoxRec & { kind: 'text' }, env: DrawEnv): void {

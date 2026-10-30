@@ -5,6 +5,7 @@ import { handlePointRot, rotateHandlePoint } from '../../../lib/canvas/geometry'
 import { anchorOf } from '../../../lib/canvas/route';
 import { isBox, type BoxRec } from '../../../lib/canvas/types';
 import { drawObject, drawObjects } from './draw';
+import { createScale } from './gestures';
 import { defaultPalette } from './palette';
 import { destroyRigs, rig, type Rig } from './testRig';
 import { fakeCtx } from './testing';
@@ -699,6 +700,25 @@ describe('sticky pads (owner 30.10)', () => {
     expect(serialize(r.engine.scene, r.engine.doc, [p])).toContain('"pad":true');
     r.engine.doc.patch(p, { pad: false });
     expect(snap(r, p)?.pad).toBeUndefined();
+  });
+});
+
+describe('new objects sized for the zoom (owner 30.10)', () => {
+  it('createScale: about one screen size, in tidy steps', () => {
+    expect(createScale(1)).toBe(1);
+    expect(createScale(4)).toBe(4);
+    expect(createScale(5.2)).toBe(6);
+    expect(createScale(100)).toBe(8);
+    expect(createScale(0.1)).toBe(0.5);
+  });
+  it('a sticky placed zoomed out at 25% is four times bigger, its text too', () => {
+    const r = rig();
+    r.engine.setCamera({ tx: 0, ty: 0, scale: 0.25 });
+    r.key('s');
+    r.click(200, 200);
+    const id = [...r.engine.selection][0];
+    expect(snap(r, id)).toMatchObject({ kind: 'sticky', w: 640, h: 640, x: 480, y: 480 });
+    expect(snap(r, id)?.fontPx).toBe(72);
   });
 });
 

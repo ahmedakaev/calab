@@ -123,7 +123,10 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
     if (g) return resizeCursorAt(g, engine.selectionFrame()?.rot ?? 0);
     if (connectorEndAt(w)) return 'pointer';
     const over = engine.hitAt(w);
-    return over ? (engine.votableAt(over.id) ? 'pointer' : 'move') : '';
+    if (!over) return '';
+    if (engine.votableAt(over.id)) return 'pointer';
+    // A pad hands out stickies: a hand, as for taking one (Alt-drag moves it).
+    return over.kind === 'sticky' && over.pad ? 'grab' : 'move';
   };
 
   /** The selection frame's rotation handle under the pointer. */
