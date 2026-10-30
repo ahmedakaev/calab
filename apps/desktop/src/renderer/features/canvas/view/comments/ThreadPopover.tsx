@@ -68,18 +68,28 @@ export const ThreadPopover = memo(function ThreadPopover({
     });
   }, [open, engine, focusCanvas]);
 
-  // The pin element, read when the popover places itself (pins move without React).
-  const anchor = useMemo(
-    () => ({
+  const pinSel = target === 'draft' ? '[data-testid="canvas-comment-draft-pin"]' : `[data-comment-id="${CSS.escape(target ?? '')}"]`;
+  // The pin element, read when the popover places itself (pins move without React); its last place if it is gone.
+  const anchor = useMemo(() => {
+    const last = { rect: new DOMRect() };
+    return {
       current: {
         getBoundingClientRect: (): DOMRect => {
-          const sel = target === 'draft' ? '[data-testid="canvas-comment-draft-pin"]' : `[data-comment-id="${CSS.escape(target ?? '')}"]`;
-          return layer.current?.querySelector(sel)?.getBoundingClientRect() ?? new DOMRect();
+          const el = layer.current?.querySelector<HTMLElement>(pinSel);
+          if (el && !el.hidden) last.rect = el.getBoundingClientRect();
+          return last.rect;
         },
       },
-    }),
-    [target, layer],
-  );
+    };
+  }, [pinSel, layer]);
+  // The object the pin sits on went away (deleted by someone): the window closes rather than float off.
+  useEffect(() => {
+    if (!target) return undefined;
+    return engine.scene.subscribe(() => {
+      const el = layer.current?.querySelector<HTMLElement>(pinSel);
+      if (!el || el.hidden) closePopover(focusCanvas);
+    });
+  }, [target, pinSel, layer, engine, focusCanvas]);
 
   if (!target) return null;
   const close = (): void => closePopover(focusCanvas);

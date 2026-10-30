@@ -273,6 +273,8 @@ export class MoveGesture implements Gesture {
         this.capture();
         if (made.length === 0) {
           this.core.doc.cancelGesture();
+          // The object limit: said, not swallowed.
+          this.core.refuseCreate();
           return;
         }
       } else if (m.alt && !this.spawn) {
@@ -751,7 +753,12 @@ export class QuickGesture implements Gesture {
     if (!this.dragged && Math.hypot(s.x - this.fromScreen.x, s.y - this.fromScreen.y) < DRAG_PX * 2) return;
     this.dragged = true;
     const a = edgeMid(this.src, this.side);
-    this.target = glueAt(this.core, w, this.src.id);
+    // A frame or zone the source sits in is the place, not a target: the line ends on empty canvas there.
+    const hit = glueAt(this.core, w, this.src.id);
+    const holder = hit ? this.core.scene.get(hit.id) : undefined;
+    const src = this.src;
+    const holds = !!holder && !isConnector(holder) && holder.x <= src.x && holder.y <= src.y && holder.x + holder.w >= src.x + src.w && holder.y + holder.h >= src.y + src.h;
+    this.target = hit && holder && holder.kind !== 'frame' && !holds ? hit : null;
     if (this.target) {
       this.at = null;
       this.core.setOverlay({ quick: null, ghost: null, wire: this.glued(this.target), ...glueOverlay(this.target) });

@@ -104,6 +104,8 @@ export class Renderer {
    * just that part of the screen.
    */
   private overlayDirty: Rect | null = null;
+  /** A frame request (not only the pen's tail) since the last frame: the tail-only composite would miss its overlay change. */
+  private frameRequested = false;
   /** Composite everything on the next frame: the first one, and any frame request without a remote layer. */
   private compositeAll = true;
   /** The overlay's world box at the last frame (`overlayBounds`): where its old pixels are, to repaint on the next one. */
@@ -368,6 +370,7 @@ export class Renderer {
    */
   requestFrame(): void {
     this.mainDirty = true;
+    this.frameRequested = true;
     // Without a remote layer the peers are painted on this canvas too, and nothing tracks where: composite it all.
     if (!this.remote) this.compositeAll = true;
     this.schedule();
@@ -444,7 +447,7 @@ export class Renderer {
     // or a change over most of the screen composite everything. The pen's stroke growing: just its tail.
     let partial: Rect[] | null = null;
     if (!this.compositeAll && !full && dx === 0 && dy === 0) {
-      if (dirty.length === 0 && this.overlayDirty) partial = [this.overlayDirty];
+      if (dirty.length === 0 && this.overlayDirty && !this.frameRequested) partial = [this.overlayDirty];
       else if (this.remote) {
         const boxes = [...dirty];
         if (lastOv) boxes.push(lastOv);
@@ -456,6 +459,7 @@ export class Renderer {
       }
     }
     this.compositeAll = false;
+    this.frameRequested = false;
     this.overlayDirty = null;
 
     if (full) {
@@ -489,8 +493,9 @@ export class Renderer {
     // Most of the screen anyway: one plain composite is cheaper than clipping.
     if (parts && parts.reduce((a, r) => a + r.w * r.h, 0) > PARTIAL_MAX_SHARE * W * H) parts = null;
     if (parts) {
-      // Nothing on screen changed (e.g. the change is off screen).
+      // Nothing on screen changed (e.g. the change is off screen); peers' cursors may have.
       if (parts.length === 0) {
+        if (this.remoteDirty) this.remoteFrame(cam);
         this.onFrame?.();
         return;
       }
@@ -514,6 +519,8 @@ export class Renderer {
     if (parts) c.restore();
     // Peers' selections follow the objects (the remote layer is redrawn below when content changed).
     if (parts && !(contentChanged && this.o.awareness.hasSelections)) {
+      // Peers' cursors moved meanwhile (a drag, the pen, a hover): their layer too, or it freezes until the end.
+      if (this.remoteDirty) this.remoteFrame(cam);
       this.onFrame?.();
       return;
     }

@@ -760,3 +760,33 @@ describe('new objects sized for the zoom (owner 30.10)', () => {
   });
 });
 
+describe('review fixes (30.10)', () => {
+  it('a hovered «continue» dot animates over several painted frames, then stops', () => {
+    const r = rig({ reducedMotion: false });
+    const [a] = r.make({ init: { kind: 'sticky', x: 100, y: 100, w: 160, h: 160 } });
+    r.engine.setSelection([a ?? '']);
+    r.raf.flush();
+    const before = r.engine.renderer.stats.frames;
+    r.engine.hoverQuick('right');
+    for (let i = 0; i < 20 && r.raf.pending > 0; i++) {
+      r.clock.t += 16;
+      r.raf.flush();
+    }
+    expect(r.engine.renderer.stats.frames - before).toBeGreaterThan(3);
+    expect(r.raf.pending).toBe(0);
+  });
+
+  it('«continue» inside a frame places the copy beside the source, inside the frame', () => {
+    const r = rig();
+    const [, a] = r.make(
+      { init: { kind: 'frame', x: 0, y: 0, w: 960, h: 540, title: 'F' } },
+      { init: { kind: 'sticky', x: 40, y: 40, w: 160, h: 160 } },
+    );
+    r.engine.setSelection([a ?? '']);
+    r.engine.quickCreate('right');
+    const made = [...r.engine.selection].find((id) => id !== a);
+    expect(snap(r, made)).toMatchObject({ kind: 'sticky', y: 40 });
+    expect(Number(snap(r, made)?.x)).toBeLessThan(960 - 160);
+  });
+});
+

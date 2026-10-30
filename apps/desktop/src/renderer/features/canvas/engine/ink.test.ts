@@ -278,3 +278,29 @@ describe('Renderer: a lifted drag', () => {
   });
 });
 
+describe('Renderer: peers keep moving during a partial frame', () => {
+  it('a remote cursor change is painted even when the main canvas composites only a piece', () => {
+    const doc = makeDoc();
+    const scene = new Scene(doc);
+    const canvas = fakeCanvas();
+    const remote = fakeCanvas();
+    const layer = fakeCtx();
+    const raf = manualRaf();
+    let overlay = emptyOverlay();
+    const r = new Renderer({
+      canvas: canvas as unknown as HTMLCanvasElement, remoteCanvas: remote as unknown as HTMLCanvasElement, scene, palette: defaultPalette('light'),
+      getCamera: () => ({ tx: 0, ty: 0, scale: 1 }), getOverlay: () => overlay, awareness: new AwarenessLayer(),
+      raf: raf.raf, cancelRaf: raf.cancel, makeLayer: () => ({ width: 0, height: 0, getContext: () => layer.ctx }),
+    });
+    r.resize(1600, 1000, 1);
+    raf.flush();
+    const remoteBefore = r.stats.remote;
+    overlay = { ...overlay, outlines: [{ rect: { x: 100, y: 100, w: 50, h: 50 }, rot: 0 }] };
+    r.requestFrame();
+    r.requestRemoteFrame();
+    raf.flush();
+    expect(r.stats.partial).toBeGreaterThan(0);
+    expect(r.stats.remote).toBeGreaterThan(remoteBefore);
+  });
+});
+

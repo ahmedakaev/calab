@@ -141,6 +141,10 @@ export interface EngineOptions {
   cancelRaf?: (id: number) => void;
 }
 
+/** Whether box `o` wholly contains `inner` (a frame or a zone the object sits in). */
+const encloses = (o: ObjectRec, inner: Rect): boolean =>
+  !isConnector(o) && o.x <= inner.x && o.y <= inner.y && o.x + o.w >= inner.x + inner.w && o.y + o.h >= inner.y + inner.h;
+
 const STATE_KEYS: readonly (keyof EngineState)[] = ['selectedId', 'selectionCount', 'tool', 'shapeKind', 'stickyColor', 'inkMarker', 'inkColor', 'inkWidth', 'eraserPx', 'frameSize', 'zoomPct', 'canUndo', 'canRedo', 'editing', 'readOnly', 'followKey', 'followName', 'votePhase', 'votesPer', 'votesLeft', 'canVote', 'multiSelect'];
 const LOCAL_AWARENESS_MS = 50;
 /** Gestures that follow their pointer when the camera moves under it, and pan the view at its edge. */
@@ -240,7 +244,7 @@ export class CanvasEngine implements Core {
   private quickHot: ConcreteSide | null = null;
   /** The sticky pad under the pointer, and each pad's corner lift in motion: from `v0` toward `to` since `t0`. */
   private padHot: string | null = null;
-  private readonly padAnim = new Map<string, { v0: number; to: number; t0: number }>();
+  private readonly padAnim = new Map<string, { v0: number; to: number; t0: number; settled?: boolean }>();
   private quickT0 = 0;
   private eraser_: number = ERASER_SIZES[1] ?? 12;
   private frame_: FramePreset = '16:9';
@@ -569,6 +573,8 @@ export class CanvasEngine implements Core {
     if (q?.hot && q.hot.t < 1) {
       const t = Math.min(1, (this.now() - this.quickT0) / QUICK_ANIM_MS);
       this.overlay = { ...this.overlay, quick: { ...q, hot: { ...q.hot, t } } };
+      // The new step has to be painted: a frame request (the overlay was set directly).
+      this.renderer.requestFrame();
       if (t < 1) more = true;
     }
     this.flushCamera();
@@ -676,7 +682,8 @@ export class CanvasEngine implements Core {
   private quickRect(src: StickyRec | ShapeRec, side: ConcreteSide): Rect {
     const probe = quickTarget(src, side, []);
     const area = rectInflate(probe, Math.max(src.w, src.h) * 6);
-    const taken = this.scene.query(area).flatMap((o) => (o.id !== src.id && !isConnector(o) ? [aabb(o)] : []));
+    // What holds the source (a frame, a template's zone) is the place it sits in, not an obstacle.
+    const taken = this.scene.query(area).flatMap((o) => (o.id !== src.id && !isConnector(o) && !encloses(o, src) ? [aabb(o)] : []));
     return quickTarget(src, side, taken);
   }
 
@@ -710,10 +717,13 @@ export class CanvasEngine implements Core {
     let moving = false;
     const now = this.now();
     for (const [id, a] of this.padAnim) {
+      if (a.settled) continue;
       const o = this.scene.get(id);
       if (o) this.renderer.invalidate(visualBounds(o));
       if (now - a.t0 < PAD_LIFT_MS) moving = true;
+      // Done: painted once more at its final value; a lifted pad keeps its value, a settled one goes.
       else if (a.to === 0) this.padAnim.delete(id);
+      else a.settled = true;
     }
     return moving;
   }
@@ -873,6 +883,8 @@ export class CanvasEngine implements Core {
   setTool(t: Tool): void {
     if (t === this.tool_) return;
     this.tool_ = t;
+    // Another tool: the pad under the pointer is no longer an invitation.
+    if (t !== 'select') this.hoverPad(null);
     this.canvas.style.cursor = toolCursor(t, this.eraser_);
     this.sync();
   }
