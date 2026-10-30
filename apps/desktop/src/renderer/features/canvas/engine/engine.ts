@@ -16,7 +16,7 @@ import { ERASER_SIZES, INK_MAX_WIDTH, INK_MIN_WIDTH, MARKER_WIDTHS, PEN_WIDTHS }
 import { LiveLayer } from '../../../lib/canvas/live';
 import {
   DEFAULTS, MAX_OBJECTS, aabb, hasText, isConnector,
-  type ObjectKind, type ObjectPatch, type ObjectRec, type RouteKind, type ShapeKind, type ShapeRec, type StickyRec,
+  type Endpoint, type ObjectKind, type ObjectPatch, type ObjectRec, type RouteKind, type ShapeKind, type ShapeRec, type StickyRec,
 } from '../../../lib/canvas/types';
 import { VOTE_DEFAULT, VoteBook, type VotePhase, type VoteSession } from '../../../lib/canvas/votes';
 import { AwarenessLayer, sameView, type PeerState, type PeerView } from './awareness';
@@ -1436,20 +1436,41 @@ export class CanvasEngine implements Core {
   }
 
   /**
-   * Inserts a built-in template centered on the visible area, in one transaction (one undo step), and selects it.
+   * Inserts a built-in template centered on the visible area, as one undo step, and selects it.
    * Returns the new ids; [] when the canvas has no room (the 5000-object limit) or cannot be edited.
    */
   insertTemplate(id: TemplateId, tr: TemplateText): string[] {
     if (!this.canEdit()) return [];
     const view = this.visibleWorld();
-    const items = buildTemplate(id, { x: view.x + view.w / 2, y: view.y + view.h / 2 }, tr, newId);
+    const center = rectCenter(view);
+    const items = buildTemplate(id, center, tr, newId);
     this.doc.checkpoint();
+    // The layout estimates the text boxes; the real bounds (text measured) decide the center, in the same gesture.
+    this.doc.beginGesture();
     const ids = this.doc.createMany(items);
+    if (ids.length > 0) this.centerObjects(ids, center);
+    this.doc.endGesture();
     if (ids.length > 0) {
       this.setSelection(ids);
       this.setTool('select');
     }
     return ids;
+  }
+
+  /** Moves the fresh objects so that their real bounds are centered on `c`; a connector moves by its free ends (glued ones follow). */
+  private centerObjects(ids: readonly string[], c: Point): void {
+    const b = this.scene.bounds(ids);
+    if (!b) return;
+    const dx = c.x - (b.x + b.w / 2);
+    const dy = c.y - (b.y + b.h / 2);
+    if (dx === 0 && dy === 0) return;
+    const move = (e: Endpoint): Endpoint => ('id' in e ? e : { x: e.x + dx, y: e.y + dy });
+    for (const oid of ids) {
+      const o = this.scene.get(oid);
+      if (!o) continue;
+      if (o.kind === 'connector') this.doc.patch(oid, { from: move(o.from), to: move(o.to) });
+      else this.doc.patch(oid, { x: o.x + dx, y: o.y + dy });
+    }
   }
 
   /** The text size in px of the object under edit (the format bar's size field): the object changes, the textarea follows. */
