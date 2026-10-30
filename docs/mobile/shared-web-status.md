@@ -1,5 +1,7 @@
 # Телефон: общий веб в оболочке — статус
 
+Как собрать и выпустить `apps/mobile` в TestFlight/Play — [release.md](release.md).
+
 ## 2026-10-29: Android native origin guard and launch-intent reset (DEV-5032, ADR-0067)
 
 The patched react-native-webview now decides main-frame navigations natively: only the exact
