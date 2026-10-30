@@ -2,6 +2,20 @@
 
 Как собрать и выпустить `apps/mobile` в TestFlight/Play — [release.md](release.md).
 
+## 2026-10-29: Android native origin guard and launch-intent reset (DEV-5032, ADR-0067)
+
+The patched react-native-webview now decides main-frame navigations natively: only the exact
+origin from the manifest meta-data `dev.calab.mobile.WEB_ORIGIN` (written by
+`plugins/withAndroidWebOrigin.js` from `EXPO_PUBLIC_CALAB_URL`) loads; everything else is cancelled
+without waiting for JS, and JS is notified fire-and-forget to open the link in the OS or show the
+error, as before. `shouldInterceptRequest` answers main-frame requests outside the origin (POST
+included) with an empty 403. `plugins/withAndroidIntentReset.js` stops `getInitialURL()` replaying
+the launch link after process death / Recents.
+Checked: JVM test of the origin check, plugin tests, `expo prebuild` + `assembleDebug`; Pixel_9
+emulator — without the reset the link replayed after kill+Recents, force-stop+Recents and
+kill+launcher, with it none did. **Not device-verified**: the guard in a live WebView (no network
+in the sandbox), POST, a third-party iframe app, Play internal track. Needs a new Android build.
+
 ## 2026-10-29: Android entry link dropped right after loading (regression from #263, DEV-4947)
 
 Found on a real Android phone (Play internal testing build 1.0.0 (2)): a task/room link opened

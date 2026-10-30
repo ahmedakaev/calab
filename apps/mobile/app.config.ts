@@ -98,6 +98,10 @@ const config: ExpoConfig = {
     // iOS 27 SDK apps without the UIKit scene lifecycle trap at launch. Expo's supported SDK 57
     // opt-in: a scene manifest plus ExpoAppSceneDelegate, which owns the window and starts React.
     ['expo-build-properties', { ios: { enableSceneSupport: true } }],
+    // Android (DEV-5032): the origin for the native main-frame guard (ADR-0067) and a launch link
+    // that is not replayed when the activity is recreated (ADR-0142).
+    ['./plugins/withAndroidWebOrigin', { origin: webOrigin }],
+    './plugins/withAndroidIntentReset',
   ],
   ...(projectId ? { extra: { eas: { projectId } } } : {}),
 };
