@@ -423,7 +423,7 @@ function Chrome({
         {canWrite && editable ? <PhoneEditHint /> : null}
         {canWrite && editable ? <PhoneFormatBar engine={engine} /> : null}
         {canWrite && editable ? (
-          <PhoneEditBar engine={engine} timer={timer} focusCanvas={focusCanvas}>
+          <PhoneEditBar engine={engine} timer={timer} palette={palette} focusCanvas={focusCanvas}>
             <PhoneProps engine={engine} palette={palette} focusCanvas={focusCanvas} />
           </PhoneEditBar>
         ) : null}
