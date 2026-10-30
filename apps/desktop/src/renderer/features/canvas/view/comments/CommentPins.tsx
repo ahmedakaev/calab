@@ -6,7 +6,7 @@
  * engine's view callback, each pin holds its world point in `--wx` / `--wy`; a pin on an object is moved
  * when the scene reports that object changed (`placePin`). In idle nothing runs (no frame, no timer).
  */
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, MessageCirclePlus } from 'lucide-react';
 import { memo, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { cx } from '../../../../components/ui';
@@ -70,7 +70,10 @@ const Pin = memo(function Pin({ id, workspaceId, engine }: { id: string; workspa
       }}
       className={cx(
         'pointer-events-auto absolute left-0 top-0 flex h-7 min-w-7 items-center gap-0.5 rounded-full rounded-bl-none border px-1.5 text-caption font-medium shadow-sm',
-        active ? 'border-accent bg-accent-strong text-accent-fg' : c.resolved ? 'border-line bg-main text-muted' : 'border-line bg-main text-fg',
+        // The thread open in the panel: filled, with a halo and above the other pins — the one pin that is «here».
+        active
+          ? 'z-[1] border-accent bg-accent-strong text-accent-fg shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]'
+          : c.resolved ? 'border-line bg-main text-muted' : 'border-line bg-main text-fg',
       )}
     >
       <MessageCircle className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
@@ -93,9 +96,10 @@ function DraftPin({ draft, engine }: { draft: CommentDraft; engine: CanvasEngine
       data-ox={draft.x}
       data-oy={draft.y}
       style={PIN_STYLE}
-      className="absolute left-0 top-0 grid size-7 place-items-center rounded-full rounded-bl-none border border-accent bg-accent-strong text-accent-fg shadow-sm"
+      // A new thread not yet sent: dashed and unfilled, so it never reads as the selected thread.
+      className="absolute left-0 top-0 grid size-7 place-items-center rounded-full rounded-bl-none border border-dashed border-accent bg-main text-accent-text shadow-sm"
     >
-      <MessageCircle className="size-3.5" strokeWidth={2} aria-hidden />
+      <MessageCirclePlus className="size-3.5" strokeWidth={2} aria-hidden />
     </div>
   );
 }
