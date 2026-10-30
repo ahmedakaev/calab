@@ -115,7 +115,9 @@ internal object CalabPushNotifier {
       .build()
     notification.flags = notification.flags or Notification.FLAG_INSISTENT
     // One ringing call at a time: a newer ring replaces the previous one (server keeps one live call).
-    post(context, CALL_TAG, notification)
+    // The tag names the ring's opaque event ID, so the server's `call-cancel` removes only this ring.
+    cancelCall(context)
+    post(context, callTag(payload.eventId), notification)
   }
 
   fun showTest(context: Context, body: String): Boolean {
@@ -130,7 +132,20 @@ internal object CalabPushNotifier {
     return post(context, TEST_TAG, notification)
   }
 
-  fun cancelCall(context: Context) = NotificationManagerCompat.from(context).cancel(CALL_TAG, 0)
+  private fun callTag(eventId: String) = "$CALL_TAG.$eventId"
+
+  /** Any ring this device shows (answer/decline tap, app foreground, missed-call message). */
+  fun cancelCall(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java) ?: return
+    try {
+      for (shown in manager.activeNotifications) if (shown.tag?.startsWith("$CALL_TAG.") == true) manager.cancel(shown.tag, shown.id)
+    } catch (_: RuntimeException) {
+      // activeNotifications is best effort on some OEM builds; the ring's own timeout still ends it.
+    }
+  }
+
+  /** The server's `call-cancel`: only the ring with this event ID; a newer ring stays. */
+  fun cancelRing(context: Context, eventId: String) = NotificationManagerCompat.from(context).cancel(callTag(eventId), 0)
 
   /** Logout: NotificationManager scopes this to Calab's own notifications. */
   fun clearAll(context: Context) = NotificationManagerCompat.from(context).cancelAll()

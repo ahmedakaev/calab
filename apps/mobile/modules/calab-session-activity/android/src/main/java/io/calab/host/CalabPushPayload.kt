@@ -23,7 +23,9 @@ internal data class CalabPushPayload(
   val avatarJpeg: String?,
 ) {
   companion object {
-    private val kinds = setOf("message", "call", "task", "calendar")
+    /** `call-cancel` stops a ring this device shows for that event ID (ADR-0071, Android). */
+    const val CALL_CANCEL = "call-cancel"
+    private val kinds = setOf("message", "call", "task", "calendar", CALL_CANCEL)
 
     fun uuid(value: String?): Boolean {
       if (value == null || value.length != 36) return false

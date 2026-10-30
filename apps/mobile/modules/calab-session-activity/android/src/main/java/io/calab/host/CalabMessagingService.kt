@@ -7,6 +7,8 @@ import com.google.firebase.messaging.RemoteMessage
 class CalabMessagingService : FirebaseMessagingService() {
   override fun onMessageReceived(message: RemoteMessage) {
     val payload = CalabPushPayload.parse(message.data, System.currentTimeMillis()) ?: return
+    // A ring that ended early: remove only the notification of that ring (opaque event ID).
+    if (payload.kind == CalabPushPayload.CALL_CANCEL) return CalabPushNotifier.cancelRing(applicationContext, payload.eventId)
     CalabPushNotifier.show(applicationContext, payload)
   }
 
