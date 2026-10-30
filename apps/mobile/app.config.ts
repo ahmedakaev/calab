@@ -62,6 +62,9 @@ const config: ExpoConfig = {
     ...(linkHosts.length ? { associatedDomains: linkHosts.map((host) => `applinks:${host}`) } : {}),
     // Explicit opt-in only; requires a matching APNs-capable profile. Default local builds request no APS grant.
     ...(pushEnvironment ? { entitlements: { 'aps-environment': pushEnvironment } } : {}),
+    // Only standard encryption (HTTPS, WebRTC DTLS-SRTP): App Store Connect then stops asking
+    // the export-compliance question on every build.
+    config: { usesNonExemptEncryption: false },
     infoPlist: {
       ...(pushEnvironment ? { CalabMessagePushEnvironment: pushEnvironment } : {}),
       ...(incomingCalls ? { CalabIncomingCallsEnabled: true } : {}),
