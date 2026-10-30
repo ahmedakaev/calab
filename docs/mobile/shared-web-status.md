@@ -13,6 +13,7 @@ Checked: JVM test of the origin check, plugin tests, `expo prebuild` + `assemble
 emulator — without the reset the link replayed after kill+Recents, force-stop+Recents and
 kill+launcher, with it none did. **Not device-verified**: the guard in a live WebView (no network
 in the sandbox), POST, a third-party iframe app, Play internal track. Needs a new Android build.
+
 ## 2026-10-29: Android host channel and FCM push (DEV-5031, DEV-5033)
 
 The host channel is on for Android too (`hostChannelEnabled`). It has no native frame check in the
