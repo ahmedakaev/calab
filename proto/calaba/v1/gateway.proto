@@ -512,6 +512,12 @@ message Ready {
   // ADR-0140: the uuidv7 lower bound of the start of read receipts — own messages with a smaller
   // id have no ticks (no retroactive «read»); empty — a server before ADR-0140.
   string read_receipts_from = 18;
+  // ADR-0151: the bots the recipient owns (bots.owner_user_id). A task created by one of them
+  // counts as the recipient's own for author rights (isTaskAuthor in packages/protocol: edit and
+  // archive with CREATE_TASKS, create-only visibility). A bot the recipient creates later comes
+  // as BOT_CREATE with owner_user_id = the recipient; a deleted one may stay until the next READY
+  // (the server decides anyway).
+  repeated string my_bot_ids = 19;
 }
 
 // A guest knocks on a room (ADR-0040); to the room's deciders.
