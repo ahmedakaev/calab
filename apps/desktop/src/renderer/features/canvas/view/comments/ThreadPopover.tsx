@@ -28,7 +28,7 @@ function closePopover(focusCanvas: () => void): void {
 function ThreadHeader({ id, ctx, onClose }: { id: string; ctx: Ctx; onClose: () => void }): ReactNode {
   const resolved = useCanvasComments((s) => !!s.byId[id]?.resolved);
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-line pl-3 pr-1">
+    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line pl-4 pr-2">
       {ctx.rights.write || ctx.rights.moderate ? (
         <label className="flex items-center gap-2">
           <Toggle checked={resolved} onChange={(v) => void resolveThread(id, v)} label={t('canvasComments.resolved')} />
@@ -98,7 +98,8 @@ export const ThreadPopover = memo(function ThreadPopover({
           align="start"
           sideOffset={10}
           collisionPadding={12}
-          className={cx(MENU_BOX, 'flex max-h-[min(70vh,520px)] w-[340px] flex-col overflow-hidden p-0')}
+          // Concentric with the composer's pill inside (its 20 px radius + the 8 px padding around it).
+          className={cx(MENU_BOX, 'flex max-h-[min(70vh,520px)] w-[340px] flex-col overflow-hidden rounded-[28px] p-0')}
           aria-label={t('canvasComments.title')}
           data-testid="canvas-comment-popover"
           // The field inside takes the focus itself (CommentInput autoFocus).
