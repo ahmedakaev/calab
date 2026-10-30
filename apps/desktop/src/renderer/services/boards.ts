@@ -60,6 +60,7 @@ import { log } from '../lib/log';
 import { platform } from '../platform';
 import { useAutomations } from '../stores/automations';
 import { checklistsOf, unreadIds, useBoards, workspaceBoards, workspaceCategories, type LastNotice } from '../stores/boards';
+import { leaveMail } from '../stores/mailUi';
 import { MY_TASKS, prefsOf, useBoardsUi, type BoardPrefs, type ViewKind } from '../stores/boardsUi';
 import { prefs } from '../stores/prefs';
 import { useRooms } from '../stores/rooms';
@@ -543,6 +544,8 @@ export function openTaskAnywhere(task: Pick<Task, 'id' | 'workspaceId' | 'boardI
   if (ui.activeWorkspaceId !== task.workspaceId) ui.setWorkspace(task.workspaceId);
   const bu = useBoardsUi.getState();
   if (!bu.active || (bu.boardOf[task.workspaceId] !== task.boardId && bu.boardOf[task.workspaceId] !== MY_TASKS)) openBoard(task.workspaceId, task.boardId);
+  // The boards may already be active under the mail (their subscription fires only on false → true).
+  leaveMail();
   bu.setActive(true);
   bu.openTask(task.id);
   void loadTask(task.id);

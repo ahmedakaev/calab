@@ -2423,3 +2423,6 @@ Expected: the task / board / room / wiki / Disk / meeting opens in the app (anot
 - Esc / × / «Открыть встречу» close it without joining; «Открыть встречу» shows the meeting in the calendar.
 - Be in another voice room or a call first: the dialog says so, the button reads «Выйти и войти»; confirming leaves it and joins the meeting room.
 - Already in the meeting room: the click only shows the room, no dialog. «Перейти в комнату» in the event card still joins at once.
+
+- Task tabs (#104, #105): open a task, ⌘-click two others (three tabs), click a fourth card plainly — the three stay and a fourth tab appears; another plain click replaces only that fourth one.
+- Open the Mail section and click any task tab (also one of another workspace): the task opens over the mail, no click is lost.
