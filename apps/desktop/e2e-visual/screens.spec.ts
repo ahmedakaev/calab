@@ -1539,6 +1539,15 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
   await expect(win.getByTestId('voice-phase')).toHaveText('Вас не слышно');
   await expect(win.getByTestId('toast')).toHaveCount(1); // still only the sound prompt
   await checkpoint(shot, 'voice-audio-recovery-unheard');
+  // Outside «Команда» the island is folded (ADR-0146): the avatar's mark carries the state.
+  await win.getByTestId('toast').getByRole('button', { name: 'Закрыть' }).click();
+  await win.getByTestId('section-calendar').click();
+  const mark = win.getByTestId('island-call-mark');
+  await expect(mark).toHaveAttribute('data-trouble', 'unheard');
+  await checkpoint(shot, 'voice-audio-recovery-folded-unheard');
+  await win.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('recovering'));
+  await expect(mark).toHaveAttribute('data-trouble', 'recovering');
+  await checkpoint(shot, 'voice-audio-recovery-folded');
 });
 
 test('workspace-menu', async ({ open, win, mock, shot }) => {
@@ -4446,6 +4455,44 @@ test('boards-task', async ({ open, win, mock, shot }) => {
   await expect(panel.getByTestId('task-description-img')).toBeVisible();
   await expect(panel.getByTestId('task-description')).toContainText('Проверить экспорт');
   await checkpoint(shot, 'boards-task-inline-image');
+
+  // Board #107: reading and editing the description look the same — one text with a heading, paragraphs,
+  // a list, a link and an emoji is shot in both modes and the blocks must sit on the same pixels.
+  await panel.getByTestId('task-description').locator('p').first().click({ position: { x: 8, y: 8 } });
+  await expect(prose).toBeFocused();
+  await win.keyboard.press('ControlOrMeta+a');
+  await win.keyboard.press('Backspace');
+  await win.keyboard.type('# Итоги звонка');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('Эхо пропало после правки 🎉 подробности на https://calab.io/docs ');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('Второй абзац с **жирным** словом.');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('- первый пункт');
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('второй пункт');
+  await panel.getByTestId('task-description-save').click();
+  await expect(editor).toHaveCount(0);
+  const read = panel.getByTestId('task-description');
+  await expect(read.locator('h1')).toHaveText('Итоги звонка');
+  const boxes = async (root: Locator): Promise<number[][]> => {
+    const out: number[][] = [];
+    for (const sel of ['h1', 'p >> nth=0', 'p >> nth=1', 'li >> nth=1']) {
+      const b = await root.locator(sel).boundingBox();
+      out.push(b ? [b.x, b.y, b.width, b.height] : []);
+    }
+    return out;
+  };
+  const readBoxes = await boxes(read);
+  await win.mouse.move(0, 0);
+  await checkpoint(shot, 'boards-task-desc-read');
+  await read.locator('h1').click();
+  await expect(prose).toBeFocused();
+  const editBoxes = await boxes(prose);
+  for (let i = 0; i < readBoxes.length; i++) for (let j = 0; j < 4; j++) expect(Math.abs((editBoxes[i]?.[j] ?? 1e6) - (readBoxes[i]?.[j] ?? -1e6)), `block ${i} coord ${j}: read ${String(readBoxes[i])} edit ${String(editBoxes[i])}`).toBeLessThanOrEqual(1);
+  await checkpoint(shot, 'boards-task-desc-edit');
+  await win.keyboard.press('Escape');
+  await expect(editor).toHaveCount(0);
 
   // #89 / #93: «×» closes the card; Ctrl/⌘-click on cards adds background tabs; a click on a tab
   // opens it; a half-typed comment survives the trip to another tab and back.
