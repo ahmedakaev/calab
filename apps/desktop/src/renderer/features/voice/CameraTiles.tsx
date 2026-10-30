@@ -209,7 +209,7 @@ const Tile = memo(
     const speaking = useVoice((s) => s.speaking[userId] ?? false);
     const muted = useWorkspaces((s) => (wsId ? (s.byId[wsId]?.voice[userId]?.muted ?? false) : false));
     // Parked for a phone call (ADR-0133), or someone else's seat kept after a lost connection
-    // (ADR-0148): the tile is dimmed.
+    // (ADR-0150): the tile is dimmed.
     const onPhone = useWorkspaces((s) => (wsId ? (s.byId[wsId]?.voice[userId]?.onPhone ?? false) : false));
     const me = useMe();
     const lost = useWorkspaces((s) => (wsId ? (s.byId[wsId]?.voice[userId]?.connectionLost ?? false) : false)) && userId !== me;

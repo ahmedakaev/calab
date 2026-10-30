@@ -307,7 +307,7 @@ func (s *Service) Reconcile(ctx context.Context) error {
 				}
 				continue
 			}
-			// A seat held for a lost connection (ADR-0148) is absent from LiveKit by definition:
+			// A seat held for a lost connection (ADR-0150) is absent from LiveKit by definition:
 			// it stays until its grace ends, then goes as a leave.
 			if st.Hold > 0 {
 				if time.Now().UnixMilli() >= st.Hold {

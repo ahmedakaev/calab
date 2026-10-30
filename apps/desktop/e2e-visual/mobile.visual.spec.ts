@@ -723,6 +723,30 @@ test('m-home', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('phone-tabbar')).toBeVisible();
+  // Voice audio recovery (#255) without LiveKit: «in voice» by store state (__calabaVoiceSeat), the
+  // recovery signals through the voice service's own paths: the strip above the tab bar and the sound prompt.
+  const seat = (phase: 'connected' | 'reconnecting'): Promise<void> =>
+    page.evaluate(([roomId, workspaceId, ph]) => (window as unknown as { __calabaVoiceSeat?: (s: object) => void }).__calabaVoiceSeat?.({ roomId, workspaceId, phase: ph }), [IDS.rooms.call, IDS.workspaces.main, phase] as const);
+  await seat('connected');
+  const strip = page.getByTestId('mobile-voice-strip');
+  await expect(strip).toBeVisible();
+  await page.evaluate(() => {
+    const w = window as unknown as { __calabaVoiceRecovery?: (what: string) => void };
+    w.__calabaVoiceRecovery?.('recovering');
+    w.__calabaVoiceRecovery?.('playback');
+  });
+  // The mic state is the strip's line only; the refused sound is the one toast, with its action.
+  await expect(page.getByTestId('toast')).toHaveCount(1);
+  await expect(page.getByTestId('toast').filter({ hasText: 'Вы не слышите собеседников' })).toBeVisible();
+  await expect(page.getByTestId('toast').getByRole('button', { name: 'Включить звук' })).toBeVisible();
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Вас не слышно'); // yellow: being restored
+  // Two lines at this width: the room name gives way instead of a cramped third line.
+  await expect(strip.getByTestId('mobile-voice-label')).toHaveCount(0);
+  await checkpoint(page, 'm-voice-recovery');
+  await page.evaluate(() => (window as unknown as { __calabaVoiceRecovery?: (w: string) => void }).__calabaVoiceRecovery?.('unheard'));
+  await expect(strip.getByTestId('mobile-voice-status')).toHaveText('Вас не слышно');
+  await expect(page.getByTestId('toast')).toHaveCount(1); // no mic toast
+  await checkpoint(page, 'm-voice-recovery-unheard');
 });
 
 // ADR-0073 §4: people in the room's voice, I am not — the banner under the header with «Присоединиться».
@@ -751,7 +775,7 @@ test('m-room-voice-banner', async ({ page }) => {
   for (const row of await rows.all()) expect(Math.round((await row.boundingBox())?.height ?? 0), 'a 56 px person row').toBe(56);
   await expect(card.getByTestId('voice-people-join')).toBeVisible();
   await checkpoint(page, 'm-voice-people');
-  // ADR-0148: Вера's connection is lost, her seat is kept: the card row dimmed with «нет связи»,
+  // ADR-0150: Вера's connection is lost, her seat is kept: the card row dimmed with «нет связи»,
   // her avatar dimmed in the banner and header stacks.
   mock.setVoiceState({ userId: IDS.users.vera, roomId: IDS.rooms.call, connectionLost: true });
   await expect(rows.nth(1).locator('[data-voice-icon="connection-lost"]')).toBeVisible();
@@ -1726,6 +1750,13 @@ test('m-settings', async ({ page }) => {
     return el.getBoundingClientRect().bottom <= innerHeight + 1 && el.scrollTop > 0;
   });
   expect(fits, 'settings section scrolls on its screen').toBe(true);
+  // Board #114: WebKit keeps its own NS (no `noiseSuppression` constraint) — RNNoise is off and
+  // disabled here, with the reason under it.
+  const noise = panel.getByRole('switch', { name: 'Шумоподавление' });
+  await noise.scrollIntoViewIfNeeded();
+  await expect(noise).toBeDisabled();
+  await expect(panel.getByText('На этом устройстве шум убирает сама система', { exact: false })).toBeVisible();
+  await checkpoint(page, 'm-settings-voice-noise', { snapshot: false });
 });
 
 // Owner 07.10: no workspace rail — the header's «Команда Calab ⌄» opens the switcher (the desktop's

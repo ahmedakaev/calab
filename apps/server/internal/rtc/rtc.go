@@ -43,7 +43,7 @@ type Config struct {
 	APIKey, Secret  string
 	MaxParticipants uint32
 	// LostGrace: how long a seat outlives an involuntary LiveKit drop (VOICE_LOST_GRACE,
-	// ADR-0148); 0 = the seat goes with the drop.
+	// ADR-0150); 0 = the seat goes with the drop.
 	LostGrace time.Duration
 }
 
@@ -315,7 +315,7 @@ func (s *Service) join(w http.ResponseWriter, r *http.Request) error {
 // (with the occupancy check when adm is active) and publishes the new state. A device already
 // recorded in the room is left as it is: pending reports whether it still waits for its
 // LiveKit connection, joinedAt identifies that wait (expectConnect) — except a seat held after
-// a lost connection, which the device takes back (seatOnRejoin, ADR-0148). A device recorded in
+// a lost connection, which the device takes back (seatOnRejoin, ADR-0150). A device recorded in
 // another room (switching rooms) moves here and keeps its mute / deafen / musician mode.
 func (s *Service) recordPending(ctx context.Context, room wsRoom, uid, sid uuid.UUID, adm admission) (pending bool, joinedAt int64, err error) {
 	var c voice.Change
@@ -333,7 +333,7 @@ func (s *Service) recordPending(ctx context.Context, room wsRoom, uid, sid uuid.
 			if cur != nil && cur.RoomID == room.ID {
 				pending, joinedAt = cur.Pending, cur.JoinedAt
 				if n, ok := seatOnRejoin(*cur, time.Now()); ok {
-					return &n // the device is back after a lost connection: the seat is its own (ADR-0148)
+					return &n // the device is back after a lost connection: the seat is its own (ADR-0150)
 				}
 				return cur // repeated /join: idempotent
 			}

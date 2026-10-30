@@ -119,7 +119,7 @@ type Config struct {
 	LiveKitAPIKey          string `env:"LIVEKIT_API_KEY"`
 	LiveKitAPISecret       string `env:"LIVEKIT_API_SECRET"`
 	LiveKitMaxParticipants uint32 `env:"LIVEKIT_MAX_PARTICIPANTS" envDefault:"50"`
-	// How long a device's voice seat outlives an involuntary LiveKit drop (ADR-0148): others see
+	// How long a device's voice seat outlives an involuntary LiveKit drop (ADR-0150): others see
 	// it as «no connection» and a /join of the device within this time takes it back without a
 	// leave/join. 0 = off (the seat goes with the drop). At most 10m.
 	VoiceLostGrace time.Duration `env:"VOICE_LOST_GRACE" envDefault:"60s"`

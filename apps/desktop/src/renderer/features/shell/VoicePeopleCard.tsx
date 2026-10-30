@@ -98,7 +98,7 @@ export function AvatarStack({
 function StackAvatar({ workspaceId, userId, size, ring, overlap }: { workspaceId: string; userId: string; size: number; ring: string; overlap: string }): ReactNode {
   const fileId = useWorkspaces((s) => s.users[userId]?.avatarFileId ?? '');
   const name = useWorkspaces(() => memberName(workspaceId, userId));
-  // Someone else's seat kept after a lost connection (ADR-0148): the avatar dimmed.
+  // Someone else's seat kept after a lost connection (ADR-0150): the avatar dimmed.
   const lost = useWorkspaces((s) => s.byId[workspaceId]?.voice[userId]?.connectionLost ?? false);
   const me = useSession((s) => s.me?.user?.id === userId);
   return (
@@ -287,7 +287,7 @@ const VoicePersonRow = memo(function VoicePersonRow({ workspaceId, userId, self 
   const ref = useRef<HTMLButtonElement>(null);
   // Parked for a phone call (ADR-0133): dimmed, a handset, never the speaking ring.
   const onPhone = v?.onPhone ?? false;
-  // Someone else's seat kept after a lost connection (ADR-0148): dimmed, «нет связи».
+  // Someone else's seat kept after a lost connection (ADR-0150): dimmed, «нет связи».
   const lost = !self && (v?.connectionLost ?? false);
   const talking = speaking && !v?.muted && !connecting && !onPhone && !lost;
   // A tap opens the member menu (Radix ContextMenu opens on `contextmenu`), as the header's «…».
