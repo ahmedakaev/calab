@@ -10,8 +10,10 @@ export const MAX_COORD = 1e7;
 export const MAX_SIZE = 1e5;
 /** Largest snapshot state of a canvas (ADR-0126 §3): the sync never posts a bigger one. */
 export const MAX_STATE = 4 * 1024 * 1024;
+/** Longest frame title (ADR-0127 addendum 2026-10-30): a name, not a text. */
+export const MAX_TITLE = 120;
 
-export type ObjectKind = 'sticky' | 'text' | 'shape' | 'connector' | 'image' | 'ink';
+export type ObjectKind = 'sticky' | 'text' | 'shape' | 'connector' | 'image' | 'ink' | 'frame';
 export type ShapeKind =
   | 'rect' | 'ellipse' | 'diamond' | 'triangle' | 'rounded'
   | 'star' | 'hexagon' | 'parallelogram' | 'arrow' | 'bubble' | 'cylinder';
@@ -132,8 +134,21 @@ export interface InkRec extends BaseRec {
   readonly erase?: readonly number[];
 }
 
-export type ObjectRec = StickyRec | TextRec | ShapeRec | ConnectorRec | ImageRec | InkRec;
-export type BoxRec = StickyRec | TextRec | ShapeRec | ImageRec | InkRec;
+/**
+ * A frame (ADR-0127 addendum 2026-10-30): a titled board behind other objects. It is a background — always drawn below
+ * every other kind and picked last — and never rotates. What it holds is computed, not stored: the objects whose center
+ * lies inside it (`Scene.frameMembers`); moving the frame moves them. Builds before it skip the kind.
+ */
+export interface FrameRec extends BaseRec {
+  readonly kind: 'frame';
+  /** Plain short name (≤ MAX_TITLE), shown above the top-left corner; '' = untitled. */
+  readonly title: string;
+  /** A hue drawn as its soft tone, or 'none' (outline only). */
+  readonly fill: string;
+}
+
+export type ObjectRec = StickyRec | TextRec | ShapeRec | ConnectorRec | ImageRec | InkRec | FrameRec;
+export type BoxRec = StickyRec | TextRec | ShapeRec | ImageRec | InkRec | FrameRec;
 /** Boxes that carry text (everything but a picture). */
 export type TextBoxRec = StickyRec | TextRec | ShapeRec;
 
@@ -144,12 +159,13 @@ const IMAGE_SRC = /^(\/api\/files\/[0-9A-Za-z-]{1,64}|\/api\/stickers\/builtin\/
 export const isImageSrc = (v: unknown): v is string => typeof v === 'string' && IMAGE_SRC.test(v);
 
 export const isConnector = (o: ObjectRec): o is ConnectorRec => o.kind === 'connector';
+export const isFrame = (o: ObjectRec): o is FrameRec => o.kind === 'frame';
 export const isBox = (o: ObjectRec): o is BoxRec => o.kind !== 'connector';
 
 export const recBounds = (o: BaseRec): Rect => ({ x: o.x, y: o.y, w: o.w, h: o.h });
 
 /** Rotation of a record in degrees (0 when absent and for connectors). */
-export const rotOf = (o: ObjectRec): number => (o.kind === 'connector' ? 0 : (o.rot ?? 0));
+export const rotOf = (o: ObjectRec): number => (o.kind === 'connector' || o.kind === 'frame' ? 0 : (o.rot ?? 0));
 
 /** Circumscribed axis-aligned rect: where the object lies on the world axes (a rotated box's frame is wider than itself). */
 export const aabb = (o: ObjectRec): Rect => (o.kind === 'connector' || !o.rot ? o : rotatedBounds(o, o.rot));
@@ -175,6 +191,11 @@ export const DEFAULTS = {
   imageSize: 200,
   inkStroke: 'stroke',
   inkWidth: 4,
+  /** A new frame: 16:9 at a size that holds a row of stickies. */
+  frameW: 960,
+  frameH: 540,
+  frameFill: 'white',
+  minFrame: 80,
 } as const;
 
 /** A fill as the pickers and templates write it: `soft:<hue>` is the hue's soft tone. */
@@ -204,6 +225,7 @@ export type ObjectInit = InitExtras & (
   | { kind: 'connector'; from: Endpoint; to: Endpoint; arrow?: Arrow; route?: RouteKind; stroke?: string; strokeWidth?: number; label?: string }
   | { kind: 'image'; x: number; y: number; w?: number; h?: number; src: string; stickerId?: string }
   | { kind: 'ink'; x: number; y: number; w?: number; h?: number; points: readonly number[]; stroke?: string; strokeWidth?: number; marker?: boolean; erase?: readonly number[] }
+  | { kind: 'frame'; x: number; y: number; w?: number; h?: number; title?: string; fill?: string }
 );
 
 /** Patch of plain (non-text) fields; applied only to the keys valid for the object's kind. */
@@ -241,4 +263,6 @@ export interface ObjectPatch {
   label?: string;
   /** A stroke's eraser swaths (same frame as its stored points); null removes them. */
   erase?: readonly number[] | null;
+  /** A frame's name. */
+  title?: string;
 }

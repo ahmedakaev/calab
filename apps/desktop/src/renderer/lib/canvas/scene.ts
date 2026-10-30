@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
-import { CanvasDoc, color, endpoint, isGroupId, isKind, isShapeKind, num, type StoredFields } from './doc';
+import { CanvasDoc, clampTitle, color, endpoint, isGroupId, isKind, isShapeKind, num, type StoredFields } from './doc';
+import { FRAME_TITLE_H, FRAME_TITLE_SIZE, frameTitleRect } from './frames';
 import {
   boundsOf, distToPolyline, normRot, pointsBounds, rectCenter, rectContainsPoint, rectInflate,
   rotatePoint, rotatedRectHitsRect, type Point, type Rect,
@@ -12,8 +13,8 @@ import { pointInShape } from './shapes';
 import { fmtFromDelta, type Fmt } from './richText';
 import { SHAPE_PAD, STICKY_PAD, TEXT_PAD, TextLayouter, isFontToken, storedFontPx, type FontToken } from './textLayout';
 import {
-  DEFAULTS, MAX_SIZE, aabb, isBound, isBox, isConnector, isImageSrc,
-  type BoxRec, type ConnectorRec, type Endpoint, type ObjectRec, type RouteKind, type Arrow,
+  DEFAULTS, MAX_SIZE, aabb, isBound, isBox, isConnector, isFrame, isImageSrc,
+  type BoxRec, type ConnectorRec, type Endpoint, type FrameRec, type ObjectRec, type RouteKind, type Arrow,
 } from './types';
 
 /** What a scene update touched: ids, the screen-relevant rects to repaint, and whether z-order moved. */
@@ -52,6 +53,8 @@ export function visualBounds(o: ObjectRec): Rect {
     }
     return r;
   }
+  // A frame's title hangs above its top edge (as wide as the frame at most).
+  if (o.kind === 'frame') return rectInflate({ x: o.x, y: o.y - FRAME_TITLE_H, w: o.w, h: o.h + FRAME_TITLE_H }, 1);
   return rectInflate(aabb(o), o.kind === 'shape' ? o.strokeWidth : o.kind === 'ink' ? o.strokeWidth / 2 + 1 : 1);
 }
 
@@ -150,11 +153,15 @@ export class Scene {
     return this.recs.has(id);
   }
 
-  /** Ids bottom → top. Cached until the set or a z changes. */
+  /** Ids bottom → top: every frame below every other object (frames are backgrounds), then by z. Cached until the set or a z changes. */
   orderedIds(): readonly string[] {
     if (!this.order) {
       const arr = Array.from(this.recs.values());
-      arr.sort((a, b) => (a.z < b.z ? -1 : a.z > b.z ? 1 : a.id < b.id ? -1 : 1));
+      arr.sort((a, b) => {
+        const fa = a.kind === 'frame';
+        if (fa !== (b.kind === 'frame')) return fa ? -1 : 1;
+        return a.z < b.z ? -1 : a.z > b.z ? 1 : a.id < b.id ? -1 : 1;
+      });
       this.order = arr.map((r) => r.id);
     }
     return this.order;
@@ -202,6 +209,54 @@ export class Scene {
     const c = this.recs.get(connectorId);
     if (!c || !isConnector(c) || c.points.length < 4) return null;
     return end === 'from' ? { x: c.points[0] ?? 0, y: c.points[1] ?? 0 } : { x: c.points[c.points.length - 2] ?? 0, y: c.points[c.points.length - 1] ?? 0 };
+  }
+
+  /** The frames, bottom → top (the order the frames panel lists them in). */
+  frames(): FrameRec[] {
+    const out: FrameRec[] = [];
+    for (const id of this.orderedIds()) {
+      const r = this.recs.get(id);
+      // Frames lead the order: the first other object ends the list.
+      if (!r || !isFrame(r)) break;
+      out.push(r);
+    }
+    return out;
+  }
+
+  /**
+   * What a frame holds, computed (never stored): every object whose center lies inside it, and — a frame inside a frame
+   * being a member as well — what those hold in turn. A frame at least as big as this one is never its member, so two
+   * frames cannot hold each other. Empty for anything but a frame.
+   */
+  frameMembers(id: string): string[] {
+    const root = this.recs.get(id);
+    if (!root || !isFrame(root)) return [];
+    const out = new Set<string>();
+    const todo: FrameRec[] = [root];
+    for (let f = todo.pop(); f; f = todo.pop()) {
+      const area = f.w * f.h;
+      for (const o of this.query(f)) {
+        if (o.id === id || out.has(o.id)) continue;
+        if (!rectContainsPoint(f, rectCenter(aabb(o)), 0)) continue;
+        if (isFrame(o) && o.w * o.h >= area) continue;
+        out.add(o.id);
+        if (isFrame(o)) todo.push(o);
+      }
+    }
+    return [...out];
+  }
+
+  /** The ids plus the members of the frames among them (what moves when they move). */
+  withFrameMembers(ids: Iterable<string>): string[] {
+    const out = new Set(ids);
+    for (const id of [...out]) if (this.recs.get(id)?.kind === 'frame') for (const m of this.frameMembers(id)) out.add(m);
+    return [...out];
+  }
+
+  /** A frame's title band (empty title: none). */
+  frameTitleRect(f: FrameRec): Rect | null {
+    if (!f.title) return null;
+    return frameTitleRect(f, this.text.layout(f.title, FRAME_TITLE_SIZE, MAX_SIZE).widths[0] ?? 0);
   }
 
   /** Members of a real group (two or more), empty for anything else. */
@@ -266,6 +321,12 @@ export class Scene {
       }
       return false;
     }
+    if (o.kind === 'frame') {
+      // By its area (frames are picked after everything above them) or by the title over its corner.
+      if (rectContainsPoint(o, p, boxTol)) return true;
+      const t = this.frameTitleRect(o);
+      return t !== null && rectContainsPoint(t, p, tol);
+    }
     // A rotated box is tested in its own frame: the point is turned back about the center.
     const q = o.rot ? rotatePoint(p, rectCenter(o), -o.rot) : p;
     // A stroke is picked by its line (its width counted in), never by the empty corners of its frame.
@@ -282,9 +343,10 @@ export class Scene {
     return !(inner.w > 0 && inner.h > 0 && pointInShape(o.shape, inner, q));
   }
 
-  /** Objects touching the rect (marquee). */
+  /** Objects touching the rect (marquee); a frame only when the rect takes it whole, so a frame drawn inside one picks its contents. */
   inRect(r: Rect): ObjectRec[] {
     return this.query(r).filter((o) => {
+      if (o.kind === 'frame') return o.x >= r.x && o.y >= r.y && o.x + o.w <= r.x + r.w && o.y + o.h <= r.y + r.h;
       if (o.kind === 'ink' && !o.rot) {
         // An unrotated stroke: by its line, so a frame across the empty part of a big scribble does not take it.
         const p = o.points;
@@ -595,6 +657,12 @@ export class Scene {
           ...(m.get('marker') === true ? { marker: true } : {}), ...this.extras(m, true),
         };
       }
+      case 'frame':
+        return {
+          kind, id, z, x, y,
+          w: num(m.get('w'), DEFAULTS.frameW, DEFAULTS.minFrame, MAX_SIZE), h: num(m.get('h'), DEFAULTS.frameH, DEFAULTS.minFrame, MAX_SIZE),
+          title: clampTitle(m.get('title')), fill: color(m.get('fill'), DEFAULTS.frameFill), ...this.extras(m, false),
+        };
       default:
         return null;
     }

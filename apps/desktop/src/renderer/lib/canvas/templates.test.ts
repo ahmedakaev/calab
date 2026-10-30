@@ -36,7 +36,7 @@ describe('templates', () => {
       for (const e of [i.init.from, i.init.to]) if ('id' in e) expect(known.has(e.id)).toBe(true);
     }
     // Every visible text comes through `tr` (a key, not a hard-coded phrase).
-    const texts = items.flatMap((i) => (i.init.kind !== 'connector' && i.init.kind !== 'image' && i.init.kind !== 'ink' && i.init.text ? [i.init.text] : []));
+    const texts = items.flatMap((i) => (i.init.kind !== 'connector' && i.init.kind !== 'image' && i.init.kind !== 'ink' && i.init.kind !== 'frame' && i.init.text ? [i.init.text] : []));
     expect(texts.length).toBeGreaterThan(0);
     for (const x of texts) expect(x).toMatch(new RegExp(`^${id}\\.[a-z0-9]+$`));
     // The areas under the stickies are locked soft-tone shapes; nothing else is locked.

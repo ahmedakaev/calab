@@ -104,10 +104,10 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
     if (!id) continue;
     const { text, fmt } = richOf(o);
     const extras: InitExtras = {};
-    if (fmt && o.kind !== 'connector' && o.kind !== 'image' && o.kind !== 'ink') extras.fmt = fmt;
+    if (fmt && o.kind !== 'connector' && o.kind !== 'image' && o.kind !== 'ink' && o.kind !== 'frame') extras.fmt = fmt;
     if ((o.kind === 'sticky' || o.kind === 'shape') && isFontToken(o.fontSize)) extras.fontSize = o.fontSize;
     if ((o.kind === 'sticky' || o.kind === 'shape') && typeof o.fontPx === 'number') extras.fontPx = o.fontPx;
-    if (o.kind !== 'connector' && typeof o.rot === 'number') extras.rot = o.rot;
+    if (o.kind !== 'connector' && o.kind !== 'frame' && typeof o.rot === 'number') extras.rot = o.rot;
     if (o.locked === true) extras.locked = true;
     const g = isGroupId(o.group) ? groups.get(o.group) : undefined;
     if (g !== undefined) extras.group = g;
@@ -166,6 +166,15 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
         });
         break;
       }
+      case 'frame':
+        out.push({
+          id,
+          init: {
+            kind: 'frame', x, y, w: num(o.w, DEFAULTS.frameW), h: num(o.h, DEFAULTS.frameH),
+            title: typeof o.title === 'string' ? o.title : '', fill: color(o.fill, DEFAULTS.frameFill), ...extras,
+          },
+        });
+        break;
     }
   }
   return out;
