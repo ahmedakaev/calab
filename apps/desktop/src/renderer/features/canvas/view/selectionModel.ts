@@ -30,6 +30,8 @@ export interface PanelModel {
   units: number;
   /** Uniform values of the selection; undefined where the selected objects differ (or do not have the field). */
   stickyColor?: string;
+  /** All selected stickies are pads (true) or none is (false); undefined when they differ. */
+  stickyPad?: boolean;
   textColor?: string;
   textSize?: number;
   /** Text size in px shared by all selected texts, stickies and shapes; undefined when they differ. */
@@ -82,6 +84,7 @@ export function panelModelOf(objs: readonly ObjectRec[], groupSize: (gid: string
     if (v !== undefined) out[k] = v;
   };
   set('stickyColor', uniform(sticky.map((o) => o.color)));
+  set('stickyPad', uniform(sticky.map((o) => o.pad === true)));
   set('textColor', uniform(text.map((o) => o.color)));
   set('textSize', uniform(text.map((o) => o.size)));
   set('fontPx', uniform([...text, ...sticky, ...shape].map(boxFontSize)));

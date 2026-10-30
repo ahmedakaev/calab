@@ -56,6 +56,25 @@ export function toolCursor(t: Tool, eraserPx: number): string {
   return t === 'select' ? '' : t === 'text' ? 'text' : t === 'eraser' ? eraserCursor(eraserPx) : 'crosshair';
 }
 
+/**
+ * A drag on a sticky pad, alone in the selection, pulls a new sticky off it: same colour, size and text size, empty, on
+ * top. Undefined for anything else (the drag moves the selection).
+ */
+function padPull(engine: CanvasEngine, id: string, ids: readonly string[]): (() => string[]) | undefined {
+  const o = engine.scene.get(id);
+  if (o?.kind !== 'sticky' || !o.pad || ids.length !== 1 || ids[0] !== id) return undefined;
+  return () => {
+    const made = engine.doc.create({
+      kind: 'sticky', x: o.x, y: o.y, w: o.w, h: o.h, color: o.color,
+      ...(o.fontSize ? { fontSize: o.fontSize } : {}), ...(o.fontPx ? { fontPx: o.fontPx } : {}),
+    });
+    return made ? [made] : [];
+  };
+}
+
+/** Kinds a double-click writes in. */
+const writable = (o: { kind: string }): boolean => o.kind === 'sticky' || o.kind === 'text' || o.kind === 'shape';
+
 export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): () => void {
   const pointers = new Map<number, Point>();
   let spaceDown = false;
@@ -217,8 +236,8 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
         const now = Date.now();
         if (lastTap && lastTap.id === hit.id && now - lastTap.at < DOUBLE_TAP_MS && !engine.votableAt(hit.id)) {
           lastTap = null;
-          // As a double click: the first steps into a group, the next edits the text.
-          if (engine.enterGroupAt(hit.id)) return;
+          // As a double click: steps into its group and edits the text at once (a picture or a stroke only steps in).
+          if (engine.enterGroupAt(hit.id) && !writable(hit)) return;
           engine.setSelection([hit.id]);
           engine.startTextEdit(hit.id);
           return;
@@ -226,7 +245,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
         lastTap = { id: hit.id, at: now };
         if (ids.length > 1) engine.setSelection(unit);
         engine.voteClick(hit.id, w, false);
-      }, TOUCH_SLOP_PX);
+      }, TOUCH_SLOP_PX, padPull(engine, hit.id, ids));
       return;
     }
     // Not selected: a tap selects (adds, in «several» mode), a drag pans — nothing moves by accident.
@@ -371,7 +390,7 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
         if (!m.shift && wasSelected && ids.length > 1) engine.setSelection(unit);
         // Voting open: a plain click on a sticky or shape is a vote (Alt or its own badge takes one back).
         if (!m.shift && !m.mod) engine.voteClick(hit.id, w, m.alt);
-      });
+      }, undefined, m.shift ? undefined : padPull(engine, hit.id, ids));
       return;
     }
     engine.activeGesture = new MarqueeGesture(engine, w, m.shift);
@@ -467,8 +486,9 @@ export function attachInput(engine: CanvasEngine, canvas: HTMLCanvasElement): ()
     if (hit) {
       // While voting a double-click is two votes, not a text edit.
       if (engine.votableAt(hit.id)) return;
-      // First double-click on a group member steps into the group; the next edits the text.
-      if (engine.enterGroupAt(hit.id)) return;
+      // A double-click on a group member steps into the group and edits its text at once (owner 30.10: one double-click
+      // on a sticky writes in it); a picture or a stroke only steps in.
+      if (engine.enterGroupAt(hit.id) && !writable(hit)) return;
       engine.setSelection([hit.id]);
       engine.startTextEdit(hit.id);
     } else engine.createTextAt(w);

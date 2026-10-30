@@ -131,7 +131,7 @@ function isLow(c: number): boolean {
 export type PlainObject = { id: string; kind: ObjectKind; z: string } & Record<string, unknown>;
 
 const FIELD_KEYS: Record<ObjectKind, readonly string[]> = {
-  sticky: ['x', 'y', 'w', 'h', 'color', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
+  sticky: ['x', 'y', 'w', 'h', 'color', 'fontSize', 'fontPx', 'pad', 'rot', 'locked', 'group'],
   text: ['x', 'y', 'w', 'size', 'color', 'rot', 'locked', 'group'],
   shape: ['shape', 'x', 'y', 'w', 'h', 'fill', 'soft', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   connector: ['from', 'to', 'arrow', 'route', 'stroke', 'strokeWidth', 'label', 'locked', 'group'],
@@ -141,7 +141,7 @@ const FIELD_KEYS: Record<ObjectKind, readonly string[]> = {
 };
 
 const PATCH_KEYS: Record<ObjectKind, readonly (keyof ObjectPatch)[]> = {
-  sticky: ['x', 'y', 'w', 'h', 'color', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
+  sticky: ['x', 'y', 'w', 'h', 'color', 'fontSize', 'fontPx', 'pad', 'rot', 'locked', 'group'],
   text: ['x', 'y', 'w', 'size', 'color', 'rot', 'locked', 'group'],
   shape: ['x', 'y', 'w', 'h', 'shape', 'fill', 'soft', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   connector: ['from', 'to', 'arrow', 'route', 'stroke', 'strokeWidth', 'label', 'locked', 'group'],
@@ -179,6 +179,7 @@ function initFields(init: ObjectInit): { fields: Record<string, unknown>; text: 
           x: num(init.x, 0), y: num(init.y, 0),
           w: num(init.w, DEFAULTS.stickySize, DEFAULTS.minBox, MAX_SIZE), h: num(init.h, DEFAULTS.stickySize, DEFAULTS.minBox, MAX_SIZE),
           color: color(init.color, DEFAULTS.stickyColor),
+          ...(init.pad === true ? { pad: true } : {}),
         },
         text: clampText(init.text ?? ''),
       };
@@ -288,7 +289,7 @@ function expandFill(kind: ObjectKind, patch: ObjectPatch): ObjectPatch {
 function patchValue(kind: ObjectKind, key: keyof ObjectPatch, v: unknown): unknown {
   switch (key) {
     case 'rot': return typeof v === 'number' && Number.isFinite(v) ? (normRot(v) === 0 ? REMOVE : normRot(v)) : undefined;
-    case 'locked': case 'soft': return typeof v === 'boolean' ? (v ? true : REMOVE) : undefined;
+    case 'locked': case 'soft': case 'pad': return typeof v === 'boolean' ? (v ? true : REMOVE) : undefined;
     case 'group': return v === null ? REMOVE : isGroupId(v) ? v : undefined;
     case 'fontSize': return isFontToken(v) ? (v === 'm' ? REMOVE : v) : undefined;
     case 'fontPx': return v === null ? REMOVE : typeof v === 'number' && Number.isFinite(v) ? clamp(v, DEFAULTS.minTextSize, DEFAULTS.maxTextSize) : undefined;

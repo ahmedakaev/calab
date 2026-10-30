@@ -223,6 +223,11 @@ export class MoveGesture implements Gesture {
     private readonly fromScreen: Point,
     private readonly onClickOnly: () => void,
     private readonly slop = DRAG_PX,
+    /**
+     * A sticky pad's drag: makes the objects that move instead (a new sticky pulled off the pad), inside the drag's
+     * gesture, so Esc or undo takes it back. Alt-drag moves the pad itself. Works on a locked pad too.
+     */
+    private readonly spawn?: () => string[],
   ) {
     // Locked objects stay where they are, whatever else moves with them. A frame takes what it holds along (computed
     // now: an object dragged in or out later is simply in or out).
@@ -256,9 +261,20 @@ export class MoveGesture implements Gesture {
     if (!this.started) {
       if (Math.hypot(s.x - this.fromScreen.x, s.y - this.fromScreen.y) < this.slop) return;
       this.started = true;
-      if (this.ids.length === 0) return;
+      const pull = m.alt ? undefined : this.spawn;
+      if (this.ids.length === 0 && !pull) return;
       this.core.doc.beginGesture();
-      if (m.alt) {
+      if (pull) {
+        const made = pull();
+        this.selectedBefore = [...this.core.selection];
+        this.ids = made;
+        if (made.length > 0) this.core.setSelection(made);
+        this.capture();
+        if (made.length === 0) {
+          this.core.doc.cancelGesture();
+          return;
+        }
+      } else if (m.alt && !this.spawn) {
         const copies = duplicate(this.core.scene, this.core.doc, this.ids, 0, 0);
         if (copies.length > 0) {
           this.selectedBefore = [...this.core.selection];

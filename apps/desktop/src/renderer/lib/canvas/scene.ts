@@ -613,7 +613,8 @@ export class Scene {
         return {
           kind, id, z, x, y,
           w: num(m.get('w'), DEFAULTS.stickySize, DEFAULTS.minBox, MAX_SIZE), h: num(m.get('h'), DEFAULTS.stickySize, DEFAULTS.minBox, MAX_SIZE),
-          color: color(m.get('color'), DEFAULTS.stickyColor), text: textOf(), ...rich(), ...fontSizeOf('sticky'), ...this.extras(m, true),
+          color: color(m.get('color'), DEFAULTS.stickyColor), text: textOf(), ...rich(), ...fontSizeOf('sticky'),
+          ...(m.get('pad') === true ? { pad: true } : {}), ...this.extras(m, true),
         };
       case 'text': {
         const w = num(m.get('w'), DEFAULTS.textW, DEFAULTS.minTextW, MAX_SIZE);

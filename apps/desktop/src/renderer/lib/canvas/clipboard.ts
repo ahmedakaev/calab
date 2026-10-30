@@ -115,7 +115,7 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
     const y = num(o.y, 0) + dy;
     switch (o.kind) {
       case 'sticky':
-        out.push({ id, init: { kind: 'sticky', x, y, w: num(o.w, 160), h: num(o.h, 160), color: color(o.color, 'yellow'), text, ...extras } });
+        out.push({ id, init: { kind: 'sticky', x, y, w: num(o.w, 160), h: num(o.h, 160), color: color(o.color, 'yellow'), text, ...(o.pad === true ? { pad: true } : {}), ...extras } });
         break;
       case 'text':
         out.push({ id, init: { kind: 'text', x, y, w: num(o.w, 240), size: num(o.size, 20), color: color(o.color, 'text'), text, ...extras } });

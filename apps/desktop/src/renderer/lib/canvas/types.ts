@@ -64,6 +64,8 @@ export interface StickyRec extends BaseRec, RichFields {
   readonly fontSize?: FontToken;
   /** Exact text size in px when it is not a preset's (ADR-0127): wins over `fontSize` (kept as the nearest token). */
   readonly fontPx?: number;
+  /** A pad (owner 30.10, Miro-style): drawn as a stack; dragging it pulls a new sticky of its colour, Alt-drag moves it. */
+  readonly pad?: boolean;
 }
 
 export interface TextRec extends BaseRec, RichFields {
@@ -219,7 +221,7 @@ export interface InitExtras {
 
 /** Fields a creation call may set (kind-specific; unknown ones are ignored). */
 export type ObjectInit = InitExtras & (
-  | { kind: 'sticky'; x: number; y: number; w?: number; h?: number; color?: string; text?: string }
+  | { kind: 'sticky'; x: number; y: number; w?: number; h?: number; color?: string; text?: string; pad?: boolean }
   | { kind: 'text'; x: number; y: number; w?: number; size?: number; color?: string; text?: string }
   | { kind: 'shape'; shape?: ShapeKind; x: number; y: number; w?: number; h?: number; fill?: string; stroke?: string; strokeWidth?: number; text?: string }
   | { kind: 'connector'; from: Endpoint; to: Endpoint; arrow?: Arrow; route?: RouteKind; stroke?: string; strokeWidth?: number; label?: string }
@@ -254,6 +256,8 @@ export interface ObjectPatch {
   fill?: string;
   /** The fill's soft tone; false removes it (a `fill` patch sets it from its prefix). */
   soft?: boolean;
+  /** A sticky pad; false removes it. */
+  pad?: boolean;
   stroke?: string;
   strokeWidth?: number;
   from?: Endpoint;

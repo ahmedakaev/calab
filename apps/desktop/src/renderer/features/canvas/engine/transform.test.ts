@@ -386,7 +386,7 @@ describe('groups', () => {
     r.drag([f.rect.x + f.rect.w, f.rect.y + f.rect.h], [f.rect.x + f.rect.w + 80, f.rect.y + f.rect.h + 80]);
     expect(rec(r, b).w).toBe(w0);
   });
-  it('a double-click steps into the group and selects one member; Esc leaves it with the group selected', () => {
+  it('a double-click steps into the group and edits the member at once; Esc leaves it with the group selected', () => {
     const r = rig();
     const [a, b] = pair2(r);
     r.engine.setSelection([a, b]);
@@ -396,14 +396,17 @@ describe('groups', () => {
     r.canvas.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 150, clientY: 150 }));
     expect([...r.engine.selection]).toEqual([a]);
     expect(r.engine.enteredGroup).not.toBeNull();
-    expect(r.engine.getState().editing).toBe(false);
+    // Owner 30.10: one double-click on a sticky writes in it, grouped or not.
+    expect(r.engine.getState().editing).toBe(true);
+    r.engine.editor.cancel();
+    r.canvas.focus();
     // Inside: a click picks a member alone, and it can be moved alone.
     r.click(350, 150);
     expect([...r.engine.selection]).toEqual([b]);
     r.drag([350, 150], [350, 250]);
     expect(snap(r, b)).toMatchObject({ y: 200 });
     expect(snap(r, a)).toMatchObject({ y: 100 });
-    // A second double-click edits the member's text.
+    // A double-click on another member edits its text.
     r.canvas.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: 350, clientY: 250 }));
     expect(r.engine.getState().editing).toBe(true);
     r.engine.editor.cancel();
@@ -653,3 +656,49 @@ describe('drawing and export of rotated objects', () => {
     expect(box?.w).toBeGreaterThan(100);
   });
 });
+
+describe('sticky pads (owner 30.10)', () => {
+  const pad = (r: Rig): string => {
+    const [id] = r.make({ init: { kind: 'sticky', x: 100, y: 100, w: 160, h: 160, color: 'pink', text: 'Ирина', pad: true } });
+    r.engine.doc.checkpoint();
+    return id ?? '';
+  };
+
+  it('a drag pulls a new empty sticky of its colour off the pad, in one undo step; the pad stays', () => {
+    const r = rig();
+    const p = pad(r);
+    const steps = r.engine.doc.undo.undoStack.length;
+    r.drag([180, 180], [580, 380]);
+    expect(snap(r, p)).toMatchObject({ x: 100, y: 100, pad: true, text: 'Ирина' });
+    const made = [...r.engine.selection];
+    expect(made).toHaveLength(1);
+    expect(made[0]).not.toBe(p);
+    expect(snap(r, made[0])).toMatchObject({ kind: 'sticky', x: 500, y: 300, w: 160, h: 160, color: 'pink', text: '' });
+    expect(snap(r, made[0])?.pad).toBeUndefined();
+    expect(r.engine.doc.undo.undoStack.length).toBe(steps + 1);
+    r.engine.undo();
+    expect(r.engine.scene.has(made[0] ?? '')).toBe(false);
+  });
+
+  it('Alt-drag moves the pad itself; a locked pad still hands out stickies', () => {
+    const r = rig();
+    const p = pad(r);
+    r.drag([180, 180], [280, 180], { altKey: true });
+    expect(snap(r, p)).toMatchObject({ x: 200, y: 100 });
+    expect(r.engine.scene.size).toBe(1);
+    r.engine.doc.patch(p, { locked: true });
+    r.engine.clearSelection();
+    r.drag([280, 180], [280, 580]);
+    expect(r.engine.scene.size).toBe(2);
+    expect(snap(r, p)).toMatchObject({ x: 200, y: 100 });
+  });
+
+  it('the flag is stored, copied and patched like any field', () => {
+    const r = rig();
+    const p = pad(r);
+    expect(serialize(r.engine.scene, r.engine.doc, [p])).toContain('"pad":true');
+    r.engine.doc.patch(p, { pad: false });
+    expect(snap(r, p)?.pad).toBeUndefined();
+  });
+});
+

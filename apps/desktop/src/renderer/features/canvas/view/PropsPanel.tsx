@@ -1,7 +1,7 @@
 import * as Popover from '@radix-ui/react-popover';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical,
-  AlignVerticalDistributeCenter, ArrowLeftRight, ArrowRight, BringToFront, Check, CopyPlus, Group, Lock, LockOpen, Minus, SendToBack, Shapes, Slash, Trash2, Ungroup,
+  AlignVerticalDistributeCenter, ArrowLeftRight, ArrowRight, BringToFront, Check, CopyPlus, Group, Layers, Lock, LockOpen, Minus, SendToBack, Shapes, Slash, Trash2, Ungroup,
   type LucideIcon,
 } from 'lucide-react';
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
@@ -476,7 +476,19 @@ export const PropsPanel = memo(function PropsPanel({
         <SwatchMenu label={t('canvasBoard.props.fill')} kind="frame" tokens={FRAME_FILLS} value={m.frameFill} palette={palette} onPick={(c) => patch({ fill: c }, ['frame'])} focusCanvas={focusCanvas} testId="canvas-prop-frame-fill" />
       ) : null}
       {m.hasSticky && !m.locked ? (
-        <SwatchMenu label={t('canvasBoard.props.color')} kind="sticky" tokens={STICKY_COLORS} value={m.stickyColor} palette={palette} onPick={(c) => patch({ color: c }, ['sticky'])} focusCanvas={focusCanvas} testId="canvas-prop-sticky-color" />
+        <>
+          <SwatchMenu label={t('canvasBoard.props.color')} kind="sticky" tokens={STICKY_COLORS} value={m.stickyColor} palette={palette} onPick={(c) => patch({ color: c }, ['sticky'])} focusCanvas={focusCanvas} testId="canvas-prop-sticky-color" />
+          {/* A pad hands out stickies of its colour (owner 30.10, Miro-style). */}
+          <IconButton
+            size="sm"
+            label={m.stickyPad ? `${t('canvasBoard.props.unpad')} · ${t('canvasBoard.props.padHint')}` : `${t('canvasBoard.props.pad')} · ${t('canvasBoard.props.padHint')}`}
+            active={m.stickyPad === true}
+            onClick={() => patch({ pad: m.stickyPad !== true }, ['sticky'])}
+            data-testid="canvas-prop-sticky-pad"
+          >
+            <Layers className="size-4" aria-hidden />
+          </IconButton>
+        </>
       ) : null}
       {!m.locked && m.hasText ? (
         <>

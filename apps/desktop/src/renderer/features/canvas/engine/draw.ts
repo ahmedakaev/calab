@@ -451,17 +451,37 @@ function drawRich(ctx: Ctx2D, env: DrawEnv, lay: TextLayout, size: number, box: 
   }
 }
 
+/** The stack band at the bottom of a sticky pad, world units: a share of its height, within bounds. */
+export const padBand = (h: number): number => Math.min(14, Math.max(6, h * 0.07));
+
 function drawSticky(ctx: Ctx2D, o: TextBoxRec & { kind: 'sticky' }, env: DrawEnv): void {
   const c = resolveSticky(env.palette, o.color);
   ctx.fillStyle = c.bg;
-  if (env.scale < TEXT_PLAQUE_SCALE) {
+  const plain = env.scale < TEXT_PLAQUE_SCALE;
+  if (plain) {
     ctx.fillRect(o.x, o.y, o.w, o.h);
   } else {
     ctx.beginPath();
     traceRounded(ctx, o, STICKY_RADIUS);
     ctx.fill();
   }
-  if (env.hiddenText !== o.id) drawLines(ctx, env, o, o.text, o.fmt, boxFontSize(o), contentRect(o), c.fg, 'left', false);
+  // A pad: the sheets under the top one show as a darker band at the bottom, split by a lighter line (inside the frame,
+  // so its bounds stay the sticky's).
+  const band = o.pad ? padBand(o.h) : 0;
+  if (band > 0 && !plain) {
+    ctx.save();
+    ctx.beginPath();
+    traceRounded(ctx, o, STICKY_RADIUS);
+    ctx.clip();
+    const a = ctx.globalAlpha;
+    ctx.fillStyle = '#000000';
+    ctx.globalAlpha = a * 0.22;
+    ctx.fillRect(o.x, o.y + o.h - band, o.w, band);
+    ctx.globalAlpha = a * 0.12;
+    ctx.fillRect(o.x, o.y + o.h - band, o.w, Math.max(1 / env.scale, band * 0.18));
+    ctx.restore();
+  }
+  if (env.hiddenText !== o.id) drawLines(ctx, env, o, o.text, o.fmt, boxFontSize(o), contentRect(band > 0 ? { ...o, h: o.h - band } : o), c.fg, 'left', false);
 }
 
 function drawText(ctx: Ctx2D, o: TextBoxRec & { kind: 'text' }, env: DrawEnv): void {
