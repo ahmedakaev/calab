@@ -201,5 +201,41 @@ func TestPushIncomingCallOverFCMEndpoint(t *testing.T) {
 	if response.Call == nil || response.Call.Id != r.ID.String() || response.RoomId != dm {
 		t.Fatal("FCM ring resolve mismatch")
 	}
-	callAction(t, caller.user, 200, r.ID.String(), "cancel")
+	// The caller hangs up before an answer: the phone gets an opaque cancel for that ring. The
+	// shared test server publishes through its own push service, so this app observes the
+	// state change directly, as it observed the ring; the caller has no ring to cancel.
+	ended := callAction(t, caller.user, 200, r.ID.String(), "cancel")
+	if ended.GetState() != v1.CallState_CALL_STATE_CANCELLED {
+		t.Fatal("call not cancelled", ended.GetState())
+	}
+	state := &v1.DispatchEvent{Event: &v1.DispatchEvent_CallState{CallState: &v1.CallStateUpdate{Call: ended}}}
+	a.Push.Observe(context.Background(), uuid.MustParse(caller.id), state)
+	a.Push.Observe(context.Background(), uuid.MustParse(callee.id), state)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		all := rec.sent()
+		if last := all[len(all)-1]; last.Kind == "call-cancel" {
+			if len(all) != 2 || last.EventID != sent[0].EventID || last.Binding != sent[0].Binding || last.CallerName != "" {
+				t.Fatal("ring cancel must name only the delivered ring")
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("ended ring was not cancelled on the FCM endpoint")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	encoded, _ := json.Marshal(rec.sent()[1])
+	if strings.Contains(string(encoded), r.ID.String()) || strings.Contains(string(encoded), dm) {
+		t.Fatal("ring cancel exposed the call or room")
+	}
+	// Past the ring's own expiry there is nothing left to cancel.
+	if _, err := testDB.Pool.Exec(context.Background(), "UPDATE push_deliveries SET expires_at=now()-interval '1 second' WHERE device_id=$1", endpoint.Id); err != nil {
+		t.Fatal(err)
+	}
+	a.Push.Observe(context.Background(), uuid.MustParse(callee.id), state)
+	time.Sleep(300 * time.Millisecond)
+	if len(rec.sent()) != 2 {
+		t.Fatal("an expired ring was cancelled again")
+	}
 }
