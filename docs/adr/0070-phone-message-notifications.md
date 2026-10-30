@@ -94,21 +94,25 @@ DEV-5031/DEV-5033. Канал host включён и на Android; сообще�
 контрактом `CalabMessageNotifications` (`pushState`, `acknowledgePush`, `testNotification`,
 `onPushChanged`), что и на iOS.
 
-- **Граница канала.** Патч WebView на Android не трогаем (навигацию и intent MainActivity
-  ведёт отдельная работа), поэтому «эквивалентная native граница» собрана из того, что
-  react-native-webview 13 уже доказывает нативно. (1) WebMessageListener сообщает
-  `sourceOrigin` отправившего фрейма; RN принимает сообщение, только если он **точно равен**
-  origin приложения. Чужой iframe отвергнут; запасной JavascriptInterface (WebView без
-  listener) отдаёт URL верхней страницы с путём и тоже отвергнут. (2) Hello не даёт
-  полномочий сразу: RN внедряет в main frame (`evaluateJavascript`) challenge, который отвечает
-  `proof` со случайным nonce этого host только если текущий `CalabHostActivity.document`
-  совпадает. Hello старого документа, застрявший при навигации, не захватит новую страницу.
-  Same-origin iframe по силе равен основному фрейму (может исполнять код в родителе), так что
-  проверка main frame сверх origin ничего бы не добавила. Native не получает auth Calab.
+- **Граница канала.** Как на iOS, она нативная и живёт в патче react-native-webview
+  (`patches/react-native-webview@13.16.1.patch`) поверх origin guard DEV-5032 (ADR-0067,
+  Android). WebMessageListener получает от Chromium `isMainFrame` и сериализованный
+  `sourceOrigin` (`https://host[:port]`, без пути). Патч передаёт сообщение в RN, только если
+  это main frame и origin **точно равен** origin приложения из manifest meta-data
+  `dev.calab.mobile.WEB_ORIGIN` (`CalabOriginGuard`). Остальное отбрасывается в Java, до JS:
+  чужой и same-origin iframe, main frame чужого origin, opaque `null`. Запасной
+  JavascriptInterface (WebView без `WEB_MESSAGE_LISTENER`) не знает фрейма и не доставляет
+  ничего: канала нет, как у старого бинарника. Main frame не может оказаться на чужом origin,
+  потому что origin guard отменяет такие навигации нативно. JS-проверок фрейма и
+  challenge/proof больше нет: `activityProtocol.ts` одинаков на обеих платформах и только
+  сужает схему и порядок. Отличие от iOS: Android не сверяет «текущий документ» в native.
+  Hello прошлого документа того же origin, пришедший после навигации, — это наш же код, а не
+  чужой. RN сбрасывает протокол на каждом loadStart/remount, и новая страница при своём hello
+  заново получает document authority. Native не получает auth Calab.
 - **Document authority в native.** На iOS её выдаёт патч WebView (`CalabHostDocumentGranted`).
-  На Android RN передаёт её модулю после proof (`grantDocument`) и отзывает при каждом
-  loadStart/ошибке/remount/revoke (`revokeDocument`). Logout дополнительно стирает отложенный
-  tap и уведомления Calab. Async-ответы перепроверяют документ, как на iOS.
+  На Android RN передаёт её модулю после hello (`setDocument(document)`) и отзывает при каждом
+  loadStart/ошибке/remount/revoke (`setDocument(null, logout)`). Logout дополнительно стирает
+  отложенный tap и уведомления Calab. Async-ответы перепроверяют документ, как на iOS.
 - **Объявляем только реализованное.** Bridge Android: `notificationsVersion`,
   `notificationsTestVersion`, `platform: 'android'`; ack — `notifications: 1, links: 1`.
   `mediaPermissionsVersion` и `calls*` не объявляются, поэтому веб сразу идёт обычными путями
@@ -141,9 +145,10 @@ DEV-5031/DEV-5033. Канал host включён и на Android; сообще�
   через встроенный `android.googleServicesFile` Expo. Без файла сборка проходит, default
   FirebaseApp отсутствует → `unsupported`.
 
-Ворота: unit-тесты (протокол, challenge, состояние FCM, регистрация), `go test` push и
-интеграционные `Push`, компиляция Kotlin (`assembleDebug` с файлом и без), merged manifest.
-Доставка FCM на устройство, tap в холодном/тёплом состоянии, prompt Android 13 и время
+Ворота: unit-тесты (протокол, состояние FCM, регистрация), `go test` push и интеграционные
+`Push`, компиляция патча и Kotlin (`assembleDebug` с файлом и без), merged manifest.
+Фильтр WebMessageListener в живом WebView (main frame против iframe), доставка FCM на
+устройство, tap в холодном/тёплом состоянии, prompt Android 13 и время
 внедрения bootstrap (Android выполняет его в `onPageStarted`, не гарантированно до скриптов
 страницы — тогда канала просто нет, как у старого бинарника) **не проверены**.
 Операторский контракт — [push-deployment](../mobile/push-deployment.md#fcm-android-2026-10-29).

@@ -141,7 +141,8 @@ Compose overlay `infra/docker/compose.push.yml` остаётся вариант�
 ```
 
 Миграция БД и новые переменные сверх трёх не нужны. Звонки через FCM работают после релиза
-API/web с ADR-0071 «Android» (сервер раньше отвергал `callsEnabled` для FCM). Проверка:
+API/web с ADR-0071 «Android» (сервер раньше отвергал `callsEnabled` для FCM). Отмена звонка
+(`call-cancel`, ADR-0071 «Android») идёт тем же transport и отдельной настройки не требует. Проверка:
 в local-account сессии `GET /api/me/push-capabilities` объявляет FCM с нужным `appId` и
 `production`. Затем на Android-сборке с `google-services.json` разрешить уведомления,
 свернуть приложение и отправить личное сообщение с другого аккаунта (сценарий —
