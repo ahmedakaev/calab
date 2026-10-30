@@ -1553,13 +1553,48 @@ test('self-mic-menu', async ({ open, win, mock, shot }) => {
 test('workspace-menu', async ({ open, win, mock, shot }) => {
   await open();
   await mainWindow(win, mock);
+  // «‹ ›» (board #113): left after the traffic lights; a room opened from another — back on, forward off.
+  const bar = win.getByTestId('titlebar');
+  await win.locator('aside').getByRole('button', { name: /разработка/ }).first().click();
+  await expect(win.getByRole('heading', { name: 'разработка' })).toBeVisible();
+  await expect(bar.getByTestId('nav-back')).toBeEnabled();
+  await expect(bar.getByTestId('nav-forward')).toBeDisabled();
+  await expect(win.locator('[data-message-id]').first()).toBeVisible();
+  await settle(win);
+  await win.locator('[data-virtuoso-scroller]').first().evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  // The picker sits in the right group, before the search.
+  const pickerBox = await bar.getByTestId('titlebar-title').boundingBox();
+  const searchBox = await bar.getByRole('button', { name: 'Поиск' }).boundingBox();
+  const backBox = await bar.getByTestId('nav-back').boundingBox();
+  expect((pickerBox?.x ?? 0) + (pickerBox?.width ?? 0), 'picker before the search').toBeLessThanOrEqual(searchBox?.x ?? 0);
+  expect(backBox?.x ?? 0, 'back left of the picker').toBeLessThan(pickerBox?.x ?? 0);
+  await checkpoint(shot, 'titlebar-history');
+  // Back returns to «общий», forward turns on.
+  await bar.getByTestId('nav-back').click();
+  await expect(win.getByRole('heading', { name: 'общий' })).toBeVisible();
+  await expect(bar.getByTestId('nav-forward')).toBeEnabled();
   // The workspace switcher (ADR-0074 §2): every workspace, then create / find, then this one's items.
-  await win.getByTestId('titlebar-title').click();
+  await bar.getByTestId('titlebar-title').click();
   await expect(win.getByRole('menu')).toBeVisible();
   await expect(win.getByTestId('switcher-row')).toHaveCount(2);
   await expect(win.getByTestId('switcher-row').first()).toHaveAttribute('aria-current', 'true');
   await expect(win.getByRole('menuitem', { name: 'Создать пространство' })).toBeVisible();
+  // Opened from the right: the sheet stays inside the window.
+  const menuBox = await win.getByTestId('workspace-switcher').boundingBox();
+  expect((menuBox?.x ?? 0) + (menuBox?.width ?? 0), 'switcher menu inside the window').toBeLessThanOrEqual(shot.viewport.width);
+  expect(menuBox?.x ?? -1).toBeGreaterThanOrEqual(0);
   await checkpoint(shot, 'workspace-menu');
+  await win.keyboard.press('Escape');
+  await expect(win.getByRole('menu')).toHaveCount(0);
+  // Esc returns the focus to the trigger (a keyboard ring): drop it for the shot.
+  await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  // A long workspace name truncates in the right group.
+  const ws = mock.state.workspaces.get(IDS.workspaces.main);
+  if (!ws) throw new Error('no main workspace');
+  ws.name = 'Очень длинное название пространства для проверки обрезки';
+  mock.dispatch({ event: { case: 'workspaceUpdate', value: { workspace: ws } } });
+  await expect(bar.getByTestId('titlebar-title')).toContainText('Очень длинное');
+  await checkpoint(shot, 'titlebar-long-name');
 });
 
 /** «+» in the room column header (owner, 28.09): «Создать комнату» / «Создать категорию». */
