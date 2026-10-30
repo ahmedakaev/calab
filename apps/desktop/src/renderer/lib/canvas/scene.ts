@@ -5,7 +5,7 @@ import {
   rotatePoint, rotatedRectHitsRect, type Point, type Rect,
 } from './geometry';
 import { isValidKey } from './fracIndex';
-import { INK_MAX_WIDTH, INK_MIN_WIDTH, fitInk, inkDistance, inkPoints } from './ink';
+import { INK_MAX_WIDTH, INK_MIN_WIDTH, fitErase, fitInk, inkDistance, inkErase, inkPoints, inSwath } from './ink';
 import { SpatialGrid } from './grid';
 import { RouteCache, connectorMidpoint, routeConnector } from './route';
 import { pointInShape } from './shapes';
@@ -269,7 +269,11 @@ export class Scene {
     // A rotated box is tested in its own frame: the point is turned back about the center.
     const q = o.rot ? rotatePoint(p, rectCenter(o), -o.rot) : p;
     // A stroke is picked by its line (its width counted in), never by the empty corners of its frame.
-    if (o.kind === 'ink') return inkDistance({ x: q.x - o.x, y: q.y - o.y }, o.points) <= o.strokeWidth / 2 + Math.max(tol, boxTol);
+    // An erased spot is empty: it picks nothing.
+    if (o.kind === 'ink') {
+      const l = { x: q.x - o.x, y: q.y - o.y };
+      return inkDistance(l, o.points) <= o.strokeWidth / 2 + Math.max(tol, boxTol) && !inSwath(l, o.erase);
+    }
     if (o.kind !== 'shape') return rectContainsPoint(o, q, boxTol);
     if (!pointInShape(o.shape, rectInflate(o, tol), q)) return false;
     if (area || o.fill !== 'none' || o.text !== '') return pointInShape(o.shape, o, q) || distNearOutline(o, q, tol);
@@ -584,8 +588,9 @@ export class Scene {
         if (!raw) return null;
         const w = num(m.get('w'), 1, 1, MAX_SIZE);
         const h = num(m.get('h'), 1, 1, MAX_SIZE);
+        const erase = inkErase(m.get('erase'));
         return {
-          kind, id, z, x, y, w, h, points: fitInk(raw, w, h),
+          kind, id, z, x, y, w, h, points: fitInk(raw, w, h), ...(erase ? { erase: fitErase(raw, erase, w, h) } : {}),
           stroke: color(m.get('stroke'), DEFAULTS.inkStroke), strokeWidth: num(m.get('strokeWidth'), DEFAULTS.inkWidth, INK_MIN_WIDTH, INK_MAX_WIDTH),
           ...(m.get('marker') === true ? { marker: true } : {}), ...this.extras(m, true),
         };

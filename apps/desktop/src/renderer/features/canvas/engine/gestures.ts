@@ -1,7 +1,7 @@
 import { pinchStep, type Camera } from '../../../lib/canvas/camera';
 import { duplicate } from '../../../lib/canvas/clipboard';
 import type { CanvasDoc } from '../../../lib/canvas/doc';
-import { INK_EPS_PX, INK_RAW_MAX, cutInk, inkFromStroke, tailRect } from '../../../lib/canvas/ink';
+import { INK_EPS_PX, INK_MAX_ERASE, INK_RAW_MAX, inkErase, inkFromStroke, inkPoints, inkSegDistance, swathToStored, swathsCover, tailRect } from '../../../lib/canvas/ink';
 import type { LiveLayer } from '../../../lib/canvas/live';
 import {
   ROT_STEP, angleToward, boundsOf, dist, mapRect, normRot, rectCenter, rectFromPoints, rectInflate, resizeRect, resizeRotated, rotatePoint, snapAngle, snapTo,
@@ -12,7 +12,7 @@ import type { Scene } from '../../../lib/canvas/scene';
 import { snapMove, snapResizePoint, type SnapOptions } from '../../../lib/canvas/snap';
 import {
   DEFAULTS, aabb, isBound, isBox, isConnector,
-  type BoxRec, type ConnectorRec, type Endpoint, type ObjectInit, type ObjectPatch, type ShapeRec, type StickyRec, type RouteKind, type ShapeKind,
+  type BoxRec, type ConnectorRec, type Endpoint, type ObjectPatch, type ShapeRec, type StickyRec, type RouteKind, type ShapeKind,
 } from '../../../lib/canvas/types';
 import type { InkPreview, OverlayState } from './overlay';
 import { edgeMid, QUICK_ROUTE } from './quick';
@@ -819,8 +819,8 @@ export class DrawGesture implements Gesture {
     const ly = this.pts[this.pts.length - 1] ?? 0;
     if (Math.hypot(w.x - lx, w.y - ly) < this.core.px(0.5)) return;
     this.pts.push(w.x, w.y);
-    // One more point reshapes the path from the midpoint before the previous point on: the last three points' hull.
-    this.core.previewInk(this.preview(), tailRect(this.pts, 3, this.style.width / 2 + this.core.px(2)));
+    // One more point reshapes the last two spline pieces (the one before it bends toward it): the last four points' hull.
+    this.core.previewInk(this.preview(), tailRect(this.pts, 4, this.style.width / 2 + this.core.px(2)));
   }
 
   end(w: Point): void {
@@ -853,81 +853,100 @@ export class DrawGesture implements Gesture {
 // ── eraser ──────────────────────────────────────────────────────────────────
 
 /**
- * Erases the part of freehand strokes under the pointer's disc (`Core.eraserPx`): a stroke it crosses is replaced by
- * the pieces left on either side (a stroke wholly covered goes; other kinds and locked strokes stay). Each cut lands at
- * once, so everyone sees the erasing; the whole drag is one undo step and Esc takes it back. Fast moves are sampled
- * every half radius, so a quick swipe leaves no bridges.
+ * The area eraser (ADR-0127 addendum 2026-10-29): the drag is a swath as wide as the ring the cursor shows, and each
+ * stroke under it keeps the part of the swath that touches it (`erase` on the stroke, cut out when drawn): exactly the
+ * covered area goes, a wide marker included, and the stroke stays one object. Shown at once through the live layer,
+ * written once on release (one undo step); a stroke the swaths cover entirely is deleted instead. Locked strokes and
+ * other kinds are left alone.
  */
 export class EraseGesture implements Gesture {
   readonly kind = 'erase';
   private last: Point;
   private began = false;
-  private readonly erased = new Set<string>();
+  /** Per stroke: the swaths this drag added, in its stored frame. */
+  private readonly added = new Map<string, number[]>();
+  private done = false;
 
   constructor(private readonly core: Core, from: Point) {
     this.last = from;
-    this.at(from);
+    this.swath(from, from);
   }
 
-  /** Ids deleted by this drag (tests). */
-  get removed(): ReadonlySet<string> {
-    return this.erased;
+  /** Strokes this drag has cut so far (tests). */
+  get touched(): ReadonlySet<string> {
+    return new Set(this.added.keys());
   }
 
-  private at(p: Point): void {
+  /** Adds the swath a → b (world) to every stroke it touches and shows the result. */
+  private swath(a: Point, b: Point): void {
     const r = this.core.px(this.core.eraserPx);
-    const hits: string[] = [];
-    const pieces: { init: ObjectInit }[] = [];
-    for (const o of this.core.scene.query({ x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r })) {
-      if (o.kind !== 'ink' || o.locked || this.erased.has(o.id)) continue;
+    const box = { x: Math.min(a.x, b.x) - r, y: Math.min(a.y, b.y) - r, w: Math.abs(b.x - a.x) + 2 * r, h: Math.abs(b.y - a.y) + 2 * r };
+    let changed = false;
+    for (const o of this.core.scene.query(box)) {
+      if (o.kind !== 'ink' || o.locked) continue;
       const center = rectCenter(o);
-      const q = o.rot ? rotatePoint(p, center, -o.rot) : p;
-      const rr = r + o.strokeWidth / 2;
-      const runs = cutInk(o.points, { x: q.x - o.x, y: q.y - o.y }, rr, Math.max(rr / 4, this.core.px(1)));
-      if (!runs) continue;
-      hits.push(o.id);
-      for (const run of runs) {
-        const world: number[] = [];
-        for (let i = 0; i + 1 < run.length; i += 2) {
-          const wp = { x: o.x + (run[i] ?? 0), y: o.y + (run[i + 1] ?? 0) };
-          const v = o.rot ? rotatePoint(wp, center, o.rot) : wp;
-          world.push(v.x, v.y);
-        }
-        // A tiny tolerance: drops only the points the cut inserted on straight segments, the drawn line stays as it was.
-        const shape = inkFromStroke(world, 0.01);
-        if (shape) pieces.push({ init: { kind: 'ink', ...shape, stroke: o.stroke, strokeWidth: o.strokeWidth, ...(o.marker ? { marker: true } : {}) } });
-      }
+      const la = o.rot ? rotatePoint(a, center, -o.rot) : a;
+      const lb = o.rot ? rotatePoint(b, center, -o.rot) : b;
+      const pa = { x: la.x - o.x, y: la.y - o.y };
+      const pb = { x: lb.x - o.x, y: lb.y - o.y };
+      if (inkSegDistance(pa, pb, o.points) > r + o.strokeWidth / 2) continue;
+      const m = this.core.doc.objects.get(o.id);
+      const raw = inkPoints(m?.get('points'));
+      if (!raw) continue;
+      const mine = this.added.get(o.id) ?? [];
+      const had = inkErase(m?.get('erase'))?.length ?? 0;
+      if ((had + mine.length) / 5 >= INK_MAX_ERASE) continue;
+      mine.push(...swathToStored(raw, o.w, o.h, pa.x, pa.y, pb.x, pb.y, r));
+      this.added.set(o.id, mine);
+      changed = true;
     }
-    if (hits.length === 0) return;
+    if (!changed) return;
     if (!this.began) {
       this.began = true;
       this.core.doc.beginGesture();
     }
-    for (const id of hits) this.erased.add(id);
-    // Connectors never glue to a stroke (`glueAt`); should one end point at it anyway, it stays where it was.
-    this.core.doc.remove(hits, (c, end) => this.core.scene.pointOf(c, end));
-    if (pieces.length) this.core.doc.createMany(pieces);
+    const patches = new Map<string, ObjectPatch>();
+    for (const [id, mine] of this.added) {
+      const had = inkErase(this.core.doc.objects.get(id)?.get('erase')) ?? [];
+      patches.set(id, { erase: [...had, ...mine] });
+    }
+    this.core.live.preview(patches);
   }
 
   move(w: Point): void {
-    const step = this.core.px(this.core.eraserPx) / 2;
-    const d = dist(this.last, w);
-    const n = Math.min(64, Math.floor(d / step));
-    for (let i = 1; i <= n; i++) this.at({ x: this.last.x + ((w.x - this.last.x) * i) / (n + 1), y: this.last.y + ((w.y - this.last.y) * i) / (n + 1) });
-    this.at(w);
+    if (this.done) return;
+    // A swath is a capsule: no sampling, one piece per third of the radius moved (fewer swaths for a slow drag).
+    if (dist(this.last, w) < this.core.px(this.core.eraserPx) / 3) return;
+    this.swath(this.last, w);
     this.last = w;
   }
 
   end(w: Point): void {
-    this.move(w);
-    if (this.began) this.core.doc.endGesture();
+    if (this.done) return;
+    if (dist(this.last, w) > 0) this.swath(this.last, w);
+    this.done = true;
+    if (!this.began) return;
+    this.core.live.commit();
+    // What the swaths took whole goes away (an invisible stroke would still be picked and counted).
+    const gone: string[] = [];
+    for (const id of this.added.keys()) {
+      const o = this.core.scene.get(id);
+      if (o?.kind === 'ink' && o.erase && swathsCover(o.points, o.strokeWidth, o.erase)) gone.push(id);
+    }
+    // Connectors never glue to a stroke (`glueAt`); should one end point at it anyway, it stays where it was.
+    if (gone.length) this.core.doc.remove(gone, (c, end) => this.core.scene.pointOf(c, end));
+    this.core.doc.endGesture();
   }
 
   cancel(): void {
-    if (this.began) this.core.doc.cancelGesture();
+    if (this.done) return;
+    this.done = true;
+    if (!this.began) return;
+    this.core.live.drop();
+    this.core.doc.cancelGesture();
   }
 
   settle(): void {
-    if (this.began) this.core.doc.endGesture();
+    this.end(this.last);
   }
 }

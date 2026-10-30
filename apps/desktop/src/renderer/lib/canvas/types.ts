@@ -128,6 +128,8 @@ export interface InkRec extends BaseRec {
   readonly strokeWidth: number;
   /** A highlighter: drawn semi-transparent (`MARKER_ALPHA`). */
   readonly marker?: boolean;
+  /** What the eraser took: swaths [x0, y0, x1, y1, r, …] relative to `x, y`, fitted like `points`; cut out when drawn. */
+  readonly erase?: readonly number[];
 }
 
 export type ObjectRec = StickyRec | TextRec | ShapeRec | ConnectorRec | ImageRec | InkRec;
@@ -201,7 +203,7 @@ export type ObjectInit = InitExtras & (
   | { kind: 'shape'; shape?: ShapeKind; x: number; y: number; w?: number; h?: number; fill?: string; stroke?: string; strokeWidth?: number; text?: string }
   | { kind: 'connector'; from: Endpoint; to: Endpoint; arrow?: Arrow; route?: RouteKind; stroke?: string; strokeWidth?: number; label?: string }
   | { kind: 'image'; x: number; y: number; w?: number; h?: number; src: string; stickerId?: string }
-  | { kind: 'ink'; x: number; y: number; w?: number; h?: number; points: readonly number[]; stroke?: string; strokeWidth?: number; marker?: boolean }
+  | { kind: 'ink'; x: number; y: number; w?: number; h?: number; points: readonly number[]; stroke?: string; strokeWidth?: number; marker?: boolean; erase?: readonly number[] }
 );
 
 /** Patch of plain (non-text) fields; applied only to the keys valid for the object's kind. */
@@ -237,4 +239,6 @@ export interface ObjectPatch {
   arrow?: Arrow;
   route?: RouteKind;
   label?: string;
+  /** A stroke's eraser swaths (same frame as its stored points); null removes them. */
+  erase?: readonly number[] | null;
 }

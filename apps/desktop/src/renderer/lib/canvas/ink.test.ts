@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import { describe, expect, it } from 'vitest';
 import { parse, serialize, toInits } from './clipboard';
 import { CanvasDoc } from './doc';
-import { INK_MAX_POINTS, cutInk, fitInk, inkDistance, inkFromStroke, isDot, simplify, tailRect, traceInk } from './ink';
+import { INK_MAX_POINTS, fitErase, fitInk, inkDistance, inkErase, inkFromStroke, inSwath, isDot, simplify, swathsCover, swathToStored, tailRect, traceInk } from './ink';
 import { Scene, visualBounds } from './scene';
 import { ids, makeDoc } from './testing';
 import { TextLayouter } from './textLayout';
@@ -15,24 +15,77 @@ const ink = (s: Scene, id: string): InkRec => {
   return o;
 };
 
-describe('cutInk', () => {
-  const line = [0, 0, 100, 0];
-  it('misses: null; a hit in the middle: the two runs outside the disc', () => {
-    expect(cutInk(line, { x: 50, y: 20 }, 10, 2)).toBeNull();
-    const runs = cutInk(line, { x: 50, y: 0 }, 10, 2) ?? [];
-    expect(runs).toHaveLength(2);
-    expect(runs[0]?.[0]).toBe(0);
-    // The cut follows the disc's edge to within one step.
-    expect(runs[0]?.[runs[0].length - 2]).toBeGreaterThanOrEqual(38);
-    expect(runs[0]?.[runs[0].length - 2]).toBeLessThan(40);
-    expect(runs[1]?.[0]).toBeGreaterThan(60);
-    expect(runs[1]?.[0]).toBeLessThanOrEqual(62);
-    expect(runs[1]?.[runs[1].length - 2]).toBe(100);
+describe('eraser swaths', () => {
+  it('inSwath: under a capsule or not', () => {
+    const e = [50, -20, 50, 20, 8];
+    expect(inSwath({ x: 50, y: 0 }, e)).toBe(true);
+    expect(inSwath({ x: 57, y: 0 }, e)).toBe(true);
+    expect(inSwath({ x: 59, y: 0 }, e)).toBe(false);
+    expect(inSwath({ x: 50, y: 0 }, undefined)).toBe(false);
   });
-  it('an end bitten off leaves one run; a stroke inside the disc or a dot leaves nothing', () => {
-    expect(cutInk(line, { x: 100, y: 0 }, 10, 2)).toHaveLength(1);
-    expect(cutInk([0, 0, 5, 0], { x: 2, y: 0 }, 10, 1)).toEqual([]);
-    expect(cutInk([3, 3, 3, 3], { x: 3, y: 4 }, 2, 1)).toEqual([]);
+  it('swathsCover: only when the whole width of the line is under them', () => {
+    expect(swathsCover([0, 0, 10, 0], 4, [-10, 0, 20, 0, 8])).toBe(true);
+    expect(swathsCover([0, 0, 100, 0], 4, [-10, 0, 20, 0, 8])).toBe(false);
+    // A swath narrower than the marker leaves its edges.
+    expect(swathsCover([0, 0, 10, 0], 32, [-10, 0, 20, 0, 8])).toBe(false);
+  });
+  it('fitErase stretches the swaths with the frame; swathToStored maps back', () => {
+    const raw = [0, 0, 100, 50];
+    const e = [50, 25, 60, 25, 4];
+    const fit = fitErase(raw, e, 200, 200);
+    expect(fit).toEqual([100, 100, 120, 100, 4 * Math.sqrt(8)]);
+    expect(fitErase(raw, e, 200, 200)).toBe(fit);
+    expect(swathToStored(raw, 200, 200, 100, 100, 120, 100, 4 * Math.sqrt(8))).toEqual(e);
+  });
+  it('inkErase accepts whole swaths with a positive radius only', () => {
+    expect(inkErase([0, 0, 1, 1, 2])).toEqual([0, 0, 1, 1, 2]);
+    expect(inkErase([0, 0, 1, 1])).toBeNull();
+    expect(inkErase([0, 0, 1, 1, 0])).toBeNull();
+    expect(inkErase([0, 0, 1, Number.NaN, 2])).toBeNull();
+  });
+});
+
+/** The path traceInk draws, sampled: every cubic piece at 16 steps. */
+function sampled(pts: readonly number[]): number[] {
+  const out: number[] = [];
+  let px = 0;
+  let py = 0;
+  traceInk({
+    moveTo: (x, y) => { px = x; py = y; out.push(x, y); },
+    lineTo: (x, y) => { px = x; py = y; out.push(x, y); },
+    bezierCurveTo: (c1x, c1y, c2x, c2y, x, y) => {
+      for (let k = 1; k <= 16; k++) {
+        const t = k / 16;
+        const u = 1 - t;
+        out.push(u * u * u * px + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x, u * u * u * py + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * y);
+      }
+      px = x;
+      py = y;
+    },
+  }, pts, 0, 0);
+  return out;
+}
+
+describe('a released stroke', () => {
+  it('draws where its preview drew: the stored path stays within a pixel of the live one, corners included', () => {
+    // A marker scribble: a zigzag with sharp turns, sampled every 2 px like coalesced pointer events.
+    const raw: number[] = [];
+    for (let k = 0; k < 12; k++) {
+      const x0 = k * 30;
+      for (let s = 0; s <= 60; s++) raw.push(x0 + s * 0.5, k % 2 ? 120 - s * 2 : s * 2);
+    }
+    const shape = inkFromStroke(raw, 0.75);
+    if (!shape) throw new Error('no stroke');
+    const live = sampled(raw);
+    const stored = sampled(fitInk(shape.points, shape.w, shape.h)).map((v, i) => v + (i % 2 ? shape.y : shape.x));
+    let worst = 0;
+    for (let i = 0; i + 1 < stored.length; i += 2) {
+      worst = Math.max(worst, inkDistance({ x: stored[i] ?? 0, y: stored[i + 1] ?? 0 }, live));
+    }
+    for (let i = 0; i + 1 < live.length; i += 2) {
+      worst = Math.max(worst, inkDistance({ x: live[i] ?? 0, y: live[i + 1] ?? 0 }, stored));
+    }
+    expect(worst).toBeLessThan(1.25);
   });
 });
 
@@ -89,14 +142,23 @@ describe('stroke geometry', () => {
     expect(inkDistance({ x: 5, y: 3 }, [0, 0, 10, 0])).toBe(3);
     expect(inkDistance({ x: 3, y: 4 }, [0, 0])).toBe(5);
   });
-  it('traceInk: quadratic pieces through the midpoints, a straight end', () => {
-    const calls: string[] = [];
-    traceInk({
-      moveTo: (x, y) => calls.push(`M${x},${y}`),
-      lineTo: (x, y) => calls.push(`L${x},${y}`),
-      quadraticCurveTo: (cx, cy, x, y) => calls.push(`Q${cx},${cy},${x},${y}`),
-    }, [0, 0, 10, 0, 10, 10, 20, 10], 100, 0);
-    expect(calls).toEqual(['M100,0', 'Q110,0,110,5', 'Q110,10,115,10', 'L120,10']);
+  it('traceInk: cubic pieces through every point (the stored corners stay), a line for two points', () => {
+    const ends: number[][] = [];
+    const sink = {
+      moveTo: (x: number, y: number) => ends.push([x, y]),
+      lineTo: (x: number, y: number) => ends.push([x, y]),
+      bezierCurveTo: (_a: number, _b: number, _c: number, _d: number, x: number, y: number) => ends.push([x, y]),
+    };
+    traceInk(sink, [0, 0, 10, 0, 10, 10, 20, 10], 100, 0);
+    expect(ends).toEqual([[100, 0], [110, 0], [110, 10], [120, 10]]);
+    ends.length = 0;
+    traceInk(sink, [0, 0, 10, 0], 0, 0);
+    expect(ends).toEqual([[0, 0], [10, 0]]);
+  });
+  it('traceInk: a straight run stays straight (controls on the line)', () => {
+    const ctrl: number[] = [];
+    traceInk({ moveTo: () => {}, lineTo: () => {}, bezierCurveTo: (_a, b, _c, d) => ctrl.push(b, d) }, [0, 0, 10, 0, 50, 0, 60, 0], 0, 0);
+    expect(ctrl.every((v) => Math.abs(v) < 1e-9)).toBe(true);
   });
   it('tailRect covers the last points with the pad', () => {
     expect(tailRect([0, 0, 100, 100, 110, 100, 120, 90], 3, 2)).toEqual({ x: 98, y: 88, w: 24, h: 14 });

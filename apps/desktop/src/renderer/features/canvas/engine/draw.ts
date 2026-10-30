@@ -4,7 +4,8 @@ import { contentRect, STICKY_RADIUS, traceRounded, traceShape } from '../../../l
 import { F_STRIKE, type Fmt } from '../../../lib/canvas/richText';
 import { LABEL_SIZE, boxFontSize, fontOf, type TextLayout, type TextLayouter } from '../../../lib/canvas/textLayout';
 import { MARKER_ALPHA, isDot, traceInk } from '../../../lib/canvas/ink';
-import { aabb, type ConnectorRec, type ImageRec, type InkRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
+import { visualBounds } from '../../../lib/canvas/scene';
+import { type ConnectorRec, type ImageRec, type InkRec, type ObjectRec, type TextBoxRec } from '../../../lib/canvas/types';
 import type { ImageSource } from './images';
 import { readableInk, resolveColor, resolveFill, resolveSticky, type CanvasPalette } from './palette';
 import type { VoteBadge } from '../../../lib/canvas/votes';
@@ -34,6 +35,8 @@ export interface DrawEnv {
   votes?: { badge(id: string): VoteBadge | null } | undefined;
   /** Decoded pictures (ADR-0127, 2026-10-23); absent: every picture is its plaque. */
   images?: ImageSource | undefined;
+  /** The world region being painted (set by `drawObjects`): an erased stroke composes only that much of itself. */
+  region?: Rect | undefined;
 }
 
 const font = (env: DrawEnv, size: number): string => `${size}px ${env.palette.fontFamily}`;
@@ -133,7 +136,108 @@ function drawBody(ctx: Ctx2D, o: ObjectRec, env: DrawEnv): void {
 
 /** A freehand stroke: the smoothed line with round caps and joins; a marker semi-transparent in one pass (no darker overlaps). */
 function drawInk(ctx: Ctx2D, o: InkRec, env: DrawEnv): void {
-  strokeInk(ctx, o.points, o.x, o.y, resolveColor(env.palette, o.stroke) ?? env.palette.ink, Math.max(o.strokeWidth, 1 / env.scale), o.marker === true);
+  const color = resolveColor(env.palette, o.stroke) ?? env.palette.ink;
+  const width = Math.max(o.strokeWidth, 1 / env.scale);
+  if (!o.erase || !strokeErased(ctx, o, color, width, env.region)) strokeInk(ctx, o.points, o.x, o.y, color, width, o.marker === true);
+}
+
+let scratch: { canvas: HTMLCanvasElement | OffscreenCanvas; ctx: Ctx2D } | null = null;
+
+/** A shared offscreen canvas of at least `w × h` device px (grown, never shrunk), cleared; null where there is none. */
+function scratchOf(w: number, h: number): Ctx2D | null {
+  if (!scratch || scratch.canvas.width < w || scratch.canvas.height < h) {
+    const cw = Math.max(w, scratch?.canvas.width ?? 0);
+    const ch = Math.max(h, scratch?.canvas.height ?? 0);
+    const c = makeTileCanvas(1);
+    if (!c) return null;
+    c.width = cw;
+    c.height = ch;
+    const x = c.getContext('2d');
+    if (!x) return null;
+    scratch = { canvas: c, ctx: x };
+  }
+  const x = scratch.ctx;
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  x.globalCompositeOperation = 'source-over';
+  x.globalAlpha = 1;
+  x.clearRect(0, 0, w, h);
+  return x;
+}
+
+/**
+ * A stroke with eraser swaths: painted opaque into the scratch canvas (only the device box of the stroke inside the
+ * painted region), the swaths punched out with `destination-out`, the result laid on `ctx` in one pass (a marker's
+ * transparency applied once). False when it cannot (no transform or scratch: a test double), so the caller paints
+ * the stroke whole.
+ */
+function strokeErased(ctx: Ctx2D, o: InkRec, color: string, width: number, region: Rect | undefined): boolean {
+  const erase = o.erase;
+  if (!erase || typeof ctx.getTransform !== 'function') return false;
+  const t = ctx.getTransform();
+  const pad = width / 2 + 1;
+  let box = { x: o.x - pad, y: o.y - pad, w: o.w + 2 * pad, h: o.h + 2 * pad };
+  // The region is in world units; the context may be turned (a rotated stroke), so only an unrotated one clips by it.
+  if (region && !o.rot) {
+    const x0 = Math.max(box.x, region.x);
+    const y0 = Math.max(box.y, region.y);
+    const x1 = Math.min(box.x + box.w, region.x + region.w);
+    const y1 = Math.min(box.y + box.h, region.y + region.h);
+    if (x1 <= x0 || y1 <= y0) return true;
+    box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  let dx0 = Infinity;
+  let dy0 = Infinity;
+  let dx1 = -Infinity;
+  let dy1 = -Infinity;
+  for (const [x, y] of [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]] as const) {
+    const px = t.a * x + t.c * y + t.e;
+    const py = t.b * x + t.d * y + t.f;
+    dx0 = Math.min(dx0, px);
+    dy0 = Math.min(dy0, py);
+    dx1 = Math.max(dx1, px);
+    dy1 = Math.max(dy1, py);
+  }
+  dx0 = Math.max(0, Math.floor(dx0));
+  dy0 = Math.max(0, Math.floor(dy0));
+  dx1 = Math.min(ctx.canvas.width, Math.ceil(dx1));
+  dy1 = Math.min(ctx.canvas.height, Math.ceil(dy1));
+  const w = dx1 - dx0;
+  const h = dy1 - dy0;
+  if (w <= 0 || h <= 0) return true;
+  const s = scratchOf(w, h);
+  if (!s || !scratch) return false;
+  s.setTransform(t.a, t.b, t.c, t.d, t.e - dx0, t.f - dy0);
+  strokeInk(s, o.points, o.x, o.y, color, width, false);
+  s.globalCompositeOperation = 'destination-out';
+  s.fillStyle = '#000';
+  s.strokeStyle = '#000';
+  s.lineCap = 'round';
+  for (let i = 0; i + 4 < erase.length; i += 5) {
+    const ax = o.x + (erase[i] ?? 0);
+    const ay = o.y + (erase[i + 1] ?? 0);
+    const bx = o.x + (erase[i + 2] ?? 0);
+    const by = o.y + (erase[i + 3] ?? 0);
+    const r = erase[i + 4] ?? 0;
+    s.beginPath();
+    if (ax === bx && ay === by) {
+      // A zero-length line has no caps in every engine: a click is a disc.
+      s.arc(ax, ay, r, 0, Math.PI * 2);
+      s.fill();
+    } else {
+      s.lineWidth = 2 * r;
+      s.moveTo(ax, ay);
+      s.lineTo(bx, by);
+      s.stroke();
+    }
+  }
+  s.globalCompositeOperation = 'source-over';
+  s.lineCap = 'butt';
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (o.marker) ctx.globalAlpha *= MARKER_ALPHA;
+  ctx.drawImage(scratch.canvas, 0, 0, w, h, dx0, dy0, w, h);
+  ctx.restore();
+  return true;
 }
 
 /** Paints a stroke's points (relative to `ox, oy`); shared by the stored strokes and the live preview. */
@@ -371,5 +475,8 @@ function drawArrowHead(ctx: Ctx2D, x: number, y: number, d: { x: number; y: numb
 
 /** Draws `objects` (already z-sorted) that touch `region`. */
 export function drawObjects(ctx: Ctx2D, objects: readonly ObjectRec[], region: Rect, env: DrawEnv): void {
-  for (const o of objects) if (o.kind === 'connector' || rectsIntersect(aabb(o), region)) drawObject(ctx, o, env);
+  const e = env.region === region ? env : { ...env, region };
+  // By what is painted (a wide marker's or a thick outline's edge is outside the frame), or a repaint beside the line
+  // would wipe that edge with the background.
+  for (const o of objects) if (o.kind === 'connector' || rectsIntersect(visualBounds(o), region)) drawObject(ctx, o, e);
 }

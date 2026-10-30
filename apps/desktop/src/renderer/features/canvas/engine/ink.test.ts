@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Rect } from '../../../lib/canvas/geometry';
+import { LiveLayer } from '../../../lib/canvas/live';
 import { Scene } from '../../../lib/canvas/scene';
 import { makeDoc } from '../../../lib/canvas/testing';
 import { TextLayouter } from '../../../lib/canvas/textLayout';
@@ -19,6 +20,7 @@ function core(style: InkStyle = { color: 'blue', width: 4, marker: false }) {
   const refused = vi.fn();
   const c = {
     doc, scene, inkStyle: style, eraserPx: 8,
+    live: new LiveLayer(doc, scene, { setTimer: () => 0, clearTimer: () => {} }),
     px: (n: number) => n,
     previewInk: (ink: InkPreview | null, dirty: Rect | null) => previews.push({ ink: ink ? { ...ink, points: [...ink.points] } : null, dirty }),
     refuseCreate: refused,
@@ -39,8 +41,8 @@ describe('DrawGesture', () => {
     const g = draw(t, [[100, 100], [110, 100], [120, 105], [130, 120]]);
     expect(t.doc.count).toBe(0);
     expect(t.previews[0]?.dirty).toBeNull();
-    // Each move repaints the last three points' box plus half the width and a 2 px margin.
-    expect(t.previews[t.previews.length - 1]?.dirty).toEqual({ x: 106, y: 96, w: 28, h: 28 });
+    // Each move repaints the last four points' box plus half the width and a 2 px margin.
+    expect(t.previews[t.previews.length - 1]?.dirty).toEqual({ x: 96, y: 96, w: 38, h: 28 });
     g.end({ x: 140, y: 120 });
     expect(t.previews[t.previews.length - 1]?.ink).toBeNull();
     expect(t.doc.count).toBe(1);
@@ -91,46 +93,62 @@ describe('EraseGesture', () => {
     return { t, a: a ?? '', b: b ?? '', locked: locked ?? '', sticky: sticky ?? '' };
   };
 
-  it('cuts the part under its disc: a line crossed in the middle leaves its two ends', () => {
+  it('takes exactly the swath under its ring: the line stays one object, picked beside the hole, not in it', () => {
     const { t, a } = setup();
     const g = new EraseGesture(t.core, { x: 50, y: -20 });
+    g.move({ x: 50, y: 20 });
+    // Shown at once (the live layer), written on release. The press itself was out of reach (20 > 8 + 2).
+    expect(t.scene.get(a)).toMatchObject({ erase: [50, -20, 50, 20, 8] });
+    expect(t.doc.snapshot(a)?.erase).toBeUndefined();
     g.end({ x: 50, y: 20 });
-    expect(g.removed.has(a)).toBe(true);
-    const left = t.scene.query({ x: -1, y: -5, w: 102, h: 10 }).filter((o) => o.kind === 'ink');
-    expect(left).toHaveLength(2);
-    const spans = left.map((o) => [o.x, o.x + o.w]).sort((p, q) => (p[0] ?? 0) - (q[0] ?? 0));
-    // Radius 8 + half the width 2: the cut is 50 ± 10.
-    expect(spans[0]?.[0]).toBeCloseTo(0);
-    expect(spans[0]?.[1]).toBeGreaterThan(38);
-    expect(spans[0]?.[1]).toBeLessThan(41);
-    expect(spans[1]?.[0]).toBeGreaterThan(59);
-    expect(spans[1]?.[1]).toBeCloseTo(100);
+    // Stored in the points' own frame: a flat line sits half a unit into its 1-unit-high frame.
+    expect(t.doc.snapshot(a)?.erase).toEqual([50, -20.5, 50, 19.5, 8]);
+    expect(t.scene.query({ x: -1, y: -5, w: 102, h: 10 }).filter((o) => o.kind === 'ink')).toHaveLength(1);
+    expect(t.scene.hit({ x: 50, y: 0 }, 0)?.id).toBeUndefined();
+    expect(t.scene.hit({ x: 40, y: 0 }, 0)?.id).toBe(a);
   });
-  it('removes the strokes it passes over, not other kinds nor locked strokes, in one undo step', () => {
+  it('a stroke the swaths cover entirely is deleted; locked strokes and other kinds stay; one undo step', () => {
     const { t, a, b, locked, sticky } = setup();
+    const [short] = t.doc.createMany([{ init: { kind: 'ink', x: 0, y: 300, w: 10, h: 1, points: [0, 0, 10, 0], strokeWidth: 4 } }]);
+    t.doc.checkpoint();
     const steps = t.doc.undo.undoStack.length;
-    // A fast swipe down across all three lines and on over the sticky.
+    // A swipe down across all three lines, along the short one and on over the sticky.
     const g = new EraseGesture(t.core, { x: 50, y: -40 });
     g.move({ x: 50, y: 260 });
+    g.move({ x: -10, y: 300 });
+    g.move({ x: 20, y: 300 });
     g.move({ x: 350, y: 50 });
     g.end({ x: 350, y: 60 });
-    // The originals, and the pieces later samples of the same drag cut again.
-    expect(g.removed.has(a) && g.removed.has(b)).toBe(true);
-    expect(g.removed.has(locked) || g.removed.has(sticky)).toBe(false);
-    expect(t.scene.has(locked)).toBe(true);
-    expect(t.scene.has(sticky)).toBe(true);
+    expect(g.touched.has(a) && g.touched.has(b) && g.touched.has(short ?? '')).toBe(true);
+    expect(g.touched.has(locked) || g.touched.has(sticky)).toBe(false);
+    expect(t.scene.has(short ?? '')).toBe(false);
+    expect(t.scene.has(a) && t.scene.has(b) && t.scene.has(locked) && t.scene.has(sticky)).toBe(true);
+    expect(t.doc.snapshot(locked)?.erase).toBeUndefined();
     expect(t.doc.undo.undoStack.length).toBe(steps + 1);
     t.doc.undo.undo();
-    expect(t.scene.has(a) && t.scene.has(b)).toBe(true);
+    expect(t.scene.has(short ?? '')).toBe(true);
+    expect(t.doc.snapshot(a)?.erase).toBeUndefined();
   });
   it('misses a line farther than its radius plus half the width; Esc gives everything back', () => {
     const { t, a } = setup();
     const g = new EraseGesture(t.core, { x: 50, y: -11 });
-    expect(g.removed.size).toBe(0);
-    g.move({ x: 50, y: -9 });
-    expect(g.removed.has(a)).toBe(true);
+    expect(g.touched.size).toBe(0);
+    g.move({ x: 50, y: -8 });
+    expect(g.touched.has(a)).toBe(true);
     g.cancel();
-    expect(t.scene.has(a)).toBe(true);
+    expect(t.scene.get(a)).not.toHaveProperty('erase');
+    expect(t.doc.snapshot(a)?.erase).toBeUndefined();
+  });
+  it('a resized stroke keeps its hole where it was cut', () => {
+    const { t, a } = setup();
+    const g = new EraseGesture(t.core, { x: 50, y: -20 });
+    g.end({ x: 50, y: 20 });
+    t.doc.patch(a, { w: 200 });
+    const o = t.scene.get(a);
+    if (o?.kind !== 'ink') throw new Error('no stroke');
+    // Stretched twice along x: the swath moved to the middle of the new length.
+    expect(o.erase?.[0]).toBeCloseTo(100);
+    expect(t.scene.hit({ x: 100, y: 0 }, 0)?.id).toBeUndefined();
   });
   it('a drag that erases nothing leaves no undo step', () => {
     const { t } = setup();

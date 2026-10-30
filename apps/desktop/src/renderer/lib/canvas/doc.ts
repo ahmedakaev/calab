@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import { clamp, normRot, type Point } from './geometry';
 import { after, before, between, isValidKey } from './fracIndex';
 import { fmtFromDelta, fmtToDelta, formatChanges, rawText, type Fmt } from './richText';
-import { INK_MAX_WIDTH, INK_MIN_WIDTH, inkPoints } from './ink';
+import { INK_MAX_WIDTH, INK_MIN_WIDTH, inkErase, inkPoints } from './ink';
 import { fontFields, isFontToken } from './textLayout';
 import {
   DEFAULTS, MAX_COORD, MAX_OBJECTS, MAX_SIZE, MAX_STATE, MAX_TEXT, SCHEMA_VERSION, SHAPE_KINDS, isImageSrc, splitFill,
@@ -133,7 +133,7 @@ const FIELD_KEYS: Record<ObjectKind, readonly string[]> = {
   shape: ['shape', 'x', 'y', 'w', 'h', 'fill', 'soft', 'stroke', 'strokeWidth', 'fontSize', 'fontPx', 'rot', 'locked', 'group'],
   connector: ['from', 'to', 'arrow', 'route', 'stroke', 'strokeWidth', 'label', 'locked', 'group'],
   image: ['x', 'y', 'w', 'h', 'src', 'stickerId', 'rot', 'locked', 'group'],
-  ink: ['x', 'y', 'w', 'h', 'points', 'stroke', 'strokeWidth', 'marker', 'rot', 'locked', 'group'],
+  ink: ['x', 'y', 'w', 'h', 'points', 'stroke', 'strokeWidth', 'marker', 'erase', 'rot', 'locked', 'group'],
 };
 
 const PATCH_KEYS: Record<ObjectKind, readonly (keyof ObjectPatch)[]> = {
@@ -143,8 +143,8 @@ const PATCH_KEYS: Record<ObjectKind, readonly (keyof ObjectPatch)[]> = {
   connector: ['from', 'to', 'arrow', 'route', 'stroke', 'strokeWidth', 'label', 'locked', 'group'],
   // The picture itself (`src`) is fixed at creation.
   image: ['x', 'y', 'w', 'h', 'rot', 'locked', 'group'],
-  // The stroke itself (`points`, `marker`) is fixed at creation; a resize stretches it through `w` / `h`.
-  ink: ['x', 'y', 'w', 'h', 'stroke', 'strokeWidth', 'rot', 'locked', 'group'],
+  // The stroke itself (`points`, `marker`) is fixed at creation; a resize stretches it through `w` / `h`; the eraser adds swaths.
+  ink: ['x', 'y', 'w', 'h', 'stroke', 'strokeWidth', 'erase', 'rot', 'locked', 'group'],
 };
 
 /** A group id is a short token (newId's alphabet); anything else is ignored. */
@@ -228,6 +228,7 @@ function initFields(init: ObjectInit): { fields: Record<string, unknown>; text: 
           points: [...(inkPoints(init.points) ?? [0, 0, 0, 0])],
           stroke: color(init.stroke, DEFAULTS.inkStroke), strokeWidth: num(init.strokeWidth, DEFAULTS.inkWidth, INK_MIN_WIDTH, INK_MAX_WIDTH),
           ...(init.marker === true ? { marker: true } : {}),
+          ...(inkErase(init.erase) ? { erase: [...(init.erase ?? [])] } : {}),
         },
         text: null,
       };
@@ -283,6 +284,7 @@ function patchValue(kind: ObjectKind, key: keyof ObjectPatch, v: unknown): unkno
     case 'arrow': return typeof v === 'string' && ARROW_SET.has(v) ? v : undefined;
     case 'route': return typeof v === 'string' && ROUTE_SET.has(v) ? v : undefined;
     case 'label': return typeof v === 'string' ? clampText(v) : undefined;
+    case 'erase': return v === null ? REMOVE : inkErase(v) ? [...(v as number[])] : undefined;
   }
 }
 
@@ -501,7 +503,7 @@ export class CanvasDoc {
     let bytes = 0;
     for (const p of prepared) {
       // A stroke's points: ~4 bytes each number (a varint or a float32).
-      const est = CanvasDoc.OBJECT_BYTES + (p.text?.length ?? 0) * 3 + (p.item.init.kind === 'ink' ? p.item.init.points.length * 4 : 0);
+      const est = CanvasDoc.OBJECT_BYTES + (p.text?.length ?? 0) * 3 + (p.item.init.kind === 'ink' ? (p.item.init.points.length + (p.item.init.erase?.length ?? 0)) * 4 : 0);
       if (cur.length > 0 && bytes + est > CanvasDoc.CHUNK_BYTES) {
         chunks.push(cur);
         cur = [];

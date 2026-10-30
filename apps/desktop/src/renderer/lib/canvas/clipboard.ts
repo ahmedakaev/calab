@@ -1,5 +1,5 @@
 import { CanvasDoc, clampText, color, endpoint, isGroupId, isKind, isShapeKind, newId, num, type PlainObject } from './doc';
-import { INK_MAX_WIDTH, INK_MIN_WIDTH, inkPoints } from './ink';
+import { INK_MAX_WIDTH, INK_MIN_WIDTH, inkErase, inkPoints } from './ink';
 import { fmtFromDelta, type DeltaOp } from './richText';
 import type { Scene } from './scene';
 import { isFontToken } from './textLayout';
@@ -160,7 +160,8 @@ export function toInits(payload: ClipboardPayload, dx: number, dy: number, makeI
           init: {
             kind: 'ink', x, y, w: num(o.w, 1, 1), h: num(o.h, 1, 1), points: pts,
             stroke: color(o.stroke, DEFAULTS.inkStroke), strokeWidth: num(o.strokeWidth, DEFAULTS.inkWidth, INK_MIN_WIDTH, INK_MAX_WIDTH),
-            ...(o.marker === true ? { marker: true } : {}), ...extras,
+            ...(o.marker === true ? { marker: true } : {}),
+            ...(inkErase(o.erase) ? { erase: o.erase as number[] } : {}), ...extras,
           },
         });
         break;
